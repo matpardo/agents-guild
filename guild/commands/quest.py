@@ -1,0 +1,41 @@
+from guild import config, db, events, identity
+from guild.errors import GuildError
+
+
+def add(ctx, slug, title, epic, tasks_csv, no_epic):
+    if no_epic and (epic is not None or tasks_csv is not None):
+        raise GuildError("--no-epic cannot be combined with --epic or --tasks", 1)
+    if not no_epic and (epic is None or tasks_csv is None):
+        raise GuildError("epic quests require --epic and --tasks, or pass --no-epic", 1)
+    existing = ctx.conn.execute("SELECT slug FROM quests WHERE slug = ?", (slug,)).fetchone()
+    if existing is not None:
+        raise GuildError("quest '{}' already exists".format(slug), 1)
+    binding = identity.require_binding(ctx.conn, ctx.session_id)
+    project = config.require_project(ctx.cwd, ctx.projects_dir)
+    tasks = []
+    if not no_epic:
+        for tid in tasks_csv.split(","):
+            tid = tid.strip()
+            if not tid:
+                continue
+            tasks.append({"tid": tid, "title": tid})
+    with db.writing(ctx.conn):
+        events.record(
+            ctx.conn,
+            ctx.now,
+            ctx.origin,
+            binding["party"],
+            ctx.session_id,
+            project,
+            "quest.added",
+            "local",
+            {
+                "slug": slug,
+                "project": project,
+                "party": binding["party"],
+                "epic": epic,
+                "title": title,
+                "tasks": tasks,
+            },
+        )
+    return "quest '{}' added".format(slug)
