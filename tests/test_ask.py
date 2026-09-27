@@ -34,8 +34,9 @@ class AskTests(GuildTestCase):
         self.assertEqual(code, 0)
         self.assertIn("ask #1 created", out)
         code, out, err = self.run_cli(["asks"], None, None)
-        self.assertIn("#1 [alpha] ready to merge?", out)
-        self.assertIn("options: yes, no", out)
+        self.assertIn("#1 alpha · ready to merge?", out)
+        self.assertIn("options: yes | no", out)
+        self.assertIn('guild answer 1 "..."', out)
 
     def test_answer_by_human(self):
         self.run_cli(
@@ -44,7 +45,7 @@ class AskTests(GuildTestCase):
         code, out, err = self.run_cli(["answer", "1", "yes, go ahead"], None, None)
         self.assertEqual(code, 0)
         code, out, err = self.run_cli(["asks"], None, None)
-        self.assertEqual(out, "")
+        self.assertIn("NEEDS YOU · nothing", out)
 
     def test_cannot_answer_twice(self):
         self.run_cli(
@@ -62,7 +63,7 @@ class AskTests(GuildTestCase):
         code, out, err = self.run_cli(["dismiss", "1"], None, None)
         self.assertEqual(code, 0)
         code, out, err = self.run_cli(["asks"], None, None)
-        self.assertEqual(out, "")
+        self.assertIn("NEEDS YOU · nothing", out)
 
     def test_unknown_ask_id(self):
         code, out, err = self.run_cli(["answer", "42", "x"], None, None)

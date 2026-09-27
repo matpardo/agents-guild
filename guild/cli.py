@@ -1,5 +1,7 @@
 import argparse
 import json
+import os
+import shutil
 import sys
 from pathlib import Path
 
@@ -12,6 +14,14 @@ from guild.errors import GuildError
 def _print(text):
     if text:
         sys.stdout.write(text + "\n")
+
+
+def _stdout_is_colored():
+    return sys.stdout.isatty() and "NO_COLOR" not in os.environ
+
+
+def _terminal_width():
+    return shutil.get_terminal_size().columns
 
 
 def _print_lines(lines):
@@ -129,9 +139,9 @@ def _handle_dismiss(ctx, args):
 
 
 def _handle_asks(ctx, args):
-    from guild.commands import ask as ask_commands
+    from guild.commands import board as board_commands
 
-    _print_lines(ask_commands.list_open(ctx))
+    _print_lines(board_commands.render_asks(ctx, None, _stdout_is_colored(), _terminal_width(), True))
     return 0
 
 
@@ -183,7 +193,7 @@ def _handle_claims(ctx, args):
 def _handle_board(ctx, args):
     from guild.commands import board as board_commands
 
-    _print_lines(board_commands.render_board(ctx, args.party))
+    _print_lines(board_commands.render_board(ctx, args.party, _stdout_is_colored(), _terminal_width()))
     return 0
 
 

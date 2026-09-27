@@ -45,7 +45,7 @@ class PrTrackTests(GuildTestCase):
         )
         self.assertEqual(code, 0)
         code, out, err = self.run_cli(["board"], "sess-1", self.repo_dir)
-        self.assertIn("acme/app#1 [draft]", out)
+        self.assertIn("app#1  draft", out)
         self.assertIn("waits: review", out)
 
     def test_track_rejects_duplicate(self):
@@ -101,7 +101,7 @@ class PrSetTests(GuildTestCase):
         )
         self.assertEqual(code, 0)
         code, out, err = self.run_cli(["board"], "sess-1", self.repo_dir)
-        self.assertIn("[ready]", out)
+        self.assertIn("app#1  ready", out)
 
     def test_set_unknown_pr_fails(self):
         code, out, err = self.run_cli(

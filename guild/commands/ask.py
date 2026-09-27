@@ -1,5 +1,3 @@
-import json
-
 from guild import config, db, events, identity, refs
 from guild.ids import next_id
 from guild.errors import GuildError
@@ -103,19 +101,3 @@ def dismiss(ctx, ask_id):
             {"id": ask_id},
         )
     return "ask #{} dismissed".format(ask_id)
-
-
-def list_open(ctx):
-    rows = ctx.conn.execute(
-        "SELECT * FROM asks WHERE state = 'open' ORDER BY created_at ASC"
-    ).fetchall()
-    lines = []
-    for row in rows:
-        ref_list = json.loads(row["refs"])
-        option_list = json.loads(row["options"])
-        line = "#{} [{}] {} — {}".format(row["id"], row["party"], row["question"], row["context"])
-        line += " refs: {}".format(", ".join(ref_list))
-        if option_list:
-            line += " options: {}".format(", ".join(option_list))
-        lines.append(line)
-    return lines

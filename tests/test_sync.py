@@ -29,7 +29,7 @@ class SyncTests(GuildTestCase):
         code, out, err = self.run_cli(["sync", "--source", "gh"], "sess-1", self.repo_dir)
         self.assertEqual(code, 0)
         code, out, err = self.run_cli(["board"], "sess-1", self.repo_dir)
-        self.assertIn("[merged] checks:✗1 ✓1", out)
+        self.assertIn("app#1  merged  ✗1 ✓1", out)
 
     def test_sync_closes_notice_when_until_met(self):
         self.run_cli(

@@ -18,6 +18,8 @@ def _targeting_lines(rows, project):
 
 
 def render_brief(ctx):
+    if ctx.session_id is None:
+        return ["brief is the per-session view for agents; from a terminal use `guild board` and `guild asks`"]
     binding = identity.resolve_binding(ctx.conn, ctx.session_id)
     active = notice_commands.active_notices(ctx.conn, ctx.now)
     if binding is None:

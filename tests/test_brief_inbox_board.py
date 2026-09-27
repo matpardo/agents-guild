@@ -7,6 +7,13 @@ class BriefTests(GuildTestCase):
         self.assertEqual(code, 0)
         self.assertIn("session not bound", out)
 
+    def test_human_terminal_points_to_board(self):
+        code, out, err = self.run_cli(["brief"], None, None)
+        self.assertEqual(code, 0)
+        self.assertNotIn("session not bound", out)
+        self.assertIn("guild board", out)
+        self.assertIn("guild asks", out)
+
     def test_bound_shows_quest_and_prs(self):
         repo_dir = self.register_project("acme", ["acme/app"])
         self.run_cli(["party", "start", "alpha"], "sess-1", repo_dir)
@@ -72,8 +79,54 @@ class BoardTests(GuildTestCase):
         self.run_cli(["party", "start", "alpha"], "sess-1", repo_dir)
         self.run_cli(["party", "start", "beta"], "sess-2", repo_dir)
         code, out, err = self.run_cli(["board", "--party", "alpha"], None, None)
-        self.assertIn("party: alpha", out)
-        self.assertNotIn("party: beta", out)
+        self.assertIn("━━ alpha", out)
+        self.assertNotIn("━━ beta", out)
+
+    def test_board_puts_open_asks_first_with_answer_hint(self):
+        repo_dir = self.register_project("acme", ["acme/app"])
+        self.run_cli(["party", "start", "alpha"], "sess-1", repo_dir)
+        self.run_cli(["quest", "add", "demo", "--title", "Demo", "--no-epic"], "sess-1", repo_dir)
+        self.run_cli(["task", "add", "demo/T01", "--title", "First"], "sess-1", repo_dir)
+        self.run_cli(
+            ["ask", "Ship it?", "--context", "tests green", "--ref", "task:demo/T01",
+             "--option", "yes", "--option", "no"],
+            "sess-1", repo_dir,
+        )
+        code, out, err = self.run_cli(["board"], None, None)
+        self.assertEqual(code, 0)
+        self.assertLess(out.index("NEEDS YOU · 1 open ask"), out.index("━━ alpha"))
+        self.assertIn("#1 alpha · Ship it?  [yes | no]", out)
+        self.assertNotIn("tests green", out)
+        self.assertIn("guild asks", out)
+
+    def test_board_nests_pr_under_its_task(self):
+        repo_dir = self.register_project("acme", ["acme/app"])
+        self.run_cli(["party", "start", "alpha"], "sess-1", repo_dir)
+        self.run_cli(["quest", "add", "demo", "--title", "Demo", "--no-epic"], "sess-1", repo_dir)
+        self.run_cli(["task", "add", "demo/T01", "--title", "First"], "sess-1", repo_dir)
+        self.run_cli(["task", "start", "demo/T01", "--summary", "coding"], "sess-1", repo_dir)
+        self.write_gh_fixture(
+            "view_acme-app_1",
+            {"state": "OPEN", "isDraft": True, "headRefName": "feature/x", "title": "t"},
+        )
+        self.run_cli(
+            ["pr", "track", "acme/app#1", "--task", "demo/T01", "--what", "Adds X", "--waits", "review"],
+            "sess-1", repo_dir,
+        )
+        code, out, err = self.run_cli(["board"], None, None)
+        lines = out.splitlines()
+        task_index = next(i for i, line in enumerate(lines) if "▶ T01" in line)
+        self.assertIn("First", lines[task_index])
+        self.assertIn("coding", lines[task_index + 1])
+        self.assertIn("app#1  draft", lines[task_index + 2])
+        self.assertIn("Adds X", lines[task_index + 2])
+        self.assertIn("waits: review", lines[task_index + 3])
+
+    def test_board_without_asks_says_nothing_needs_you(self):
+        repo_dir = self.register_project("acme", ["acme/app"])
+        self.run_cli(["party", "start", "alpha"], "sess-1", repo_dir)
+        code, out, err = self.run_cli(["board"], None, None)
+        self.assertIn("NEEDS YOU · nothing", out)
 
 
 if __name__ == "__main__":
