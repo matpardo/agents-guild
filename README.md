@@ -208,10 +208,10 @@ Default paths (all overridable via env, useful for tests):
 
 ## Agent rules
 
-`GUILD.md` holds the instructions agents need to use guild (bind, track PRs, ask, notice, claim). `install.sh` links it to `~/.claude/GUILD.md`; add one line to `~/.claude/CLAUDE.md` so every session loads it:
+`GUILD.md` holds the instructions agents need to use guild (bind, track PRs, ask, notice, claim). `install.sh` links it to `~/.claude/GUILD.md`; add one line to `~/.claude/CLAUDE.md` so every session loads it (absolute path, so it resolves the same even when `CLAUDE.md` is itself a symlink):
 
 ```
-@GUILD.md
+@~/.claude/GUILD.md
 ```
 
 The rules ship with the CLI, so they change in the same commit as the commands they describe.
