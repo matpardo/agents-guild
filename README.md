@@ -206,6 +206,16 @@ Default paths (all overridable via env, useful for tests):
 }
 ```
 
+## Agent rules
+
+`GUILD.md` holds the instructions agents need to use guild (bind, track PRs, ask, notice, claim). `install.sh` links it to `~/.claude/GUILD.md`; add one line to `~/.claude/CLAUDE.md` so every session loads it:
+
+```
+@GUILD.md
+```
+
+The rules ship with the CLI, so they change in the same commit as the commands they describe.
+
 ## Hooks
 
 Wired from `~/.claude/settings.json` (not part of this repo):
