@@ -13,6 +13,9 @@ prose. Local first. Python 3.10 stdlib only, no runtime dependencies.
 - A PR registry reconciled against `gh`, not memory.
 - Area claims so two sessions don't step on the same file.
 
+Specs, plans and decisions for guild itself live in [`sdd/`](sdd/README.md) and
+are updated in the same PR as the code.
+
 ## Glossary
 
 - **guild** — one install: the database and config on this machine (or
