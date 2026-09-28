@@ -197,6 +197,13 @@ def _handle_board(ctx, args):
     return 0
 
 
+def _handle_next(ctx, args):
+    from guild.commands import next as next_commands
+
+    _print_lines(next_commands.run(ctx, args.all))
+    return 0
+
+
 def _handle_sync(ctx, args):
     from guild.commands import sync as sync_commands
 
@@ -397,6 +404,10 @@ def build_parser():
     board = subparsers.add_parser("board")
     board.add_argument("--party")
     board.set_defaults(handler=_handle_board)
+
+    next_parser = subparsers.add_parser("next")
+    next_parser.add_argument("--all", action="store_true")
+    next_parser.set_defaults(handler=_handle_next)
 
     sync = subparsers.add_parser("sync")
     sync.add_argument("--source", required=True, choices=["gh", "jira", "sdd"])
