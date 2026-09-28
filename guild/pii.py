@@ -10,7 +10,7 @@ ANSWER_MAX_LENGTH = 1000
 HANDOFF_FIELD_MAX_LENGTH = 4000
 
 BROADCAST_REMINDER = (
-    "guild: this text is broadcast to every session and may be exported"
+    "note: this text is broadcast to every session and may be exported"
     " — never include names or identifiers of real people"
 )
 

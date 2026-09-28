@@ -90,7 +90,7 @@ class AskTests(GuildTestCase):
             ["ask", "ready?", "--context", "x", "--ref", "task:demo/T01"], "sess-1", self.repo_dir
         )
         self.assertEqual(code, 0)
-        self.assertIn("guild: this text is broadcast to every session", out)
+        self.assertIn("note: this text is broadcast to every session", out)
 
     def test_create_rejects_question_over_max_length(self):
         code, out, err = self.run_cli(

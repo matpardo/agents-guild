@@ -14,6 +14,12 @@ def _validate_scope(ctx, to):
     config.load_project(ctx.projects_dir, name)
 
 
+def _reject_duplicate(ctx, actor_party, to, text):
+    for row in active_notices(ctx.conn, ctx.now):
+        if row["party"] == actor_party and row["scope"] == to and row["text"] == text:
+            raise GuildError("same text already active as notice #{}".format(row["id"]), 1)
+
+
 def create(ctx, text, to, ttl, until):
     _validate_scope(ctx, to)
     project = config.resolve_project(ctx.cwd, config.load_all_projects(ctx.projects_dir))
@@ -25,6 +31,7 @@ def create(ctx, text, to, ttl, until):
         until_condition = json.dumps(refs.parse_until(until))
     binding = identity.resolve_binding(ctx.conn, ctx.session_id)
     actor_party = binding["party"] if binding is not None else None
+    _reject_duplicate(ctx, actor_party, to, text)
     notice_id = next_id(ctx.conn, "notices")
     with db.writing(ctx.conn):
         events.record(

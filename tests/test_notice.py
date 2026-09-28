@@ -35,7 +35,35 @@ class NoticeTests(GuildTestCase):
             ["notice", "create", "pipeline down", "--to", "guild", "--ttl", "2h"], None, None
         )
         self.assertEqual(code, 0)
-        self.assertIn("guild: this text is broadcast to every session", out)
+        self.assertIn("note: this text is broadcast to every session", out)
+
+    def test_success_reminder_does_not_look_like_an_error(self):
+        code, out, err = self.run_cli(
+            ["notice", "create", "ci down", "--to", "guild", "--ttl", "1h"], None, None
+        )
+        self.assertEqual(code, 0)
+        self.assertEqual(err, "")
+        for line in out.splitlines():
+            self.assertFalse(line.startswith("guild:"), line)
+        self.assertIn("note:", out)
+
+    def test_duplicate_active_notice_from_same_actor_is_rejected(self):
+        self.run_cli(["notice", "create", "ci down", "--to", "guild", "--ttl", "1h"], None, None)
+        code, out, err = self.run_cli(
+            ["notice", "create", "ci down", "--to", "guild", "--ttl", "1h"], None, None
+        )
+        self.assertEqual(code, 1)
+        self.assertIn("already active as notice #1", err)
+        code, out, err = self.run_cli(["notices"], None, None)
+        self.assertEqual(len([line for line in out.splitlines() if "ci down" in line]), 1)
+
+    def test_same_text_allowed_after_previous_notice_closed(self):
+        self.run_cli(["notice", "create", "ci down", "--to", "guild", "--ttl", "1h"], None, None)
+        self.run_cli(["notice", "close", "1"], None, None)
+        code, out, err = self.run_cli(
+            ["notice", "create", "ci down", "--to", "guild", "--ttl", "1h"], None, None
+        )
+        self.assertEqual(code, 0)
 
     def test_create_rejects_text_over_max_length(self):
         code, out, err = self.run_cli(
