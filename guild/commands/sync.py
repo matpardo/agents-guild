@@ -1,9 +1,11 @@
 import json
 
 from guild import config, db, events, timeutil
-from guild.adapters import github, sdd
+from guild.adapters import github, jira_acli, sdd
 from guild.commands import notice as notice_commands
 from guild.errors import GuildError
+
+_TRACKER_SUPPORTED_KINDS = ("jira-acli",)
 
 _SDD_PATTERN_KEYS = ("task_heading", "key_ref", "deps_line", "status_line")
 _SDD_OPTIONAL_PATTERN_KEYS = ("order_list", "key_line")
@@ -166,9 +168,112 @@ def _sync_sdd(ctx):
     return failures
 
 
+def _require_tracker_config(project_data, project):
+    tracker_config = project_data.get("tracker")
+    if tracker_config is None:
+        raise GuildError(
+            "project '{}' has no 'tracker' config block: add one to sync tracker cards".format(
+                project
+            ),
+            1,
+        )
+    kind = tracker_config.get("kind")
+    if kind not in _TRACKER_SUPPORTED_KINDS:
+        raise GuildError(
+            "project '{}' tracker.kind '{}' is not supported".format(project, kind), 1
+        )
+
+
+def _distinct_keys(conn, table, project):
+    rows = conn.execute(
+        "SELECT DISTINCT jira_key FROM {} WHERE project = ? AND jira_key IS NOT NULL".format(
+            table
+        ),
+        (project,),
+    ).fetchall()
+    return [row["jira_key"] for row in rows]
+
+
+def _sync_children(cards, failures, epic_key):
+    try:
+        children, invalid_keys = jira_acli.children_of(epic_key)
+    except jira_acli.JiraAcliError as error:
+        failures.append("{}: {}".format(epic_key, error))
+        return
+    for key in invalid_keys:
+        failures.append("{}: invalid tracker key".format(key))
+    for card in children:
+        card["parent_key"] = epic_key
+        cards[card["key"]] = card
+
+
+def _sync_by_key(cards, failures, keys):
+    if not keys:
+        return
+    try:
+        found_cards, invalid_keys = jira_acli.cards_by_key(keys)
+    except jira_acli.JiraAcliError as error:
+        failures.append("tracker query failed: {}".format(error))
+        return
+    for key in invalid_keys:
+        failures.append("{}: invalid tracker key".format(key))
+    found_keys = set()
+    for card in found_cards:
+        found_keys.add(card["key"])
+        card["parent_key"] = None
+        cards[card["key"]] = card
+    invalid_keys_set = set(invalid_keys)
+    for key in keys:
+        if key in found_keys or key in invalid_keys_set:
+            continue
+        failures.append("{}: not found in tracker".format(key))
+
+
+def _missing_keys(keys, seen):
+    result = []
+    for key in keys:
+        if key in seen or key in result:
+            continue
+        result.append(key)
+    return result
+
+
+def _sync_tracker(ctx):
+    project = config.require_project(ctx.cwd, ctx.projects_dir)
+    project_data = config.load_project(ctx.projects_dir, project)
+    _require_tracker_config(project_data, project)
+
+    epic_keys = _distinct_keys(ctx.conn, "epics", project)
+    task_keys = _distinct_keys(ctx.conn, "tasks", project)
+
+    failures = []
+    cards = {}
+    for epic_key in epic_keys:
+        _sync_children(cards, failures, epic_key)
+
+    remaining_keys = _missing_keys(epic_keys + task_keys, set(cards))
+    _sync_by_key(cards, failures, remaining_keys)
+
+    with db.writing(ctx.conn):
+        events.record(
+            ctx.conn,
+            ctx.now,
+            ctx.origin,
+            None,
+            ctx.session_id,
+            project,
+            "tracker.synced",
+            "local",
+            {"project": project, "cards": list(cards.values())},
+        )
+    return failures
+
+
 def run(ctx, source):
     if source == "gh":
         return _sync_gh(ctx)
     if source == "sdd":
         return _sync_sdd(ctx)
-    raise GuildError("sync source '{}' is not implemented in phase 1".format(source), 1)
+    if source == "tracker":
+        return _sync_tracker(ctx)
+    raise GuildError("sync source '{}' is not implemented".format(source), 1)

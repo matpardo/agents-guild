@@ -132,6 +132,25 @@ def _epic_synced(conn, event):
         )
 
 
+def _tracker_synced(conn, event):
+    payload = event["payload"]
+    project = payload["project"]
+    conn.execute("DELETE FROM cards WHERE project = ?", (project,))
+    for card in payload["cards"]:
+        conn.execute(
+            "INSERT INTO cards (project, key, status, status_category, issue_type, parent_key)"
+            " VALUES (?, ?, ?, ?, ?, ?)",
+            (
+                project,
+                card["key"],
+                card["status"],
+                card["status_category"],
+                card["issue_type"],
+                card["parent_key"],
+            ),
+        )
+
+
 def _pr_tracked(conn, event):
     payload = event["payload"]
     conn.execute(
@@ -316,6 +335,7 @@ _REDUCERS = {
     "task.blocked": _task_blocked,
     "task.done": _task_done,
     "epic.synced": _epic_synced,
+    "tracker.synced": _tracker_synced,
     "pr.tracked": _pr_tracked,
     "pr.set": _pr_set,
     "pr.synced": _pr_synced,
