@@ -32,7 +32,7 @@ updated: 2026-09-28
 ## T04 — guild drift
 
 **Depends on:** T03
-**Status:** [x] done
+**Status:** [x] done — #9
 
 **What:** `guild drift [--epic <slug>]`, read-only, eight rules: merged PR with task not done; tracker and SDD disagree; SDD task without card (keyed epics only); card not under its epic; PR open with card not started; PR closed unmerged; party with no running leader (`awaiting-leader` excluded); epic done (`sdd.epic_status_field`, stored as `epics.sdd_status`) with open work. Never calls `gh`/`acli`.
 
