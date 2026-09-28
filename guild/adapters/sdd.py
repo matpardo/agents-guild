@@ -146,6 +146,10 @@ def parse_epic_key(text, field):
     return _frontmatter_fields(text).get(field) or None
 
 
+def parse_epic_status(text, field):
+    return _frontmatter_fields(text).get(field) or None
+
+
 def discover_epic_files(root, epics_dir):
     base = Path(root).expanduser() / epics_dir
     if not base.is_dir():

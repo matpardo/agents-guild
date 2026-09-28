@@ -106,6 +106,34 @@ class SyncSddTests(GuildTestCase):
         conn.close()
         self.assertIsNone(row[0])
 
+    def test_sync_stores_epic_status_from_configured_frontmatter_field(self):
+        (self.sdd_root / "epics" / "widget-rollout" / "tasks.md").write_text(
+            "---\nepic: widget-rollout\nstatus: done\n---\n\n"
+            "## T01 — Configure retries\n\n**Deps:** —\n**Status:** [ ] pending\n"
+        )
+        self._write_project_config(
+            sdd_config=dict(
+                _PATTERNS, root=str(self.sdd_root), epics_dir="epics", epic_status_field="status"
+            )
+        )
+        code, out, err = self.run_cli(["sync", "--source", "sdd"], "sess-1", self.repo_dir)
+        self.assertEqual(code, 0, err)
+        conn = sqlite3.connect(str(self.data_home / "guild" / "guild.db"))
+        row = conn.execute("SELECT sdd_status FROM epics WHERE epic = 'widget-rollout'").fetchone()
+        conn.close()
+        self.assertEqual(row[0], "done")
+
+    def test_sync_gives_no_epic_status_when_field_not_configured(self):
+        self._write_project_config(
+            sdd_config=dict(_PATTERNS, root=str(self.sdd_root), epics_dir="epics")
+        )
+        code, out, err = self.run_cli(["sync", "--source", "sdd"], "sess-1", self.repo_dir)
+        self.assertEqual(code, 0, err)
+        conn = sqlite3.connect(str(self.data_home / "guild" / "guild.db"))
+        row = conn.execute("SELECT sdd_status FROM epics WHERE epic = 'widget-rollout'").fetchone()
+        conn.close()
+        self.assertIsNone(row[0])
+
     def test_legacy_epic_synced_event_without_jira_key_replays_as_none(self):
         legacy_event = {
             "ts": "2026-01-01T00:00:00+00:00",
@@ -114,9 +142,12 @@ class SyncSddTests(GuildTestCase):
         }
         conn = db.connect(paths.db_path())
         reducers.apply(conn, dict(legacy_event, kind="epic.synced"))
-        row = conn.execute("SELECT jira_key FROM epics WHERE epic = 'widget-rollout'").fetchone()
+        row = conn.execute(
+            "SELECT jira_key, sdd_status FROM epics WHERE epic = 'widget-rollout'"
+        ).fetchone()
         conn.close()
         self.assertIsNone(row["jira_key"])
+        self.assertIsNone(row["sdd_status"])
 
     def test_sync_reports_unparseable_file_and_exits_nonzero(self):
         (self.sdd_root / "epics" / "letters").mkdir(parents=True)
