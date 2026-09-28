@@ -1,0 +1,107 @@
+import re
+from pathlib import Path
+
+_TID_TOKEN_RE = re.compile(r"T\d+\w*")
+
+
+def _captured_text(match):
+    if match.re.groups >= 1:
+        return match.group(1)
+    return match.group(0)
+
+
+def _order_index(lines, order_list_re):
+    order_index = {}
+    counter = 0
+    for line in lines:
+        match = order_list_re.match(line.strip())
+        if match is None:
+            continue
+        for tid in _TID_TOKEN_RE.findall(line):
+            if tid in order_index:
+                continue
+            order_index[tid] = counter
+            counter += 1
+    return order_index
+
+
+def _find_deps(body, deps_line_re):
+    for line in body:
+        match = deps_line_re.match(line.strip())
+        if match is None:
+            continue
+        return _TID_TOKEN_RE.findall(_captured_text(match))
+    return []
+
+
+def _find_status(body, status_line_re):
+    for line in body:
+        match = status_line_re.match(line.strip())
+        if match is None:
+            continue
+        return "done" if "[x]" in _captured_text(match) else "pending"
+    return "pending"
+
+
+def _find_key_ref(heading_line, key_ref_re):
+    match = key_ref_re.search(heading_line)
+    if match is None:
+        return None
+    return _captured_text(match)
+
+
+def parse_tasks_text(text, patterns):
+    task_heading_re = re.compile(patterns["task_heading"])
+    key_ref_re = re.compile(patterns["key_ref"])
+    deps_line_re = re.compile(patterns["deps_line"])
+    status_line_re = re.compile(patterns["status_line"])
+    order_list_pattern = patterns.get("order_list")
+    order_list_re = re.compile(order_list_pattern) if order_list_pattern else None
+
+    lines = text.splitlines()
+    headings = []
+    for index, line in enumerate(lines):
+        match = task_heading_re.match(line.strip())
+        if match is None:
+            continue
+        headings.append((index, match.group(1), match.group(2).strip()))
+
+    if not headings:
+        return None
+
+    order_index = _order_index(lines, order_list_re) if order_list_re else {}
+
+    tasks = []
+    for position, (index, tid, title) in enumerate(headings):
+        end = headings[position + 1][0] if position + 1 < len(headings) else len(lines)
+        body = lines[index + 1 : end]
+        tasks.append(
+            {
+                "tid": tid,
+                "title": title,
+                "jira_key": _find_key_ref(lines[index], key_ref_re),
+                "deps": _find_deps(body, deps_line_re),
+                "order_idx": order_index.get(tid),
+                "sdd_status": _find_status(body, status_line_re),
+            }
+        )
+    return tasks
+
+
+def parse_tasks_file(path, patterns):
+    text = Path(path).read_text()
+    return parse_tasks_text(text, patterns)
+
+
+def discover_epic_files(root, epics_dir):
+    base = Path(root).expanduser() / epics_dir
+    if not base.is_dir():
+        return []
+    files = []
+    for entry in sorted(base.iterdir()):
+        if not entry.is_dir():
+            continue
+        tasks_file = entry / "tasks.md"
+        if tasks_file.is_file():
+            files.append((entry.name, tasks_file))
+    return files
