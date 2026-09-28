@@ -47,6 +47,15 @@ def _party_closed(conn, event):
     )
 
 
+def _party_handed_off(conn, event):
+    payload = event["payload"]
+    conn.execute("UPDATE parties SET state = 'awaiting-leader' WHERE name = ?", (payload["party"],))
+    conn.execute(
+        "UPDATE leaders SET handoff_path = ? WHERE party = ? AND generation = ?",
+        (payload["handoff_path"], payload["party"], payload["generation"]),
+    )
+
+
 def _quest_added(conn, event):
     payload = event["payload"]
     conn.execute(
@@ -288,6 +297,7 @@ _REDUCERS = {
     "party.started": _party_started,
     "party.resumed": _party_resumed,
     "party.closed": _party_closed,
+    "party.handed_off": _party_handed_off,
     "quest.added": _quest_added,
     "task.added": _task_added,
     "task.started": _task_started,
