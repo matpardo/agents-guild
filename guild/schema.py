@@ -6,6 +6,7 @@ PROJECTION_TABLES = (
     "epics",
     "tasks",
     "prs",
+    "cards",
     "asks",
     "notices",
     "claims",
@@ -110,6 +111,17 @@ _CREATE_STATEMENTS = (
         seeded INTEGER NOT NULL,
         synced_at TEXT,
         PRIMARY KEY (repo, number)
+    )
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS cards (
+        project TEXT NOT NULL,
+        key TEXT NOT NULL,
+        status TEXT NOT NULL,
+        status_category TEXT NOT NULL,
+        issue_type TEXT NOT NULL,
+        parent_key TEXT,
+        PRIMARY KEY (project, key)
     )
     """,
     """

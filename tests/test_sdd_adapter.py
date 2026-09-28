@@ -138,6 +138,36 @@ class UnparseableFileTests(unittest.TestCase):
         self.assertIsNone(result)
 
 
+class EpicKeyFrontmatterTests(unittest.TestCase):
+    def test_reads_configured_field_from_frontmatter(self):
+        text = "---\nepic: widget-rollout\njira: DEMO-1\n---\n\n## T01 — x\n"
+        self.assertEqual(sdd.parse_epic_key(text, "jira"), "DEMO-1")
+
+    def test_absent_field_gives_none(self):
+        text = "---\nepic: widget-rollout\n---\n\n## T01 — x\n"
+        self.assertIsNone(sdd.parse_epic_key(text, "jira"))
+
+    def test_no_frontmatter_gives_none(self):
+        text = "## T01 — x\n"
+        self.assertIsNone(sdd.parse_epic_key(text, "jira"))
+
+    def test_unterminated_frontmatter_gives_none(self):
+        text = "---\nepic: widget-rollout\njira: DEMO-1\n\n## T01 — x\n"
+        self.assertIsNone(sdd.parse_epic_key(text, "jira"))
+
+    def test_field_not_configured_gives_none(self):
+        text = "---\nepic: widget-rollout\njira: DEMO-1\n---\n\n## T01 — x\n"
+        self.assertIsNone(sdd.parse_epic_key(text, None))
+
+    def test_empty_field_value_gives_none(self):
+        text = "---\nepic: widget-rollout\njira:\n---\n\n## T01 — x\n"
+        self.assertIsNone(sdd.parse_epic_key(text, "jira"))
+
+    def test_blank_line_inside_frontmatter_is_skipped(self):
+        text = "---\nepic: widget-rollout\n\njira: DEMO-1\n---\n\n## T01 — x\n"
+        self.assertEqual(sdd.parse_epic_key(text, "jira"), "DEMO-1")
+
+
 class DiscoverEpicFilesTests(unittest.TestCase):
     def test_discovers_epic_directories_with_tasks_md(self):
         import tempfile

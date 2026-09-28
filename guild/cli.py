@@ -427,7 +427,7 @@ def build_parser():
     handoff.set_defaults(handler=_handle_handoff)
 
     sync = subparsers.add_parser("sync")
-    sync.add_argument("--source", required=True, choices=["gh", "jira", "sdd"])
+    sync.add_argument("--source", required=True, choices=["gh", "sdd", "tracker"])
     sync.set_defaults(handler=_handle_sync)
 
     brief = subparsers.add_parser("brief")

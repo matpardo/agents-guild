@@ -1,3 +1,7 @@
+from guild import db, origin, paths, timeutil
+from guild.commands import sync as sync_commands
+from guild.context import RunContext
+from guild.errors import GuildError
 from tests.testutil import GuildTestCase
 
 
@@ -57,9 +61,14 @@ class SyncTests(GuildTestCase):
         self.assertIn("sync failed for acme/app#1", err)
 
     def test_unimplemented_source_rejected(self):
-        code, out, err = self.run_cli(["sync", "--source", "jira"], "sess-1", self.repo_dir)
-        self.assertEqual(code, 1)
-        self.assertIn("not implemented", err)
+        conn = db.connect(paths.db_path())
+        ctx = RunContext(
+            conn, "sess-1", self.repo_dir, timeutil.utcnow(), origin.current_origin(), None, None, None
+        )
+        with self.assertRaises(GuildError) as raised:
+            sync_commands.run(ctx, "bogus")
+        conn.close()
+        self.assertIn("not implemented", raised.exception.message)
 
 
 if __name__ == "__main__":

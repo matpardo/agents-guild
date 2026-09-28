@@ -109,9 +109,10 @@ def _epic_synced(conn, event):
     project, epic = payload["project"], payload["epic"]
     conn.execute(
         "INSERT INTO epics (project, epic, title, jira_key, sdd_path, sdd_status)"
-        " VALUES (?, ?, NULL, NULL, ?, NULL)"
-        " ON CONFLICT(project, epic) DO UPDATE SET sdd_path = excluded.sdd_path",
-        (project, epic, payload["sdd_path"]),
+        " VALUES (?, ?, NULL, ?, ?, NULL)"
+        " ON CONFLICT(project, epic) DO UPDATE SET sdd_path = excluded.sdd_path,"
+        " jira_key = excluded.jira_key",
+        (project, epic, payload.get("jira_key"), payload["sdd_path"]),
     )
     conn.execute("DELETE FROM tasks WHERE project = ? AND epic = ?", (project, epic))
     for task in payload["tasks"]:
@@ -127,6 +128,25 @@ def _epic_synced(conn, event):
                 _dump(task["deps"]),
                 task["order_idx"],
                 task["sdd_status"],
+            ),
+        )
+
+
+def _tracker_synced(conn, event):
+    payload = event["payload"]
+    project = payload["project"]
+    conn.execute("DELETE FROM cards WHERE project = ?", (project,))
+    for card in payload["cards"]:
+        conn.execute(
+            "INSERT INTO cards (project, key, status, status_category, issue_type, parent_key)"
+            " VALUES (?, ?, ?, ?, ?, ?)",
+            (
+                project,
+                card["key"],
+                card["status"],
+                card["status_category"],
+                card["issue_type"],
+                card["parent_key"],
             ),
         )
 
@@ -315,6 +335,7 @@ _REDUCERS = {
     "task.blocked": _task_blocked,
     "task.done": _task_done,
     "epic.synced": _epic_synced,
+    "tracker.synced": _tracker_synced,
     "pr.tracked": _pr_tracked,
     "pr.set": _pr_set,
     "pr.synced": _pr_synced,

@@ -122,6 +122,30 @@ def parse_tasks_file(path, patterns):
     return parse_tasks_text(text, patterns)
 
 
+def _frontmatter_fields(text):
+    lines = text.splitlines()
+    if not lines or lines[0] != "---":
+        return {}
+    end = None
+    for index, line in enumerate(lines[1:], start=1):
+        if line == "---":
+            end = index
+            break
+    if end is None:
+        return {}
+    fields = {}
+    for line in lines[1:end]:
+        key, sep, value = line.partition(":")
+        if not sep:
+            continue
+        fields[key.strip()] = value.strip()
+    return fields
+
+
+def parse_epic_key(text, field):
+    return _frontmatter_fields(text).get(field) or None
+
+
 def discover_epic_files(root, epics_dir):
     base = Path(root).expanduser() / epics_dir
     if not base.is_dir():
