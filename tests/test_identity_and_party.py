@@ -21,6 +21,12 @@ class PartyStartResumeCloseTests(GuildTestCase):
         self.assertIn("party: alpha", out)
         self.assertIn("generation: 1", out)
 
+    def test_start_records_session_name_from_claude_sessions_dir(self):
+        self.write_session(4242, "sess-1", "2026-01-10-billing")
+        self.run_cli(["party", "start", "alpha"], "sess-1", None)
+        code, out, err = self.run_cli(["board"], None, None)
+        self.assertIn("2026-01-10-billing", out)
+
     def test_start_requires_session(self):
         code, out, err = self.run_cli(["party", "start", "alpha"], None, None)
         self.assertEqual(code, 1)
