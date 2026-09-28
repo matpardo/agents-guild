@@ -1,3 +1,4 @@
+import json
 import os
 import shlex
 import subprocess
@@ -75,6 +76,25 @@ def prompt_submit(ctx):
     with db.writing(ctx.conn):
         inbox_commands.advance_cursor(ctx.conn, identity.cursor_key(ctx.session_id), seq)
     return "\n".join(lines)
+
+
+def post_tool_use(ctx):
+    binding = identity.resolve_binding(ctx.conn, ctx.session_id)
+    lines, seq = inbox_commands.new_lines(ctx, binding)
+    project = binding["project"] if binding is not None else None
+    lines = lines + _ctx_nudge_lines(ctx, project)
+    with db.writing(ctx.conn):
+        inbox_commands.advance_cursor(ctx.conn, identity.cursor_key(ctx.session_id), seq)
+    if not lines:
+        return None
+    return json.dumps(
+        {
+            "hookSpecificOutput": {
+                "hookEventName": "PostToolUse",
+                "additionalContext": "\n".join(lines),
+            }
+        }
+    )
 
 
 def _push_segments(command):

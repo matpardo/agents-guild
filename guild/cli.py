@@ -428,7 +428,9 @@ def build_parser():
     statusline.set_defaults(handler=_handle_statusline)
 
     hook = subparsers.add_parser("hook")
-    hook.add_argument("hook_name", choices=["session-start", "prompt-submit", "pre-push"])
+    hook.add_argument(
+        "hook_name", choices=["session-start", "prompt-submit", "pre-push", "post-tool-use"]
+    )
 
     seed = subparsers.add_parser("seed")
     seed.add_argument("file")
@@ -483,6 +485,8 @@ def _run_stateful_hook(hook_name, stdin_data):
         ctx = _build_context(session_id, cwd)
         if hook_name == "session-start":
             text = hook_commands.session_start(ctx)
+        elif hook_name == "post-tool-use":
+            text = hook_commands.post_tool_use(ctx)
         else:
             text = hook_commands.prompt_submit(ctx)
     except Exception as error:
