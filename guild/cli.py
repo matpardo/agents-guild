@@ -235,6 +235,8 @@ def _handle_inbox(ctx, args):
 def _handle_statusline(ctx, args):
     from guild.commands import statusline as statusline_commands
 
+    if args.ctx is not None:
+        statusline_commands.record_ctx(ctx.state_dir, args.session, args.ctx)
     _print(statusline_commands.render(ctx, args.session))
     return 0
 
@@ -422,6 +424,7 @@ def build_parser():
 
     statusline = subparsers.add_parser("statusline")
     statusline.add_argument("--session", required=True)
+    statusline.add_argument("--ctx", type=int)
     statusline.set_defaults(handler=_handle_statusline)
 
     hook = subparsers.add_parser("hook")
