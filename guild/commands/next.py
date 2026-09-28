@@ -201,13 +201,21 @@ def _pr_label(row):
     return "{}#{}".format(row["repo"], row["number"])
 
 
+def _task_title_display(next_task):
+    if next_task["epic"] is not None:
+        return '"{}"'.format(next_task["title"])
+    return next_task["title"]
+
+
 def _render_all(tier1, tier2, tier3, next_task, disagreements):
     lines = []
     for row, reason, _ in tier1 + tier2 + tier3:
         lines.append("PR {}: {}".format(_pr_label(row), reason))
     if next_task is not None:
         lines.append(
-            "task {}/{}: {} — ready".format(next_task["quest"], next_task["tid"], next_task["title"])
+            "task {}/{}: {} — ready".format(
+                next_task["quest"], next_task["tid"], _task_title_display(next_task)
+            )
         )
     for line in disagreements:
         lines.append("disagreement: {}".format(line))
@@ -229,7 +237,9 @@ def _render_single(ctx, tier1, tier2, tier3, next_task, disagreements, blocked, 
         return lines
     if next_task is not None:
         lines = [
-            "task {}/{}: {} — ready".format(next_task["quest"], next_task["tid"], next_task["title"])
+            "task {}/{}: {} — ready".format(
+                next_task["quest"], next_task["tid"], _task_title_display(next_task)
+            )
         ]
         for line in disagreements:
             lines.append("disagreement: {}".format(line))

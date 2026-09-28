@@ -91,7 +91,8 @@ def _ctx_nudge_lines(ctx, project):
 
 def prompt_submit(ctx):
     binding = identity.resolve_binding(ctx.conn, ctx.session_id)
-    lines, seq = inbox_commands.new_lines(ctx, binding)
+    message_lines, seq = inbox_commands.new_lines(ctx, binding)
+    lines = inbox_commands.framed(message_lines)
     if binding is None:
         marker = _hint_marker_path(ctx)
         if not marker.exists():
@@ -107,7 +108,8 @@ def prompt_submit(ctx):
 
 def post_tool_use(ctx):
     binding = identity.resolve_binding(ctx.conn, ctx.session_id)
-    lines, seq = inbox_commands.new_lines(ctx, binding)
+    message_lines, seq = inbox_commands.new_lines(ctx, binding)
+    lines = inbox_commands.framed(message_lines)
     project = binding["project"] if binding is not None else None
     lines = lines + _ctx_nudge_lines(ctx, project)
     with db.writing(ctx.conn):

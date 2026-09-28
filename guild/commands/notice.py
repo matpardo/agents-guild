@@ -1,6 +1,6 @@
 import json
 
-from guild import config, db, events, identity, refs, timeutil
+from guild import config, db, events, identity, refs, sanitize, timeutil
 from guild.ids import next_id
 from guild.errors import GuildError
 
@@ -78,6 +78,12 @@ def active_notices(conn, now):
             continue
         result.append(row)
     return result
+
+
+def format_notice_line(notice_id, party, text):
+    author = party or "human"
+    clean_text = sanitize.collapse_to_single_line(text)
+    return '- notice #{} from {}: "{}"'.format(notice_id, author, clean_text)
 
 
 def targeting(rows, project, scope_guild_always):

@@ -184,7 +184,7 @@ class Tier4Tests(NextTestCase):
 
     def test_next_task_when_deps_done(self):
         code, out, err = self.run_cli(["next"], "sess-1", self.repo_dir)
-        self.assertIn("task wave1/T02: Second task — ready", out)
+        self.assertIn('task wave1/T02: "Second task" — ready', out)
 
     def test_next_task_blocked_by_pending_dep_reports_source(self):
         self.sync_sdd(
@@ -217,7 +217,7 @@ class Tier4Tests(NextTestCase):
     def test_claim_by_self_does_not_block_task(self):
         self.run_cli(["claim", "task:compliance/T02", "--ttl", "8h"], "sess-1", self.repo_dir)
         code, out, err = self.run_cli(["next"], "sess-1", self.repo_dir)
-        self.assertIn("task wave1/T02: Second task — ready", out)
+        self.assertIn('task wave1/T02: "Second task" — ready', out)
 
     def test_nothing_queued_reports_nothing_actionable(self):
         self.run_cli(["task", "done", "wave1/T02"], "sess-1", self.repo_dir)
@@ -280,7 +280,7 @@ class NextAllTests(NextTestCase):
         self.run_cli(["sync", "--source", "gh"], "sess-1", self.repo_dir)
         code, out, err = self.run_cli(["next", "--all"], "sess-1", self.repo_dir)
         self.assertIn("PR acme/app#1: failing checks (1 failing)", out)
-        self.assertIn("task wave1/T01: First task — ready", out)
+        self.assertIn('task wave1/T01: "First task" — ready', out)
 
 
 if __name__ == "__main__":

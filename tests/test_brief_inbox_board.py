@@ -72,7 +72,7 @@ class InboxTests(GuildTestCase):
         self.run_cli(["answer", "1", "yes go"], None, None)
 
         code, out, err = self.run_cli(["inbox", "--since-last"], "sess-1", repo_dir)
-        self.assertIn("ask #1 answered: yes go", out)
+        self.assertIn('- ask #1 answered by human: "yes go"', out)
 
     def test_notice_with_embedded_newline_cannot_forge_extra_line(self):
         repo_dir = self.register_project("acme", ["acme/app"])
