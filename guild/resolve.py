@@ -11,7 +11,15 @@ def _guild_opinion(conn, project, epic, tid):
 
 
 def _tracker_opinion(conn, project, epic, tid):
-    return None
+    row = conn.execute(
+        "SELECT cards.status_category AS status_category FROM tasks"
+        " JOIN cards ON cards.project = tasks.project AND cards.key = tasks.jira_key"
+        " WHERE tasks.project = ? AND tasks.epic = ? AND tasks.tid = ?",
+        (project, epic, tid),
+    ).fetchone()
+    if row is None:
+        return None
+    return row["status_category"] == "done"
 
 
 def _sdd_opinion(conn, project, epic, tid):

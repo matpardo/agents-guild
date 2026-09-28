@@ -25,9 +25,9 @@ updated: 2026-09-28
 ## T03 — Tracker opinion in the resolver
 
 **Depends on:** T02
-**Status:** [ ] pending
+**Status:** [x] done — #8
 
-**What:** fill the empty tracker slot; configured done statuses; no hidden defaults.
+**What:** fill the empty tracker slot from the synced card of the task's key. Uses the tracker's status category (`done` / `indeterminate` / `new`) rather than a configured list of status names: it is tracker data, language-independent, and needs no default. On real data (826 tasks) the tracker decides 644 and surfaces 92 disagreements with SDD.
 
 ## T04 — guild drift
 
