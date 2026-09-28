@@ -39,6 +39,19 @@ prose. Local first. Python 3.10 stdlib only, no runtime dependencies.
 Symlinks `bin/guild` into `~/.local/bin/guild`. Make sure that directory is
 on your `PATH`. Not run automatically by anything in this repo.
 
+Hooks run `guild` in every session, so the installed copy must never be a
+checkout you are editing: a half-written change goes live at once. If you
+develop guild, install from a dedicated worktree that only moves to reviewed
+commits:
+
+```
+git worktree add --detach ../agents-guild-live main
+../agents-guild-live/install.sh
+git -C ../agents-guild-live fetch && git -C ../agents-guild-live checkout --detach origin/main
+```
+
+The last line is the update step, after each merge.
+
 ## Commands
 
 ```
