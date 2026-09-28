@@ -53,7 +53,7 @@ def _handle_party_start(ctx, args):
 def _handle_party_resume(ctx, args):
     from guild.commands import party as party_commands
 
-    _print(party_commands.resume(ctx, args.party))
+    _print(party_commands.resume(ctx, args.party, args.session))
     return 0
 
 
@@ -205,9 +205,11 @@ def _handle_handoff(ctx, args):
 
 
 def _handle_next(ctx, args):
+    from guild import identity
     from guild.commands import next as next_commands
 
-    _print_lines(next_commands.run(ctx, args.all, not args.all))
+    binding = identity.require_binding(ctx.conn, ctx.session_id)
+    _print_lines(next_commands.run(ctx, binding, args.all, not args.all))
     return 0
 
 
@@ -279,6 +281,7 @@ def _add_party_parser(subparsers):
 
     resume = actions.add_parser("resume")
     resume.add_argument("party")
+    resume.add_argument("--session")
     resume.set_defaults(handler=_handle_party_resume)
 
     close = actions.add_parser("close")

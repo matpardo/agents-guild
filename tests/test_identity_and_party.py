@@ -65,6 +65,36 @@ class PartyStartResumeCloseTests(GuildTestCase):
         self.assertEqual(code, 0)
         self.assertNotIn("Handoff", out)
 
+    def test_resume_by_session_name_from_human_terminal(self):
+        repo_dir = self.register_project("acme", ["acme/app"])
+        self.run_cli(["party", "start", "alpha"], "sess-1", repo_dir)
+        self.write_session(4242, "sess-2", "alpha-g2")
+        code, out, err = self.run_cli(
+            ["party", "resume", "alpha", "--session", "alpha-g2"], None, repo_dir
+        )
+        self.assertEqual(code, 0)
+        self.assertIn("generation 2", out)
+        code, out, err = self.run_cli(["whoami"], "sess-2", None)
+        self.assertIn("party: alpha", out)
+        self.assertIn("generation: 2", out)
+
+    def test_resume_by_session_name_unknown_name_fails(self):
+        self.run_cli(["party", "start", "alpha"], "sess-1", None)
+        code, out, err = self.run_cli(
+            ["party", "resume", "alpha", "--session", "ghost-session"], None, None
+        )
+        self.assertEqual(code, 1)
+        self.assertIn("no session named 'ghost-session'", err)
+
+    def test_resume_by_session_name_inside_claude_session_fails(self):
+        self.run_cli(["party", "start", "alpha"], "sess-1", None)
+        self.write_session(4242, "sess-2", "alpha-g2")
+        code, out, err = self.run_cli(
+            ["party", "resume", "alpha", "--session", "alpha-g2"], "sess-3", None
+        )
+        self.assertEqual(code, 1)
+        self.assertIn("cannot be used from inside a Claude Code session", err)
+
     def test_resume_unknown_party_fails(self):
         code, out, err = self.run_cli(["party", "resume", "ghost"], "sess-1", None)
         self.assertEqual(code, 1)

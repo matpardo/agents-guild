@@ -1,7 +1,7 @@
 import json
 from datetime import timedelta
 
-from guild import config, events, identity, resolve, timeutil
+from guild import config, events, resolve, timeutil
 from guild.commands import pr as pr_commands
 
 
@@ -241,8 +241,7 @@ def _render_single(ctx, tier1, tier2, tier3, next_task, disagreements, blocked, 
     return lines
 
 
-def run(ctx, show_all, acknowledge):
-    binding = identity.require_binding(ctx.conn, ctx.session_id)
+def run(ctx, binding, show_all, acknowledge):
     party, project = binding["party"], binding["project"]
     stale_hours = _stale_hours(ctx.projects_dir, project)
 

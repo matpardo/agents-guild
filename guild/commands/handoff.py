@@ -45,7 +45,9 @@ def _claim_lines(conn, now, party):
 def _render_handoff(ctx, binding, in_flight, learned):
     lines = ["# Handoff: {} (generation {})".format(binding["party"], binding["generation"]), ""]
     lines += _section("Quest", _quest_lines(ctx.conn, binding["party"]))
-    lines += _section("Next", ["- {}".format(line) for line in next_commands.run(ctx, True, False)])
+    lines += _section(
+        "Next", ["- {}".format(line) for line in next_commands.run(ctx, binding, True, False)]
+    )
     lines += _section("PRs", _pr_lines(ctx.conn, binding["party"]))
     lines += _section("Open asks", _ask_lines(ctx.conn, binding["party"]))
     lines += _section("Active notices", _notice_lines(ctx.conn, ctx.now, binding["party"]))

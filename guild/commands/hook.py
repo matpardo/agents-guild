@@ -49,7 +49,7 @@ def _resume_lines(ctx, binding):
         return []
     marker.parent.mkdir(parents=True, exist_ok=True)
     marker.touch()
-    return [handoff_content, ""] + next_commands.run(ctx, False, False)
+    return [handoff_content, ""] + next_commands.run(ctx, binding, False, False)
 
 
 def session_start(ctx):
