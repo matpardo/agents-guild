@@ -83,6 +83,19 @@ class MigrationTests(GuildTestCase):
         for table in ("epics", "tasks"):
             self.assertEqual(conn.execute("SELECT COUNT(*) AS n FROM {}".format(table)).fetchone()["n"], 0)
 
+    def test_old_schema_db_gains_cards_table(self):
+        db_path = self.data_home / "guild.db"
+        _make_old_schema_db(db_path)
+
+        conn = db.connect(db_path)
+
+        cards_columns = {row["name"] for row in conn.execute("PRAGMA table_info(cards)").fetchall()}
+        self.assertEqual(
+            cards_columns,
+            {"project", "key", "status", "status_category", "issue_type", "parent_key"},
+        )
+        self.assertEqual(conn.execute("SELECT COUNT(*) AS n FROM cards").fetchone()["n"], 0)
+
     def test_rebuild_works_after_migration(self):
         db_path = self.data_home / "guild.db"
         _make_old_schema_db(db_path)
