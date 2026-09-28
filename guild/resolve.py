@@ -1,9 +1,9 @@
-def _guild_opinion(conn, epic, tid):
+def _guild_opinion(conn, project, epic, tid):
     rows = conn.execute(
         "SELECT quest_tasks.state AS state FROM quest_tasks"
         " JOIN quests ON quests.slug = quest_tasks.quest"
-        " WHERE quests.epic = ? AND quest_tasks.tid = ?",
-        (epic, tid),
+        " WHERE quests.project = ? AND quests.epic = ? AND quest_tasks.tid = ?",
+        (project, epic, tid),
     ).fetchall()
     if not rows:
         return None
@@ -25,7 +25,7 @@ def _sdd_opinion(conn, project, epic, tid):
 
 
 _SOURCES = (
-    ("guild", lambda conn, project, epic, tid: _guild_opinion(conn, epic, tid)),
+    ("guild", _guild_opinion),
     ("tracker", _tracker_opinion),
     ("sdd", _sdd_opinion),
 )

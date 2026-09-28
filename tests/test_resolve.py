@@ -46,6 +46,11 @@ class ResolveTaskDoneTests(GuildTestCase):
         self.assertEqual(source, "sdd")
         self.assertEqual(disagreements, [])
 
+    def test_guild_opinion_scoped_to_project(self):
+        is_done, source, disagreements = resolve.resolve_task_done(self.conn, "other", "compliance", "T01")
+        self.assertIsNone(source)
+        self.assertEqual(disagreements, [])
+
     def test_guild_done_overrides_sdd_pending(self):
         self.run_cli(["task", "done", "wave1/T02"], "sess-1", self.repo_dir)
         is_done, source, disagreements = resolve.resolve_task_done(self.conn, "acme", "compliance", "T02")
