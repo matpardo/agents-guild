@@ -110,6 +110,24 @@ class GuildTestCase(unittest.TestCase):
             sys.stdin = original_stdin
         return exit_code, stdout.getvalue(), stderr.getvalue()
 
+    def sync_sdd(self, cwd, session_id, project_name, epic, tasks_md_text):
+        sdd_root = self.root / "sdd-{}".format(project_name)
+        epic_dir = sdd_root / "epics" / epic
+        epic_dir.mkdir(parents=True, exist_ok=True)
+        (epic_dir / "tasks.md").write_text(tasks_md_text)
+        config_file = self.config_home / "guild" / "projects" / "{}.json".format(project_name)
+        data = json.loads(config_file.read_text())
+        data["sdd"] = {
+            "root": str(sdd_root),
+            "epics_dir": "epics",
+            "task_heading": r"^#{2,3}\s+(T\d+\w*)\s+.*[-—]\s*(.+)$",
+            "key_ref": r"[A-Z]{2,10}-\d+",
+            "deps_line": r"^\*\*Deps:\*\*\s*(.+)$",
+            "status_line": r"^\*\*Status:\*\*\s*(.+)$",
+        }
+        config_file.write_text(json.dumps(data))
+        return self.run_cli(["sync", "--source", "sdd"], session_id, cwd)
+
     def write_session(self, pid, session_id, name):
         session_file = self.sessions_dir / "{}.json".format(pid)
         session_file.write_text(json.dumps({"pid": pid, "sessionId": session_id, "name": name}))
