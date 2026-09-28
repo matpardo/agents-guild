@@ -44,6 +44,17 @@ class ClaimTests(GuildTestCase):
         self.assertEqual(code, 1)
         self.assertIn("does not hold claim", err)
 
+    def test_claim_by_task_ref_accepted(self):
+        code, out, err = self.run_cli(["claim", "task:demo/T01", "--ttl", "30m"], "sess-1", self.repo_dir)
+        self.assertEqual(code, 0)
+        code, out, err = self.run_cli(["claims"], "sess-1", self.repo_dir)
+        self.assertIn("task:demo/T01 — alpha", out)
+
+    def test_claim_by_task_ref_rejects_malformed_ref(self):
+        code, out, err = self.run_cli(["claim", "task:no-slash-here", "--ttl", "30m"], "sess-1", self.repo_dir)
+        self.assertEqual(code, 1)
+        self.assertIn("invalid task ref", err)
+
     def test_release_by_holder(self):
         self.run_cli(["claim", "ci.yml", "--ttl", "30m"], "sess-1", self.repo_dir)
         code, out, err = self.run_cli(["release", "ci.yml"], "sess-1", self.repo_dir)

@@ -1,8 +1,16 @@
-from guild import config, db, events, identity, timeutil
+from guild import config, db, events, identity, refs, timeutil
 from guild.errors import GuildError
+
+_TASK_AREA_PREFIX = "task:"
+
+
+def _validate_area(area):
+    if area.startswith(_TASK_AREA_PREFIX):
+        refs.parse_task_ref(area[len(_TASK_AREA_PREFIX):])
 
 
 def claim(ctx, area, ttl):
+    _validate_area(area)
     binding = identity.require_binding(ctx.conn, ctx.session_id)
     project = config.require_project(ctx.cwd, ctx.projects_dir)
     row = ctx.conn.execute(
