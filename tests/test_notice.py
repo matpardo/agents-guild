@@ -30,6 +30,43 @@ class NoticeTests(GuildTestCase):
         self.assertEqual(code, 1)
         self.assertIn("invalid", err)
 
+    def test_create_prints_broadcast_reminder(self):
+        code, out, err = self.run_cli(
+            ["notice", "create", "pipeline down", "--to", "guild", "--ttl", "2h"], None, None
+        )
+        self.assertEqual(code, 0)
+        self.assertIn("guild: this text is broadcast to every session", out)
+
+    def test_create_rejects_text_over_max_length(self):
+        code, out, err = self.run_cli(
+            ["notice", "create", "x" * 501, "--to", "guild", "--ttl", "2h"], None, None
+        )
+        self.assertEqual(code, 1)
+        self.assertIn("exceeds the maximum length", err)
+
+    def test_create_rejects_email_address(self):
+        code, out, err = self.run_cli(
+            ["notice", "create", "contact jane.doe@example.com", "--to", "guild", "--ttl", "2h"],
+            None, None,
+        )
+        self.assertEqual(code, 1)
+        self.assertIn("must not contain an email address", err)
+
+    def test_create_rejects_text_matching_project_pii_pattern(self):
+        config_file = self.config_home / "guild" / "projects" / "acme.json"
+        import json
+
+        data = json.loads(config_file.read_text())
+        data["pii_patterns"] = [r"Jane Doe"]
+        config_file.write_text(json.dumps(data))
+        code, out, err = self.run_cli(
+            ["notice", "create", "student Jane Doe missed class", "--to", "project:acme", "--ttl", "2h"],
+            None, self.repo_dir,
+        )
+        self.assertEqual(code, 1)
+        self.assertIn("forbidden", err)
+        self.assertNotIn("Jane Doe", err)
+
     def test_create_strips_escape_sequences_from_text(self):
         code, out, err = self.run_cli(
             ["notice", "create", "hi\x1b[31mRED\x1b[0m", "--to", "guild", "--ttl", "1h"], None, None

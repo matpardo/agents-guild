@@ -1,4 +1,4 @@
-from guild import db, events, identity, names, paths, render
+from guild import db, events, identity, names, paths, pii, render
 from guild.commands import claim as claim_commands
 from guild.commands import next as next_commands
 from guild.commands import notice as notice_commands
@@ -68,6 +68,9 @@ def run(ctx, in_flight, learned):
     if not learned.strip():
         raise GuildError("--learned must not be empty", 1)
     binding = identity.require_binding(ctx.conn, ctx.session_id)
+    patterns = pii.project_patterns(ctx.projects_dir, binding["project"])
+    pii.validate_field(in_flight, "--in-flight", pii.HANDOFF_FIELD_MAX_LENGTH, patterns)
+    pii.validate_field(learned, "--learned", pii.HANDOFF_FIELD_MAX_LENGTH, patterns)
     party, generation = binding["party"], binding["generation"]
     content = _render_handoff(ctx, binding, in_flight, learned)
     handoffs_dir = paths.handoffs_dir()
@@ -87,4 +90,4 @@ def run(ctx, in_flight, learned):
             "local",
             {"party": party, "generation": generation, "handoff_path": str(handoff_path)},
         )
-    return _resume_command(party, generation + 1)
+    return "{}\n{}".format(_resume_command(party, generation + 1), pii.BROADCAST_REMINDER)

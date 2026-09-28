@@ -1,4 +1,4 @@
-from guild import config, db, events, identity, refs
+from guild import config, db, events, identity, pii, refs
 from guild.ids import next_id
 from guild.errors import GuildError
 
@@ -31,6 +31,9 @@ def create(ctx, question, context_text, ref_list, option_list):
         raise GuildError("ask needs at least one --ref", 1)
     binding = identity.require_binding(ctx.conn, ctx.session_id)
     project = config.resolve_project(ctx.cwd, config.load_all_projects(ctx.projects_dir))
+    patterns = pii.project_patterns(ctx.projects_dir, project)
+    pii.validate_field(question, "ask question", pii.ASK_QUESTION_MAX_LENGTH, patterns)
+    pii.validate_field(context_text, "ask context", pii.ASK_CONTEXT_MAX_LENGTH, patterns)
     normalized_refs = _validate_refs(ctx, ref_list)
     ask_id = next_id(ctx.conn, "asks")
     with db.writing(ctx.conn):
@@ -52,7 +55,7 @@ def create(ctx, question, context_text, ref_list, option_list):
                 "options": option_list,
             },
         )
-    return "ask #{} created".format(ask_id)
+    return "ask #{} created\n{}".format(ask_id, pii.BROADCAST_REMINDER)
 
 
 def answer(ctx, ask_id, text):
@@ -64,6 +67,8 @@ def answer(ctx, ask_id, text):
     binding = identity.resolve_binding(ctx.conn, ctx.session_id)
     actor_party = binding["party"] if binding is not None else None
     project = config.resolve_project(ctx.cwd, config.load_all_projects(ctx.projects_dir))
+    patterns = pii.project_patterns(ctx.projects_dir, project)
+    pii.validate_field(text, "answer", pii.ANSWER_MAX_LENGTH, patterns)
     with db.writing(ctx.conn):
         events.record(
             ctx.conn,

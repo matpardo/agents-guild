@@ -35,6 +35,35 @@ class HandoffTests(GuildTestCase):
         self.assertEqual(code, 1)
         self.assertIn("--learned", err)
 
+    def test_prints_broadcast_reminder(self):
+        code, out, err = self.run_cli(
+            ["handoff", "--in-flight", "x", "--learned", "y"], "sess-1", self.repo_dir
+        )
+        self.assertEqual(code, 0)
+        self.assertIn("guild: this text is broadcast to every session", out)
+
+    def test_rejects_in_flight_over_max_length(self):
+        code, out, err = self.run_cli(
+            ["handoff", "--in-flight", "x" * 4001, "--learned", "y"], "sess-1", self.repo_dir
+        )
+        self.assertEqual(code, 1)
+        self.assertIn("exceeds the maximum length", err)
+
+    def test_rejects_learned_over_max_length(self):
+        code, out, err = self.run_cli(
+            ["handoff", "--in-flight", "x", "--learned", "y" * 4001], "sess-1", self.repo_dir
+        )
+        self.assertEqual(code, 1)
+        self.assertIn("exceeds the maximum length", err)
+
+    def test_rejects_email_in_in_flight(self):
+        code, out, err = self.run_cli(
+            ["handoff", "--in-flight", "ping jane.doe@example.com", "--learned", "y"],
+            "sess-1", self.repo_dir,
+        )
+        self.assertEqual(code, 1)
+        self.assertIn("must not contain an email address", err)
+
     def test_writes_handoff_file_and_prints_resume_command(self):
         code, out, err = self.run_cli(
             ["handoff", "--in-flight", "shipping T01", "--learned", "ci flakes on retries"],

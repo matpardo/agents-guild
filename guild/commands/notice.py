@@ -1,6 +1,6 @@
 import json
 
-from guild import config, db, events, identity, refs, sanitize, timeutil
+from guild import config, db, events, identity, pii, refs, sanitize, timeutil
 from guild.ids import next_id
 from guild.errors import GuildError
 
@@ -16,13 +16,15 @@ def _validate_scope(ctx, to):
 
 def create(ctx, text, to, ttl, until):
     _validate_scope(ctx, to)
+    project = config.resolve_project(ctx.cwd, config.load_all_projects(ctx.projects_dir))
+    patterns = pii.project_patterns(ctx.projects_dir, project)
+    pii.validate_field(text, "notice text", pii.NOTICE_TEXT_MAX_LENGTH, patterns)
     expires_at = timeutil.expires_at_iso(ctx.now, ttl)
     until_condition = None
     if until is not None:
         until_condition = json.dumps(refs.parse_until(until))
     binding = identity.resolve_binding(ctx.conn, ctx.session_id)
     actor_party = binding["party"] if binding is not None else None
-    project = config.resolve_project(ctx.cwd, config.load_all_projects(ctx.projects_dir))
     notice_id = next_id(ctx.conn, "notices")
     with db.writing(ctx.conn):
         events.record(
@@ -43,7 +45,7 @@ def create(ctx, text, to, ttl, until):
                 "expires_at": expires_at,
             },
         )
-    return "notice #{} created".format(notice_id)
+    return "notice #{} created\n{}".format(notice_id, pii.BROADCAST_REMINDER)
 
 
 def close(ctx, notice_id):
