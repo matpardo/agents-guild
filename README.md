@@ -93,7 +93,7 @@ guild next [--all]     # ranked action queue for the caller's party
 guild handoff --in-flight "..." --learned "..."
 
 guild board [--party <name>]
-guild sync --source gh|sdd
+guild sync --source gh|sdd|tracker
 guild brief
 guild inbox --since-last
 guild statusline --session <id> [--ctx <pct>]
@@ -240,8 +240,10 @@ against path traversal, not an identity boundary.
     "deps_line": "^\\*\\*Depende de:\\*\\*\\s*(.+)$",
     "status_line": "^\\*\\*Status:\\*\\*\\s*(.+)$",
     "order_list": "^\\d+\\.\\s+(.+)$",
-    "key_line": "^\\*\\*(?:JIRA|Jira):\\*\\*\\s*(.+)$"
+    "key_line": "^\\*\\*(?:JIRA|Jira):\\*\\*\\s*(.+)$",
+    "epic_key_field": "jira"
   },
+  "tracker": {"kind": "jira-acli"},
   "next": {"stale_hours": 8},
   "handoff_threshold": 80
 }
@@ -254,6 +256,14 @@ against path traversal, not an identity boundary.
   and skipped; other files still sync; `guild sync` exits non-zero if any
   file failed. See "SDD parsing rules" below for exactly how each regex is
   used.
+  - `epic_key_field` (optional): the frontmatter key (a plain `key: value`
+    line between the leading `---` markers of the epic's `tasks.md`) that
+    names the epic's own tracker card, e.g. `jira: DEMO-1`. Stored as
+    `epics.jira_key`. Absent field, or no frontmatter at all, gives `NULL` —
+    never guessed from the epic slug.
+- `tracker` (optional): drives `guild sync --source tracker`. `kind` is
+  required when this block exists; only `"jira-acli"` is supported today,
+  anything else is a clear error. See "Tracker sync" below.
 - `next.stale_hours` (optional): threshold for `guild next` tier 3
   (`converging` PR with no activity). Absent → that tier is skipped, never
   defaulted.
@@ -265,7 +275,7 @@ against path traversal, not an identity boundary.
   ask question/context, answer text and handoff `--in-flight`/`--learned` for
   the caller's project. A match rejects the command with an error that names
   the field, never the matched text.
-- Unknown top-level keys are allowed (reserved for phase 3: `jira`).
+- Unknown top-level keys are allowed.
 
 ### SDD parsing rules
 
@@ -293,19 +303,49 @@ against path traversal, not an identity boundary.
   files that write `**Status:** done` in prose without a checkbox still read
   as pending until the checkbox is ticked.
 
+### Tracker sync
+
+`guild sync --source tracker` (adapter `guild/adapters/jira_acli.py`, `acli
+jira workitem search`, list-form subprocess, never a shell) is read-only and
+observes, for the caller's project:
+
+1. For every observed epic with a `jira_key` (`epics.jira_key`, from
+   `sdd.epic_key_field`), its children (`parent = <EPIC>`). Those cards get
+   `parent_key = <epic key>`.
+2. Every task `jira_key` not already seen as a child, plus every epic key
+   itself, fetched by key in chunks of 50 (`key in (A,B,...)`). Those cards
+   get `parent_key = NULL` — meaning "not a child of its epic" (or, for an
+   epic card, simply itself), not "no parent in the tracker".
+3. Each card's `key`, `fields.status.name`, `fields.status.statusCategory.key`
+   (`new`/`indeterminate`/`done`) and `fields.issuetype.name` are stored in
+   the `cards` projection (`project, key, status, status_category,
+   issue_type, parent_key`), replaced wholesale for the project on every
+   sync (snapshot semantics, rebuild-safe).
+
+A key that fails `^[A-Z][A-Z0-9]+-\d+$` is never interpolated into JQL: it is
+reported (`<KEY>: invalid tracker key`) and skipped. A key requested but not
+returned by the tracker is reported as `<KEY>: not found in tracker`. A
+non-zero `acli` exit or unparseable JSON is reported per query
+(`<KEY>: <stderr>` for a failed children query, `tracker query failed: ...`
+for a failed by-key query) without stopping the rest of the sync. Any of
+these failures makes `guild sync --source tracker` exit non-zero, same as
+`gh`/`sdd` sync.
+
 ## Storage
 
 Append-only `events` table (SQLite, WAL, `busy_timeout=5000`, writes wrapped
 in `BEGIN IMMEDIATE`) plus projection tables kept in sync in the same
 transaction: `parties`, `leaders`, `quests`, `quest_tasks`, `epics`, `tasks`,
-`prs`, `asks`, `notices`, `claims`, `cursors`. `guild rebuild` drops every
+`prs`, `cards`, `asks`, `notices`, `claims`, `cursors`. `guild rebuild` drops every
 projection and replays all events from scratch — the only exception is
 `cursors`, which is a per-session read position, not domain state, and is
 left untouched by rebuild.
 
 `epics`/`tasks` are observed-only (never written by a guild command): they
 hold whatever `guild sync --source sdd` last read, keyed by
-`(project, epic)` / `(project, epic, tid)`. `leaders.handoff_path` and the
+`(project, epic)` / `(project, epic, tid)`. `cards` is likewise observed-only,
+holding whatever `guild sync --source tracker` last read, keyed by
+`(project, key)`, fully replaced on every sync. `leaders.handoff_path` and the
 PR activity columns (`prs.mergeable`, `prs.review_comment_count`,
 `prs.last_notified_comment_count`, `prs.last_activity_at`) were added by a
 schema migration (`schema._add_column_if_missing`, `ALTER TABLE ... ADD
@@ -508,7 +548,11 @@ ask-summary sorting by unblock count, context-usage nudges
 (`UserPromptSubmit`/`PostToolUse`), `guild handoff` and resuming a party
 (including by session name from a human terminal).
 
-The JIRA adapter, `observations`, `drift` and `raid` are phase 3.
+Phase 3 (three-way tracking, in progress): card keys read from a dedicated
+`key_line`, the epic key read from `sdd.epic_key_field` frontmatter, and the
+read-only `jira-acli` tracker adapter (`guild sync --source tracker`,
+observed `cards`) are done. The resolver's tracker opinion, `guild drift`
+and `raid` are still pending.
 
 **Idle-session wake: no-go (spike, this release).** The design considered
 having a resumed leader auto-spawn (`claude -n ...`) instead of asking a
