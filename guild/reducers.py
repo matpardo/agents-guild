@@ -171,12 +171,23 @@ def _pr_set(conn, event):
     )
 
 
+_PR_SYNCED_CARRY_FORWARD_FIELDS = ("mergeable", "review_comment_count")
+
+
+def _pr_synced_field(current, payload, field):
+    if field in payload:
+        return payload[field]
+    return current[field]
+
+
 def _pr_synced_changed(current, payload):
-    fields = (
-        "lifecycle", "gh_state", "gh_draft", "branch", "title",
-        "checks_failing", "checks_passing", "mergeable", "review_comment_count",
+    fields = ("lifecycle", "gh_state", "gh_draft", "branch", "title", "checks_failing", "checks_passing")
+    if any(current[field] != payload[field] for field in fields):
+        return True
+    return any(
+        current[field] != _pr_synced_field(current, payload, field)
+        for field in _PR_SYNCED_CARRY_FORWARD_FIELDS
     )
-    return any(current[field] != payload[field] for field in fields)
 
 
 def _pr_synced(conn, event):
@@ -199,8 +210,8 @@ def _pr_synced(conn, event):
             payload["title"],
             payload["checks_failing"],
             payload["checks_passing"],
-            payload["mergeable"],
-            payload["review_comment_count"],
+            _pr_synced_field(current, payload, "mergeable"),
+            _pr_synced_field(current, payload, "review_comment_count"),
             payload["synced_at"],
             last_activity_at,
             payload["repo"],

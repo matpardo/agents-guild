@@ -1,6 +1,6 @@
 import sqlite3
 
-from guild import db, origin, paths, timeutil
+from guild import db, origin, paths, reducers, timeutil
 from guild.commands import pr as pr_commands
 from guild.context import RunContext
 from tests.testutil import GuildTestCase
@@ -86,6 +86,30 @@ class PrActivityTests(GuildTestCase):
         self.run_cli(["pr", "set", "acme/app#1", "--waits", "y"], "sess-1", self.repo_dir)
         after = self._pr_row()["last_activity_at"]
         self.assertEqual(before, after)
+
+    def test_pr_synced_reducer_tolerates_legacy_payload_missing_new_fields(self):
+        conn = db.connect(paths.db_path())
+        legacy_event = {
+            "ts": timeutil.to_iso(timeutil.utcnow()),
+            "payload": {
+                "repo": "acme/app",
+                "number": 1,
+                "gh_state": "OPEN",
+                "gh_draft": False,
+                "branch": "feature/x",
+                "title": "t",
+                "checks_failing": 0,
+                "checks_passing": 0,
+                "lifecycle": "ready",
+                "synced_at": timeutil.to_iso(timeutil.utcnow()),
+            },
+        }
+        reducers.apply(conn, dict(legacy_event, kind="pr.synced"))
+        row = conn.execute("SELECT * FROM prs WHERE repo = 'acme/app' AND number = 1").fetchone()
+        self.assertEqual(row["lifecycle"], "ready")
+        self.assertIsNone(row["mergeable"])
+        self.assertEqual(row["review_comment_count"], 0)
+        conn.close()
 
     def test_acknowledge_comments_syncs_last_notified_count(self):
         self.write_gh_fixture(
