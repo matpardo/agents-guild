@@ -146,8 +146,12 @@ read-only: it never fires that event.
 `guild next`'s dependency check (and future `guild drift`) resolve whether a
 task is done by asking, in this fixed precedence order, the first source
 that has an opinion: **guild** (any `quest_tasks` row for that epic/tid —
-`done` state means done, any other state means not done), **tracker** (JIRA,
-phase 3 — no opinion yet), **sdd** (`tasks.sdd_status`). No opinion anywhere
+`done` state means done, any other state means not done), **tracker** (the
+card whose key the task carries, from the last `guild sync --source tracker`:
+status category `done` means done, `new`/`indeterminate` means not done; no
+key or no synced card → no opinion), **sdd** (`tasks.sdd_status`). The
+tracker's status category is used instead of status names, so it works in
+any tracker language without a configured list. No opinion anywhere
 → not done, never assumed done. When more than one source has an opinion and
 they disagree, the disagreement is returned and surfaced by `guild next`.
 
@@ -562,7 +566,7 @@ ask-summary sorting by unblock count, context-usage nudges
 Phase 3 (three-way tracking, in progress): card keys read from a dedicated
 `key_line`, the epic key read from `sdd.epic_key_field` frontmatter, and the
 read-only `jira-acli` tracker adapter (`guild sync --source tracker`,
-observed `cards`) are done. The resolver's tracker opinion, `guild drift`
+observed `cards`) and the resolver's tracker opinion are done. `guild drift`
 and `raid` are still pending.
 
 **Idle-session wake: no-go (spike, this release).** The design considered
