@@ -61,6 +61,22 @@ def _find_key_ref(heading_line, key_ref_re):
     return _captured_text(match)
 
 
+def _find_key_in_body(body, key_line_re, key_ref_re):
+    for line in body:
+        match = key_line_re.match(line.strip())
+        if match is None:
+            continue
+        return _find_key_ref(_captured_text(match), key_ref_re)
+    return None
+
+
+def _task_key(heading_line, body, key_ref_re, key_line_re):
+    heading_key = _find_key_ref(heading_line, key_ref_re)
+    if heading_key is not None or key_line_re is None:
+        return heading_key
+    return _find_key_in_body(body, key_line_re, key_ref_re)
+
+
 def parse_tasks_text(text, patterns):
     task_heading_re = re.compile(patterns["task_heading"])
     key_ref_re = re.compile(patterns["key_ref"])
@@ -68,6 +84,8 @@ def parse_tasks_text(text, patterns):
     status_line_re = re.compile(patterns["status_line"])
     order_list_pattern = patterns.get("order_list")
     order_list_re = re.compile(order_list_pattern) if order_list_pattern else None
+    key_line_pattern = patterns.get("key_line")
+    key_line_re = re.compile(key_line_pattern) if key_line_pattern else None
 
     lines = text.splitlines()
     headings = []
@@ -90,7 +108,7 @@ def parse_tasks_text(text, patterns):
             {
                 "tid": tid,
                 "title": title,
-                "jira_key": _find_key_ref(lines[index], key_ref_re),
+                "jira_key": _task_key(lines[index], body, key_ref_re, key_line_re),
                 "deps": _find_deps(body, deps_line_re),
                 "order_idx": order_index.get(tid),
                 "sdd_status": _find_status(body, status_line_re),

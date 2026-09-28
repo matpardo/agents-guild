@@ -239,7 +239,8 @@ against path traversal, not an identity boundary.
     "key_ref": "[A-Z]{2,10}-\\d+",
     "deps_line": "^\\*\\*Depende de:\\*\\*\\s*(.+)$",
     "status_line": "^\\*\\*Status:\\*\\*\\s*(.+)$",
-    "order_list": "^\\d+\\.\\s+(.+)$"
+    "order_list": "^\\d+\\.\\s+(.+)$",
+    "key_line": "^\\*\\*(?:JIRA|Jira):\\*\\*\\s*(.+)$"
   },
   "next": {"stale_hours": 8},
   "handoff_threshold": 80
@@ -248,7 +249,7 @@ against path traversal, not an identity boundary.
 
 - `sdd` (optional): drives `guild sync --source sdd`. Three independent,
   explicit regexes (`task_heading`, `key_ref`, `deps_line`, `status_line`) plus
-  an optional `order_list`; no hidden defaults, no fallback shape. A
+  optional `order_list` and `key_line`; no hidden defaults, no fallback shape. A
   `tasks.md` file with zero `task_heading` matches is reported unparseable
   and skipped; other files still sync; `guild sync` exits non-zero if any
   file failed. See "SDD parsing rules" below for exactly how each regex is
@@ -272,11 +273,14 @@ against path traversal, not an identity boundary.
   title. Match lazily up to the **first** spaced dash after the tid (`.*?\s[—–-]\s+`),
   so a `→ KEY` or `(KEY)` connector before it is skipped and hyphens inside the
   title (`cross-tenant`, `(KEY-12)`) are kept.
-- `key_ref` is searched (not matched) against the heading line only; a
+- `key_ref` is searched (not matched) against the heading line first; a
   generic token pattern such as `[A-Z]{2,10}-\d+` covers `→ KEY`, `(KEY)` and
-  `· KEY` connectors. No match on that line → no key, even if the task has a
-  `**JIRA:**`-style line elsewhere in its body (out of scope for the heading
-  regex by design).
+  `· KEY` connectors. A key in the heading always wins.
+- `key_line` (optional) matches a body line such as `**JIRA:** KEY`; when the
+  heading has no key, `key_ref` is searched in its group 1 and the **first**
+  key found is the task's key (`**JIRA:** KEY-12 — moved under KEY-3` gives
+  `KEY-12`; a markdown link `[KEY-12](…/browse/KEY-12)` works too). A matching
+  line with no key token gives no key.
 - `deps_line`/`order_list` are matched per body line; whichever line matches
   contributes its tid tokens via a fixed `T\d+\w*` token search, never a
   strict CSV split — prose around the ids (`T01 (gate — ...), T14`) and

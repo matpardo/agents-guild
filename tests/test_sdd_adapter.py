@@ -31,6 +31,42 @@ class DominantShapeTests(unittest.TestCase):
         self.assertEqual(tasks[1]["sdd_status"], "pending")
 
 
+_PATTERNS_WITH_KEY_LINE = dict(_PATTERNS, key_line=r"^\*\*(?:JIRA|Jira):\*\*\s*(.+)$")
+
+
+def _key_line_task(heading, key_line):
+    text = "{}\n\n{}\n**Deps:** —\n**Status:** [ ] pending\n".format(heading, key_line)
+    return sdd.parse_tasks_text(text, _PATTERNS_WITH_KEY_LINE)[0]
+
+
+class KeyLineTests(unittest.TestCase):
+    def test_key_read_from_key_line_when_heading_has_none(self):
+        task = _key_line_task("## T01 — Configure retries", "**JIRA:** DEMO-12")
+        self.assertEqual(task["jira_key"], "DEMO-12")
+
+    def test_heading_key_wins_over_key_line(self):
+        task = _key_line_task("## T01 → DEMO-7 — Configure retries", "**JIRA:** DEMO-12")
+        self.assertEqual(task["jira_key"], "DEMO-7")
+
+    def test_markdown_link_key_line(self):
+        task = _key_line_task(
+            "## T01 — Configure retries", "**Jira:** [DEMO-12](https://tracker.example/browse/DEMO-12)"
+        )
+        self.assertEqual(task["jira_key"], "DEMO-12")
+
+    def test_first_key_on_line_is_taken(self):
+        task = _key_line_task("## T01 — Configure retries", "**JIRA:** DEMO-12 — moved under DEMO-3")
+        self.assertEqual(task["jira_key"], "DEMO-12")
+
+    def test_key_line_without_key_gives_none(self):
+        task = _key_line_task("## T01 — Configure retries", "**JIRA:** none yet")
+        self.assertIsNone(task["jira_key"])
+
+    def test_key_line_ignored_when_not_configured(self):
+        text = "## T01 — Configure retries\n\n**JIRA:** DEMO-12\n**Status:** [ ] pending\n"
+        self.assertIsNone(sdd.parse_tasks_text(text, _PATTERNS)[0]["jira_key"])
+
+
 class KeyRefShapeTests(unittest.TestCase):
     def test_title_keeps_hyphens_after_first_separator(self):
         text = (

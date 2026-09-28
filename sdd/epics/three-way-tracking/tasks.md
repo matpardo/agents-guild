@@ -11,7 +11,7 @@ updated: 2026-09-28
 ## T01 — Card key from a dedicated line
 
 **Depends on:** —
-**Status:** [ ] pending
+**Status:** [x] done
 
 **What:** optional `key_line` regex in the `sdd` config; heading key still wins when both exist.
 

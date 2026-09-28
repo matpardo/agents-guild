@@ -1,4 +1,5 @@
 import json
+import sqlite3
 
 from tests.testutil import GuildTestCase
 
@@ -59,6 +60,22 @@ class SyncSddTests(GuildTestCase):
         self.assertEqual(code, 0)
         code, out, err = self.run_cli(["board"], "sess-1", self.repo_dir)
         self.assertIn("queued: T01, T02", out)
+
+    def test_sync_stores_key_from_configured_key_line(self):
+        (self.sdd_root / "epics" / "widget-rollout" / "tasks.md").write_text(
+            "## T01 — Configure retries\n\n**JIRA:** DEMO-12\n**Deps:** —\n**Status:** [ ] pending\n"
+        )
+        self._write_project_config(
+            sdd_config=dict(
+                _PATTERNS, root=str(self.sdd_root), epics_dir="epics", key_line=r"^\*\*JIRA:\*\*\s*(.+)$"
+            )
+        )
+        code, out, err = self.run_cli(["sync", "--source", "sdd"], "sess-1", self.repo_dir)
+        self.assertEqual(code, 0, err)
+        conn = sqlite3.connect(str(self.data_home / "guild" / "guild.db"))
+        row = conn.execute("SELECT jira_key FROM tasks WHERE tid = 'T01'").fetchone()
+        conn.close()
+        self.assertEqual(row[0], "DEMO-12")
 
     def test_sync_reports_unparseable_file_and_exits_nonzero(self):
         (self.sdd_root / "epics" / "letters").mkdir(parents=True)
