@@ -327,9 +327,12 @@ reported (`<KEY>: invalid tracker key`) and skipped. A key requested but not
 returned by the tracker is reported as `<KEY>: not found in tracker`. A
 non-zero `acli` exit or unparseable JSON is reported per query
 (`<KEY>: <stderr>` for a failed children query, `tracker query failed: ...`
-for a failed by-key query) without stopping the rest of the sync. Any of
-these failures makes `guild sync --source tracker` exit non-zero, same as
-`gh`/`sdd` sync.
+for a failed by-key query) and **nothing is written**: a partial snapshot
+would delete cards that were not fetched and would record an epic's children
+as "not a child of their epic". The previous snapshot is kept and the output
+says `tracker snapshot not updated: previous cards kept`. Invalid and
+not-found keys do not block the write. Any of these failures makes
+`guild sync --source tracker` exit non-zero, same as `gh`/`sdd` sync.
 
 ## Storage
 

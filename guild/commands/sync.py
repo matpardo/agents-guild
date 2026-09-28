@@ -194,11 +194,11 @@ def _distinct_keys(conn, table, project):
     return [row["jira_key"] for row in rows]
 
 
-def _sync_children(cards, failures, epic_key):
+def _sync_children(cards, failures, query_errors, epic_key):
     try:
         children, invalid_keys = jira_acli.children_of(epic_key)
     except jira_acli.JiraAcliError as error:
-        failures.append("{}: {}".format(epic_key, error))
+        query_errors.append("{}: {}".format(epic_key, error))
         return
     for key in invalid_keys:
         failures.append("{}: invalid tracker key".format(key))
@@ -207,13 +207,13 @@ def _sync_children(cards, failures, epic_key):
         cards[card["key"]] = card
 
 
-def _sync_by_key(cards, failures, keys):
+def _sync_by_key(cards, failures, query_errors, keys):
     if not keys:
         return
     try:
         found_cards, invalid_keys = jira_acli.cards_by_key(keys)
     except jira_acli.JiraAcliError as error:
-        failures.append("tracker query failed: {}".format(error))
+        query_errors.append("tracker query failed: {}".format(error))
         return
     for key in invalid_keys:
         failures.append("{}: invalid tracker key".format(key))
@@ -238,6 +238,9 @@ def _missing_keys(keys, seen):
     return result
 
 
+_SNAPSHOT_KEPT = "tracker snapshot not updated: previous cards kept"
+
+
 def _sync_tracker(ctx):
     project = config.require_project(ctx.cwd, ctx.projects_dir)
     project_data = config.load_project(ctx.projects_dir, project)
@@ -247,12 +250,17 @@ def _sync_tracker(ctx):
     task_keys = _distinct_keys(ctx.conn, "tasks", project)
 
     failures = []
+    query_errors = []
     cards = {}
     for epic_key in epic_keys:
-        _sync_children(cards, failures, epic_key)
+        _sync_children(cards, failures, query_errors, epic_key)
+    if query_errors:
+        return failures + query_errors + [_SNAPSHOT_KEPT]
 
     remaining_keys = _missing_keys(epic_keys + task_keys, set(cards))
-    _sync_by_key(cards, failures, remaining_keys)
+    _sync_by_key(cards, failures, query_errors, remaining_keys)
+    if query_errors:
+        return failures + query_errors + [_SNAPSHOT_KEPT]
 
     with db.writing(ctx.conn):
         events.record(
