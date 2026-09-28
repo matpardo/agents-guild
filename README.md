@@ -206,7 +206,7 @@ order). Commands that need a project fail clearly when none matches.
   "sdd": {
     "root": "~/Documents/_projects/acme/sdd-docs",
     "epics_dir": "epics",
-    "task_heading": "^#{2,3}\\s+(T\\d+\\w*)\\s+.*[-—]\\s*(.+)$",
+    "task_heading": "^#{2,3}\\s+(T\\d+\\w*)\\b.*?\\s[—–-]\\s+(.+)$",
     "key_ref": "[A-Z]{2,10}-\\d+",
     "deps_line": "^\\*\\*Depende de:\\*\\*\\s*(.+)$",
     "status_line": "^\\*\\*Status:\\*\\*\\s*(.+)$",
@@ -235,9 +235,9 @@ order). Commands that need a project fail clearly when none matches.
 ### SDD parsing rules
 
 - `task_heading` matches a `##`/`###` line; group 1 is the tid, group 2 the
-  title (write it so a greedy `.*` before the last dash-like separator lands
-  the title after that separator, regardless of what precedes it — a `→ KEY`
-  or `(KEY)` connector, or nothing).
+  title. Match lazily up to the **first** spaced dash after the tid (`.*?\s[—–-]\s+`),
+  so a `→ KEY` or `(KEY)` connector before it is skipped and hyphens inside the
+  title (`cross-tenant`, `(KEY-12)`) are kept.
 - `key_ref` is searched (not matched) against the heading line only; a
   generic token pattern such as `[A-Z]{2,10}-\d+` covers `→ KEY`, `(KEY)` and
   `· KEY` connectors. No match on that line → no key, even if the task has a
