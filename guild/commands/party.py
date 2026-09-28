@@ -1,5 +1,21 @@
+from pathlib import Path
+
 from guild import config, db, events, identity, session_info
+from guild.commands import next as next_commands
 from guild.errors import GuildError
+
+
+def previous_handoff_content(conn, party, generation):
+    row = conn.execute(
+        "SELECT handoff_path FROM leaders WHERE party = ? AND generation = ?",
+        (party, generation - 1),
+    ).fetchone()
+    if row is None or row["handoff_path"] is None:
+        return None
+    path = Path(row["handoff_path"])
+    if not path.is_file():
+        return None
+    return path.read_text().rstrip()
 
 
 def start(ctx, name):
@@ -52,7 +68,12 @@ def resume(ctx, name):
             "local",
             {"party": name, "generation": generation, "session_name": session_name},
         )
-    return "party '{}' resumed, generation {}".format(name, generation)
+    lines = ["party '{}' resumed, generation {}".format(name, generation)]
+    handoff_content = previous_handoff_content(ctx.conn, name, generation)
+    if handoff_content is not None:
+        lines += ["", handoff_content, ""]
+        lines.extend(next_commands.run(ctx, False, False))
+    return "\n".join(lines)
 
 
 def close(ctx):

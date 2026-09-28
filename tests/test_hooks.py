@@ -20,6 +20,32 @@ class SessionStartHookTests(GuildTestCase):
         self.assertEqual(code, 0)
         self.assertIn("party: alpha", out)
 
+    def test_resumed_generation_shows_handoff_once(self):
+        repo_dir = self.register_project("acme", ["acme/app"])
+        self.run_cli(["party", "start", "alpha"], "sess-1", repo_dir)
+        self.run_cli(["quest", "add", "demo", "--title", "Demo", "--no-epic"], "sess-1", repo_dir)
+        self.run_cli(["task", "add", "demo/T01", "--title", "First"], "sess-1", repo_dir)
+        self.run_cli(
+            ["handoff", "--in-flight", "shipping T01", "--learned", "watch ci flakes"],
+            "sess-1", repo_dir,
+        )
+        self.run_cli(["party", "resume", "alpha"], "sess-2", repo_dir)
+        payload = {"session_id": "sess-2", "cwd": str(repo_dir)}
+
+        code, out, err = self.run_hook("session-start", payload)
+        self.assertIn("shipping T01", out)
+        self.assertIn("task demo/T01", out)
+
+        code, out, err = self.run_hook("session-start", payload)
+        self.assertNotIn("shipping T01", out)
+
+    def test_first_generation_never_shows_handoff(self):
+        repo_dir = self.register_project("acme", ["acme/app"])
+        self.run_cli(["party", "start", "alpha"], "sess-1", repo_dir)
+        code, out, err = self.run_hook("session-start", {"session_id": "sess-1", "cwd": str(repo_dir)})
+        self.assertEqual(code, 0)
+        self.assertIn("party: alpha", out)
+
 
 class PromptSubmitHookTests(GuildTestCase):
     def test_unbound_hint_shown_once(self):

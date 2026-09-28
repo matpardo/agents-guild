@@ -9,6 +9,8 @@ from guild import config, db, identity
 from guild.adapters import github
 from guild.commands import brief as brief_commands
 from guild.commands import inbox as inbox_commands
+from guild.commands import next as next_commands
+from guild.commands import party as party_commands
 from guild.commands import statusline as statusline_commands
 from guild.identity import UNBOUND_HINT
 
@@ -30,10 +32,34 @@ def _spawn_background_sync(cwd):
     )
 
 
+def _resume_marker_path(ctx, generation):
+    return ctx.state_dir / "hints" / "resumed-{}-g{}".format(identity.cursor_key(ctx.session_id), generation)
+
+
+def _resume_lines(ctx, binding):
+    if binding["generation"] <= 1:
+        return []
+    marker = _resume_marker_path(ctx, binding["generation"])
+    if marker.exists():
+        return []
+    handoff_content = party_commands.previous_handoff_content(
+        ctx.conn, binding["party"], binding["generation"]
+    )
+    if handoff_content is None:
+        return []
+    marker.parent.mkdir(parents=True, exist_ok=True)
+    marker.touch()
+    return [handoff_content, ""] + next_commands.run(ctx, False, False)
+
+
 def session_start(ctx):
-    text = "\n".join(brief_commands.render_brief(ctx))
+    binding = identity.resolve_binding(ctx.conn, ctx.session_id)
+    lines = []
+    if binding is not None:
+        lines = _resume_lines(ctx, binding)
+    lines.extend(brief_commands.render_brief(ctx))
     _spawn_background_sync(ctx.cwd)
-    return text
+    return "\n".join(lines)
 
 
 def _hint_marker_path(ctx):

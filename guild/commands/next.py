@@ -216,12 +216,12 @@ def _render_all(tier1, tier2, tier3, next_task, disagreements):
     return lines
 
 
-def _render_single(ctx, tier1, tier2, tier3, next_task, disagreements, blocked):
+def _render_single(ctx, tier1, tier2, tier3, next_task, disagreements, blocked, acknowledge):
     for candidates in (tier1, tier2, tier3):
         if not candidates:
             continue
         row, reason, should_ack = candidates[0]
-        if should_ack:
+        if should_ack and acknowledge:
             pr_commands.acknowledge_comments(ctx, row["repo"], row["number"])
         lines = ["PR {}: {}".format(_pr_label(row), reason)]
         for line in disagreements:
@@ -241,7 +241,7 @@ def _render_single(ctx, tier1, tier2, tier3, next_task, disagreements, blocked):
     return lines
 
 
-def run(ctx, show_all):
+def run(ctx, show_all, acknowledge):
     binding = identity.require_binding(ctx.conn, ctx.session_id)
     party, project = binding["party"], binding["project"]
     stale_hours = _stale_hours(ctx.projects_dir, project)
@@ -256,4 +256,4 @@ def run(ctx, show_all):
 
     if show_all:
         return _render_all(tier1, tier2, tier3, next_task, disagreements)
-    return _render_single(ctx, tier1, tier2, tier3, next_task, disagreements, blocked)
+    return _render_single(ctx, tier1, tier2, tier3, next_task, disagreements, blocked, acknowledge)

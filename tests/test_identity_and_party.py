@@ -43,6 +43,28 @@ class PartyStartResumeCloseTests(GuildTestCase):
         self.assertIn("party: alpha", out)
         self.assertIn("generation: 2", out)
 
+    def test_resume_prints_previous_handoff_and_next_line(self):
+        repo_dir = self.register_project("acme", ["acme/app"])
+        self.run_cli(["party", "start", "alpha"], "sess-1", repo_dir)
+        self.run_cli(["quest", "add", "demo", "--title", "Demo", "--no-epic"], "sess-1", repo_dir)
+        self.run_cli(["task", "add", "demo/T01", "--title", "First"], "sess-1", repo_dir)
+        self.run_cli(
+            ["handoff", "--in-flight", "shipping T01", "--learned", "watch ci flakes"],
+            "sess-1", repo_dir,
+        )
+        code, out, err = self.run_cli(["party", "resume", "alpha"], "sess-2", repo_dir)
+        self.assertEqual(code, 0)
+        self.assertIn("shipping T01", out)
+        self.assertIn("watch ci flakes", out)
+        self.assertIn("task demo/T01", out)
+
+    def test_resume_without_prior_handoff_has_no_handoff_section(self):
+        repo_dir = self.register_project("acme", ["acme/app"])
+        self.run_cli(["party", "start", "alpha"], "sess-1", repo_dir)
+        code, out, err = self.run_cli(["party", "resume", "alpha"], "sess-2", repo_dir)
+        self.assertEqual(code, 0)
+        self.assertNotIn("Handoff", out)
+
     def test_resume_unknown_party_fails(self):
         code, out, err = self.run_cli(["party", "resume", "ghost"], "sess-1", None)
         self.assertEqual(code, 1)

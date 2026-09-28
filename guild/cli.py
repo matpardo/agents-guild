@@ -207,7 +207,7 @@ def _handle_handoff(ctx, args):
 def _handle_next(ctx, args):
     from guild.commands import next as next_commands
 
-    _print_lines(next_commands.run(ctx, args.all))
+    _print_lines(next_commands.run(ctx, args.all, not args.all))
     return 0
 
 
