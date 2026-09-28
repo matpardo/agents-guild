@@ -94,6 +94,7 @@ guild handoff --in-flight "..." --learned "..."
 
 guild board [--party <name>]
 guild sync --source gh|sdd|tracker
+guild drift [--epic <slug>]
 guild brief
 guild inbox --since-last
 guild statusline --session <id> [--ctx <pct>]
@@ -143,17 +144,41 @@ read-only: it never fires that event.
 
 ### Task done resolver
 
-`guild next`'s dependency check (and future `guild drift`) resolve whether a
-task is done by asking, in this fixed precedence order, the first source
-that has an opinion: **guild** (any `quest_tasks` row for that epic/tid —
-`done` state means done, any other state means not done), **tracker** (the
-card whose key the task carries, from the last `guild sync --source tracker`:
-status category `done` means done, `new`/`indeterminate` means not done; no
-key or no synced card → no opinion), **sdd** (`tasks.sdd_status`). The
-tracker's status category is used instead of status names, so it works in
-any tracker language without a configured list. No opinion anywhere
-→ not done, never assumed done. When more than one source has an opinion and
-they disagree, the disagreement is returned and surfaced by `guild next`.
+`guild next`'s dependency check resolves whether a task is done by asking,
+in this fixed precedence order, the first source that has an opinion:
+**guild** (any `quest_tasks` row for that epic/tid — `done` state means
+done, any other state means not done), **tracker** (the card whose key the
+task carries, from the last `guild sync --source tracker`: status category
+`done` means done, `new`/`indeterminate` means not done; no key or no synced
+card → no opinion), **sdd** (`tasks.sdd_status`). The tracker's status
+category is used instead of status names, so it works in any tracker
+language without a configured list. No opinion anywhere → not done, never
+assumed done. When more than one source has an opinion and they disagree,
+the disagreement is returned and surfaced by `guild next`.
+
+### `guild drift`
+
+`guild drift [--epic <slug>]` reports, for the project resolved from cwd,
+every disagreement between guild, SDD and the tracker that the last
+`guild sync --source gh|sdd|tracker` observed. Read-only: it never fires an
+event and never calls `gh` or `acli` — it only reads the projections a prior
+sync filled. `--epic` restricts every epic-scoped rule to that epic. Exit
+code is always 0 (it is a report, not a check); output groups findings by
+rule, in this order, each finding naming the refs and what each source says:
+
+| Rule | Finding when |
+|---|---|
+| `merged PR, task not done` | a tracked PR has lifecycle `merged` and its linked quest task state is not `done` |
+| `tracker and SDD disagree` | a task has a synced card and `sdd_status`, and card done (`status_category == done`) disagrees with `sdd_status == done` |
+| `SDD task without card` | the epic has a `jira_key` but the task has none (only for keyed epics) |
+| `card not under its epic` | the epic has a `jira_key` and the task's synced card has `parent_key IS NULL` |
+| `PR open, card not started` | a tracked PR is not merged/closed and its linked task's card has `status_category == new` |
+| `PR closed unmerged` | a tracked PR has lifecycle `closed` |
+| `party has no running leader` | an `active` party's `leader_session_id` is not the id of any session file under the Claude sessions dir (`awaiting-leader` parties are not findings) |
+| `epic done with open work` | the epic's `sdd_status == done` but it still has a non-done quest task, or an open tracked PR linked to it |
+
+The last line is `N findings` or `no drift`. `guild drift` never writes to
+SDD or the tracker: fixing drift stays with humans and the normal skills.
 
 ### `guild handoff` and resuming a party
 
@@ -253,7 +278,8 @@ against path traversal, not an identity boundary.
     "status_line": "^\\*\\*Status:\\*\\*\\s*(.+)$",
     "order_list": "^\\d+\\.\\s+(.+)$",
     "key_line": "^\\*\\*(?:JIRA|Jira):\\*\\*\\s*(.+)$",
-    "epic_key_field": "jira"
+    "epic_key_field": "jira",
+    "epic_status_field": "status"
   },
   "tracker": {"kind": "jira-acli"},
   "next": {"stale_hours": 8},
@@ -273,6 +299,10 @@ against path traversal, not an identity boundary.
     names the epic's own tracker card, e.g. `jira: DEMO-1`. Stored as
     `epics.jira_key`. Absent field, or no frontmatter at all, gives `NULL` —
     never guessed from the epic slug.
+  - `epic_status_field` (optional): the frontmatter key that carries the
+    epic's own SDD status, e.g. `status: done`, parsed exactly like
+    `epic_key_field` and stored as `epics.sdd_status`. Absent field, or no
+    frontmatter at all, gives `NULL`.
 - `tracker` (optional): drives `guild sync --source tracker`. `kind` is
   required when this block exists; only `"jira-acli"` is supported today,
   anything else is a clear error. See "Tracker sync" below.
@@ -564,10 +594,11 @@ ask-summary sorting by unblock count, context-usage nudges
 (including by session name from a human terminal).
 
 Phase 3 (three-way tracking, in progress): card keys read from a dedicated
-`key_line`, the epic key read from `sdd.epic_key_field` frontmatter, and the
-read-only `jira-acli` tracker adapter (`guild sync --source tracker`,
-observed `cards`) and the resolver's tracker opinion are done. `guild drift`
-and `raid` are still pending.
+`key_line`, the epic key and status read from `sdd.epic_key_field` and
+`sdd.epic_status_field` frontmatter, the read-only `jira-acli` tracker
+adapter (`guild sync --source tracker`, observed `cards`), the resolver's
+tracker opinion, and the read-only `guild drift` report are done. `raid` is
+still pending.
 
 **Idle-session wake: no-go (spike, this release).** The design considered
 having a resumed leader auto-spawn (`claude -n ...`) instead of asking a

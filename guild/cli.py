@@ -222,6 +222,15 @@ def _handle_sync(ctx, args):
     return 1 if failures else 0
 
 
+def _handle_drift(ctx, args):
+    from guild import config
+    from guild.commands import drift as drift_commands
+
+    project = config.require_project(ctx.cwd, ctx.projects_dir)
+    _print_lines(drift_commands.run(ctx, project, args.epic))
+    return 0
+
+
 def _handle_brief(ctx, args):
     from guild.commands import brief as brief_commands
 
@@ -429,6 +438,10 @@ def build_parser():
     sync = subparsers.add_parser("sync")
     sync.add_argument("--source", required=True, choices=["gh", "sdd", "tracker"])
     sync.set_defaults(handler=_handle_sync)
+
+    drift = subparsers.add_parser("drift")
+    drift.add_argument("--epic")
+    drift.set_defaults(handler=_handle_drift)
 
     brief = subparsers.add_parser("brief")
     brief.set_defaults(handler=_handle_brief)
