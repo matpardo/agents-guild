@@ -67,6 +67,22 @@ def track(ctx, ref, task_ref, what, waits):
     return "PR '{}#{}' tracked".format(repo, number)
 
 
+def acknowledge_comments(ctx, repo, number):
+    row = _load_pr(ctx, repo, number)
+    with db.writing(ctx.conn):
+        events.record(
+            ctx.conn,
+            ctx.now,
+            ctx.origin,
+            row["party"],
+            ctx.session_id,
+            None,
+            "pr.comments_acknowledged",
+            "guild",
+            {"repo": repo, "number": number},
+        )
+
+
 def set_(ctx, ref, lifecycle, waits):
     if lifecycle is None and waits is None:
         raise GuildError("pr set needs --lifecycle and/or --waits", 1)

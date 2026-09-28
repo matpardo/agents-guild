@@ -1,5 +1,8 @@
 import sqlite3
 
+from guild import db, origin, paths, timeutil
+from guild.commands import pr as pr_commands
+from guild.context import RunContext
 from tests.testutil import GuildTestCase
 
 
@@ -83,6 +86,24 @@ class PrActivityTests(GuildTestCase):
         self.run_cli(["pr", "set", "acme/app#1", "--waits", "y"], "sess-1", self.repo_dir)
         after = self._pr_row()["last_activity_at"]
         self.assertEqual(before, after)
+
+    def test_acknowledge_comments_syncs_last_notified_count(self):
+        self.write_gh_fixture(
+            "view_acme-app_1",
+            {
+                "state": "OPEN", "isDraft": True, "headRefName": "feature/x", "title": "t",
+                "comments": [{"id": 1}, {"id": 2}],
+            },
+        )
+        self.run_cli(["sync", "--source", "gh"], "sess-1", self.repo_dir)
+        self.assertEqual(self._pr_row()["last_notified_comment_count"], 0)
+
+        conn = db.connect(paths.db_path())
+        ctx = RunContext(conn, "sess-1", self.repo_dir, timeutil.utcnow(), origin.current_origin(), None, None, None)
+        pr_commands.acknowledge_comments(ctx, "acme/app", 1)
+        conn.close()
+
+        self.assertEqual(self._pr_row()["last_notified_comment_count"], 2)
 
 
 if __name__ == "__main__":

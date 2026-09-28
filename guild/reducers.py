@@ -200,6 +200,18 @@ def _pr_synced(conn, event):
     )
 
 
+def _pr_comments_acknowledged(conn, event):
+    payload = event["payload"]
+    row = conn.execute(
+        "SELECT review_comment_count FROM prs WHERE repo = ? AND number = ?",
+        (payload["repo"], payload["number"]),
+    ).fetchone()
+    conn.execute(
+        "UPDATE prs SET last_notified_comment_count = ? WHERE repo = ? AND number = ?",
+        (row["review_comment_count"], payload["repo"], payload["number"]),
+    )
+
+
 def _ask_created(conn, event):
     payload = event["payload"]
     conn.execute(
@@ -285,6 +297,7 @@ _REDUCERS = {
     "pr.tracked": _pr_tracked,
     "pr.set": _pr_set,
     "pr.synced": _pr_synced,
+    "pr.comments_acknowledged": _pr_comments_acknowledged,
     "ask.created": _ask_created,
     "ask.answered": _ask_answered,
     "ask.dismissed": _ask_dismissed,
