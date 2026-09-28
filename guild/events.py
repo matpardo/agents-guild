@@ -1,11 +1,12 @@
 import json
 import uuid
 
-from guild import reducers
+from guild import reducers, sanitize
 from guild.timeutil import to_iso
 
 
 def record(conn, now, origin, party, session_id, project, kind, visibility, payload):
+    payload = sanitize.sanitize_payload(payload)
     event_id = str(uuid.uuid4())
     ts = to_iso(now)
     conn.execute(

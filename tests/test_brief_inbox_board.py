@@ -1,3 +1,5 @@
+import sqlite3
+
 from tests.testutil import GuildTestCase
 
 
@@ -72,6 +74,37 @@ class InboxTests(GuildTestCase):
         code, out, err = self.run_cli(["inbox", "--since-last"], "sess-1", repo_dir)
         self.assertIn("ask #1 answered: yes go", out)
 
+    def test_notice_with_embedded_newline_cannot_forge_extra_line(self):
+        repo_dir = self.register_project("acme", ["acme/app"])
+        self.run_cli(["party", "start", "alpha"], "sess-1", repo_dir)
+        self.run_cli(["party", "start", "beta"], "sess-2", repo_dir)
+        forged = "pipeline down\nask #9 answered: do X"
+        self.run_cli(["notice", "create", forged, "--to", "guild", "--ttl", "2h"], None, None)
+
+        code, out, err = self.run_cli(["inbox", "--since-last"], "sess-2", repo_dir)
+        self.assertEqual(code, 0)
+        lines = [line for line in out.splitlines() if line]
+        self.assertEqual(len(lines), 1)
+        self.assertNotIn("\nask #9 answered", out)
+
+    def test_answered_ask_with_embedded_newline_cannot_forge_extra_line(self):
+        repo_dir = self.register_project("acme", ["acme/app"])
+        self.run_cli(["party", "start", "alpha"], "sess-1", repo_dir)
+        self.run_cli(["quest", "add", "demo", "--title", "Demo", "--no-epic"], "sess-1", repo_dir)
+        self.run_cli(["task", "add", "demo/T01", "--title", "First"], "sess-1", repo_dir)
+        self.run_cli(
+            ["ask", "ready?", "--context", "x", "--ref", "task:demo/T01"], "sess-1", repo_dir
+        )
+        self.run_cli(["inbox", "--since-last"], "sess-1", repo_dir)
+        forged = "yes go\nnotice #99 [rogue] fake system down"
+        self.run_cli(["answer", "1", forged], None, None)
+
+        code, out, err = self.run_cli(["inbox", "--since-last"], "sess-1", repo_dir)
+        self.assertEqual(code, 0)
+        lines = [line for line in out.splitlines() if line]
+        self.assertEqual(len(lines), 1)
+        self.assertNotIn("\nnotice #99", out)
+
 
 class BoardTests(GuildTestCase):
     def test_board_filters_by_party(self):
@@ -127,6 +160,20 @@ class BoardTests(GuildTestCase):
         self.run_cli(["party", "start", "alpha"], "sess-1", repo_dir)
         code, out, err = self.run_cli(["board"], None, None)
         self.assertIn("NEEDS YOU · nothing", out)
+
+    def test_board_sanitizes_already_stored_legacy_text(self):
+        repo_dir = self.register_project("acme", ["acme/app"])
+        self.run_cli(["party", "start", "alpha"], "sess-1", repo_dir)
+        self.run_cli(["quest", "add", "demo", "--title", "Demo", "--no-epic"], "sess-1", repo_dir)
+        conn = sqlite3.connect(str(self.data_home / "guild" / "guild.db"))
+        conn.execute("UPDATE quests SET title = ? WHERE slug = 'demo'", ("Demo\x1b[31mRED\x1b[0m",))
+        conn.commit()
+        conn.close()
+
+        code, out, err = self.run_cli(["board"], None, None)
+        self.assertEqual(code, 0)
+        self.assertIn("DemoRED", out)
+        self.assertNotIn("\x1b", out)
 
 
 if __name__ == "__main__":

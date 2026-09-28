@@ -1,4 +1,4 @@
-from guild import config, events, identity
+from guild import config, events, identity, sanitize
 from guild.commands import notice
 
 
@@ -34,8 +34,9 @@ def new_lines(ctx, binding):
             targets_guild = payload["scope"] == "guild"
             targets_project = project is not None and payload["scope"] == "project:{}".format(project)
             if targets_guild or targets_project:
+                text = sanitize.collapse_to_single_line(payload["text"])
                 lines.append(
-                    "notice #{} [{}] {}".format(payload["id"], payload["party"] or "human", payload["text"])
+                    "notice #{} [{}] {}".format(payload["id"], payload["party"] or "human", text)
                 )
         elif event["kind"] in ("ask.answered", "ask.dismissed") and caller_party is not None:
             ask_row = ctx.conn.execute(
@@ -44,7 +45,8 @@ def new_lines(ctx, binding):
             if ask_row is None or ask_row["party"] != caller_party:
                 continue
             if event["kind"] == "ask.answered":
-                lines.append("ask #{} answered: {}".format(payload["id"], payload["answer"]))
+                answer = sanitize.collapse_to_single_line(payload["answer"])
+                lines.append("ask #{} answered: {}".format(payload["id"], answer))
             else:
                 lines.append("ask #{} dismissed".format(payload["id"]))
     highest_seq = new_events[-1]["seq"] if new_events else last_seq

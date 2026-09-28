@@ -30,6 +30,15 @@ class NoticeTests(GuildTestCase):
         self.assertEqual(code, 1)
         self.assertIn("invalid", err)
 
+    def test_create_strips_escape_sequences_from_text(self):
+        code, out, err = self.run_cli(
+            ["notice", "create", "hi\x1b[31mRED\x1b[0m", "--to", "guild", "--ttl", "1h"], None, None
+        )
+        self.assertEqual(code, 0)
+        code, out, err = self.run_cli(["notices"], None, None)
+        self.assertIn("hiRED", out)
+        self.assertNotIn("\x1b", out)
+
     def test_create_and_list_guild_scope(self):
         code, out, err = self.run_cli(
             ["notice", "create", "pipeline down", "--to", "guild", "--ttl", "2h"], None, None
