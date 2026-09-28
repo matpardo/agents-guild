@@ -18,7 +18,7 @@ updated: 2026-09-28
 ## T02 — Tracker adapter, read-only
 
 **Depends on:** T01
-**Status:** [x] done
+**Status:** [x] done — #6
 
 **What:** optional `sdd.epic_key_field` reads the epic's own card key from its `tasks.md` frontmatter into `epics.jira_key`; `sync --source tracker` (`jira-acli` adapter over `acli`) observes each card's status, status category and parent (children of an epic get `parent_key = <epic>`, everything else fetched by key gets `parent_key = NULL`); invalid keys, not-found keys and adapter failures are reported per card, non-fatal to the rest of the sync.
 
