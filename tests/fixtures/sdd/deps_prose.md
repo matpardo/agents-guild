@@ -8,7 +8,7 @@
 
 ## T02 — Ship feature flag
 
-**Deps:** T01 (gate — blocks until merged), T14
+**Deps:** T01 (gate — needs T01 merged first), T14
 
 **Status:** [ ] pending
 

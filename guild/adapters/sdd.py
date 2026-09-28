@@ -30,8 +30,19 @@ def _find_deps(body, deps_line_re):
         match = deps_line_re.match(line.strip())
         if match is None:
             continue
-        return _TID_TOKEN_RE.findall(_captured_text(match))
+        return _dedupe(_TID_TOKEN_RE.findall(_captured_text(match)))
     return []
+
+
+def _dedupe(tids):
+    seen = set()
+    result = []
+    for tid in tids:
+        if tid in seen:
+            continue
+        seen.add(tid)
+        result.append(tid)
+    return result
 
 
 def _find_status(body, status_line_re):

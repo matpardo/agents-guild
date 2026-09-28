@@ -49,6 +49,15 @@ class DepsParsingTests(unittest.TestCase):
         by_tid = {t["tid"]: t for t in tasks}
         self.assertEqual(by_tid["T02"]["deps"], ["T01", "T14"])
 
+    def test_repeated_tid_in_prose_is_deduped(self):
+        tasks = sdd.parse_tasks_text(
+            "## T02 — Ship feature flag\n\n"
+            "**Deps:** T01 (gate — needs T01 merged first), T14\n\n"
+            "**Status:** [ ] pending\n",
+            _PATTERNS,
+        )
+        self.assertEqual(tasks[0]["deps"], ["T01", "T14"])
+
     def test_em_dash_alone_means_no_deps(self):
         tasks = _parse("deps_none.md", _PATTERNS)
         self.assertEqual(tasks[0]["deps"], [])
