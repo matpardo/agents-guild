@@ -1,4 +1,4 @@
-from guild import db, events, identity, paths, render
+from guild import db, events, identity, names, paths, render
 from guild.commands import claim as claim_commands
 from guild.commands import next as next_commands
 from guild.commands import notice as notice_commands
@@ -70,8 +70,10 @@ def run(ctx, in_flight, learned):
     binding = identity.require_binding(ctx.conn, ctx.session_id)
     party, generation = binding["party"], binding["generation"]
     content = _render_handoff(ctx, binding, in_flight, learned)
-    handoff_path = paths.handoffs_dir() / "{}-g{}.md".format(party, generation)
-    handoff_path.parent.mkdir(parents=True, exist_ok=True)
+    handoffs_dir = paths.handoffs_dir()
+    handoff_path = handoffs_dir / "{}-g{}.md".format(party, generation)
+    handoffs_dir.mkdir(parents=True, exist_ok=True)
+    handoff_path = names.ensure_within(handoff_path, handoffs_dir)
     handoff_path.write_text(content)
     with db.writing(ctx.conn):
         events.record(

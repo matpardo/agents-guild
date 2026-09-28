@@ -23,6 +23,13 @@ class NoticeTests(GuildTestCase):
         )
         self.assertEqual(code, 1)
 
+    def test_create_rejects_path_traversal_project_scope(self):
+        code, out, err = self.run_cli(
+            ["notice", "create", "hi", "--to", "project:../../tmp/x", "--ttl", "1h"], None, None
+        )
+        self.assertEqual(code, 1)
+        self.assertIn("invalid", err)
+
     def test_create_and_list_guild_scope(self):
         code, out, err = self.run_cli(
             ["notice", "create", "pipeline down", "--to", "guild", "--ttl", "2h"], None, None

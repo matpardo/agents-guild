@@ -1,4 +1,5 @@
 import sqlite3
+from unittest import mock
 
 from tests.testutil import GuildTestCase
 
@@ -82,6 +83,17 @@ class HandoffTests(GuildTestCase):
         )
         content = (self.data_home / "guild" / "handoffs" / "alpha-g1.md").read_text()
         self.assertIn("failing checks", content)
+
+    def test_defense_in_depth_rejects_handoff_path_escaping_handoffs_dir(self):
+        malicious_binding = {"party": "../../tmp/evil", "generation": 1, "project": "acme"}
+        with mock.patch("guild.identity.require_binding", return_value=malicious_binding):
+            code, out, err = self.run_cli(
+                ["handoff", "--in-flight", "x", "--learned", "y"], "sess-1", self.repo_dir
+            )
+        self.assertEqual(code, 1)
+        self.assertIn("escapes", err)
+        escaped_path = self.data_home / "tmp" / "evil-g1.md"
+        self.assertFalse(escaped_path.exists())
 
 
 if __name__ == "__main__":

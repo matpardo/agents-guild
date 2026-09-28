@@ -126,6 +126,23 @@ class PartyStartResumeCloseTests(GuildTestCase):
         self.assertIn("party: (unbound)", out)
 
 
+class PartyNameValidationTests(GuildTestCase):
+    def test_start_rejects_path_traversal_name(self):
+        code, out, err = self.run_cli(["party", "start", "../../tmp/x"], "sess-1", None)
+        self.assertEqual(code, 1)
+        self.assertIn("invalid party name", err)
+
+    def test_start_rejects_slash_in_name(self):
+        code, out, err = self.run_cli(["party", "start", "a/b"], "sess-1", None)
+        self.assertEqual(code, 1)
+        self.assertIn("invalid party name", err)
+
+    def test_resume_rejects_path_traversal_name(self):
+        code, out, err = self.run_cli(["party", "resume", "../../tmp/x"], "sess-1", None)
+        self.assertEqual(code, 1)
+        self.assertIn("invalid party name", err)
+
+
 class WriteRefusalTests(GuildTestCase):
     def test_unbound_write_is_refused_with_hint(self):
         code, out, err = self.run_cli(

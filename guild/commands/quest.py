@@ -1,4 +1,4 @@
-from guild import config, db, events, identity
+from guild import config, db, events, identity, names
 from guild.errors import GuildError
 
 
@@ -28,6 +28,7 @@ def _resolve_epic_tasks(conn, project, epic, tasks_csv):
 
 
 def add(ctx, slug, title, epic, tasks_csv, no_epic):
+    names.validate_name(slug, "quest slug")
     if no_epic and (epic is not None or tasks_csv is not None):
         raise GuildError("--no-epic cannot be combined with --epic or --tasks", 1)
     if not no_epic and (epic is None or tasks_csv is None):
