@@ -1,13 +1,17 @@
+import json
 import os
 import shlex
 import subprocess
 import sys
 from pathlib import Path
 
-from guild import db, identity
+from guild import config, db, identity
 from guild.adapters import github
 from guild.commands import brief as brief_commands
 from guild.commands import inbox as inbox_commands
+from guild.commands import next as next_commands
+from guild.commands import party as party_commands
+from guild.commands import statusline as statusline_commands
 from guild.identity import UNBOUND_HINT
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -28,14 +32,60 @@ def _spawn_background_sync(cwd):
     )
 
 
+def _resume_marker_path(ctx, generation):
+    return ctx.state_dir / "hints" / "resumed-{}-g{}".format(identity.cursor_key(ctx.session_id), generation)
+
+
+def _resume_lines(ctx, binding):
+    if binding["generation"] <= 1:
+        return []
+    marker = _resume_marker_path(ctx, binding["generation"])
+    if marker.exists():
+        return []
+    handoff_content = party_commands.previous_handoff_content(
+        ctx.conn, binding["party"], binding["generation"]
+    )
+    if handoff_content is None:
+        return []
+    marker.parent.mkdir(parents=True, exist_ok=True)
+    marker.touch()
+    return [handoff_content, ""] + next_commands.run(ctx, binding, False, False)
+
+
 def session_start(ctx):
-    text = "\n".join(brief_commands.render_brief(ctx))
+    binding = identity.resolve_binding(ctx.conn, ctx.session_id)
+    lines = []
+    if binding is not None:
+        lines = _resume_lines(ctx, binding)
+    lines.extend(brief_commands.render_brief(ctx))
     _spawn_background_sync(ctx.cwd)
-    return text
+    return "\n".join(lines)
 
 
 def _hint_marker_path(ctx):
     return ctx.state_dir / "hints" / identity.cursor_key(ctx.session_id)
+
+
+def _nudge_marker_path(ctx):
+    return ctx.state_dir / "hints" / "nudge-{}".format(identity.cursor_key(ctx.session_id))
+
+
+def _ctx_nudge_lines(ctx, project):
+    if project is None:
+        return []
+    pct = statusline_commands.read_ctx(ctx.state_dir, ctx.session_id)
+    if pct is None:
+        return []
+    project_data = config.load_project(ctx.projects_dir, project)
+    threshold = project_data.get("handoff_threshold")
+    if threshold is None or pct < threshold:
+        return []
+    marker = _nudge_marker_path(ctx)
+    if marker.exists():
+        return []
+    marker.parent.mkdir(parents=True, exist_ok=True)
+    marker.touch()
+    return ["Context at {}%. Finish current step, run `guild handoff`.".format(pct)]
 
 
 def prompt_submit(ctx):
@@ -47,9 +97,30 @@ def prompt_submit(ctx):
             marker.parent.mkdir(parents=True, exist_ok=True)
             marker.touch()
             lines = [UNBOUND_HINT] + lines
+    project = binding["project"] if binding is not None else None
+    lines = lines + _ctx_nudge_lines(ctx, project)
     with db.writing(ctx.conn):
         inbox_commands.advance_cursor(ctx.conn, identity.cursor_key(ctx.session_id), seq)
     return "\n".join(lines)
+
+
+def post_tool_use(ctx):
+    binding = identity.resolve_binding(ctx.conn, ctx.session_id)
+    lines, seq = inbox_commands.new_lines(ctx, binding)
+    project = binding["project"] if binding is not None else None
+    lines = lines + _ctx_nudge_lines(ctx, project)
+    with db.writing(ctx.conn):
+        inbox_commands.advance_cursor(ctx.conn, identity.cursor_key(ctx.session_id), seq)
+    if not lines:
+        return None
+    return json.dumps(
+        {
+            "hookSpecificOutput": {
+                "hookEventName": "PostToolUse",
+                "additionalContext": "\n".join(lines),
+            }
+        }
+    )
 
 
 def _push_segments(command):

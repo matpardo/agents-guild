@@ -47,6 +47,15 @@ def _party_closed(conn, event):
     )
 
 
+def _party_handed_off(conn, event):
+    payload = event["payload"]
+    conn.execute("UPDATE parties SET state = 'awaiting-leader' WHERE name = ?", (payload["party"],))
+    conn.execute(
+        "UPDATE leaders SET handoff_path = ? WHERE party = ? AND generation = ?",
+        (payload["handoff_path"], payload["party"], payload["generation"]),
+    )
+
+
 def _quest_added(conn, event):
     payload = event["payload"]
     conn.execute(
@@ -95,12 +104,40 @@ def _task_done(conn, event):
     )
 
 
+def _epic_synced(conn, event):
+    payload = event["payload"]
+    project, epic = payload["project"], payload["epic"]
+    conn.execute(
+        "INSERT INTO epics (project, epic, title, jira_key, sdd_path, sdd_status)"
+        " VALUES (?, ?, NULL, NULL, ?, NULL)"
+        " ON CONFLICT(project, epic) DO UPDATE SET sdd_path = excluded.sdd_path",
+        (project, epic, payload["sdd_path"]),
+    )
+    conn.execute("DELETE FROM tasks WHERE project = ? AND epic = ?", (project, epic))
+    for task in payload["tasks"]:
+        conn.execute(
+            "INSERT INTO tasks (project, epic, tid, title, jira_key, deps, order_idx, sdd_status)"
+            " VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            (
+                project,
+                epic,
+                task["tid"],
+                task["title"],
+                task["jira_key"],
+                _dump(task["deps"]),
+                task["order_idx"],
+                task["sdd_status"],
+            ),
+        )
+
+
 def _pr_tracked(conn, event):
     payload = event["payload"]
     conn.execute(
         "INSERT INTO prs (repo, number, party, task_quest, task_tid, what, waits, lifecycle,"
-        " branch, title, gh_state, gh_draft, checks_failing, checks_passing, seeded, synced_at)"
-        " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, ?, NULL)",
+        " branch, title, gh_state, gh_draft, checks_failing, checks_passing, seeded, synced_at,"
+        " mergeable, review_comment_count, last_notified_comment_count, last_activity_at)"
+        " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, ?, NULL, NULL, 0, 0, ?)",
         (
             payload["repo"],
             payload["number"],
@@ -115,23 +152,56 @@ def _pr_tracked(conn, event):
             payload["gh_state"],
             payload["gh_draft"],
             payload["seeded"],
+            event["ts"],
         ),
     )
 
 
 def _pr_set(conn, event):
     payload = event["payload"]
+    current = conn.execute(
+        "SELECT lifecycle, waits, last_activity_at FROM prs WHERE repo = ? AND number = ?",
+        (payload["repo"], payload["number"]),
+    ).fetchone()
+    changed = current["lifecycle"] != payload["lifecycle"] or current["waits"] != payload["waits"]
+    last_activity_at = event["ts"] if changed else current["last_activity_at"]
     conn.execute(
-        "UPDATE prs SET lifecycle = ?, waits = ? WHERE repo = ? AND number = ?",
-        (payload["lifecycle"], payload["waits"], payload["repo"], payload["number"]),
+        "UPDATE prs SET lifecycle = ?, waits = ?, last_activity_at = ? WHERE repo = ? AND number = ?",
+        (payload["lifecycle"], payload["waits"], last_activity_at, payload["repo"], payload["number"]),
+    )
+
+
+_PR_SYNCED_CARRY_FORWARD_FIELDS = ("mergeable", "review_comment_count")
+
+
+def _pr_synced_field(current, payload, field):
+    if field in payload:
+        return payload[field]
+    return current[field]
+
+
+def _pr_synced_changed(current, payload):
+    fields = ("lifecycle", "gh_state", "gh_draft", "branch", "title", "checks_failing", "checks_passing")
+    if any(current[field] != payload[field] for field in fields):
+        return True
+    return any(
+        current[field] != _pr_synced_field(current, payload, field)
+        for field in _PR_SYNCED_CARRY_FORWARD_FIELDS
     )
 
 
 def _pr_synced(conn, event):
     payload = event["payload"]
+    current = conn.execute(
+        "SELECT lifecycle, gh_state, gh_draft, branch, title, checks_failing, checks_passing,"
+        " mergeable, review_comment_count, last_activity_at FROM prs WHERE repo = ? AND number = ?",
+        (payload["repo"], payload["number"]),
+    ).fetchone()
+    last_activity_at = event["ts"] if _pr_synced_changed(current, payload) else current["last_activity_at"]
     conn.execute(
         "UPDATE prs SET lifecycle = ?, gh_state = ?, gh_draft = ?, branch = ?, title = ?,"
-        " checks_failing = ?, checks_passing = ?, synced_at = ? WHERE repo = ? AND number = ?",
+        " checks_failing = ?, checks_passing = ?, mergeable = ?, review_comment_count = ?,"
+        " synced_at = ?, last_activity_at = ? WHERE repo = ? AND number = ?",
         (
             payload["lifecycle"],
             payload["gh_state"],
@@ -140,10 +210,25 @@ def _pr_synced(conn, event):
             payload["title"],
             payload["checks_failing"],
             payload["checks_passing"],
+            _pr_synced_field(current, payload, "mergeable"),
+            _pr_synced_field(current, payload, "review_comment_count"),
             payload["synced_at"],
+            last_activity_at,
             payload["repo"],
             payload["number"],
         ),
+    )
+
+
+def _pr_comments_acknowledged(conn, event):
+    payload = event["payload"]
+    row = conn.execute(
+        "SELECT review_comment_count FROM prs WHERE repo = ? AND number = ?",
+        (payload["repo"], payload["number"]),
+    ).fetchone()
+    conn.execute(
+        "UPDATE prs SET last_notified_comment_count = ? WHERE repo = ? AND number = ?",
+        (row["review_comment_count"], payload["repo"], payload["number"]),
     )
 
 
@@ -223,14 +308,17 @@ _REDUCERS = {
     "party.started": _party_started,
     "party.resumed": _party_resumed,
     "party.closed": _party_closed,
+    "party.handed_off": _party_handed_off,
     "quest.added": _quest_added,
     "task.added": _task_added,
     "task.started": _task_started,
     "task.blocked": _task_blocked,
     "task.done": _task_done,
+    "epic.synced": _epic_synced,
     "pr.tracked": _pr_tracked,
     "pr.set": _pr_set,
     "pr.synced": _pr_synced,
+    "pr.comments_acknowledged": _pr_comments_acknowledged,
     "ask.created": _ask_created,
     "ask.answered": _ask_answered,
     "ask.dismissed": _ask_dismissed,

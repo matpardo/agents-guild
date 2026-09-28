@@ -17,3 +17,16 @@ def read_session_name(sessions_dir, session_id):
         if data.get("sessionId") == session_id:
             return data.get("name")
     return None
+
+
+def resolve_session_id(sessions_dir, session_name):
+    if not sessions_dir.is_dir():
+        return None
+    for entry in sessions_dir.glob("*.json"):
+        try:
+            data = json.loads(entry.read_text())
+        except (json.JSONDecodeError, OSError):
+            continue
+        if data.get("name") == session_name:
+            return data.get("sessionId")
+    return None

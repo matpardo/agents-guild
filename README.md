@@ -46,7 +46,7 @@ guild whoami
 guild init-project <name> --config <file.json>
 
 guild party start <name>
-guild party resume <party>
+guild party resume <party> [--session <name>]   # --session: from a human terminal only
 guild party close
 
 guild quest add <slug> --title "..." --epic <slug> --tasks T09,T07b
@@ -69,18 +69,22 @@ guild notice create "<text>" --to project:<name>|guild --ttl <dur> [--until pr:<
 guild notice close <id>
 guild notices
 
-guild claim <area> --ttl <dur>
+guild claim <area> --ttl <dur>          # area, or task:<epic>/<tid> / task:<quest>/<tid>
 guild release <area>
 guild claims
 
+guild next [--all]     # ranked action queue for the caller's party
+guild handoff --in-flight "..." --learned "..."
+
 guild board [--party <name>]
-guild sync --source gh
+guild sync --source gh|sdd
 guild brief
 guild inbox --since-last
-guild statusline --session <id>
+guild statusline --session <id> [--ctx <pct>]
 
 guild hook session-start   # reads Claude Code hook JSON on stdin
 guild hook prompt-submit
+guild hook post-tool-use
 guild hook pre-push
 
 guild seed <file.json>
@@ -90,6 +94,72 @@ guild export --visibility guild
 
 Refs use two literal formats: `pr:<owner/repo>#<n>` and `task:<quest>/<tid>`.
 Durations: `30m`, `8h`, `3d` — anything else is rejected.
+
+### `guild next`
+
+Deterministic, per-party ranking, evaluated in order:
+
+1. Own PR with failing checks, a merge conflict (`mergeable == CONFLICTING`),
+   or unseen review comments (`review_comment_count >
+   last_notified_comment_count`).
+2. Own PR whose lifecycle is `needs-human` and has an ask, referencing it,
+   answered after the PR was last `pr set`.
+3. Own PR `converging` with no activity for longer than the project's
+   `next.stale_hours` (skipped entirely when that key is absent — no hidden
+   default).
+4. Next queued task of the caller's active quests, ordered by the observed
+   `tasks.order_idx` (nulls last, then `tid`), whose dependencies (`tasks.deps`)
+   all resolve `done` (see resolver below), that has no open ask referencing
+   it and is not task-claimed by another party.
+5. Nothing actionable: the exact blockers (pending deps and who says so, open
+   ask ids, claim holders).
+
+Any disagreement the dependency resolver finds between sources it consulted
+is always printed as a `disagreement: ...` line, whether or not it changed
+the outcome.
+
+Without `--all`, only the single top item is printed; if it is a PR selected
+because of new review comments, `guild next` also fires
+`pr.comments_acknowledged` for it (documented side effect — the PR's
+`last_notified_comment_count` catches up so the same comments are not
+reported again). `guild next --all` prints the full queue and is always
+read-only: it never fires that event.
+
+### Task done resolver
+
+`guild next`'s dependency check (and future `guild drift`) resolve whether a
+task is done by asking, in this fixed precedence order, the first source
+that has an opinion: **guild** (any `quest_tasks` row for that epic/tid —
+`done` state means done, any other state means not done), **tracker** (JIRA,
+phase 3 — no opinion yet), **sdd** (`tasks.sdd_status`). No opinion anywhere
+→ not done, never assumed done. When more than one source has an opinion and
+they disagree, the disagreement is returned and surfaced by `guild next`.
+
+### `guild handoff` and resuming a party
+
+`guild handoff --in-flight "..." --learned "..."` (both required, non-empty)
+renders `$XDG_DATA_HOME/guild/handoffs/<party>-g<N>.md` from the DB (active
+quests, the full `guild next --all` queue, PRs, open asks, active notices and
+claims, plus the two free-text fields), records `party.handed_off` (party →
+`awaiting-leader`, `leaders.handoff_path` set for this generation) and prints
+one command for the human to run:
+
+```
+claude -n <party>-g<N+1> "run in Bash `guild party resume <party>`, then read the handoff it prints"
+```
+
+There is no `/guild-resume` skill: the printed prompt is the entire contract.
+`guild party resume <party>` prints the previous generation's handoff content
+plus a single (read-only, non-acknowledging) `guild next` line. A
+freshly-resumed generation's very next `SessionStart` (e.g. after `/clear`)
+shows the same handoff + next line once more, then reverts to the normal
+brief.
+
+`guild party resume <party> --session <name>` lets a human resume a party for
+a session that already exists but was never bound (resolves the session id
+via `~/.claude/sessions` by its `/rename` name). It is refused from inside a
+Claude Code session (use the plain form there) and fails clearly when the
+name is not found.
 
 ### Design note: `notice`
 
@@ -132,21 +202,81 @@ order). Commands that need a project fail clearly when none matches.
 {
   "name": "acme",
   "paths": ["~/Documents/_projects/acme/*"],
-  "github": {"repos": ["acme/app", "acme/docs"]}
+  "github": {"repos": ["acme/app", "acme/docs"]},
+  "sdd": {
+    "root": "~/Documents/_projects/acme/sdd-docs",
+    "epics_dir": "epics",
+    "task_heading": "^#{2,3}\\s+(T\\d+\\w*)\\s+.*[-—]\\s*(.+)$",
+    "key_ref": "[A-Z]{2,10}-\\d+",
+    "deps_line": "^\\*\\*Depende de:\\*\\*\\s*(.+)$",
+    "status_line": "^\\*\\*Status:\\*\\*\\s*(.+)$",
+    "order_list": "^\\d+\\.\\s+(.+)$"
+  },
+  "next": {"stale_hours": 8},
+  "handoff_threshold": 80
 }
 ```
 
-Unknown top-level keys are allowed (reserved for phase 2/3: `jira`, `sdd`).
+- `sdd` (optional): drives `guild sync --source sdd`. Three independent,
+  explicit regexes (`task_heading`, `key_ref`, `deps_line`, `status_line`) plus
+  an optional `order_list`; no hidden defaults, no fallback shape. A
+  `tasks.md` file with zero `task_heading` matches is reported unparseable
+  and skipped; other files still sync; `guild sync` exits non-zero if any
+  file failed. See "SDD parsing rules" below for exactly how each regex is
+  used.
+- `next.stale_hours` (optional): threshold for `guild next` tier 3
+  (`converging` PR with no activity). Absent → that tier is skipped, never
+  defaulted.
+- `handoff_threshold` (optional): context-usage percent (0-100) at or above
+  which `UserPromptSubmit`/`PostToolUse` hooks nudge once per session toward
+  `guild handoff`. Absent → no nudge.
+- Unknown top-level keys are allowed (reserved for phase 3: `jira`).
+
+### SDD parsing rules
+
+- `task_heading` matches a `##`/`###` line; group 1 is the tid, group 2 the
+  title (write it so a greedy `.*` before the last dash-like separator lands
+  the title after that separator, regardless of what precedes it — a `→ KEY`
+  or `(KEY)` connector, or nothing).
+- `key_ref` is searched (not matched) against the heading line only; a
+  generic token pattern such as `[A-Z]{2,10}-\d+` covers `→ KEY`, `(KEY)` and
+  `· KEY` connectors. No match on that line → no key, even if the task has a
+  `**JIRA:**`-style line elsewhere in its body (out of scope for the heading
+  regex by design).
+- `deps_line`/`order_list` are matched per body line; whichever line matches
+  contributes its tid tokens via a fixed `T\d+\w*` token search, never a
+  strict CSV split — prose around the ids (`T01 (gate — ...), T14`) and
+  repeated mentions of the same tid are both handled; a bare `—` (or any line
+  with no tid tokens) means no deps / no explicit order for that task.
+  `order_list` is optional; without it every task's `order_idx` is `None`.
+- `status_line` is matched per body line; only a literal `[x]` checkbox
+  counts as done. Anything else — `[ ]`, free text with no checkbox, or no
+  matching line at all — is pending. This is a deliberate simplification: SDD
+  files that write `**Status:** done` in prose without a checkbox still read
+  as pending until the checkbox is ticked.
 
 ## Storage
 
 Append-only `events` table (SQLite, WAL, `busy_timeout=5000`, writes wrapped
 in `BEGIN IMMEDIATE`) plus projection tables kept in sync in the same
-transaction: `parties`, `leaders`, `quests`, `quest_tasks`, `prs`, `asks`,
-`notices`, `claims`, `cursors`. `guild rebuild` drops every projection and
-replays all events from scratch — the only exception is `cursors`, which is
-a per-session read position, not domain state, and is left untouched by
-rebuild.
+transaction: `parties`, `leaders`, `quests`, `quest_tasks`, `epics`, `tasks`,
+`prs`, `asks`, `notices`, `claims`, `cursors`. `guild rebuild` drops every
+projection and replays all events from scratch — the only exception is
+`cursors`, which is a per-session read position, not domain state, and is
+left untouched by rebuild.
+
+`epics`/`tasks` are observed-only (never written by a guild command): they
+hold whatever `guild sync --source sdd` last read, keyed by
+`(project, epic)` / `(project, epic, tid)`. `leaders.handoff_path` and the
+PR activity columns (`prs.mergeable`, `prs.review_comment_count`,
+`prs.last_notified_comment_count`, `prs.last_activity_at`) were added by a
+schema migration (`schema._add_column_if_missing`, `ALTER TABLE ... ADD
+COLUMN`, guarded by `PRAGMA table_info`) that runs on every `db.connect`, so
+a pre-existing database picks them up in place — no separate migrate step,
+no data loss. Old events recorded before `mergeable`/`review_comment_count`
+existed lack those payload keys; `guild rebuild` tolerates that (carries the
+current stored value forward instead of raising) so historic databases
+replay cleanly.
 
 Default paths (all overridable via env, useful for tests):
 
@@ -159,7 +289,10 @@ Default paths (all overridable via env, useful for tests):
 
 `guild seed <file.json>` loads state through the normal event path (so
 `guild rebuild` reproduces it). Seeded PRs skip the `gh` existence check
-(payload flag `seeded: true`).
+(payload flag `seeded: true`); seeded epic-quest tasks skip the "tid must
+exist in the synced `tasks` table" check that `guild quest add --epic ...`
+enforces (seed writes `quest.added` events directly, bypassing that
+command).
 
 ```json
 {
@@ -229,6 +362,9 @@ Wired from `~/.claude/settings.json` (not part of this repo):
     "UserPromptSubmit": [
       {"hooks": [{"type": "command", "command": "guild hook prompt-submit"}]}
     ],
+    "PostToolUse": [
+      {"hooks": [{"type": "command", "command": "guild hook post-tool-use"}]}
+    ],
     "PreToolUse": [
       {
         "matcher": "Bash",
@@ -240,10 +376,24 @@ Wired from `~/.claude/settings.json` (not part of this repo):
 ```
 
 - `session-start`: prints `guild brief` to stdout (becomes context), then
-  spawns `guild sync --source gh` in the background, detached.
+  spawns `guild sync --source gh` in the background, detached. If this
+  session was just bound as generation N > 1 (i.e. a resumed party) and this
+  generation's handoff has not been shown yet, it is prepended once, together
+  with a single read-only `guild next` line, ahead of the normal brief — this
+  also covers a `SessionStart` refire (e.g. after `/clear`) within the same
+  resumed generation.
 - `prompt-submit`: prints only events new since this session's cursor
   (notices, answers/dismissals of this party's asks). Unbound sessions also
-  get the binding hint, once. Local DB only, no network.
+  get the binding hint, once. If a project `handoff_threshold` is configured
+  and the last `guild statusline --ctx <pct>` recorded for this session is at
+  or above it, nudges once per session toward `guild handoff`. Local DB only,
+  no network.
+- `post-tool-use`: the same new-events-since-cursor and context-threshold
+  nudge as `prompt-submit` (sharing the same cursor, so nothing is reported
+  twice across the two hooks), emitted as
+  `{"hookSpecificOutput": {"hookEventName": "PostToolUse", "additionalContext": "..."}}`;
+  completely silent (no output at all) when there is nothing new. Both hooks
+  run in well under 100ms against a local SQLite DB.
 - `pre-push`: inspects `git push` commands before they run; blocks pushes to
   a branch whose only PRs are merged/closed.
 
@@ -267,7 +417,28 @@ python3 -m venv .venv
 
 ## Status
 
-Phase 1 (core) only: identity, party/quest/task/pr/ask/notice/claim, board,
-brief, inbox, statusline, `gh` sync, pre-push guard, hooks, seed/rebuild/
-export. `guild next`, `guild handoff`, the SDD/JIRA adapters, `drift` and
-`raid` are later phases.
+Phase 1 (core): identity, party/quest/task/pr/ask/notice/claim, board, brief,
+inbox, statusline, `gh` sync, pre-push guard, hooks, seed/rebuild/export.
+
+Phase 2 (keep moving, this release): `sdd` adapter and `guild sync --source
+sdd` (observed `epics`/`tasks`, epic-quest task validation against them),
+gh sync extended with `mergeable`/review comment tracking, `guild next`
+(ranked action queue, dependency resolver with guild > tracker > sdd
+precedence and surfaced disagreements), task-scoped claims, ask/board
+ask-summary sorting by unblock count, context-usage nudges
+(`UserPromptSubmit`/`PostToolUse`), `guild handoff` and resuming a party
+(including by session name from a human terminal).
+
+The JIRA adapter, `observations`, `drift` and `raid` are phase 3.
+
+**Idle-session wake: no-go (spike, this release).** The design considered
+having a resumed leader auto-spawn (`claude -n ...`) instead of asking a
+human to run one command. Not built: the mechanism that could plausibly wake
+or drive a specific Claude Code session from the outside is the per-session
+socket under `~/.claude/`, which is undocumented internal IPC with a
+per-session private key — not a public contract. Building against it now
+would mean guild's core handoff flow depends on an implementation detail
+that can change without notice. `guild handoff` instead prints the one
+`claude -n <party>-g<N+1> "..."` command for a human (or an orchestrating
+agent) to run; revisit auto-spawn if a public, documented session-control
+contract appears.

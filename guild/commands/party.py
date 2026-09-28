@@ -1,5 +1,21 @@
+from pathlib import Path
+
 from guild import config, db, events, identity, session_info
+from guild.commands import next as next_commands
 from guild.errors import GuildError
+
+
+def previous_handoff_content(conn, party, generation):
+    row = conn.execute(
+        "SELECT handoff_path FROM leaders WHERE party = ? AND generation = ?",
+        (party, generation - 1),
+    ).fetchone()
+    if row is None or row["handoff_path"] is None:
+        return None
+    path = Path(row["handoff_path"])
+    if not path.is_file():
+        return None
+    return path.read_text().rstrip()
 
 
 def start(ctx, name):
@@ -28,9 +44,21 @@ def start(ctx, name):
     return "party '{}' started, generation 1".format(name)
 
 
-def resume(ctx, name):
+def _resolve_resume_session_id(ctx, session_name):
+    if session_name is not None:
+        if ctx.session_id is not None:
+            raise GuildError("--session cannot be used from inside a Claude Code session", 1)
+        session_id = session_info.resolve_session_id(ctx.sessions_dir, session_name)
+        if session_id is None:
+            raise GuildError("no session named '{}' found in {}".format(session_name, ctx.sessions_dir), 1)
+        return session_id
     if ctx.session_id is None:
         raise GuildError("party resume requires a Claude Code session", 1)
+    return ctx.session_id
+
+
+def resume(ctx, name, session_name):
+    session_id = _resolve_resume_session_id(ctx, session_name)
     row = ctx.conn.execute(
         "SELECT project, generation, state FROM parties WHERE name = ?", (name,)
     ).fetchone()
@@ -39,20 +67,26 @@ def resume(ctx, name):
     if row["state"] == "closed":
         raise GuildError("party '{}' is closed".format(name), 1)
     generation = row["generation"] + 1
-    session_name = session_info.read_session_name(ctx.sessions_dir, ctx.session_id)
+    resolved_session_name = session_name or session_info.read_session_name(ctx.sessions_dir, session_id)
     with db.writing(ctx.conn):
         events.record(
             ctx.conn,
             ctx.now,
             ctx.origin,
             name,
-            ctx.session_id,
+            session_id,
             row["project"],
             "party.resumed",
             "local",
-            {"party": name, "generation": generation, "session_name": session_name},
+            {"party": name, "generation": generation, "session_name": resolved_session_name},
         )
-    return "party '{}' resumed, generation {}".format(name, generation)
+    lines = ["party '{}' resumed, generation {}".format(name, generation)]
+    handoff_content = previous_handoff_content(ctx.conn, name, generation)
+    if handoff_content is not None:
+        lines += ["", handoff_content, ""]
+        binding = identity.resolve_binding(ctx.conn, session_id)
+        lines.extend(next_commands.run(ctx, binding, False, False))
+    return "\n".join(lines)
 
 
 def close(ctx):

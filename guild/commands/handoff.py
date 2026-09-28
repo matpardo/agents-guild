@@ -1,0 +1,88 @@
+from guild import db, events, identity, paths, render
+from guild.commands import claim as claim_commands
+from guild.commands import next as next_commands
+from guild.commands import notice as notice_commands
+from guild.errors import GuildError
+
+
+def _section(title, lines):
+    return ["## {}".format(title), *lines, ""]
+
+
+def _quest_lines(conn, party):
+    quests = conn.execute(
+        "SELECT slug, title FROM quests WHERE party = ? AND state = 'active' ORDER BY slug ASC",
+        (party,),
+    ).fetchall()
+    return ["- {} — {}".format(row["slug"], row["title"]) for row in quests]
+
+
+def _pr_lines(conn, party):
+    rows = conn.execute(
+        "SELECT * FROM prs WHERE party = ? ORDER BY repo ASC, number ASC", (party,)
+    ).fetchall()
+    return ["- {}".format(render.pr_line(row)) for row in rows]
+
+
+def _ask_lines(conn, party):
+    rows = conn.execute(
+        "SELECT id, question FROM asks WHERE party = ? AND state = 'open' ORDER BY id ASC",
+        (party,),
+    ).fetchall()
+    return ["- #{}: {}".format(row["id"], row["question"]) for row in rows]
+
+
+def _notice_lines(conn, now, party):
+    rows = [row for row in notice_commands.active_notices(conn, now) if row["party"] == party]
+    return ["- #{}: {}".format(row["id"], row["text"]) for row in rows]
+
+
+def _claim_lines(conn, now, party):
+    rows = [row for row in claim_commands.list_claims(conn, now) if row["party"] == party]
+    return ["- {} until {}".format(row["area"], row["expires_at"]) for row in rows]
+
+
+def _render_handoff(ctx, binding, in_flight, learned):
+    lines = ["# Handoff: {} (generation {})".format(binding["party"], binding["generation"]), ""]
+    lines += _section("Quest", _quest_lines(ctx.conn, binding["party"]))
+    lines += _section(
+        "Next", ["- {}".format(line) for line in next_commands.run(ctx, binding, True, False)]
+    )
+    lines += _section("PRs", _pr_lines(ctx.conn, binding["party"]))
+    lines += _section("Open asks", _ask_lines(ctx.conn, binding["party"]))
+    lines += _section("Active notices", _notice_lines(ctx.conn, ctx.now, binding["party"]))
+    lines += _section("Claims", _claim_lines(ctx.conn, ctx.now, binding["party"]))
+    lines += _section("In flight", [in_flight])
+    lines += _section("Learned", [learned])
+    return "\n".join(lines) + "\n"
+
+
+def _resume_command(party, next_generation):
+    prompt = "run in Bash `guild party resume {}`, then read the handoff it prints".format(party)
+    return 'claude -n {}-g{} "{}"'.format(party, next_generation, prompt)
+
+
+def run(ctx, in_flight, learned):
+    if not in_flight.strip():
+        raise GuildError("--in-flight must not be empty", 1)
+    if not learned.strip():
+        raise GuildError("--learned must not be empty", 1)
+    binding = identity.require_binding(ctx.conn, ctx.session_id)
+    party, generation = binding["party"], binding["generation"]
+    content = _render_handoff(ctx, binding, in_flight, learned)
+    handoff_path = paths.handoffs_dir() / "{}-g{}.md".format(party, generation)
+    handoff_path.parent.mkdir(parents=True, exist_ok=True)
+    handoff_path.write_text(content)
+    with db.writing(ctx.conn):
+        events.record(
+            ctx.conn,
+            ctx.now,
+            ctx.origin,
+            party,
+            ctx.session_id,
+            binding["project"],
+            "party.handed_off",
+            "local",
+            {"party": party, "generation": generation, "handoff_path": str(handoff_path)},
+        )
+    return _resume_command(party, generation + 1)

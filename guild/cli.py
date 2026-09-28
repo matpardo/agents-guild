@@ -53,7 +53,7 @@ def _handle_party_start(ctx, args):
 def _handle_party_resume(ctx, args):
     from guild.commands import party as party_commands
 
-    _print(party_commands.resume(ctx, args.party))
+    _print(party_commands.resume(ctx, args.party, args.session))
     return 0
 
 
@@ -197,6 +197,22 @@ def _handle_board(ctx, args):
     return 0
 
 
+def _handle_handoff(ctx, args):
+    from guild.commands import handoff as handoff_commands
+
+    _print(handoff_commands.run(ctx, args.in_flight, args.learned))
+    return 0
+
+
+def _handle_next(ctx, args):
+    from guild import identity
+    from guild.commands import next as next_commands
+
+    binding = identity.require_binding(ctx.conn, ctx.session_id)
+    _print_lines(next_commands.run(ctx, binding, args.all, not args.all))
+    return 0
+
+
 def _handle_sync(ctx, args):
     from guild.commands import sync as sync_commands
 
@@ -228,6 +244,8 @@ def _handle_inbox(ctx, args):
 def _handle_statusline(ctx, args):
     from guild.commands import statusline as statusline_commands
 
+    if args.ctx is not None:
+        statusline_commands.record_ctx(ctx.state_dir, args.session, args.ctx)
     _print(statusline_commands.render(ctx, args.session))
     return 0
 
@@ -263,6 +281,7 @@ def _add_party_parser(subparsers):
 
     resume = actions.add_parser("resume")
     resume.add_argument("party")
+    resume.add_argument("--session")
     resume.set_defaults(handler=_handle_party_resume)
 
     close = actions.add_parser("close")
@@ -398,6 +417,15 @@ def build_parser():
     board.add_argument("--party")
     board.set_defaults(handler=_handle_board)
 
+    next_parser = subparsers.add_parser("next")
+    next_parser.add_argument("--all", action="store_true")
+    next_parser.set_defaults(handler=_handle_next)
+
+    handoff = subparsers.add_parser("handoff")
+    handoff.add_argument("--in-flight", required=True)
+    handoff.add_argument("--learned", required=True)
+    handoff.set_defaults(handler=_handle_handoff)
+
     sync = subparsers.add_parser("sync")
     sync.add_argument("--source", required=True, choices=["gh", "jira", "sdd"])
     sync.set_defaults(handler=_handle_sync)
@@ -411,10 +439,13 @@ def build_parser():
 
     statusline = subparsers.add_parser("statusline")
     statusline.add_argument("--session", required=True)
+    statusline.add_argument("--ctx", type=int)
     statusline.set_defaults(handler=_handle_statusline)
 
     hook = subparsers.add_parser("hook")
-    hook.add_argument("hook_name", choices=["session-start", "prompt-submit", "pre-push"])
+    hook.add_argument(
+        "hook_name", choices=["session-start", "prompt-submit", "pre-push", "post-tool-use"]
+    )
 
     seed = subparsers.add_parser("seed")
     seed.add_argument("file")
@@ -469,6 +500,8 @@ def _run_stateful_hook(hook_name, stdin_data):
         ctx = _build_context(session_id, cwd)
         if hook_name == "session-start":
             text = hook_commands.session_start(ctx)
+        elif hook_name == "post-tool-use":
+            text = hook_commands.post_tool_use(ctx)
         else:
             text = hook_commands.prompt_submit(ctx)
     except Exception as error:

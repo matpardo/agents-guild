@@ -3,6 +3,8 @@ PROJECTION_TABLES = (
     "leaders",
     "quests",
     "quest_tasks",
+    "epics",
+    "tasks",
     "prs",
     "asks",
     "notices",
@@ -63,6 +65,30 @@ _CREATE_STATEMENTS = (
         summary TEXT,
         blocked_reason TEXT,
         PRIMARY KEY (quest, tid)
+    )
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS epics (
+        project TEXT NOT NULL,
+        epic TEXT NOT NULL,
+        title TEXT,
+        jira_key TEXT,
+        sdd_path TEXT,
+        sdd_status TEXT,
+        PRIMARY KEY (project, epic)
+    )
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS tasks (
+        project TEXT NOT NULL,
+        epic TEXT NOT NULL,
+        tid TEXT NOT NULL,
+        title TEXT NOT NULL,
+        jira_key TEXT,
+        deps TEXT NOT NULL,
+        order_idx INTEGER,
+        sdd_status TEXT NOT NULL,
+        PRIMARY KEY (project, epic, tid)
     )
     """,
     """
@@ -128,10 +154,31 @@ _CREATE_STATEMENTS = (
     """,
 )
 
+_COLUMN_MIGRATIONS = (
+    ("leaders", "handoff_path", "TEXT"),
+    ("prs", "mergeable", "TEXT"),
+    ("prs", "review_comment_count", "INTEGER"),
+    ("prs", "last_notified_comment_count", "INTEGER"),
+    ("prs", "last_activity_at", "TEXT"),
+)
+
+
+def _existing_columns(conn, table):
+    rows = conn.execute("PRAGMA table_info({})".format(table)).fetchall()
+    return {row["name"] for row in rows}
+
+
+def _add_column_if_missing(conn, table, column, ddl_type):
+    if column in _existing_columns(conn, table):
+        return
+    conn.execute("ALTER TABLE {} ADD COLUMN {} {}".format(table, column, ddl_type))
+
 
 def create_all(conn):
     for statement in _CREATE_STATEMENTS:
         conn.execute(statement)
+    for table, column, ddl_type in _COLUMN_MIGRATIONS:
+        _add_column_if_missing(conn, table, column, ddl_type)
 
 
 def drop_projections(conn):

@@ -1,9 +1,11 @@
 import json
 
-from guild import db, events, timeutil
-from guild.adapters import github
+from guild import config, db, events, timeutil
+from guild.adapters import github, sdd
 from guild.commands import notice as notice_commands
 from guild.errors import GuildError
+
+_SDD_PATTERN_KEYS = ("task_heading", "key_ref", "deps_line", "status_line")
 
 _FAILING_CONCLUSIONS = ("FAILURE", "CANCELLED", "TIMED_OUT", "ACTION_REQUIRED")
 _SUCCESS_CONCLUSION = "SUCCESS"
@@ -34,10 +36,14 @@ def _sync_pr(ctx, row):
         ctx.cwd,
         row["repo"],
         row["number"],
-        ["state", "isDraft", "mergedAt", "headRefName", "title", "statusCheckRollup", "reviewDecision"],
+        [
+            "state", "isDraft", "mergedAt", "headRefName", "title", "statusCheckRollup",
+            "reviewDecision", "mergeable", "comments", "reviews",
+        ],
     )
     failing, passing = _count_checks(gh_data.get("statusCheckRollup"))
     lifecycle = _lifecycle_from_gh(row["lifecycle"], gh_data)
+    review_comment_count = len(gh_data.get("comments") or []) + len(gh_data.get("reviews") or [])
     with db.writing(ctx.conn):
         events.record(
             ctx.conn,
@@ -58,6 +64,8 @@ def _sync_pr(ctx, row):
                 "checks_failing": failing,
                 "checks_passing": passing,
                 "lifecycle": lifecycle,
+                "mergeable": gh_data.get("mergeable"),
+                "review_comment_count": review_comment_count,
                 "synced_at": timeutil.to_iso(ctx.now),
             },
         )
@@ -89,9 +97,7 @@ def _close_met_notices(ctx):
             )
 
 
-def run(ctx, source):
-    if source != "gh":
-        raise GuildError("sync source '{}' is not implemented in phase 1".format(source), 1)
+def _sync_gh(ctx):
     rows = ctx.conn.execute(
         "SELECT * FROM prs WHERE lifecycle NOT IN ('merged', 'closed')"
     ).fetchall()
@@ -103,3 +109,55 @@ def run(ctx, source):
             failures.append("{}#{}: {}".format(row["repo"], row["number"], error))
     _close_met_notices(ctx)
     return failures
+
+
+def _sdd_patterns(sdd_config):
+    patterns = {key: sdd_config[key] for key in _SDD_PATTERN_KEYS}
+    if "order_list" in sdd_config:
+        patterns["order_list"] = sdd_config["order_list"]
+    return patterns
+
+
+def _sync_epic_file(ctx, project, epic, path, patterns):
+    tasks = sdd.parse_tasks_file(path, patterns)
+    if tasks is None:
+        raise GuildError("no matching task headings", 1)
+    with db.writing(ctx.conn):
+        events.record(
+            ctx.conn,
+            ctx.now,
+            ctx.origin,
+            None,
+            ctx.session_id,
+            project,
+            "epic.synced",
+            "local",
+            {"project": project, "epic": epic, "sdd_path": str(path), "tasks": tasks},
+        )
+
+
+def _sync_sdd(ctx):
+    project = config.require_project(ctx.cwd, ctx.projects_dir)
+    project_data = config.load_project(ctx.projects_dir, project)
+    sdd_config = project_data.get("sdd")
+    if sdd_config is None:
+        raise GuildError(
+            "project '{}' has no 'sdd' config block: add one to sync SDD tasks".format(project), 1
+        )
+    patterns = _sdd_patterns(sdd_config)
+    epic_files = sdd.discover_epic_files(sdd_config["root"], sdd_config["epics_dir"])
+    failures = []
+    for epic, path in epic_files:
+        try:
+            _sync_epic_file(ctx, project, epic, path, patterns)
+        except GuildError as error:
+            failures.append("{}: {}".format(path, error.message))
+    return failures
+
+
+def run(ctx, source):
+    if source == "gh":
+        return _sync_gh(ctx)
+    if source == "sdd":
+        return _sync_sdd(ctx)
+    raise GuildError("sync source '{}' is not implemented in phase 1".format(source), 1)

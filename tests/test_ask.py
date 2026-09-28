@@ -65,6 +65,21 @@ class AskTests(GuildTestCase):
         code, out, err = self.run_cli(["asks"], None, None)
         self.assertIn("NEEDS YOU · nothing", out)
 
+    def test_asks_sorted_by_ref_count_desc_then_created_then_id(self):
+        self.run_cli(["task", "add", "demo/T02", "--title", "Second"], "sess-1", self.repo_dir)
+        self.run_cli(
+            ["ask", "single ref?", "--context", "x", "--ref", "task:demo/T01"], "sess-1", self.repo_dir
+        )
+        self.run_cli(
+            [
+                "ask", "two refs?", "--context", "x",
+                "--ref", "task:demo/T01", "--ref", "task:demo/T02",
+            ],
+            "sess-1", self.repo_dir,
+        )
+        code, out, err = self.run_cli(["asks"], None, None)
+        self.assertLess(out.index("two refs?"), out.index("single ref?"))
+
     def test_unknown_ask_id(self):
         code, out, err = self.run_cli(["answer", "42", "x"], None, None)
         self.assertEqual(code, 1)

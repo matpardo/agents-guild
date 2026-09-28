@@ -1,6 +1,9 @@
+import json
 import time
 from unittest import mock
 
+from guild import paths
+from guild.commands import statusline as statusline_commands
 from tests.testutil import GuildTestCase
 
 
@@ -11,6 +14,32 @@ class SessionStartHookTests(GuildTestCase):
         self.assertIn("session not bound", out)
 
     def test_bound_prints_brief_and_spawns_sync(self):
+        repo_dir = self.register_project("acme", ["acme/app"])
+        self.run_cli(["party", "start", "alpha"], "sess-1", repo_dir)
+        code, out, err = self.run_hook("session-start", {"session_id": "sess-1", "cwd": str(repo_dir)})
+        self.assertEqual(code, 0)
+        self.assertIn("party: alpha", out)
+
+    def test_resumed_generation_shows_handoff_once(self):
+        repo_dir = self.register_project("acme", ["acme/app"])
+        self.run_cli(["party", "start", "alpha"], "sess-1", repo_dir)
+        self.run_cli(["quest", "add", "demo", "--title", "Demo", "--no-epic"], "sess-1", repo_dir)
+        self.run_cli(["task", "add", "demo/T01", "--title", "First"], "sess-1", repo_dir)
+        self.run_cli(
+            ["handoff", "--in-flight", "shipping T01", "--learned", "watch ci flakes"],
+            "sess-1", repo_dir,
+        )
+        self.run_cli(["party", "resume", "alpha"], "sess-2", repo_dir)
+        payload = {"session_id": "sess-2", "cwd": str(repo_dir)}
+
+        code, out, err = self.run_hook("session-start", payload)
+        self.assertIn("shipping T01", out)
+        self.assertIn("task demo/T01", out)
+
+        code, out, err = self.run_hook("session-start", payload)
+        self.assertNotIn("shipping T01", out)
+
+    def test_first_generation_never_shows_handoff(self):
         repo_dir = self.register_project("acme", ["acme/app"])
         self.run_cli(["party", "start", "alpha"], "sess-1", repo_dir)
         code, out, err = self.run_hook("session-start", {"session_id": "sess-1", "cwd": str(repo_dir)})
@@ -44,6 +73,92 @@ class PromptSubmitHookTests(GuildTestCase):
         self.assertLess(elapsed_ms, 100, "prompt-submit hook took {:.1f}ms".format(elapsed_ms))
 
 
+class CtxNudgeTests(GuildTestCase):
+    def _set_handoff_threshold(self, pct):
+        config_file = self.config_home / "guild" / "projects" / "acme.json"
+        data = json.loads(config_file.read_text())
+        data["handoff_threshold"] = pct
+        config_file.write_text(json.dumps(data))
+
+    def test_nudge_fires_once_when_over_threshold(self):
+        repo_dir = self.register_project("acme", ["acme/app"])
+        self.run_cli(["party", "start", "alpha"], "sess-1", repo_dir)
+        self._set_handoff_threshold(80)
+        statusline_commands.record_ctx(paths.state_dir(), "sess-1", 81)
+        payload = {"session_id": "sess-1", "cwd": str(repo_dir)}
+
+        code, out, err = self.run_hook("prompt-submit", payload)
+        self.assertIn("Context at 81%", out)
+
+        code, out, err = self.run_hook("prompt-submit", payload)
+        self.assertNotIn("Context at", out)
+
+    def test_no_nudge_below_threshold(self):
+        repo_dir = self.register_project("acme", ["acme/app"])
+        self.run_cli(["party", "start", "alpha"], "sess-1", repo_dir)
+        self._set_handoff_threshold(80)
+        statusline_commands.record_ctx(paths.state_dir(), "sess-1", 50)
+        code, out, err = self.run_hook(
+            "prompt-submit", {"session_id": "sess-1", "cwd": str(repo_dir)}
+        )
+        self.assertNotIn("Context at", out)
+
+    def test_no_nudge_when_threshold_not_configured(self):
+        repo_dir = self.register_project("acme", ["acme/app"])
+        self.run_cli(["party", "start", "alpha"], "sess-1", repo_dir)
+        statusline_commands.record_ctx(paths.state_dir(), "sess-1", 95)
+        code, out, err = self.run_hook(
+            "prompt-submit", {"session_id": "sess-1", "cwd": str(repo_dir)}
+        )
+        self.assertNotIn("Context at", out)
+
+
+class PostToolUseHookTests(GuildTestCase):
+    def test_silent_when_nothing_new(self):
+        repo_dir = self.register_project("acme", ["acme/app"])
+        self.run_cli(["party", "start", "alpha"], "sess-1", repo_dir)
+        code, out, err = self.run_hook(
+            "post-tool-use", {"session_id": "sess-1", "cwd": str(repo_dir)}
+        )
+        self.assertEqual(code, 0)
+        self.assertEqual(out, "")
+
+    def test_reports_new_notice_as_hook_specific_output(self):
+        repo_dir = self.register_project("acme", ["acme/app"])
+        self.run_cli(["party", "start", "alpha"], "sess-1", repo_dir)
+        self.run_cli(["party", "start", "beta"], "sess-2", repo_dir)
+        self.run_cli(["notice", "create", "pipeline down", "--to", "guild", "--ttl", "2h"], None, None)
+        code, out, err = self.run_hook(
+            "post-tool-use", {"session_id": "sess-2", "cwd": str(repo_dir)}
+        )
+        self.assertEqual(code, 0)
+        payload = json.loads(out)
+        self.assertEqual(payload["hookSpecificOutput"]["hookEventName"], "PostToolUse")
+        self.assertIn("pipeline down", payload["hookSpecificOutput"]["additionalContext"])
+
+    def test_shares_cursor_with_prompt_submit(self):
+        repo_dir = self.register_project("acme", ["acme/app"])
+        self.run_cli(["party", "start", "alpha"], "sess-1", repo_dir)
+        self.run_cli(["party", "start", "beta"], "sess-2", repo_dir)
+        self.run_cli(["notice", "create", "pipeline down", "--to", "guild", "--ttl", "2h"], None, None)
+        payload = {"session_id": "sess-2", "cwd": str(repo_dir)}
+
+        code, out, err = self.run_hook("prompt-submit", payload)
+        self.assertIn("pipeline down", out)
+
+        code, out, err = self.run_hook("post-tool-use", payload)
+        self.assertEqual(out, "")
+
+    def test_latency_under_100ms(self):
+        repo_dir = self.register_project("acme", ["acme/app"])
+        self.run_cli(["party", "start", "alpha"], "sess-1", repo_dir)
+        payload = {"session_id": "sess-1", "cwd": str(repo_dir)}
+        started = time.monotonic()
+        self.run_hook("post-tool-use", payload)
+        elapsed_ms = (time.monotonic() - started) * 1000
+        self.assertLess(elapsed_ms, 100, "post-tool-use hook took {:.1f}ms".format(elapsed_ms))
+
+
 class HookErrorContainmentTests(GuildTestCase):
     def test_session_start_swallows_exceptions(self):
         with mock.patch(
@@ -58,6 +173,14 @@ class HookErrorContainmentTests(GuildTestCase):
             "guild.commands.hook.prompt_submit", side_effect=RuntimeError("boom")
         ):
             code, out, err = self.run_hook("prompt-submit", {"session_id": "sess-1", "cwd": str(self.root)})
+        self.assertEqual(code, 0)
+        self.assertEqual(out.strip(), "guild hook error: boom")
+
+    def test_post_tool_use_swallows_exceptions(self):
+        with mock.patch(
+            "guild.commands.hook.post_tool_use", side_effect=RuntimeError("boom")
+        ):
+            code, out, err = self.run_hook("post-tool-use", {"session_id": "sess-1", "cwd": str(self.root)})
         self.assertEqual(code, 0)
         self.assertEqual(out.strip(), "guild hook error: boom")
 

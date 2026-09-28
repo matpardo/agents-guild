@@ -2,6 +2,31 @@ from guild import config, db, events, identity
 from guild.errors import GuildError
 
 
+def _resolve_epic_tasks(conn, project, epic, tasks_csv):
+    epic_row = conn.execute(
+        "SELECT epic FROM epics WHERE project = ? AND epic = ?", (project, epic)
+    ).fetchone()
+    if epic_row is None:
+        raise GuildError(
+            "epic '{}' was never synced: run `guild sync --source sdd`".format(epic), 1
+        )
+    tasks = []
+    for tid in tasks_csv.split(","):
+        tid = tid.strip()
+        if not tid:
+            continue
+        task_row = conn.execute(
+            "SELECT tid, title FROM tasks WHERE project = ? AND epic = ? AND tid = ?",
+            (project, epic, tid),
+        ).fetchone()
+        if task_row is None:
+            raise GuildError(
+                "task '{}' not found in epic '{}': run `guild sync --source sdd`".format(tid, epic), 1
+            )
+        tasks.append({"tid": task_row["tid"], "title": task_row["title"]})
+    return tasks
+
+
 def add(ctx, slug, title, epic, tasks_csv, no_epic):
     if no_epic and (epic is not None or tasks_csv is not None):
         raise GuildError("--no-epic cannot be combined with --epic or --tasks", 1)
@@ -14,11 +39,7 @@ def add(ctx, slug, title, epic, tasks_csv, no_epic):
     project = config.require_project(ctx.cwd, ctx.projects_dir)
     tasks = []
     if not no_epic:
-        for tid in tasks_csv.split(","):
-            tid = tid.strip()
-            if not tid:
-                continue
-            tasks.append({"tid": tid, "title": tid})
+        tasks = _resolve_epic_tasks(ctx.conn, project, epic, tasks_csv)
     with db.writing(ctx.conn):
         events.record(
             ctx.conn,
