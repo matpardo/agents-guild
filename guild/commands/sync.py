@@ -6,6 +6,7 @@ from guild.commands import notice as notice_commands
 from guild.errors import GuildError
 
 _SDD_PATTERN_KEYS = ("task_heading", "key_ref", "deps_line", "status_line")
+_SDD_OPTIONAL_PATTERN_KEYS = ("order_list", "key_line")
 
 _FAILING_CONCLUSIONS = ("FAILURE", "CANCELLED", "TIMED_OUT", "ACTION_REQUIRED")
 _SUCCESS_CONCLUSION = "SUCCESS"
@@ -113,8 +114,9 @@ def _sync_gh(ctx):
 
 def _sdd_patterns(sdd_config):
     patterns = {key: sdd_config[key] for key in _SDD_PATTERN_KEYS}
-    if "order_list" in sdd_config:
-        patterns["order_list"] = sdd_config["order_list"]
+    for optional_key in _SDD_OPTIONAL_PATTERN_KEYS:
+        if optional_key in sdd_config:
+            patterns[optional_key] = sdd_config[optional_key]
     return patterns
 
 
