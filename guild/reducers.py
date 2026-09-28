@@ -95,6 +95,33 @@ def _task_done(conn, event):
     )
 
 
+def _epic_synced(conn, event):
+    payload = event["payload"]
+    project, epic = payload["project"], payload["epic"]
+    conn.execute(
+        "INSERT INTO epics (project, epic, title, jira_key, sdd_path, sdd_status)"
+        " VALUES (?, ?, NULL, NULL, ?, NULL)"
+        " ON CONFLICT(project, epic) DO UPDATE SET sdd_path = excluded.sdd_path",
+        (project, epic, payload["sdd_path"]),
+    )
+    conn.execute("DELETE FROM tasks WHERE project = ? AND epic = ?", (project, epic))
+    for task in payload["tasks"]:
+        conn.execute(
+            "INSERT INTO tasks (project, epic, tid, title, jira_key, deps, order_idx, sdd_status)"
+            " VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            (
+                project,
+                epic,
+                task["tid"],
+                task["title"],
+                task["jira_key"],
+                _dump(task["deps"]),
+                task["order_idx"],
+                task["sdd_status"],
+            ),
+        )
+
+
 def _pr_tracked(conn, event):
     payload = event["payload"]
     conn.execute(
@@ -228,6 +255,7 @@ _REDUCERS = {
     "task.started": _task_started,
     "task.blocked": _task_blocked,
     "task.done": _task_done,
+    "epic.synced": _epic_synced,
     "pr.tracked": _pr_tracked,
     "pr.set": _pr_set,
     "pr.synced": _pr_synced,
