@@ -127,11 +127,14 @@ def _ask_summary_lines(painter, row):
     return [first] + wrapped[1:]
 
 
+def _ask_sort_key(row):
+    return (-len(json.loads(row["refs"])), row["created_at"], row["id"])
+
+
 def render_asks(ctx, party_filter, color, width, detailed):
     painter = _Painter(color, width)
-    rows = ctx.conn.execute(
-        "SELECT * FROM asks WHERE state = 'open' ORDER BY created_at ASC, id ASC"
-    ).fetchall()
+    rows = ctx.conn.execute("SELECT * FROM asks WHERE state = 'open'").fetchall()
+    rows = sorted(rows, key=_ask_sort_key)
     if party_filter is not None:
         rows = [row for row in rows if row["party"] == party_filter]
     if not rows:
