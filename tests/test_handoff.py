@@ -1,4 +1,6 @@
+import os
 import sqlite3
+import subprocess
 from unittest import mock
 
 from tests.testutil import GuildTestCase
@@ -70,8 +72,7 @@ class HandoffTests(GuildTestCase):
             "sess-1", self.repo_dir,
         )
         self.assertEqual(code, 0)
-        self.assertIn("claude -n alpha-g2", out)
-        self.assertIn("guild party resume alpha", out)
+        self.assertIn("GUILD_RESUME=alpha claude -n alpha-g2", out)
 
         handoff_path = self.data_home / "guild" / "handoffs" / "alpha-g1.md"
         self.assertTrue(handoff_path.is_file())
@@ -129,3 +130,69 @@ if __name__ == "__main__":
     import unittest
 
     unittest.main()
+
+
+class ResumeCommandShellTests(GuildTestCase):
+    def setUp(self):
+        super().setUp()
+        self.repo_dir = self.register_project("acme", ["acme/app"])
+        self.run_cli(["party", "start", "alpha"], "sess-1", self.repo_dir)
+
+    def test_printed_command_runs_nothing_and_passes_prompt_intact(self):
+        code, out, err = self.run_cli(
+            ["handoff", "--in-flight", "x", "--learned", "y"], "sess-1", self.repo_dir
+        )
+        command = out.splitlines()[0]
+        marker = self.root / "executed"
+        script = 'guild() {{ touch "{}"; }}; claude() {{ printf "%s\\n" "$GUILD_RESUME" "$@"; }}; {}'.format(
+            marker, command
+        )
+        result = subprocess.run(["bash", "-c", script], capture_output=True, text=True, check=True)
+        self.assertFalse(marker.exists())
+        self.assertEqual(
+            result.stdout.splitlines(),
+            ["alpha", "-n", "alpha-g2", "Continue the work described in the guild handoff."],
+        )
+
+
+class AutoResumeTests(GuildTestCase):
+    def setUp(self):
+        super().setUp()
+        self.repo_dir = self.register_project("acme", ["acme/app"])
+        self.run_cli(["party", "start", "alpha"], "sess-1", self.repo_dir)
+        self.run_cli(["quest", "add", "demo", "--title", "Demo", "--no-epic"], "sess-1", self.repo_dir)
+        self.run_cli(["task", "add", "demo/T01", "--title", "First"], "sess-1", self.repo_dir)
+
+    def _session_start(self, session_id, resume_party):
+        with mock.patch.dict(os.environ, {"GUILD_RESUME": resume_party}):
+            return self.run_hook("session-start", {"session_id": session_id, "cwd": str(self.repo_dir)})
+
+    def test_awaiting_party_is_bound_and_handoff_injected_once(self):
+        self.run_cli(["handoff", "--in-flight", "shipping T01", "--learned", "retries flake"], "sess-1", self.repo_dir)
+        code, out, err = self._session_start("sess-2", "alpha")
+        self.assertEqual(code, 0)
+        self.assertIn("party 'alpha' resumed, generation 2", out)
+        self.assertEqual(out.count("shipping T01"), 1)
+        self.assertIn("task demo/T01", out)
+        code, out, err = self.run_cli(["whoami"], "sess-2", self.repo_dir)
+        self.assertIn("alpha", out)
+
+    def test_active_party_is_not_taken_over(self):
+        code, out, err = self._session_start("sess-2", "alpha")
+        self.assertEqual(code, 0)
+        self.assertIn("GUILD_RESUME=alpha not applied: party is active", out)
+        code, out, err = self.run_cli(["whoami"], "sess-1", self.repo_dir)
+        self.assertIn("alpha", out)
+
+    def test_session_already_leading_the_party_is_left_alone(self):
+        self.run_cli(["handoff", "--in-flight", "x", "--learned", "y"], "sess-1", self.repo_dir)
+        self._session_start("sess-2", "alpha")
+        code, out, err = self._session_start("sess-2", "alpha")
+        self.assertEqual(code, 0)
+        self.assertNotIn("not applied", out)
+        self.assertNotIn("generation 3", out)
+
+    def test_invalid_party_name_is_reported(self):
+        code, out, err = self._session_start("sess-2", "../x")
+        self.assertEqual(code, 0)
+        self.assertIn("GUILD_RESUME=../x not applied", out)
