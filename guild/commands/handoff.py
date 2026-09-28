@@ -1,3 +1,5 @@
+import shlex
+
 from guild import db, events, identity, names, paths, pii, render
 from guild.commands import claim as claim_commands
 from guild.commands import next as next_commands
@@ -57,9 +59,13 @@ def _render_handoff(ctx, binding, in_flight, learned):
     return "\n".join(lines) + "\n"
 
 
+_RESUME_PROMPT = "Continue the work described in the guild handoff."
+
+
 def _resume_command(party, next_generation):
-    prompt = "run in Bash `guild party resume {}`, then read the handoff it prints".format(party)
-    return 'claude -n {}-g{} "{}"'.format(party, next_generation, prompt)
+    return "GUILD_RESUME={} claude -n {}-g{} {}".format(
+        party, party, next_generation, shlex.quote(_RESUME_PROMPT)
+    )
 
 
 def run(ctx, in_flight, learned):

@@ -502,7 +502,7 @@ def _run_stateful_hook(hook_name, stdin_data):
         cwd = Path(stdin_data.get("cwd", str(Path.cwd())))
         ctx = _build_context(session_id, cwd)
         if hook_name == "session-start":
-            text = hook_commands.session_start(ctx)
+            text = hook_commands.session_start(ctx, os.environ.get("GUILD_RESUME") or None)
         elif hook_name == "post-tool-use":
             text = hook_commands.post_tool_use(ctx)
         else:

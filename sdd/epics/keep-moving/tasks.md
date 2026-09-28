@@ -56,3 +56,10 @@ updated: 2026-09-28
 **Status:** [x] done — #2
 
 **What:** hyphens inside titles were cutting them; match lazily up to the first spaced dash.
+
+## T08 — Next session binds itself on handoff
+
+**Depends on:** T05
+**Status:** [x] done — #7
+
+**What:** the printed resume command put backticks inside double quotes, so the human's shell ran `guild party resume` before `claude` started and the prompt arrived empty. The command is now `GUILD_RESUME=<party> claude -n <party>-g<N+1> '<fixed prompt>'`; the `SessionStart` hook binds an `awaiting-leader` party and injects the handoff, so the agent runs nothing.

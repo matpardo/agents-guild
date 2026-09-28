@@ -6,13 +6,14 @@ import subprocess
 import sys
 from pathlib import Path
 
-from guild import config, db, identity
+from guild import config, db, identity, names
 from guild.adapters import github
 from guild.commands import brief as brief_commands
 from guild.commands import inbox as inbox_commands
 from guild.commands import next as next_commands
 from guild.commands import party as party_commands
 from guild.commands import statusline as statusline_commands
+from guild.errors import GuildError
 from guild.identity import UNBOUND_HINT
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -53,11 +54,30 @@ def _resume_lines(ctx, binding):
     return [handoff_content, ""] + next_commands.run(ctx, binding, False, False)
 
 
-def session_start(ctx):
+def _auto_resume_lines(ctx, resume_party):
+    if resume_party is None:
+        return []
     binding = identity.resolve_binding(ctx.conn, ctx.session_id)
-    lines = []
+    if binding is not None and binding["party"] == resume_party:
+        return []
+    label = "GUILD_RESUME={} not applied".format(resume_party)
+    try:
+        names.validate_name(resume_party, "party name")
+    except GuildError as error:
+        return ["{}: {}".format(label, error.message)]
+    row = ctx.conn.execute("SELECT state FROM parties WHERE name = ?", (resume_party,)).fetchone()
+    if row is None:
+        return ["{}: unknown party".format(label)]
+    if row["state"] != "awaiting-leader":
+        return ["{}: party is {}".format(label, row["state"])]
+    return [party_commands.resume(ctx, resume_party, None).splitlines()[0]]
+
+
+def session_start(ctx, resume_party):
+    lines = _auto_resume_lines(ctx, resume_party)
+    binding = identity.resolve_binding(ctx.conn, ctx.session_id)
     if binding is not None:
-        lines = _resume_lines(ctx, binding)
+        lines.extend(_resume_lines(ctx, binding))
     lines.extend(brief_commands.render_brief(ctx))
     _spawn_background_sync(ctx.cwd)
     return "\n".join(lines)
