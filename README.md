@@ -161,11 +161,19 @@ claims, plus the two free-text fields), records `party.handed_off` (party →
 one command for the human to run:
 
 ```
-claude -n <party>-g<N+1> "run in Bash `guild party resume <party>`, then read the handoff it prints"
+GUILD_RESUME=<party> claude -n <party>-g<N+1> 'Continue the work described in the guild handoff.'
 ```
 
-There is no `/guild-resume` skill: the printed prompt is the entire contract.
-`guild party resume <party>` prints the previous generation's handoff content
+The new session binds itself: the `SessionStart` hook inherits
+`GUILD_RESUME` from `claude`, and when that party is `awaiting-leader` it
+resumes it for the new session and injects the handoff plus the next item
+before the first prompt. The agent runs nothing and nothing needs quoting —
+the prompt is a fixed, single-quoted constant. If the party is not waiting
+for a leader (still active, closed, unknown or an invalid name), nothing is
+bound and the context says why (`GUILD_RESUME=<party> not applied: ...`). A
+session that already leads that party (e.g. after `/clear`) is left alone.
+
+The manual path still works: `guild party resume <party>` prints the previous generation's handoff content
 plus a single (read-only, non-acknowledging) `guild next` line. A
 freshly-resumed generation's very next `SessionStart` (e.g. after `/clear`)
 shows the same handoff + next line once more, then reverts to the normal
@@ -518,6 +526,6 @@ socket under `~/.claude/`, which is undocumented internal IPC with a
 per-session private key — not a public contract. Building against it now
 would mean guild's core handoff flow depends on an implementation detail
 that can change without notice. `guild handoff` instead prints the one
-`claude -n <party>-g<N+1> "..."` command for a human (or an orchestrating
+`GUILD_RESUME=<party> claude -n <party>-g<N+1> '...'` command for a human (or an orchestrating
 agent) to run; revisit auto-spawn if a public, documented session-control
 contract appears.
