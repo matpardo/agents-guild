@@ -120,10 +120,12 @@ def _sdd_patterns(sdd_config):
     return patterns
 
 
-def _sync_epic_file(ctx, project, epic, path, patterns):
-    tasks = sdd.parse_tasks_file(path, patterns)
+def _sync_epic_file(ctx, project, epic, path, patterns, epic_key_field):
+    text = path.read_text()
+    tasks = sdd.parse_tasks_text(text, patterns)
     if tasks is None:
         raise GuildError("no matching task headings", 1)
+    jira_key = sdd.parse_epic_key(text, epic_key_field)
     with db.writing(ctx.conn):
         events.record(
             ctx.conn,
@@ -134,7 +136,13 @@ def _sync_epic_file(ctx, project, epic, path, patterns):
             project,
             "epic.synced",
             "local",
-            {"project": project, "epic": epic, "sdd_path": str(path), "tasks": tasks},
+            {
+                "project": project,
+                "epic": epic,
+                "sdd_path": str(path),
+                "jira_key": jira_key,
+                "tasks": tasks,
+            },
         )
 
 
@@ -147,11 +155,12 @@ def _sync_sdd(ctx):
             "project '{}' has no 'sdd' config block: add one to sync SDD tasks".format(project), 1
         )
     patterns = _sdd_patterns(sdd_config)
+    epic_key_field = sdd_config.get("epic_key_field")
     epic_files = sdd.discover_epic_files(sdd_config["root"], sdd_config["epics_dir"])
     failures = []
     for epic, path in epic_files:
         try:
-            _sync_epic_file(ctx, project, epic, path, patterns)
+            _sync_epic_file(ctx, project, epic, path, patterns, epic_key_field)
         except GuildError as error:
             failures.append("{}: {}".format(path, error.message))
     return failures

@@ -109,9 +109,10 @@ def _epic_synced(conn, event):
     project, epic = payload["project"], payload["epic"]
     conn.execute(
         "INSERT INTO epics (project, epic, title, jira_key, sdd_path, sdd_status)"
-        " VALUES (?, ?, NULL, NULL, ?, NULL)"
-        " ON CONFLICT(project, epic) DO UPDATE SET sdd_path = excluded.sdd_path",
-        (project, epic, payload["sdd_path"]),
+        " VALUES (?, ?, NULL, ?, ?, NULL)"
+        " ON CONFLICT(project, epic) DO UPDATE SET sdd_path = excluded.sdd_path,"
+        " jira_key = excluded.jira_key",
+        (project, epic, payload.get("jira_key"), payload["sdd_path"]),
     )
     conn.execute("DELETE FROM tasks WHERE project = ? AND epic = ?", (project, epic))
     for task in payload["tasks"]:
