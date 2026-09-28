@@ -126,8 +126,9 @@ def _pr_tracked(conn, event):
     payload = event["payload"]
     conn.execute(
         "INSERT INTO prs (repo, number, party, task_quest, task_tid, what, waits, lifecycle,"
-        " branch, title, gh_state, gh_draft, checks_failing, checks_passing, seeded, synced_at)"
-        " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, ?, NULL)",
+        " branch, title, gh_state, gh_draft, checks_failing, checks_passing, seeded, synced_at,"
+        " mergeable, review_comment_count, last_notified_comment_count, last_activity_at)"
+        " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, ?, NULL, NULL, 0, 0, ?)",
         (
             payload["repo"],
             payload["number"],
@@ -142,23 +143,45 @@ def _pr_tracked(conn, event):
             payload["gh_state"],
             payload["gh_draft"],
             payload["seeded"],
+            event["ts"],
         ),
     )
 
 
 def _pr_set(conn, event):
     payload = event["payload"]
+    current = conn.execute(
+        "SELECT lifecycle, waits, last_activity_at FROM prs WHERE repo = ? AND number = ?",
+        (payload["repo"], payload["number"]),
+    ).fetchone()
+    changed = current["lifecycle"] != payload["lifecycle"] or current["waits"] != payload["waits"]
+    last_activity_at = event["ts"] if changed else current["last_activity_at"]
     conn.execute(
-        "UPDATE prs SET lifecycle = ?, waits = ? WHERE repo = ? AND number = ?",
-        (payload["lifecycle"], payload["waits"], payload["repo"], payload["number"]),
+        "UPDATE prs SET lifecycle = ?, waits = ?, last_activity_at = ? WHERE repo = ? AND number = ?",
+        (payload["lifecycle"], payload["waits"], last_activity_at, payload["repo"], payload["number"]),
     )
+
+
+def _pr_synced_changed(current, payload):
+    fields = (
+        "lifecycle", "gh_state", "gh_draft", "branch", "title",
+        "checks_failing", "checks_passing", "mergeable", "review_comment_count",
+    )
+    return any(current[field] != payload[field] for field in fields)
 
 
 def _pr_synced(conn, event):
     payload = event["payload"]
+    current = conn.execute(
+        "SELECT lifecycle, gh_state, gh_draft, branch, title, checks_failing, checks_passing,"
+        " mergeable, review_comment_count, last_activity_at FROM prs WHERE repo = ? AND number = ?",
+        (payload["repo"], payload["number"]),
+    ).fetchone()
+    last_activity_at = event["ts"] if _pr_synced_changed(current, payload) else current["last_activity_at"]
     conn.execute(
         "UPDATE prs SET lifecycle = ?, gh_state = ?, gh_draft = ?, branch = ?, title = ?,"
-        " checks_failing = ?, checks_passing = ?, synced_at = ? WHERE repo = ? AND number = ?",
+        " checks_failing = ?, checks_passing = ?, mergeable = ?, review_comment_count = ?,"
+        " synced_at = ?, last_activity_at = ? WHERE repo = ? AND number = ?",
         (
             payload["lifecycle"],
             payload["gh_state"],
@@ -167,7 +190,10 @@ def _pr_synced(conn, event):
             payload["title"],
             payload["checks_failing"],
             payload["checks_passing"],
+            payload["mergeable"],
+            payload["review_comment_count"],
             payload["synced_at"],
+            last_activity_at,
             payload["repo"],
             payload["number"],
         ),

@@ -36,10 +36,14 @@ def _sync_pr(ctx, row):
         ctx.cwd,
         row["repo"],
         row["number"],
-        ["state", "isDraft", "mergedAt", "headRefName", "title", "statusCheckRollup", "reviewDecision"],
+        [
+            "state", "isDraft", "mergedAt", "headRefName", "title", "statusCheckRollup",
+            "reviewDecision", "mergeable", "comments", "reviews",
+        ],
     )
     failing, passing = _count_checks(gh_data.get("statusCheckRollup"))
     lifecycle = _lifecycle_from_gh(row["lifecycle"], gh_data)
+    review_comment_count = len(gh_data.get("comments") or []) + len(gh_data.get("reviews") or [])
     with db.writing(ctx.conn):
         events.record(
             ctx.conn,
@@ -60,6 +64,8 @@ def _sync_pr(ctx, row):
                 "checks_failing": failing,
                 "checks_passing": passing,
                 "lifecycle": lifecycle,
+                "mergeable": gh_data.get("mergeable"),
+                "review_comment_count": review_comment_count,
                 "synced_at": timeutil.to_iso(ctx.now),
             },
         )
