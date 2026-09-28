@@ -6,7 +6,7 @@ from guild.adapters import sdd
 _FIXTURES = Path(__file__).resolve().parent / "fixtures" / "sdd"
 
 _PATTERNS = {
-    "task_heading": r"^#{2,3}\s+(T\d+\w*)\s+.*[-—]\s*(.+)$",
+    "task_heading": r"^#{2,3}\s+(T\d+\w*)\b.*?\s[—–-]\s+(.+)$",
     "key_ref": r"[A-Z]{2,10}-\d+",
     "deps_line": r"^\*\*Deps:\*\*\s*(.+)$",
     "status_line": r"^\*\*Status:\*\*\s*(.+)$",
@@ -32,6 +32,19 @@ class DominantShapeTests(unittest.TestCase):
 
 
 class KeyRefShapeTests(unittest.TestCase):
+    def test_title_keeps_hyphens_after_first_separator(self):
+        text = (
+            "## T01 — Cross-tenant owner lookup (DEMO-186)\n\n"
+            "**Deps:** —\n\n**Status:** [ ] pending\n\n"
+            "### T02 → DEMO-7 — Feature-namespace guide\n\n"
+            "**Deps:** T01\n\n**Status:** [x] done\n"
+        )
+        tasks = sdd.parse_tasks_text(text, _PATTERNS)
+        self.assertEqual(tasks[0]["title"], "Cross-tenant owner lookup (DEMO-186)")
+        self.assertEqual(tasks[0]["jira_key"], "DEMO-186")
+        self.assertEqual(tasks[1]["title"], "Feature-namespace guide")
+        self.assertEqual(tasks[1]["jira_key"], "DEMO-7")
+
     def test_parses_arrow_key_heading(self):
         tasks = _parse("key_arrow.md", _PATTERNS)
         self.assertEqual(tasks[0]["title"], "Add validation")

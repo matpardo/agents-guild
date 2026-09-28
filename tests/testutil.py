@@ -120,7 +120,7 @@ class GuildTestCase(unittest.TestCase):
         data["sdd"] = {
             "root": str(sdd_root),
             "epics_dir": "epics",
-            "task_heading": r"^#{2,3}\s+(T\d+\w*)\s+.*[-—]\s*(.+)$",
+            "task_heading": r"^#{2,3}\s+(T\d+\w*)\b.*?\s[—–-]\s+(.+)$",
             "key_ref": r"[A-Z]{2,10}-\d+",
             "deps_line": r"^\*\*Deps:\*\*\s*(.+)$",
             "status_line": r"^\*\*Status:\*\*\s*(.+)$",
