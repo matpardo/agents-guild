@@ -1,6 +1,9 @@
+import json
 import time
 from unittest import mock
 
+from guild import paths
+from guild.commands import statusline as statusline_commands
 from tests.testutil import GuildTestCase
 
 
@@ -42,6 +45,46 @@ class PromptSubmitHookTests(GuildTestCase):
         self.run_hook("prompt-submit", payload)
         elapsed_ms = (time.monotonic() - started) * 1000
         self.assertLess(elapsed_ms, 100, "prompt-submit hook took {:.1f}ms".format(elapsed_ms))
+
+
+class CtxNudgeTests(GuildTestCase):
+    def _set_handoff_threshold(self, pct):
+        config_file = self.config_home / "guild" / "projects" / "acme.json"
+        data = json.loads(config_file.read_text())
+        data["handoff_threshold"] = pct
+        config_file.write_text(json.dumps(data))
+
+    def test_nudge_fires_once_when_over_threshold(self):
+        repo_dir = self.register_project("acme", ["acme/app"])
+        self.run_cli(["party", "start", "alpha"], "sess-1", repo_dir)
+        self._set_handoff_threshold(80)
+        statusline_commands.record_ctx(paths.state_dir(), "sess-1", 81)
+        payload = {"session_id": "sess-1", "cwd": str(repo_dir)}
+
+        code, out, err = self.run_hook("prompt-submit", payload)
+        self.assertIn("Context at 81%", out)
+
+        code, out, err = self.run_hook("prompt-submit", payload)
+        self.assertNotIn("Context at", out)
+
+    def test_no_nudge_below_threshold(self):
+        repo_dir = self.register_project("acme", ["acme/app"])
+        self.run_cli(["party", "start", "alpha"], "sess-1", repo_dir)
+        self._set_handoff_threshold(80)
+        statusline_commands.record_ctx(paths.state_dir(), "sess-1", 50)
+        code, out, err = self.run_hook(
+            "prompt-submit", {"session_id": "sess-1", "cwd": str(repo_dir)}
+        )
+        self.assertNotIn("Context at", out)
+
+    def test_no_nudge_when_threshold_not_configured(self):
+        repo_dir = self.register_project("acme", ["acme/app"])
+        self.run_cli(["party", "start", "alpha"], "sess-1", repo_dir)
+        statusline_commands.record_ctx(paths.state_dir(), "sess-1", 95)
+        code, out, err = self.run_hook(
+            "prompt-submit", {"session_id": "sess-1", "cwd": str(repo_dir)}
+        )
+        self.assertNotIn("Context at", out)
 
 
 class HookErrorContainmentTests(GuildTestCase):
