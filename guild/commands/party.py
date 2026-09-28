@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from guild import config, db, events, identity, session_info
+from guild import config, db, events, identity, names, session_info
 from guild.commands import next as next_commands
 from guild.errors import GuildError
 
@@ -19,6 +19,7 @@ def previous_handoff_content(conn, party, generation):
 
 
 def start(ctx, name):
+    names.validate_name(name, "party name")
     if ctx.session_id is None:
         raise GuildError("party start requires a Claude Code session", 1)
     existing = ctx.conn.execute("SELECT name FROM parties WHERE name = ?", (name,)).fetchone()
@@ -58,6 +59,7 @@ def _resolve_resume_session_id(ctx, session_name):
 
 
 def resume(ctx, name, session_name):
+    names.validate_name(name, "party name")
     session_id = _resolve_resume_session_id(ctx, session_name)
     row = ctx.conn.execute(
         "SELECT project, generation, state FROM parties WHERE name = ?", (name,)

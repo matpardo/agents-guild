@@ -1,4 +1,5 @@
 import sqlite3
+from unittest import mock
 
 from tests.testutil import GuildTestCase
 
@@ -33,6 +34,35 @@ class HandoffTests(GuildTestCase):
         )
         self.assertEqual(code, 1)
         self.assertIn("--learned", err)
+
+    def test_prints_broadcast_reminder(self):
+        code, out, err = self.run_cli(
+            ["handoff", "--in-flight", "x", "--learned", "y"], "sess-1", self.repo_dir
+        )
+        self.assertEqual(code, 0)
+        self.assertIn("note: this text is broadcast to every session", out)
+
+    def test_rejects_in_flight_over_max_length(self):
+        code, out, err = self.run_cli(
+            ["handoff", "--in-flight", "x" * 4001, "--learned", "y"], "sess-1", self.repo_dir
+        )
+        self.assertEqual(code, 1)
+        self.assertIn("exceeds the maximum length", err)
+
+    def test_rejects_learned_over_max_length(self):
+        code, out, err = self.run_cli(
+            ["handoff", "--in-flight", "x", "--learned", "y" * 4001], "sess-1", self.repo_dir
+        )
+        self.assertEqual(code, 1)
+        self.assertIn("exceeds the maximum length", err)
+
+    def test_rejects_email_in_in_flight(self):
+        code, out, err = self.run_cli(
+            ["handoff", "--in-flight", "ping jane.doe@example.com", "--learned", "y"],
+            "sess-1", self.repo_dir,
+        )
+        self.assertEqual(code, 1)
+        self.assertIn("must not contain an email address", err)
 
     def test_writes_handoff_file_and_prints_resume_command(self):
         code, out, err = self.run_cli(
@@ -82,6 +112,17 @@ class HandoffTests(GuildTestCase):
         )
         content = (self.data_home / "guild" / "handoffs" / "alpha-g1.md").read_text()
         self.assertIn("failing checks", content)
+
+    def test_defense_in_depth_rejects_handoff_path_escaping_handoffs_dir(self):
+        malicious_binding = {"party": "../../tmp/evil", "generation": 1, "project": "acme"}
+        with mock.patch("guild.identity.require_binding", return_value=malicious_binding):
+            code, out, err = self.run_cli(
+                ["handoff", "--in-flight", "x", "--learned", "y"], "sess-1", self.repo_dir
+            )
+        self.assertEqual(code, 1)
+        self.assertIn("escapes", err)
+        escaped_path = self.data_home / "tmp" / "evil-g1.md"
+        self.assertFalse(escaped_path.exists())
 
 
 if __name__ == "__main__":

@@ -60,10 +60,12 @@ def _tier1_candidates(conn, party):
     for row in _own_open_prs(conn, party):
         if (row["checks_failing"] or 0) > 0:
             results.append((row, "failing checks ({} failing)".format(row["checks_failing"]), False))
-        elif row["mergeable"] == "CONFLICTING":
+            continue
+        if row["mergeable"] == "CONFLICTING":
             results.append((row, "merge conflict", False))
-        elif (row["review_comment_count"] or 0) > (row["last_notified_comment_count"] or 0):
-            unseen = row["review_comment_count"] - row["last_notified_comment_count"]
+            continue
+        unseen = (row["review_comment_count"] or 0) - (row["last_notified_comment_count"] or 0)
+        if unseen > 0:
             results.append((row, "new review comments ({} unseen)".format(unseen), True))
     return results
 
@@ -201,13 +203,21 @@ def _pr_label(row):
     return "{}#{}".format(row["repo"], row["number"])
 
 
+def _task_title_display(next_task):
+    if next_task["epic"] is not None:
+        return '"{}"'.format(next_task["title"])
+    return next_task["title"]
+
+
 def _render_all(tier1, tier2, tier3, next_task, disagreements):
     lines = []
     for row, reason, _ in tier1 + tier2 + tier3:
         lines.append("PR {}: {}".format(_pr_label(row), reason))
     if next_task is not None:
         lines.append(
-            "task {}/{}: {} — ready".format(next_task["quest"], next_task["tid"], next_task["title"])
+            "task {}/{}: {} — ready".format(
+                next_task["quest"], next_task["tid"], _task_title_display(next_task)
+            )
         )
     for line in disagreements:
         lines.append("disagreement: {}".format(line))
@@ -229,7 +239,9 @@ def _render_single(ctx, tier1, tier2, tier3, next_task, disagreements, blocked, 
         return lines
     if next_task is not None:
         lines = [
-            "task {}/{}: {} — ready".format(next_task["quest"], next_task["tid"], next_task["title"])
+            "task {}/{}: {} — ready".format(
+                next_task["quest"], next_task["tid"], _task_title_display(next_task)
+            )
         ]
         for line in disagreements:
             lines.append("disagreement: {}".format(line))

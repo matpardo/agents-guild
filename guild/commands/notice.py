@@ -1,6 +1,6 @@
 import json
 
-from guild import config, db, events, identity, refs, timeutil
+from guild import config, db, events, identity, pii, refs, sanitize, timeutil
 from guild.ids import next_id
 from guild.errors import GuildError
 
@@ -14,15 +14,24 @@ def _validate_scope(ctx, to):
     config.load_project(ctx.projects_dir, name)
 
 
+def _reject_duplicate(ctx, actor_party, to, text):
+    for row in active_notices(ctx.conn, ctx.now):
+        if row["party"] == actor_party and row["scope"] == to and row["text"] == text:
+            raise GuildError("same text already active as notice #{}".format(row["id"]), 1)
+
+
 def create(ctx, text, to, ttl, until):
     _validate_scope(ctx, to)
+    project = config.resolve_project(ctx.cwd, config.load_all_projects(ctx.projects_dir))
+    patterns = pii.project_patterns(ctx.projects_dir, project)
+    pii.validate_field(text, "notice text", pii.NOTICE_TEXT_MAX_LENGTH, patterns)
     expires_at = timeutil.expires_at_iso(ctx.now, ttl)
     until_condition = None
     if until is not None:
         until_condition = json.dumps(refs.parse_until(until))
     binding = identity.resolve_binding(ctx.conn, ctx.session_id)
     actor_party = binding["party"] if binding is not None else None
-    project = config.resolve_project(ctx.cwd, config.load_all_projects(ctx.projects_dir))
+    _reject_duplicate(ctx, actor_party, to, text)
     notice_id = next_id(ctx.conn, "notices")
     with db.writing(ctx.conn):
         events.record(
@@ -43,7 +52,7 @@ def create(ctx, text, to, ttl, until):
                 "expires_at": expires_at,
             },
         )
-    return "notice #{} created".format(notice_id)
+    return "notice #{} created\n{}".format(notice_id, pii.BROADCAST_REMINDER)
 
 
 def close(ctx, notice_id):
@@ -78,6 +87,12 @@ def active_notices(conn, now):
             continue
         result.append(row)
     return result
+
+
+def format_notice_line(notice_id, party, text):
+    author = party or "human"
+    clean_text = sanitize.collapse_to_single_line(text)
+    return '- notice #{} from {}: "{}"'.format(notice_id, author, clean_text)
 
 
 def targeting(rows, project, scope_guild_always):

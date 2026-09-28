@@ -85,6 +85,51 @@ class AskTests(GuildTestCase):
         self.assertEqual(code, 1)
         self.assertIn("unknown ask", err)
 
+    def test_create_prints_broadcast_reminder(self):
+        code, out, err = self.run_cli(
+            ["ask", "ready?", "--context", "x", "--ref", "task:demo/T01"], "sess-1", self.repo_dir
+        )
+        self.assertEqual(code, 0)
+        self.assertIn("note: this text is broadcast to every session", out)
+
+    def test_create_rejects_question_over_max_length(self):
+        code, out, err = self.run_cli(
+            ["ask", "x" * 301, "--context", "x", "--ref", "task:demo/T01"], "sess-1", self.repo_dir
+        )
+        self.assertEqual(code, 1)
+        self.assertIn("exceeds the maximum length", err)
+
+    def test_create_rejects_context_over_max_length(self):
+        code, out, err = self.run_cli(
+            ["ask", "ready?", "--context", "x" * 2001, "--ref", "task:demo/T01"], "sess-1", self.repo_dir
+        )
+        self.assertEqual(code, 1)
+        self.assertIn("exceeds the maximum length", err)
+
+    def test_create_rejects_email_in_question(self):
+        code, out, err = self.run_cli(
+            ["ask", "reach jane.doe@example.com?", "--context", "x", "--ref", "task:demo/T01"],
+            "sess-1", self.repo_dir,
+        )
+        self.assertEqual(code, 1)
+        self.assertIn("must not contain an email address", err)
+
+    def test_answer_rejects_text_over_max_length(self):
+        self.run_cli(
+            ["ask", "ready?", "--context", "x", "--ref", "task:demo/T01"], "sess-1", self.repo_dir
+        )
+        code, out, err = self.run_cli(["answer", "1", "x" * 1001], None, None)
+        self.assertEqual(code, 1)
+        self.assertIn("exceeds the maximum length", err)
+
+    def test_answer_rejects_email(self):
+        self.run_cli(
+            ["ask", "ready?", "--context", "x", "--ref", "task:demo/T01"], "sess-1", self.repo_dir
+        )
+        code, out, err = self.run_cli(["answer", "1", "ping jane.doe@example.com"], None, None)
+        self.assertEqual(code, 1)
+        self.assertIn("must not contain an email address", err)
+
 
 if __name__ == "__main__":
     import unittest

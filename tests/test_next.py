@@ -80,6 +80,25 @@ class Tier1Tests(NextTestCase):
         row = self._pr_row()
         self.assertEqual(row["last_notified_comment_count"], 2)
 
+    def test_legacy_pr_without_notified_count_does_not_crash(self):
+        self.write_gh_fixture(
+            "view_acme-app_1",
+            {
+                "state": "OPEN", "isDraft": True, "headRefName": "feature/x", "title": "t",
+                "comments": [{"id": 1}, {"id": 2}],
+            },
+        )
+        self.run_cli(["sync", "--source", "gh"], "sess-1", self.repo_dir)
+        conn = sqlite3.connect(str(self.data_home / "guild" / "guild.db"))
+        conn.execute("UPDATE prs SET last_notified_comment_count = NULL")
+        conn.commit()
+        conn.close()
+        code, out, err = self.run_cli(["next"], "sess-1", self.repo_dir)
+        self.assertEqual(code, 0, err)
+        self.assertIn("new review comments (2 unseen)", out)
+        code, out, err = self.run_cli(["next", "--all"], "sess-1", self.repo_dir)
+        self.assertEqual(code, 0, err)
+
     def test_next_all_is_read_only(self):
         self.write_gh_fixture(
             "view_acme-app_1",
@@ -184,7 +203,7 @@ class Tier4Tests(NextTestCase):
 
     def test_next_task_when_deps_done(self):
         code, out, err = self.run_cli(["next"], "sess-1", self.repo_dir)
-        self.assertIn("task wave1/T02: Second task — ready", out)
+        self.assertIn('task wave1/T02: "Second task" — ready', out)
 
     def test_next_task_blocked_by_pending_dep_reports_source(self):
         self.sync_sdd(
@@ -217,7 +236,7 @@ class Tier4Tests(NextTestCase):
     def test_claim_by_self_does_not_block_task(self):
         self.run_cli(["claim", "task:compliance/T02", "--ttl", "8h"], "sess-1", self.repo_dir)
         code, out, err = self.run_cli(["next"], "sess-1", self.repo_dir)
-        self.assertIn("task wave1/T02: Second task — ready", out)
+        self.assertIn('task wave1/T02: "Second task" — ready', out)
 
     def test_nothing_queued_reports_nothing_actionable(self):
         self.run_cli(["task", "done", "wave1/T02"], "sess-1", self.repo_dir)
@@ -280,7 +299,7 @@ class NextAllTests(NextTestCase):
         self.run_cli(["sync", "--source", "gh"], "sess-1", self.repo_dir)
         code, out, err = self.run_cli(["next", "--all"], "sess-1", self.repo_dir)
         self.assertIn("PR acme/app#1: failing checks (1 failing)", out)
-        self.assertIn("task wave1/T01: First task — ready", out)
+        self.assertIn('task wave1/T01: "First task" — ready', out)
 
 
 if __name__ == "__main__":

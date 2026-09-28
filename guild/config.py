@@ -2,6 +2,7 @@ import fnmatch
 import json
 from pathlib import Path
 
+from guild import names
 from guild.errors import GuildError
 
 _REQUIRED_KEYS = ("name", "paths", "github")
@@ -42,6 +43,7 @@ def load_all_projects(projects_dir):
 
 
 def load_project(projects_dir, name):
+    names.validate_name(name, "project name")
     config_file = projects_dir / "{}.json".format(name)
     if not config_file.is_file():
         raise GuildError("unknown project '{}': run guild init-project first".format(name), 1)

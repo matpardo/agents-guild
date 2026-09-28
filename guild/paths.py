@@ -42,3 +42,9 @@ def claude_sessions_dir():
     if value:
         return Path(value).expanduser()
     return Path.home() / ".claude" / "sessions"
+
+
+def ensure_private_dir(path):
+    path.mkdir(parents=True, exist_ok=True)
+    path.chmod(0o700)
+    return path

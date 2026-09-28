@@ -30,6 +30,14 @@ class InitProjectTests(GuildTestCase):
         code, out, err = self.run_cli(["init-project", "acme", "--config", str(bad_file)], None, None)
         self.assertEqual(code, 1)
 
+    def test_rejects_path_traversal_name(self):
+        config_file = self.write_project_config("../../tmp/x", ["/tmp/acme/*"], ["acme/app"])
+        code, out, err = self.run_cli(
+            ["init-project", "../../tmp/x", "--config", str(config_file)], None, None
+        )
+        self.assertEqual(code, 1)
+        self.assertIn("invalid project name", err)
+
 
 if __name__ == "__main__":
     import unittest

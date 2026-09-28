@@ -463,6 +463,9 @@ def build_parser():
 
 def _build_context(session_id, cwd):
     conn = db.connect(paths.db_path())
+    paths.ensure_private_dir(paths.state_dir())
+    paths.ensure_private_dir(paths.handoffs_dir())
+    paths.ensure_private_dir(paths.projects_config_dir())
     return RunContext(
         conn,
         session_id,
@@ -523,6 +526,7 @@ def _dispatch_hook(args):
 
 
 def main(argv):
+    os.umask(0o077)
     parser = build_parser()
     args = parser.parse_args(argv)
     if args.command == "hook":

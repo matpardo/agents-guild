@@ -113,6 +113,13 @@ class QuestAddValidationTests(GuildTestCase):
         )
         self.assertEqual(code, 0)
 
+    def test_rejects_path_traversal_slug(self):
+        code, out, err = self.run_cli(
+            ["quest", "add", "../../tmp/x", "--title", "Demo", "--no-epic"], "sess-1", self.repo_dir
+        )
+        self.assertEqual(code, 1)
+        self.assertIn("invalid quest slug", err)
+
     def test_duplicate_slug_rejected(self):
         self.run_cli(["quest", "add", "demo", "--title", "Demo", "--no-epic"], "sess-1", self.repo_dir)
         code, out, err = self.run_cli(

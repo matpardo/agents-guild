@@ -1,7 +1,7 @@
 import json
 import textwrap
 
-from guild import timeutil
+from guild import sanitize, timeutil
 from guild.commands import claim as claim_commands
 from guild.commands import notice as notice_commands
 
@@ -31,11 +31,13 @@ class _Painter:
         self.width = width
 
     def paint(self, text, style):
+        text = sanitize.strip_control_sequences(text)
         if not self.color:
             return text
         return "\033[{}m{}\033[0m".format(_STYLES[style], text)
 
     def wrap(self, text, indent):
+        text = sanitize.strip_control_sequences(text)
         return textwrap.wrap(
             text,
             width=max(self.width, 40),
@@ -86,7 +88,10 @@ def _pr_lines(painter, pr_row, indent):
         painter.paint(lifecycle, _LIFECYCLE_STYLES[lifecycle]), _checks_painted(painter, pr_row)
     )
     plain_head = "● {}#{}  {}  {}".format(
-        pr_row["repo"].split("/")[-1], pr_row["number"], status_plain, pr_row["what"]
+        pr_row["repo"].split("/")[-1],
+        pr_row["number"],
+        status_plain,
+        sanitize.strip_control_sequences(pr_row["what"]),
     )
     head_lines = textwrap.wrap(
         plain_head,
@@ -179,7 +184,8 @@ def _task_lines(painter, task_row, task_prs):
                 "    ■ blocked: {} — {}".format(task_row["tid"], task_row["blocked_reason"]), "red"
             )
         ]
-    lines = ["    ▶ {}  {}".format(painter.paint(task_row["tid"], "bold"), task_row["title"])]
+    title = sanitize.strip_control_sequences(task_row["title"])
+    lines = ["    ▶ {}  {}".format(painter.paint(task_row["tid"], "bold"), title)]
     if task_row["summary"]:
         lines.extend(painter.paint(line, "dim") for line in painter.wrap(task_row["summary"], "        "))
     for pr_row in task_prs:
@@ -188,7 +194,8 @@ def _task_lines(painter, task_row, task_prs):
 
 
 def _quest_lines(ctx, painter, quest_row, prs_by_task):
-    lines = ["  {} — {}".format(painter.paint(quest_row["slug"], "bold"), quest_row["title"])]
+    title = sanitize.strip_control_sequences(quest_row["title"])
+    lines = ["  {} — {}".format(painter.paint(quest_row["slug"], "bold"), title)]
     task_rows = ctx.conn.execute(
         "SELECT * FROM quest_tasks WHERE quest = ? AND state != 'done' ORDER BY tid ASC",
         (quest_row["slug"],),

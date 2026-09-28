@@ -1,11 +1,12 @@
 import shutil
 from pathlib import Path
 
-from guild import config
+from guild import config, names
 from guild.errors import GuildError
 
 
 def run(ctx, name, config_file):
+    names.validate_name(name, "project name")
     source = Path(config_file)
     if not source.is_file():
         raise GuildError("config file '{}' does not exist".format(config_file), 1)

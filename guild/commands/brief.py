@@ -1,5 +1,6 @@
 from guild import config, identity, render
 from guild.commands import claim as claim_commands
+from guild.commands import inbox as inbox_commands
 from guild.commands import notice as notice_commands
 from guild.identity import UNBOUND_HINT
 
@@ -11,10 +12,8 @@ def _resolve_project(ctx):
 
 def _targeting_lines(rows, project):
     matched = notice_commands.targeting(rows, project, True)
-    return [
-        "#{} [{}] {} ({})".format(row["id"], row["party"] or "human", row["text"], row["scope"])
-        for row in matched
-    ]
+    lines = [notice_commands.format_notice_line(row["id"], row["party"], row["text"]) for row in matched]
+    return inbox_commands.framed(lines)
 
 
 def render_brief(ctx):
