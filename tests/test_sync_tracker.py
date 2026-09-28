@@ -130,6 +130,74 @@ class SyncTrackerTests(GuildTestCase):
         self.assertEqual(code, 1)
         self.assertIn("A-1: invalid tracker key", err)
 
+    def test_children_query_failure_is_reported_and_other_epics_still_sync(self):
+        self._write_project_config(
+            tracker_config={"kind": "jira-acli"},
+            sdd_config=dict(_SDD_PATTERNS, root=str(self.sdd_root), epics_dir="epics"),
+        )
+        self._write_epic(
+            "---\nepic: widget-rollout\njira: DEMO-1\n---\n\n"
+            "## T01 — Configure retries\n\n**JIRA:** DEMO-2\n**Deps:** —\n**Status:** [ ] pending\n"
+        )
+        second_epic_dir = self.sdd_root / "epics" / "other-rollout"
+        second_epic_dir.mkdir(parents=True)
+        (second_epic_dir / "tasks.md").write_text(
+            "---\nepic: other-rollout\njira: DEMO-5\n---\n\n"
+            "## T01 — Another\n\n**JIRA:** DEMO-6\n**Deps:** —\n**Status:** [ ] pending\n"
+        )
+        self._sync_sdd()
+        self.write_acli_error("parent = DEMO-1", "rate limited")
+        self.write_acli_fixture(
+            "parent = DEMO-5",
+            [{"key": "DEMO-6", "fields": {"status": {"name": "To Do", "statusCategory": {"key": "new"}}, "issuetype": {"name": "Task"}}}],
+        )
+        self.write_acli_fixture(
+            "key in (DEMO-1,DEMO-5)",
+            [
+                {"key": "DEMO-1", "fields": {"status": {"name": "Open", "statusCategory": {"key": "new"}}, "issuetype": {"name": "Epic"}}},
+                {"key": "DEMO-5", "fields": {"status": {"name": "Open", "statusCategory": {"key": "new"}}, "issuetype": {"name": "Epic"}}},
+            ],
+        )
+        code, out, err = self._sync_tracker()
+        self.assertEqual(code, 1)
+        self.assertIn("DEMO-1: rate limited", err)
+        cards = self._cards()
+        self.assertEqual(cards["DEMO-6"]["parent_key"], "DEMO-5")
+
+    def test_invalid_epic_key_from_children_query_is_reported(self):
+        self._write_project_config(
+            tracker_config={"kind": "jira-acli"},
+            sdd_config=dict(_SDD_PATTERNS, root=str(self.sdd_root), epics_dir="epics", epic_key_field="jira"),
+        )
+        self._write_epic(
+            "---\nepic: widget-rollout\njira: a-1\n---\n\n"
+            "## T01 — Configure retries\n\n**Deps:** —\n**Status:** [ ] pending\n"
+        )
+        self._sync_sdd()
+        code, out, err = self._sync_tracker()
+        self.assertEqual(code, 1)
+        self.assertIn("a-1: invalid tracker key", err)
+
+    def test_by_key_query_failure_is_reported(self):
+        self._write_project_config(
+            tracker_config={"kind": "jira-acli"},
+            sdd_config=dict(_SDD_PATTERNS, root=str(self.sdd_root), epics_dir="epics"),
+        )
+        self._write_epic(
+            "## T01 — Standalone\n\n**JIRA:** DEMO-9\n**Deps:** —\n**Status:** [ ] pending\n"
+        )
+        self._sync_sdd()
+        self.write_acli_error("key in (DEMO-9)", "boom")
+        code, out, err = self._sync_tracker()
+        self.assertEqual(code, 1)
+        self.assertIn("tracker query failed: boom", err)
+
+    def test_no_keys_at_all_skips_tracker_query_entirely(self):
+        self._write_project_config(tracker_config={"kind": "jira-acli"})
+        code, out, err = self._sync_tracker()
+        self.assertEqual(code, 0, err)
+        self.assertEqual(self._cards(), {})
+
     def test_rebuild_is_idempotent_for_cards(self):
         self._write_project_config(
             tracker_config={"kind": "jira-acli"},

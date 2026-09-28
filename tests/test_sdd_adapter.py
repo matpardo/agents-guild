@@ -163,6 +163,10 @@ class EpicKeyFrontmatterTests(unittest.TestCase):
         text = "---\nepic: widget-rollout\njira:\n---\n\n## T01 — x\n"
         self.assertIsNone(sdd.parse_epic_key(text, "jira"))
 
+    def test_blank_line_inside_frontmatter_is_skipped(self):
+        text = "---\nepic: widget-rollout\n\njira: DEMO-1\n---\n\n## T01 — x\n"
+        self.assertEqual(sdd.parse_epic_key(text, "jira"), "DEMO-1")
+
 
 class DiscoverEpicFilesTests(unittest.TestCase):
     def test_discovers_epic_directories_with_tasks_md(self):
