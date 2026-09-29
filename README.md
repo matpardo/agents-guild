@@ -94,7 +94,7 @@ guild handoff --in-flight "..." --learned "..."
 
 guild board [--party <name>]
 guild sync --source gh|sdd|tracker
-guild drift [--epic <slug>]
+guild drift [--epic <slug> | --all]
 guild brief
 guild inbox --since-last
 guild statusline --session <id> [--ctx <pct>]
@@ -158,13 +158,27 @@ the disagreement is returned and surfaced by `guild next`.
 
 ### `guild drift`
 
-`guild drift [--epic <slug>]` reports, for the project resolved from cwd,
-every disagreement between guild, SDD and the tracker that the last
+`guild drift [--epic <slug> | --all]` reports, for the project resolved from
+cwd, every disagreement between guild, SDD and the tracker that the last
 `guild sync --source gh|sdd|tracker` observed. Read-only: it never fires an
 event and never calls `gh` or `acli` — it only reads the projections a prior
-sync filled. `--epic` restricts every epic-scoped rule to that epic. Exit
-code is always 0 (it is a report, not a check); output groups findings by
-rule, in this order, each finding naming the refs and what each source says:
+sync filled.
+
+Without flags, the report is scoped to work in progress: every epic-scoped
+rule (`tracker and SDD disagree`, `SDD task without card`, `card not under
+its epic`, `epic done with open work`) runs only on epics referenced by an
+`active` quest of the project, and every PR rule (`merged PR, task not
+done`, `PR open, card not started`, `PR closed unmerged`) runs only on PRs
+tracked by a party that is `active` or `awaiting-leader`. `party has no
+running leader` is unaffected by scope, always project-wide. `--all` drops
+this default and reports the whole project (the audit mode). `--epic <slug>`
+restricts every epic-scoped rule to that epic, regardless of quest state;
+`--epic` and `--all` are mutually exclusive. The first line always states
+the resolved scope, e.g. `scope: 2 epics in active quests (use --all for the
+whole project)`, `scope: no epics in active quests`, `scope: whole project`
+or `scope: epic <slug>`. Exit code is always 0 (it is a report, not a
+check); output then groups findings by rule, in this order, each finding
+naming the refs and what each source says:
 
 | Rule | Finding when |
 |---|---|

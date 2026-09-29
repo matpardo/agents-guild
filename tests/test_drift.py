@@ -103,7 +103,9 @@ class NoDriftTests(DriftTestCase):
         self._sync_sdd()
         code, out, err = self._drift()
         self.assertEqual(code, 0, err)
-        self.assertEqual(out.strip(), "no drift")
+        self.assertEqual(
+            out.strip(), "scope: no epics in active quests\nno drift"
+        )
 
 
 class MergedPrTaskNotDoneTests(DriftTestCase):
@@ -131,7 +133,10 @@ class MergedPrTaskNotDoneTests(DriftTestCase):
         code, out, err = self._drift()
         self.assertEqual(code, 0, err)
         self.assertNotIn("merged PR, task not done", out)
-        self.assertEqual(out.strip(), "no drift")
+        self.assertEqual(
+            out.strip(),
+            "scope: 1 epics in active quests (use --all for the whole project)\nno drift",
+        )
 
 
 class TrackerSddDisagreeTests(DriftTestCase):
@@ -142,6 +147,10 @@ class TrackerSddDisagreeTests(DriftTestCase):
             "## T01 — First\n\n**JIRA:** DEMO-1\n**Deps:** —\n**Status:** [ ] pending\n",
         )
         self._sync_sdd()
+        self.run_cli(
+            ["quest", "add", "wave2", "--title", "Wave 2", "--epic", "wave2", "--tasks", "T01"],
+            "sess-1", self.repo_dir,
+        )
 
     def test_card_done_and_sdd_pending_is_a_finding(self):
         self._record_cards([self._card("DEMO-1", "done", status="Listo")])
@@ -164,6 +173,10 @@ class SddTaskWithoutCardTests(DriftTestCase):
             "## T01 — First\n\n**Deps:** —\n**Status:** [ ] pending\n",
         )
         self._sync_sdd()
+        self.run_cli(
+            ["quest", "add", "wave3", "--title", "Wave 3", "--epic", "wave3", "--tasks", "T01"],
+            "sess-1", self.repo_dir,
+        )
         code, out, err = self._drift()
         self.assertEqual(code, 0, err)
         self.assertIn("SDD task without card (1)", out)
@@ -187,6 +200,10 @@ class CardNotUnderEpicTests(DriftTestCase):
             "## T01 — First\n\n**JIRA:** DEMO-21\n**Deps:** —\n**Status:** [ ] pending\n",
         )
         self._sync_sdd()
+        self.run_cli(
+            ["quest", "add", "wave4", "--title", "Wave 4", "--epic", "wave4", "--tasks", "T01"],
+            "sess-1", self.repo_dir,
+        )
 
     def test_card_with_no_parent_is_a_finding(self):
         self._record_cards([self._card("DEMO-21", "new", parent_key=None)])
@@ -342,6 +359,14 @@ class EpicFilterTests(DriftTestCase):
             "## T01 — First\n\n**Deps:** —\n**Status:** [ ] pending\n",
         )
         self._sync_sdd()
+        self.run_cli(
+            ["quest", "add", "wave9", "--title", "Wave 9", "--epic", "wave9", "--tasks", "T01"],
+            "sess-1", self.repo_dir,
+        )
+        self.run_cli(
+            ["quest", "add", "wave10", "--title", "Wave 10", "--epic", "wave10", "--tasks", "T01"],
+            "sess-1", self.repo_dir,
+        )
 
     def test_epic_filter_restricts_findings_to_that_epic(self):
         code, out, err = self._drift(epic="wave9")
@@ -381,6 +406,55 @@ class NoNetworkTests(DriftTestCase):
             os.environ["PATH"] = original_path
         self.assertEqual(code, 0, err)
         self.assertIn("findings", out)
+
+
+class DefaultScopeTests(DriftTestCase):
+    def test_epic_without_active_quest_excluded_by_default_and_included_with_all(self):
+        self._write_epic(
+            "wave20", "jira: DEMO-200\nstatus: active\n",
+            "## T01 — First\n\n**Deps:** —\n**Status:** [ ] pending\n",
+        )
+        self._sync_sdd()
+        code, out, err = self._drift()
+        self.assertEqual(code, 0, err)
+        self.assertNotIn("wave20", out)
+        code, out, err = self.run_cli(["drift", "--all"], "sess-1", self.repo_dir)
+        self.assertEqual(code, 0, err)
+        self.assertIn("task:wave20/T01: no tracker key", out)
+
+    def test_scope_line_default_with_no_epics_in_active_quests(self):
+        code, out, err = self._drift()
+        self.assertEqual(code, 0, err)
+        self.assertEqual(out.splitlines()[0], "scope: no epics in active quests")
+
+    def test_scope_line_default_with_epics_in_active_quests(self):
+        self._write_epic("wave21", "status: active\n", "## T01 — First\n\n**Deps:** —\n**Status:** [ ] pending\n")
+        self._sync_sdd()
+        self.run_cli(
+            ["quest", "add", "wave21", "--title", "Wave 21", "--epic", "wave21", "--tasks", "T01"],
+            "sess-1", self.repo_dir,
+        )
+        code, out, err = self._drift()
+        self.assertEqual(code, 0, err)
+        self.assertEqual(
+            out.splitlines()[0], "scope: 1 epics in active quests (use --all for the whole project)"
+        )
+
+    def test_scope_line_all(self):
+        code, out, err = self.run_cli(["drift", "--all"], "sess-1", self.repo_dir)
+        self.assertEqual(code, 0, err)
+        self.assertEqual(out.splitlines()[0], "scope: whole project")
+
+    def test_scope_line_epic_filter(self):
+        code, out, err = self._drift(epic="somewhere")
+        self.assertEqual(code, 0, err)
+        self.assertEqual(out.splitlines()[0], "scope: epic somewhere")
+
+    def test_epic_and_all_are_mutually_exclusive(self):
+        code, out, err = self.run_cli(
+            ["drift", "--epic", "somewhere", "--all"], "sess-1", self.repo_dir
+        )
+        self.assertEqual(code, 2)
 
 
 if __name__ == "__main__":

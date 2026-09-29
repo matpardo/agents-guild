@@ -1,28 +1,57 @@
 from guild import session_info
 
+_DEFAULT_PARTY_STATES = ("active", "awaiting-leader")
 
-def _epic_clause(alias, epic_filter):
-    if epic_filter is None:
+
+def _epic_clause(alias, epics):
+    if epics is None:
         return ""
-    return " AND {}.epic = ?".format(alias)
+    if not epics:
+        return " AND 0"
+    placeholders = ", ".join("?" for _ in epics)
+    return " AND {}.epic IN ({})".format(alias, placeholders)
 
 
-def _epic_params(project, epic_filter):
-    if epic_filter is None:
+def _epic_params(project, epics):
+    if epics is None:
         return (project,)
-    return (project, epic_filter)
+    return (project,) + tuple(epics)
 
 
-def _rule_merged_pr_task_not_done(conn, project, epic_filter):
+def _party_clause(party_states):
+    if party_states is None:
+        return ""
+    placeholders = ", ".join("?" for _ in party_states)
+    return " AND parties.state IN ({})".format(placeholders)
+
+
+def _party_params(party_states):
+    if party_states is None:
+        return ()
+    return tuple(party_states)
+
+
+def _active_quest_epics(conn, project):
+    rows = conn.execute(
+        "SELECT DISTINCT epic FROM quests"
+        " WHERE project = ? AND state = 'active' AND epic IS NOT NULL"
+        " ORDER BY epic",
+        (project,),
+    ).fetchall()
+    return [row["epic"] for row in rows]
+
+
+def _rule_merged_pr_task_not_done(conn, project, epics, party_states):
     rows = conn.execute(
         "SELECT prs.repo AS repo, prs.number AS number, prs.task_quest AS quest,"
         " prs.task_tid AS tid, quest_tasks.state AS state"
         " FROM prs"
         " JOIN quests ON quests.slug = prs.task_quest"
         " JOIN quest_tasks ON quest_tasks.quest = prs.task_quest AND quest_tasks.tid = prs.task_tid"
+        " JOIN parties ON parties.name = prs.party"
         " WHERE quests.project = ? AND prs.lifecycle = 'merged' AND quest_tasks.state != 'done'"
-        + _epic_clause("quests", epic_filter),
-        _epic_params(project, epic_filter),
+        + _epic_clause("quests", epics) + _party_clause(party_states),
+        _epic_params(project, epics) + _party_params(party_states),
     ).fetchall()
     return [
         "pr:{}#{}: merged, task:{}/{} state={}".format(
@@ -32,15 +61,15 @@ def _rule_merged_pr_task_not_done(conn, project, epic_filter):
     ]
 
 
-def _rule_tracker_sdd_disagree(conn, project, epic_filter):
+def _rule_tracker_sdd_disagree(conn, project, epics):
     rows = conn.execute(
         "SELECT tasks.epic AS epic, tasks.tid AS tid, tasks.jira_key AS jira_key,"
         " tasks.sdd_status AS sdd_status, cards.status AS status,"
         " cards.status_category AS status_category"
         " FROM tasks"
         " JOIN cards ON cards.project = tasks.project AND cards.key = tasks.jira_key"
-        " WHERE tasks.project = ?" + _epic_clause("tasks", epic_filter),
-        _epic_params(project, epic_filter),
+        " WHERE tasks.project = ?" + _epic_clause("tasks", epics),
+        _epic_params(project, epics),
     ).fetchall()
     findings = []
     for row in rows:
@@ -61,14 +90,14 @@ def _rule_tracker_sdd_disagree(conn, project, epic_filter):
     return findings
 
 
-def _rule_sdd_task_without_card(conn, project, epic_filter):
+def _rule_sdd_task_without_card(conn, project, epics):
     rows = conn.execute(
         "SELECT tasks.epic AS epic, tasks.tid AS tid, epics.jira_key AS epic_key"
         " FROM tasks"
         " JOIN epics ON epics.project = tasks.project AND epics.epic = tasks.epic"
         " WHERE tasks.project = ? AND epics.jira_key IS NOT NULL AND tasks.jira_key IS NULL"
-        + _epic_clause("tasks", epic_filter),
-        _epic_params(project, epic_filter),
+        + _epic_clause("tasks", epics),
+        _epic_params(project, epics),
     ).fetchall()
     return [
         "task:{}/{}: no tracker key (epic {} is keyed {})".format(
@@ -78,7 +107,7 @@ def _rule_sdd_task_without_card(conn, project, epic_filter):
     ]
 
 
-def _rule_card_not_under_epic(conn, project, epic_filter):
+def _rule_card_not_under_epic(conn, project, epics):
     rows = conn.execute(
         "SELECT tasks.epic AS epic, tasks.tid AS tid, tasks.jira_key AS jira_key,"
         " epics.jira_key AS epic_key"
@@ -86,8 +115,8 @@ def _rule_card_not_under_epic(conn, project, epic_filter):
         " JOIN epics ON epics.project = tasks.project AND epics.epic = tasks.epic"
         " JOIN cards ON cards.project = tasks.project AND cards.key = tasks.jira_key"
         " WHERE tasks.project = ? AND epics.jira_key IS NOT NULL AND cards.parent_key IS NULL"
-        + _epic_clause("tasks", epic_filter),
-        _epic_params(project, epic_filter),
+        + _epic_clause("tasks", epics),
+        _epic_params(project, epics),
     ).fetchall()
     return [
         "task:{}/{} ({}): card not under epic {} ({}) in tracker".format(
@@ -97,7 +126,7 @@ def _rule_card_not_under_epic(conn, project, epic_filter):
     ]
 
 
-def _rule_pr_open_card_not_started(conn, project, epic_filter):
+def _rule_pr_open_card_not_started(conn, project, epics, party_states):
     rows = conn.execute(
         "SELECT prs.repo AS repo, prs.number AS number, prs.lifecycle AS lifecycle,"
         " quests.epic AS epic, prs.task_tid AS tid, tasks.jira_key AS jira_key,"
@@ -107,9 +136,11 @@ def _rule_pr_open_card_not_started(conn, project, epic_filter):
         " JOIN tasks ON tasks.project = quests.project AND tasks.epic = quests.epic"
         " AND tasks.tid = prs.task_tid"
         " JOIN cards ON cards.project = tasks.project AND cards.key = tasks.jira_key"
+        " JOIN parties ON parties.name = prs.party"
         " WHERE quests.project = ? AND prs.lifecycle NOT IN ('merged', 'closed')"
-        " AND cards.status_category = 'new'" + _epic_clause("quests", epic_filter),
-        _epic_params(project, epic_filter),
+        " AND cards.status_category = 'new'"
+        + _epic_clause("quests", epics) + _party_clause(party_states),
+        _epic_params(project, epics) + _party_params(party_states),
     ).fetchall()
     return [
         "pr:{}#{} ({}): task:{}/{} card {} not started ({})".format(
@@ -120,14 +151,16 @@ def _rule_pr_open_card_not_started(conn, project, epic_filter):
     ]
 
 
-def _rule_pr_closed_unmerged(conn, project, epic_filter):
+def _rule_pr_closed_unmerged(conn, project, epics, party_states):
     rows = conn.execute(
         "SELECT prs.repo AS repo, prs.number AS number, prs.task_quest AS quest,"
         " prs.task_tid AS tid"
         " FROM prs"
         " JOIN quests ON quests.slug = prs.task_quest"
-        " WHERE quests.project = ? AND prs.lifecycle = 'closed'" + _epic_clause("quests", epic_filter),
-        _epic_params(project, epic_filter),
+        " JOIN parties ON parties.name = prs.party"
+        " WHERE quests.project = ? AND prs.lifecycle = 'closed'"
+        + _epic_clause("quests", epics) + _party_clause(party_states),
+        _epic_params(project, epics) + _party_params(party_states),
     ).fetchall()
     return [
         "pr:{}#{}: closed unmerged (task:{}/{})".format(row["repo"], row["number"], row["quest"], row["tid"])
@@ -176,10 +209,10 @@ def _epic_done_pr_findings(conn, project, epic):
     ]
 
 
-def _rule_epic_done_with_open_work(conn, project, epic_filter):
+def _rule_epic_done_with_open_work(conn, project, epics):
     epic_rows = conn.execute(
-        "SELECT epic FROM epics WHERE project = ? AND sdd_status = 'done'" + _epic_clause("epics", epic_filter),
-        _epic_params(project, epic_filter),
+        "SELECT epic FROM epics WHERE project = ? AND sdd_status = 'done'" + _epic_clause("epics", epics),
+        _epic_params(project, epics),
     ).fetchall()
     findings = []
     for epic_row in epic_rows:
@@ -189,16 +222,16 @@ def _rule_epic_done_with_open_work(conn, project, epic_filter):
     return findings
 
 
-def _collect(conn, project, epic_filter, sessions_dir):
+def _collect(conn, project, epics, party_states, sessions_dir):
     return [
-        ("merged PR, task not done", _rule_merged_pr_task_not_done(conn, project, epic_filter)),
-        ("tracker and SDD disagree", _rule_tracker_sdd_disagree(conn, project, epic_filter)),
-        ("SDD task without card", _rule_sdd_task_without_card(conn, project, epic_filter)),
-        ("card not under its epic", _rule_card_not_under_epic(conn, project, epic_filter)),
-        ("PR open, card not started", _rule_pr_open_card_not_started(conn, project, epic_filter)),
-        ("PR closed unmerged", _rule_pr_closed_unmerged(conn, project, epic_filter)),
+        ("merged PR, task not done", _rule_merged_pr_task_not_done(conn, project, epics, party_states)),
+        ("tracker and SDD disagree", _rule_tracker_sdd_disagree(conn, project, epics)),
+        ("SDD task without card", _rule_sdd_task_without_card(conn, project, epics)),
+        ("card not under its epic", _rule_card_not_under_epic(conn, project, epics)),
+        ("PR open, card not started", _rule_pr_open_card_not_started(conn, project, epics, party_states)),
+        ("PR closed unmerged", _rule_pr_closed_unmerged(conn, project, epics, party_states)),
         ("party has no running leader", _rule_party_without_leader(conn, project, sessions_dir)),
-        ("epic done with open work", _rule_epic_done_with_open_work(conn, project, epic_filter)),
+        ("epic done with open work", _rule_epic_done_with_open_work(conn, project, epics)),
     ]
 
 
@@ -219,6 +252,22 @@ def _render(groups):
     return lines
 
 
-def run(ctx, project, epic_filter):
-    groups = _collect(ctx.conn, project, epic_filter, ctx.sessions_dir)
-    return _render(groups)
+def _resolve_scope(conn, project, epic, all_scope):
+    if all_scope:
+        return None, None, "scope: whole project"
+    if epic is not None:
+        return (epic,), None, "scope: epic {}".format(epic)
+    epics = _active_quest_epics(conn, project)
+    if not epics:
+        return [], _DEFAULT_PARTY_STATES, "scope: no epics in active quests"
+    return (
+        epics,
+        _DEFAULT_PARTY_STATES,
+        "scope: {} epics in active quests (use --all for the whole project)".format(len(epics)),
+    )
+
+
+def run(ctx, project, epic, all_scope):
+    epics, party_states, scope_line = _resolve_scope(ctx.conn, project, epic, all_scope)
+    groups = _collect(ctx.conn, project, epics, party_states, ctx.sessions_dir)
+    return [scope_line] + _render(groups)
