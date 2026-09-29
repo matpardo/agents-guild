@@ -49,7 +49,7 @@ Each task is a heading plus two fields, which is the shape guild reads (`guild s
 
 ## Using it with guild
 
-Register this repo as a guild project; point `sdd.root` at the checkout that follows `main` (the live worktree), so a task counts as done once its PR is merged:
+Register this repo as a guild project; point `sdd.root` at the checkout that follows `main` (the live worktree), so a task counts as done once its PR is merged. This stays in `root` mode on purpose: it points at the dedicated live worktree this project already manages (see "Install" in the top-level README), not a checkout shared with other sessions. For a docs repo without that guarantee, use `sdd.git_repo`/`sdd.git_ref` instead (see the top-level README's "Project config" section):
 
 ```json
 {

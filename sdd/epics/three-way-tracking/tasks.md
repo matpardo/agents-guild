@@ -49,3 +49,17 @@ updated: 2026-09-28
 **Status:** [ ] pending
 
 **What:** count only refs still blocked at render time.
+
+## T07 — Drift defaults to work in progress
+
+**Depends on:** T04
+**Status:** [x] done — #11
+
+**What:** without flags, `guild drift` scopes epic-scoped rules to epics referenced by an active quest and PR rules to PRs tracked by an active or awaiting-leader party; `--all` reports the whole project as before; `--epic` is unchanged and mutually exclusive with `--all`. The first output line always states the resolved scope.
+
+## T08 — Read SDD from a git ref
+
+**Depends on:** —
+**Status:** [x] done — #11
+
+**What:** the `sdd` config block accepts `git_repo`+`git_ref` instead of `root` (mutually exclusive, both git keys required together); `sync --source sdd` then fetches `origin`, lists and reads `tasks.md` files at that ref via `git ls-tree`/`git show`, never touching the repo's working copy, and stores each epic's `sdd_path` as `git:<ref>:<path>`.

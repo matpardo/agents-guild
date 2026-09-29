@@ -234,7 +234,7 @@ def _handle_drift(ctx, args):
     from guild.commands import drift as drift_commands
 
     project = config.require_project(ctx.cwd, ctx.projects_dir)
-    _print_lines(drift_commands.run(ctx, project, args.epic))
+    _print_lines(drift_commands.run(ctx, project, args.epic, args.all))
     return 0
 
 
@@ -452,7 +452,9 @@ def build_parser():
     sync.set_defaults(handler=_handle_sync)
 
     drift = subparsers.add_parser("drift")
-    drift.add_argument("--epic")
+    drift_scope = drift.add_mutually_exclusive_group()
+    drift_scope.add_argument("--epic")
+    drift_scope.add_argument("--all", action="store_true")
     drift.set_defaults(handler=_handle_drift)
 
     brief = subparsers.add_parser("brief")

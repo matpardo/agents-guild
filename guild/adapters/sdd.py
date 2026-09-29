@@ -1,7 +1,12 @@
 import re
+import subprocess
 from pathlib import Path
 
 _TID_TOKEN_RE = re.compile(r"T\d+\w*")
+
+
+class GitSddError(Exception):
+    pass
 
 
 def _captured_text(match):
@@ -162,3 +167,41 @@ def discover_epic_files(root, epics_dir):
         if tasks_file.is_file():
             files.append((entry.name, tasks_file))
     return files
+
+
+def _run_git(repo, args):
+    result = subprocess.run(
+        ["git", "-C", str(Path(repo).expanduser())] + args, capture_output=True, text=True
+    )
+    if result.returncode != 0:
+        raise GitSddError(result.stderr.strip() or "git {} failed".format(" ".join(args)))
+    return result.stdout
+
+
+def git_fetch(repo):
+    _run_git(repo, ["fetch", "--quiet", "origin"])
+
+
+def _epic_from_tasks_path(path, epics_dir):
+    prefix = epics_dir.rstrip("/") + "/"
+    if not path.startswith(prefix) or not path.endswith("/tasks.md"):
+        return None
+    middle = path[len(prefix) : -len("/tasks.md")]
+    if not middle or "/" in middle:
+        return None
+    return middle
+
+
+def git_tasks_files(repo, ref, epics_dir):
+    output = _run_git(repo, ["ls-tree", "-r", "--name-only", ref, "--", epics_dir])
+    files = []
+    for line in output.splitlines():
+        epic = _epic_from_tasks_path(line, epics_dir)
+        if epic is None:
+            continue
+        files.append((epic, line))
+    return sorted(files)
+
+
+def git_show(repo, ref, path):
+    return _run_git(repo, ["show", "{}:{}".format(ref, path)])
