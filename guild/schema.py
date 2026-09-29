@@ -181,6 +181,7 @@ _COLUMN_MIGRATIONS = (
     ("prs", "review_comment_count", "INTEGER"),
     ("prs", "last_notified_comment_count", "INTEGER"),
     ("prs", "last_activity_at", "TEXT"),
+    ("notices", "announces", "TEXT"),
 )
 
 

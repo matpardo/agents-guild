@@ -62,9 +62,41 @@ def create(ctx, text, to, ttl, until):
                 "text": text,
                 "until_condition": until_condition,
                 "expires_at": expires_at,
+                "announces": None,
             },
         )
     return "notice #{} created\n{}".format(notice_id, pii.BROADCAST_REMINDER)
+
+
+def create_announcing(ctx, actor_party, text, to, ttl, announces):
+    notice_id = next_id(ctx.conn, "notices")
+    expires_at = timeutil.expires_at_iso(ctx.now, ttl)
+    with db.writing(ctx.conn):
+        events.record(
+            ctx.conn,
+            ctx.now,
+            ctx.origin,
+            actor_party,
+            ctx.session_id,
+            None,
+            "notice.created",
+            "guild",
+            {
+                "id": notice_id,
+                "party": actor_party,
+                "scope": to,
+                "text": text,
+                "until_condition": None,
+                "expires_at": expires_at,
+                "announces": announces,
+            },
+        )
+    return notice_id
+
+
+def announced(conn, announces):
+    row = conn.execute("SELECT id FROM notices WHERE announces = ?", (announces,)).fetchone()
+    return row is not None
 
 
 def close(ctx, notice_id):
