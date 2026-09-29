@@ -353,7 +353,8 @@ def _party_section(ctx, painter, party_row):
     raids = raid_commands.member_raids(ctx.conn, ctx.now, party_row["name"])
     if raids:
         raid_text = ", ".join(
-            "{} ({})".format(row["raid"], timeutil.time_left_label(ctx.now, row["expires_at"])) for row in raids
+            "{} ({})".format(row["raid"], timeutil.membership_left_label(ctx.now, row["expires_at"]))
+            for row in raids
         )
         lines.append(painter.paint("  raids: {}".format(raid_text), "dim"))
     lines.append("")

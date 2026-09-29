@@ -13,6 +13,15 @@ PROJECTION_TABLES = (
     "raid_members",
 )
 
+_RAID_MEMBERS_TABLE = """
+    CREATE TABLE IF NOT EXISTS raid_members (
+        raid TEXT NOT NULL,
+        party TEXT NOT NULL,
+        expires_at TEXT,
+        PRIMARY KEY (raid, party)
+    )
+    """
+
 _CREATE_STATEMENTS = (
     """
     CREATE TABLE IF NOT EXISTS events (
@@ -159,14 +168,7 @@ _CREATE_STATEMENTS = (
         PRIMARY KEY (project, area)
     )
     """,
-    """
-    CREATE TABLE IF NOT EXISTS raid_members (
-        raid TEXT NOT NULL,
-        party TEXT NOT NULL,
-        expires_at TEXT NOT NULL,
-        PRIMARY KEY (raid, party)
-    )
-    """,
+    _RAID_MEMBERS_TABLE,
     """
     CREATE TABLE IF NOT EXISTS cursors (
         session_id TEXT PRIMARY KEY,
@@ -196,9 +198,38 @@ def _add_column_if_missing(conn, table, column, ddl_type):
     conn.execute("ALTER TABLE {} ADD COLUMN {} {}".format(table, column, ddl_type))
 
 
+def _raid_expiry_is_not_null(conn):
+    rows = conn.execute("PRAGMA table_info(raid_members)").fetchall()
+    return any(row["name"] == "expires_at" and row["notnull"] for row in rows)
+
+
+def _rebuild_raid_members(conn):
+    conn.execute("ALTER TABLE raid_members RENAME TO raid_members_legacy")
+    conn.execute(_RAID_MEMBERS_TABLE)
+    conn.execute(
+        "INSERT INTO raid_members (raid, party, expires_at)"
+        " SELECT raid, party, expires_at FROM raid_members_legacy"
+    )
+    conn.execute("DROP TABLE raid_members_legacy")
+
+
+def _relax_raid_expiry(conn):
+    if not _raid_expiry_is_not_null(conn):
+        return
+    conn.execute("BEGIN IMMEDIATE")
+    try:
+        if _raid_expiry_is_not_null(conn):
+            _rebuild_raid_members(conn)
+    except Exception:
+        conn.execute("ROLLBACK")
+        raise
+    conn.execute("COMMIT")
+
+
 def create_all(conn):
     for statement in _CREATE_STATEMENTS:
         conn.execute(statement)
+    _relax_raid_expiry(conn)
     for table, column, ddl_type in _COLUMN_MIGRATIONS:
         _add_column_if_missing(conn, table, column, ddl_type)
 
