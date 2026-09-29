@@ -59,14 +59,18 @@ def create(ctx, question, context_text, ref_list, option_list):
 
 
 def answer(ctx, ask_id, text):
-    row = ctx.conn.execute("SELECT id, state FROM asks WHERE id = ?", (ask_id,)).fetchone()
+    row = ctx.conn.execute(
+        "SELECT asks.id AS id, asks.state AS state, parties.project AS project FROM asks"
+        " LEFT JOIN parties ON parties.name = asks.party WHERE asks.id = ?",
+        (ask_id,),
+    ).fetchone()
     if row is None:
         raise GuildError("unknown ask #{}".format(ask_id), 1)
     if row["state"] != "open":
         raise GuildError("ask #{} is not open".format(ask_id), 1)
     binding = identity.resolve_binding(ctx.conn, ctx.session_id)
     actor_party = binding["party"] if binding is not None else None
-    project = config.resolve_project(ctx.cwd, config.load_all_projects(ctx.projects_dir))
+    project = row["project"]
     patterns = pii.project_patterns(ctx.projects_dir, project)
     pii.validate_field(text, "answer", pii.ANSWER_MAX_LENGTH, patterns)
     with db.writing(ctx.conn):

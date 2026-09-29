@@ -3,6 +3,10 @@
 
   var REFRESH_INTERVAL_MS = 15000;
   var BOARD_URL = "/api/board";
+  var SESSION_URL = "/api/session";
+  var EMPTY_ANSWER_MESSAGE = "write an answer first";
+  var NO_SESSION_MESSAGE = "session token not loaded, reload the page";
+  var sessionToken = null;
 
   var state = {
     partyFilter: "all",
@@ -10,6 +14,12 @@
     raidFilter: "all",
     openParties: {},
     openContexts: {},
+    drafts: {},
+    statuses: {},
+    busy: {},
+    focusedAskId: null,
+    focusStart: 0,
+    focusEnd: 0,
   };
 
   function el(tag) {
@@ -58,6 +68,142 @@
     return "blocks: 0 of " + ask.total_refs + " refs still open (may be stale)";
   }
 
+  function askUrl(askId, action) {
+    return "/api/asks/" + askId + "/" + action;
+  }
+
+  function errorMessage(body) {
+    if (body && typeof body.error === "string") {
+      return body.error;
+    }
+    return "request failed";
+  }
+
+  function postAskAction(askId, action, payload) {
+    if (sessionToken === null) {
+      state.statuses[askId] = NO_SESSION_MESSAGE;
+      fetchBoard();
+      return;
+    }
+    state.busy[askId] = true;
+    state.statuses[askId] = "sending...";
+    fetchBoard();
+    fetch(askUrl(askId, action), {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Guild-Token": sessionToken,
+      },
+      body: JSON.stringify(payload),
+    })
+      .then(function (response) {
+        return response.json().then(
+          function (body) {
+            return { ok: response.ok, body: body };
+          },
+          function () {
+            return { ok: false, body: null };
+          }
+        );
+      })
+      .catch(function () {
+        return { ok: false, body: null };
+      })
+      .then(function (result) {
+        delete state.busy[askId];
+        if (result.ok) {
+          delete state.drafts[askId];
+          delete state.statuses[askId];
+        } else {
+          state.statuses[askId] = errorMessage(result.body);
+        }
+        fetchBoard();
+      });
+  }
+
+  function submitAnswer(askId) {
+    var text = state.drafts[askId] || "";
+    if (text.trim() === "") {
+      state.statuses[askId] = EMPTY_ANSWER_MESSAGE;
+      fetchBoard();
+      return;
+    }
+    postAskAction(askId, "answer", { answer: text });
+  }
+
+  function submitDismiss(askId) {
+    if (!window.confirm("Dismiss ask #" + askId + "?")) {
+      return;
+    }
+    postAskAction(askId, "dismiss", {});
+  }
+
+  function renderOptionButton(ask, optionText, area) {
+    var button = textEl("button", optionText);
+    button.type = "button";
+    button.className = "option-button";
+    button.disabled = state.busy[ask.id] === true;
+    button.addEventListener("click", function () {
+      state.drafts[ask.id] = optionText;
+      area.value = optionText;
+      area.focus();
+    });
+    return button;
+  }
+
+  function renderAnswerArea(ask) {
+    var area = el("textarea");
+    area.className = "answer-field";
+    area.rows = 3;
+    area.value = state.drafts[ask.id] || "";
+    area.disabled = state.busy[ask.id] === true;
+    area.dataset.askId = String(ask.id);
+    area.addEventListener("input", function () {
+      state.drafts[ask.id] = area.value;
+    });
+    return area;
+  }
+
+  function renderActionButton(ask, label, handler) {
+    var button = textEl("button", label);
+    button.type = "button";
+    button.disabled = state.busy[ask.id] === true;
+    button.addEventListener("click", handler);
+    return button;
+  }
+
+  function renderAskControls(ask) {
+    var controls = el("div");
+    controls.className = "ask-controls";
+    var area = renderAnswerArea(ask);
+    if (ask.options.length > 0) {
+      var choices = el("div");
+      choices.className = "option-buttons";
+      ask.options.forEach(function (optionText) {
+        choices.appendChild(renderOptionButton(ask, optionText, area));
+      });
+      controls.appendChild(choices);
+    }
+    controls.appendChild(area);
+    var actions = el("div");
+    actions.className = "ask-actions";
+    actions.appendChild(
+      renderActionButton(ask, "Answer", function () {
+        submitAnswer(ask.id);
+      })
+    );
+    actions.appendChild(
+      renderActionButton(ask, "Dismiss", function () {
+        submitDismiss(ask.id);
+      })
+    );
+    var status = textEl("span", state.statuses[ask.id] || "");
+    status.className = "ask-status";
+    actions.appendChild(status);
+    controls.appendChild(actions);
+    return controls;
+  }
+
   function renderAsk(ask) {
     var article = el("article");
     article.className = "card ask";
@@ -83,6 +229,7 @@
       state.openContexts[ask.id] = details.open;
     });
     article.appendChild(details);
+    article.appendChild(renderAskControls(ask));
 
     return article;
   }
@@ -371,7 +518,31 @@
     };
   }
 
+  function rememberFocus() {
+    var active = document.activeElement;
+    state.focusedAskId = null;
+    if (active && active.dataset && active.dataset.askId) {
+      state.focusedAskId = active.dataset.askId;
+      state.focusStart = active.selectionStart;
+      state.focusEnd = active.selectionEnd;
+    }
+  }
+
+  function restoreFocus() {
+    if (state.focusedAskId === null) {
+      return;
+    }
+    var areas = document.querySelectorAll("textarea.answer-field");
+    Array.prototype.forEach.call(areas, function (area) {
+      if (area.dataset.askId === state.focusedAskId && !area.disabled) {
+        area.focus();
+        area.setSelectionRange(state.focusStart, state.focusEnd);
+      }
+    });
+  }
+
   function render(data) {
+    rememberFocus();
     document.getElementById("generated-at").textContent = "generated at " + data.generated_at;
     refreshPartyFilterOptions(data.parties);
     refreshRaidFilterOptions(data.raids);
@@ -380,6 +551,18 @@
     renderNotices(filtered.notices);
     renderDrift(filtered.drift);
     renderParties(filtered.parties);
+    restoreFocus();
+  }
+
+  function fetchSession() {
+    fetch(SESSION_URL)
+      .then(function (response) {
+        return response.json();
+      })
+      .then(function (body) {
+        sessionToken = body.token;
+      })
+      .catch(function () {});
   }
 
   function fetchBoard() {
@@ -404,6 +587,7 @@
       state.raidFilter = event.target.value;
       fetchBoard();
     });
+    fetchSession();
     fetchBoard();
     setInterval(fetchBoard, REFRESH_INTERVAL_MS);
   });

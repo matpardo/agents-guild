@@ -301,21 +301,49 @@ keeping the current filters and which blocks are collapsed. PR links open
 tracker card when the project configures `tracker.browse_url` (see
 "Project config").
 
+**Answering from the page**: each open ask card has one button per option
+(clicking it only copies the option's text into the answer field), an answer
+field, an `Answer` button and a `Dismiss` button (which asks for
+confirmation). Answers and dismissals go through the same code as `guild
+answer` and `guild dismiss`, acting as the human actor (no session): the
+same length cap, email and project `pii_patterns` rejection, "not open" and
+unknown-ask errors apply, and a rejected request shows the server's message
+under the buttons. An empty answer is not sent. Buttons are disabled while a
+request is in flight; on success the board is re-fetched. The 15-second
+refresh keeps whatever you typed (and the focus) in each answer field.
+Project `pii_patterns` are those of the project of the party that asked, wherever
+`guild web` (or `guild answer`) is started from.
+
 **Security model**: the server binds to `127.0.0.1` only, on the stdlib's
 `http.server.ThreadingHTTPServer` — no third-party dependency, no build
-step. It is read-only: every route is `GET`, anything else is `405`.
-Requests whose `Host` header is not exactly `127.0.0.1:<port>` or
-`localhost:<port>` get `421`, which blocks DNS rebinding from a page on
-another origin. Every response carries a strict `Content-Security-Policy`
-(`default-src 'self'`, no inline or third-party scripts, no external
-assets), `X-Content-Type-Options: nosniff` and `Referrer-Policy:
-no-referrer`; `/api/*` additionally sends `Cache-Control: no-store`. The
-page (`guild/web/app.js`) builds every node with `document.createElement`
-and sets text with `textContent` only — it never uses `innerHTML` or any
-HTML-injecting API, so text coming from agents, SDD, GitHub or the tracker
-is never executed. `guild web` never writes to the database and logs no
-per-request access noise to stderr (server errors still do). Ctrl-C exits
-cleanly.
+step. Reads are `GET`; the only writes are `POST /api/asks/<id>/answer`
+(body `{"answer": "<text>"}`) and `POST /api/asks/<id>/dismiss` (body `{}`),
+with `<id>` a positive integer (otherwise `404`); every other method,
+including `OPTIONS`, is `405`, and no response ever carries CORS headers, so
+cross-origin preflights fail. Requests whose `Host` header is not exactly
+`127.0.0.1:<port>` or `localhost:<port>` get `421`, which blocks DNS
+rebinding from a page on another origin. A `POST` must also pass all of:
+an `Origin` header equal to `http://127.0.0.1:<port>` or
+`http://localhost:<port>` (`403`); an `X-Guild-Token` header equal to the
+per-start session token, compared in constant time (`403`); `Content-Type:
+application/json` (`415`); a `Content-Length` of at most 16384 bytes (`411`
+when missing, `413` when larger, exactly that many bytes are read); and a
+JSON object with the required string key (`400`). The token is generated
+with `secrets.token_urlsafe(32)` at each start, lives in memory only, is
+never logged or printed, and is served only by `GET /api/session`; the page
+keeps it in a script variable, never in `localStorage`, a cookie or the URL.
+A custom header cannot be sent cross-origin without a preflight, which is
+refused. Validation failures answer `422` with `{"error": "<message>"}`
+and never echo the submitted text. Every response carries a strict
+`Content-Security-Policy` (`default-src 'self'`, no inline or third-party
+scripts, no external assets), `X-Content-Type-Options: nosniff` and
+`Referrer-Policy: no-referrer`; `/api/*` additionally sends `Cache-Control:
+no-store`. The page (`guild/web/app.js`) builds every node with
+`document.createElement` and sets text with `textContent` only — it never
+uses `innerHTML` or any HTML-injecting API, so text coming from agents, SDD,
+GitHub or the tracker is never executed. Apart from answering and dismissing
+asks, `guild web` never writes to the database, and it logs no per-request
+access noise to stderr (server errors still do). Ctrl-C exits cleanly.
 
 ### `guild handoff` and resuming a party
 
@@ -707,7 +735,7 @@ personal data:
   ask context 2000, answer 1000, handoff `--in-flight`/`--learned` 4000 each.
 - An embedded email address is always rejected.
 - A project's `pii_patterns` (see "Project config") are checked too, scoped
-  to the caller's project.
+  to the caller's project; for an answer, to the project of the party that asked.
 - Every successful `notice create`, `ask` and `handoff` prints one reminder
   line afterward: never put names or identifiers of real people (students,
   guardians, staff) in these fields — use ids and roles instead.

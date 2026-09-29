@@ -5,7 +5,7 @@ title: Web view of the guild board
 status: done
 owner: matpardo
 created: 2026-09-28
-updated: 2026-09-28
+updated: 2026-09-29
 ---
 
 # Spec: Web view of the guild board
@@ -24,10 +24,11 @@ See the guild board, asks and notices in a browser, with a clearer layout than t
 - One HTML page with plain JavaScript, fed by a JSON endpoint: asks first (ordered by what they still block), then notices, then one block per party with quests, tasks and PRs nested under their tasks; raids and claims per party; drift findings for work in progress.
 - Filters by party and by state; collapsible party blocks; periodic refresh.
 - Links to PRs on GitHub and, when configured, to cards in the tracker.
+- Writing from the page: answering and dismissing open asks, with the same validation as `guild answer` and `guild dismiss`, acting as the human actor.
 
 ## Out of scope
 
-- Writing from the page (answering asks). A later task, with its own security design.
+- Writing anything from the page other than answering and dismissing asks.
 - Other machines (see `federation`).
 - Replacing the terminal board.
 
@@ -39,6 +40,9 @@ See the guild board, asks and notices in a browser, with a clearer layout than t
 ## Security and data
 
 - Bound to 127.0.0.1; requests whose `Host` header is not the loopback address and port are rejected (blocks DNS rebinding).
-- Read-only: only `GET`; anything else is 405.
+- Writes are limited to `POST /api/asks/<id>/answer` and `POST /api/asks/<id>/dismiss`; every other method, including `OPTIONS`, is 405, and no response carries CORS headers.
+- Each write must carry an `Origin` equal to the loopback address and port (403), a per-start session token in `X-Guild-Token` compared in constant time (403), `Content-Type: application/json` (415), a `Content-Length` of at most 16384 bytes (411/413) and a valid JSON object (400).
+- The session token comes from `secrets.token_urlsafe(32)`, lives in memory only, is never logged, and is served only by `GET /api/session`; the page keeps it in a script variable, not in storage, cookies or the URL.
+- Writes reuse `guild answer` / `guild dismiss` (length cap, email and `pii_patterns` rejection, "not open", unknown ask) as the human actor; failures are 422 with a message that never echoes the submitted text.
 - All text is inserted with `textContent`, never as HTML. A strict `Content-Security-Policy` (`default-src 'self'`) forbids inline and third-party scripts; no external assets.
 - The JSON carries the same free text as the terminal board; it never leaves the machine.
