@@ -42,3 +42,10 @@ updated: 2026-09-28
 **Status:** [x] done — 3849536
 
 **What:** rules ship with the CLI; `install.sh` links them; imported by absolute path.
+
+## T06 — Closing a party cleans up
+
+**Depends on:** T02
+**Status:** [x] done
+
+**What:** `guild party close [<party>]` works from a terminal once the session is gone; closing marks the party's quests done, dismisses its open asks, releases its claims and lists tracked PRs still open. `guild quest done <slug>` finishes a single quest.

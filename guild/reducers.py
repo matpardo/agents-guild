@@ -41,6 +41,9 @@ def _party_resumed(conn, event):
 def _party_closed(conn, event):
     payload = event["payload"]
     conn.execute("UPDATE parties SET state = 'closed' WHERE name = ?", (payload["party"],))
+    conn.execute("UPDATE quests SET state = 'done' WHERE party = ? AND state = 'active'", (payload["party"],))
+    conn.execute("UPDATE asks SET state = 'dismissed' WHERE party = ? AND state = 'open'", (payload["party"],))
+    conn.execute("DELETE FROM claims WHERE party = ?", (payload["party"],))
     conn.execute(
         "UPDATE leaders SET ended_at = ? WHERE party = ? AND generation = ? AND ended_at IS NULL",
         (event["ts"], payload["party"], payload["generation"]),
@@ -54,6 +57,10 @@ def _party_handed_off(conn, event):
         "UPDATE leaders SET handoff_path = ? WHERE party = ? AND generation = ?",
         (payload["handoff_path"], payload["party"], payload["generation"]),
     )
+
+
+def _quest_done(conn, event):
+    conn.execute("UPDATE quests SET state = 'done' WHERE slug = ?", (event["payload"]["slug"],))
 
 
 def _quest_added(conn, event):
@@ -330,6 +337,7 @@ _REDUCERS = {
     "party.closed": _party_closed,
     "party.handed_off": _party_handed_off,
     "quest.added": _quest_added,
+    "quest.done": _quest_done,
     "task.added": _task_added,
     "task.started": _task_started,
     "task.blocked": _task_blocked,

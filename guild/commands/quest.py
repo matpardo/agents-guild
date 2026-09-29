@@ -27,6 +27,32 @@ def _resolve_epic_tasks(conn, project, epic, tasks_csv):
     return tasks
 
 
+def done(ctx, slug):
+    binding = identity.require_binding(ctx.conn, ctx.session_id)
+    row = ctx.conn.execute("SELECT party, project, state FROM quests WHERE slug = ?", (slug,)).fetchone()
+    if row is None:
+        raise GuildError("unknown quest '{}'".format(slug), 1)
+    if row["party"] != binding["party"]:
+        raise GuildError(
+            "quest '{}' is not owned by party '{}'".format(slug, binding["party"]), 1
+        )
+    if row["state"] != "active":
+        raise GuildError("quest '{}' is already {}".format(slug, row["state"]), 1)
+    with db.writing(ctx.conn):
+        events.record(
+            ctx.conn,
+            ctx.now,
+            ctx.origin,
+            binding["party"],
+            ctx.session_id,
+            row["project"],
+            "quest.done",
+            "local",
+            {"slug": slug},
+        )
+    return "quest '{}' done".format(slug)
+
+
 def add(ctx, slug, title, epic, tasks_csv, no_epic):
     names.validate_name(slug, "quest slug")
     if no_epic and (epic is not None or tasks_csv is not None):

@@ -1,6 +1,7 @@
 from pathlib import Path
 
 from guild import config, db, events, identity, names, session_info
+from guild.commands import claim as claim_commands
 from guild.commands import next as next_commands
 from guild.errors import GuildError
 
@@ -91,18 +92,70 @@ def resume(ctx, name, session_name):
     return "\n".join(lines)
 
 
-def close(ctx):
-    binding = identity.require_binding(ctx.conn, ctx.session_id)
+def _close_target(ctx, name):
+    if name is None:
+        return identity.require_binding(ctx.conn, ctx.session_id)["party"]
+    names.validate_name(name, "party name")
+    if ctx.session_id is None:
+        return name
+    binding = identity.resolve_binding(ctx.conn, ctx.session_id)
+    if binding is None or binding["party"] != name:
+        raise GuildError(
+            "cannot close another party from a session: run `guild party close {}` from a terminal".format(name), 1
+        )
+    return name
+
+
+def _count(amount, noun):
+    return "{} {}{}".format(amount, noun, "" if amount == 1 else "s")
+
+
+def _cleanup_summary(ctx, party):
+    quests = ctx.conn.execute(
+        "SELECT COUNT(*) AS n FROM quests WHERE party = ? AND state = 'active'", (party,)
+    ).fetchone()["n"]
+    asks = ctx.conn.execute(
+        "SELECT COUNT(*) AS n FROM asks WHERE party = ? AND state = 'open'", (party,)
+    ).fetchone()["n"]
+    claims = len([row for row in claim_commands.list_claims(ctx.conn, ctx.now) if row["party"] == party])
+    return "{} done, {} dismissed, {} released".format(
+        _count(quests, "quest"), _count(asks, "ask"), _count(claims, "claim")
+    )
+
+
+def _open_pr_refs(conn, party):
+    rows = conn.execute(
+        "SELECT repo, number FROM prs WHERE party = ? AND lifecycle NOT IN ('merged', 'closed')"
+        " ORDER BY repo ASC, number ASC",
+        (party,),
+    ).fetchall()
+    return ["{}#{}".format(row["repo"], row["number"]) for row in rows]
+
+
+def close(ctx, name):
+    party = _close_target(ctx, name)
+    row = ctx.conn.execute(
+        "SELECT project, generation, state FROM parties WHERE name = ?", (party,)
+    ).fetchone()
+    if row is None:
+        raise GuildError("unknown party '{}'".format(party), 1)
+    if row["state"] == "closed":
+        raise GuildError("party '{}' is already closed".format(party), 1)
+    summary = _cleanup_summary(ctx, party)
+    open_prs = _open_pr_refs(ctx.conn, party)
     with db.writing(ctx.conn):
         events.record(
             ctx.conn,
             ctx.now,
             ctx.origin,
-            binding["party"],
+            party,
             ctx.session_id,
-            binding["project"],
+            row["project"],
             "party.closed",
             "local",
-            {"party": binding["party"], "generation": binding["generation"]},
+            {"party": party, "generation": row["generation"]},
         )
-    return "party '{}' closed".format(binding["party"])
+    lines = ["party '{}' closed: {}".format(party, summary)]
+    if open_prs:
+        lines.append("tracked PRs still open: {}".format(", ".join(open_prs)))
+    return "\n".join(lines)

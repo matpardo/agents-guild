@@ -60,7 +60,14 @@ def _handle_party_resume(ctx, args):
 def _handle_party_close(ctx, args):
     from guild.commands import party as party_commands
 
-    _print(party_commands.close(ctx))
+    _print(party_commands.close(ctx, args.name))
+    return 0
+
+
+def _handle_quest_done(ctx, args):
+    from guild.commands import quest as quest_commands
+
+    _print(quest_commands.done(ctx, args.slug))
     return 0
 
 
@@ -294,6 +301,7 @@ def _add_party_parser(subparsers):
     resume.set_defaults(handler=_handle_party_resume)
 
     close = actions.add_parser("close")
+    close.add_argument("name", nargs="?")
     close.set_defaults(handler=_handle_party_close)
 
 
@@ -308,6 +316,10 @@ def _add_quest_parser(subparsers):
     add.add_argument("--tasks")
     add.add_argument("--no-epic", action="store_true")
     add.set_defaults(handler=_handle_quest_add)
+
+    done = actions.add_parser("done")
+    done.add_argument("slug")
+    done.set_defaults(handler=_handle_quest_done)
 
 
 def _add_task_parser(subparsers):
