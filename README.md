@@ -111,6 +111,7 @@ guild hook session-start   # reads Claude Code hook JSON on stdin
 guild hook prompt-submit
 guild hook post-tool-use
 guild hook pre-push
+guild hook pre-edit
 
 guild seed <file.json>
 guild rebuild
@@ -449,6 +450,13 @@ against path traversal, not an identity boundary.
   ask question/context, answer text and handoff `--in-flight`/`--learned` for
   the caller's project. A match rejects the command with an error that names
   the field, never the matched text.
+- `shared_areas` (optional): list of glob strings relative to the repo root
+  (e.g. `config/routes.rb`, `db/migrate/*`, `config/locales/*.yml`), matched
+  with `fnmatch` against POSIX-style relative paths by `guild hook pre-edit`
+  (see "Hooks"). Present → `shared_area_claim_ttl` is required, or the config
+  fails to load.
+- `shared_area_claim_ttl` (required together with `shared_areas`): the TTL
+  (`30m`/`8h`/`3d`) the pre-edit guard claims a matched area for.
 - Unknown top-level keys are allowed.
 
 ### SDD parsing rules
@@ -651,6 +659,10 @@ Wired from `~/.claude/settings.json` (not part of this repo):
       {
         "matcher": "Bash",
         "hooks": [{"type": "command", "command": "guild hook pre-push"}]
+      },
+      {
+        "matcher": "Edit|Write|MultiEdit|NotebookEdit",
+        "hooks": [{"type": "command", "command": "guild hook pre-edit"}]
       }
     ]
   }
@@ -683,6 +695,33 @@ Wired from `~/.claude/settings.json` (not part of this repo):
   directory cannot be determined (bad `-C` dir, detached HEAD, unparseable
   command), it warns via `systemMessage` instead of allowing the push
   unverified.
+- `pre-edit`: guards a project's `shared_areas` (see "Project config") on
+  `Edit`/`Write`/`MultiEdit`/`NotebookEdit` calls (`tool_input.file_path`, or
+  `notebook_path` for `NotebookEdit`). Any other tool, no path, an unbound
+  session, an unresolved project, a project without `shared_areas`, a path
+  outside any git repo, or a path matching no configured glob: allowed
+  silently. Otherwise the file's relative path (from
+  `git -C <first existing ancestor dir> rev-parse --show-toplevel`, so it
+  works from inside a `git worktree` too, e.g. one `/epic-auto-full` creates
+  outside the main checkout) is matched with `fnmatch` against every
+  `shared_areas` glob; the first match is the claim key `area:<glob>` — one
+  claim per glob, not per file, so every file under a glob like
+  `db/migrate/*` shares one claim. If another party already holds an
+  unexpired claim on that key, the edit is denied
+  (`{"hookSpecificOutput": {"hookEventName": "PreToolUse",
+  "permissionDecision": "deny", "permissionDecisionReason": "..."}}`) naming
+  the holder and the local expiry time, and pointing at the raid
+  (`guild notice --to raid:<name>`) when the caller's party is a member of
+  one, or at the holder's party otherwise. Otherwise the claim is recorded or
+  refreshed for the caller's party (TTL `shared_area_claim_ttl`) through the
+  normal `guild claim` path, so events and `guild rebuild` see it like any
+  other claim; the payload also carries `claimed_by_agent: <agent_type>`
+  when the calling tool call carries one, for traceability, without changing
+  the decision. Verified against real Claude Code: `PreToolUse` fires for
+  subagent tool calls too, the stdin JSON carries the **parent session's**
+  `session_id` (so the guard binds to the parent's party) plus `agent_id`/
+  `agent_type` (null on the main thread), and a `permissionDecisionReason`
+  reaches the denied subagent verbatim.
 
 Whenever `prompt-submit`, `post-tool-use` or the `session-start` brief inject
 notices or answered asks from other sessions, the block is preceded by one
