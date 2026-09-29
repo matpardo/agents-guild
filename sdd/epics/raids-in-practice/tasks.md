@@ -25,7 +25,7 @@ updated: 2026-09-29
 ## T03 — Membership until leave
 
 **Depends on:** —
-**Status:** [ ] pending
+**Status:** [x] done
 
 **What:** `raid join` takes exactly one of `--ttl` or `--until-leave`; warn once before a membership expires.
 
