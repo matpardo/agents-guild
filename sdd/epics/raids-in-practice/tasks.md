@@ -39,7 +39,7 @@ updated: 2026-09-29
 ## T05 — Raid lead
 
 **Depends on:** T03
-**Status:** [x] done
+**Status:** [x] done — #24
 
 **What:** `raid join --lead`, one lead per raid, shown in raids, board, web and briefs; members' new asks reach the lead's inbox.
 
@@ -53,6 +53,6 @@ updated: 2026-09-29
 ## T07 — Raid views and clearer project errors
 
 **Depends on:** T05
-**Status:** [x] done
+**Status:** [x] done — #24
 
 **What:** `guild board --raid <name>`, raid filter in `guild web`; unknown-project errors list known project names.
