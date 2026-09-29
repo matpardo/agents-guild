@@ -123,8 +123,62 @@ def _sdd_patterns(sdd_config):
     return patterns
 
 
-def _sync_epic_file(ctx, project, epic, path, patterns, epic_key_field, epic_status_field):
-    text = path.read_text()
+def _validate_sdd_source(sdd_config, project):
+    has_root = "root" in sdd_config
+    has_git_repo = "git_repo" in sdd_config
+    has_git_ref = "git_ref" in sdd_config
+    has_git = has_git_repo or has_git_ref
+    if has_root and has_git:
+        raise GuildError(
+            "project '{}' sdd config must set either 'root' or 'git_repo'+'git_ref', not both".format(
+                project
+            ),
+            1,
+        )
+    if not has_root and not has_git:
+        raise GuildError(
+            "project '{}' sdd config needs 'root', or both 'git_repo' and 'git_ref'".format(project), 1
+        )
+    if has_git and (not has_git_repo or not has_git_ref):
+        raise GuildError(
+            "project '{}' sdd config needs both 'git_repo' and 'git_ref'".format(project), 1
+        )
+
+
+def _root_epic_source(sdd_config):
+    epics_path = Path(sdd_config["root"]).expanduser() / sdd_config["epics_dir"]
+    if not epics_path.is_dir():
+        raise GuildError("sdd epics directory {} does not exist: check sdd.root".format(epics_path), 1)
+    for epic, path in sdd.discover_epic_files(sdd_config["root"], sdd_config["epics_dir"]):
+        yield epic, path.read_text(), str(path)
+
+
+def _git_epic_source(sdd_config):
+    repo = sdd_config["git_repo"]
+    ref = sdd_config["git_ref"]
+    epics_dir = sdd_config["epics_dir"]
+    try:
+        sdd.git_fetch(repo)
+    except sdd.GitSddError as error:
+        raise GuildError("git fetch failed for {}: {}".format(repo, error), 1)
+    try:
+        files = sdd.git_tasks_files(repo, ref, epics_dir)
+    except sdd.GitSddError as error:
+        raise GuildError("git ls-tree failed for {} at {}: {}".format(repo, ref, error), 1)
+    if not files:
+        raise GuildError(
+            "no tasks.md files found under {} at {}:{}: check sdd.git_ref".format(repo, ref, epics_dir),
+            1,
+        )
+    for epic, path in files:
+        try:
+            text = sdd.git_show(repo, ref, path)
+        except sdd.GitSddError as error:
+            raise GuildError("git show failed for {}:{}: {}".format(ref, path, error), 1)
+        yield epic, text, "git:{}:{}".format(ref, path)
+
+
+def _sync_epic_file(ctx, project, epic, text, sdd_path, patterns, epic_key_field, epic_status_field):
     tasks = sdd.parse_tasks_text(text, patterns)
     if tasks is None:
         raise GuildError("no matching task headings", 1)
@@ -143,7 +197,7 @@ def _sync_epic_file(ctx, project, epic, path, patterns, epic_key_field, epic_sta
             {
                 "project": project,
                 "epic": epic,
-                "sdd_path": str(path),
+                "sdd_path": sdd_path,
                 "jira_key": jira_key,
                 "sdd_status": sdd_status,
                 "tasks": tasks,
@@ -159,19 +213,17 @@ def _sync_sdd(ctx):
         raise GuildError(
             "project '{}' has no 'sdd' config block: add one to sync SDD tasks".format(project), 1
         )
+    _validate_sdd_source(sdd_config, project)
     patterns = _sdd_patterns(sdd_config)
     epic_key_field = sdd_config.get("epic_key_field")
     epic_status_field = sdd_config.get("epic_status_field")
-    epics_path = Path(sdd_config["root"]).expanduser() / sdd_config["epics_dir"]
-    if not epics_path.is_dir():
-        raise GuildError("sdd epics directory {} does not exist: check sdd.root".format(epics_path), 1)
-    epic_files = sdd.discover_epic_files(sdd_config["root"], sdd_config["epics_dir"])
+    epic_source = _root_epic_source(sdd_config) if "root" in sdd_config else _git_epic_source(sdd_config)
     failures = []
-    for epic, path in epic_files:
+    for epic, text, sdd_path in epic_source:
         try:
-            _sync_epic_file(ctx, project, epic, path, patterns, epic_key_field, epic_status_field)
+            _sync_epic_file(ctx, project, epic, text, sdd_path, patterns, epic_key_field, epic_status_field)
         except GuildError as error:
-            failures.append("{}: {}".format(path, error.message))
+            failures.append("{}: {}".format(sdd_path, error.message))
     return failures
 
 

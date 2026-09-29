@@ -301,6 +301,8 @@ against path traversal, not an identity boundary.
 }
 ```
 
+`sdd.root` above can instead be `"git_repo": "~/Documents/_projects/acme/sdd-docs", "git_ref": "origin/main"` (see above) to read the same `epics_dir` from a git ref instead of a working copy.
+
 - `sdd` (optional): drives `guild sync --source sdd`. Three independent,
   explicit regexes (`task_heading`, `key_ref`, `deps_line`, `status_line`) plus
   optional `order_list` and `key_line`; no hidden defaults, no fallback shape. A
@@ -308,6 +310,21 @@ against path traversal, not an identity boundary.
   and skipped; other files still sync; `guild sync` exits non-zero if any
   file failed. See "SDD parsing rules" below for exactly how each regex is
   used.
+  - Two mutually exclusive ways to read `epics_dir`, exactly one required:
+    - `root`: a plain checkout path. `guild` reads `tasks.md` files straight
+      off disk, so the checkout must exist and stay put.
+    - `git_repo` + `git_ref` (e.g. `"origin/main"`), both required together:
+      `guild` runs `git -C <git_repo> fetch --quiet origin`, lists
+      `tasks.md` files at `<git_ref>` with `git ls-tree` and reads each with
+      `git show <git_ref>:<path>` — it never checks out, resets or otherwise
+      touches `git_repo`'s working tree, so it is safe to point at a clone a
+      human or another session is actively using. A failed fetch, an unknown
+      ref, or zero `tasks.md` files under `epics_dir` at that ref is a clear
+      error, never an empty sync. `epics.sdd_path` is stored as
+      `git:<git_ref>:<path>` in this mode. Prefer `git_repo`/`git_ref` for a
+      docs repo shared with other sessions — the worktree guild reads from
+      can otherwise be deleted or switched out from under it by someone
+      else's cleanup, and `sync` would silently read nothing.
   - `epic_key_field` (optional): the frontmatter key (a plain `key: value`
     line between the leading `---` markers of the epic's `tasks.md`) that
     names the epic's own tracker card, e.g. `jira: DEMO-1`. Stored as
