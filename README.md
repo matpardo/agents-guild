@@ -63,10 +63,11 @@ guild init-project <name> --config <file.json>
 
 guild party start <name>
 guild party resume <party> [--session <name>]   # --session: from a human terminal only
-guild party close
+guild party close [<party>]     # <party>: from a terminal, or your own party
 
 guild quest add <slug> --title "..." --epic <slug> --tasks T09,T07b
 guild quest add <slug> --title "..." --no-epic
+guild quest done <slug>
 
 guild task add <quest>/<tid> --title "..."          # no-epic quests only
 guild task start <quest>/<tid> [--summary "..."]
@@ -141,6 +142,16 @@ because of new review comments, `guild next` also fires
 `last_notified_comment_count` catches up so the same comments are not
 reported again). `guild next --all` prints the full queue and is always
 read-only: it never fires that event.
+
+### Closing a party
+
+`guild party close` closes the caller's party; `guild party close <party>`
+closes any party from a terminal (a session may only name its own party).
+Closing cascades in the same event: the party's active quests become `done`,
+its open asks are dismissed and its claims are released. Tracked PRs stay
+tracked for history and are listed if still open. `guild quest done <slug>`
+finishes one quest without closing its party. Closed parties leave the board
+and quests that are `done` leave `guild drift`'s default scope.
 
 ### Task done resolver
 
