@@ -168,6 +168,29 @@ class EpicKeyFrontmatterTests(unittest.TestCase):
         self.assertEqual(sdd.parse_epic_key(text, "jira"), "DEMO-1")
 
 
+class EpicStatusFrontmatterTests(unittest.TestCase):
+    def test_reads_configured_field_from_frontmatter(self):
+        text = "---\nepic: widget-rollout\nstatus: done\n---\n\n## T01 — x\n"
+        self.assertEqual(sdd.parse_epic_status(text, "status"), "done")
+
+    def test_absent_field_gives_none(self):
+        text = "---\nepic: widget-rollout\n---\n\n## T01 — x\n"
+        self.assertIsNone(sdd.parse_epic_status(text, "status"))
+
+    def test_no_frontmatter_gives_none(self):
+        text = "## T01 — x\n"
+        self.assertIsNone(sdd.parse_epic_status(text, "status"))
+
+    def test_field_not_configured_gives_none(self):
+        text = "---\nepic: widget-rollout\nstatus: done\n---\n\n## T01 — x\n"
+        self.assertIsNone(sdd.parse_epic_status(text, None))
+
+    def test_key_and_status_fields_are_independent(self):
+        text = "---\nepic: widget-rollout\njira: DEMO-1\nstatus: active\n---\n\n## T01 — x\n"
+        self.assertEqual(sdd.parse_epic_key(text, "jira"), "DEMO-1")
+        self.assertEqual(sdd.parse_epic_status(text, "status"), "active")
+
+
 class DiscoverEpicFilesTests(unittest.TestCase):
     def test_discovers_epic_directories_with_tasks_md(self):
         import tempfile
