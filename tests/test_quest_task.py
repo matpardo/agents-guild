@@ -1,3 +1,7 @@
+from datetime import timedelta
+from unittest import mock
+
+from guild import timeutil
 from tests.testutil import GuildTestCase
 
 
@@ -127,6 +131,141 @@ class QuestAddValidationTests(GuildTestCase):
         )
         self.assertEqual(code, 1)
         self.assertIn("already exists", err)
+
+
+class QuestAddConflictTests(GuildTestCase):
+    def setUp(self):
+        super().setUp()
+        self.repo_dir = self.register_project("acme", ["acme/app"])
+        self.run_cli(["party", "start", "alpha"], "sess-1", self.repo_dir)
+        self.run_cli(["party", "start", "beta"], "sess-2", self.repo_dir)
+        self.sync_sdd(
+            self.repo_dir,
+            "sess-1",
+            "acme",
+            "compliance",
+            "## T01 — First task\n\n**Deps:** —\n\n**Status:** [ ] pending\n\n"
+            "## T02 — Second task\n\n**Deps:** —\n\n**Status:** [ ] pending\n\n"
+            "## T03 — Third task\n\n**Deps:** —\n\n**Status:** [ ] pending\n\n"
+            "## T05 — Fifth task\n\n**Deps:** —\n\n**Status:** [ ] pending\n",
+        )
+
+    def test_conflict_via_other_quest(self):
+        self.run_cli(
+            ["quest", "add", "alpha-q", "--title", "A", "--epic", "compliance", "--tasks", "T01"],
+            "sess-1",
+            self.repo_dir,
+        )
+        code, out, err = self.run_cli(
+            ["quest", "add", "beta-q", "--title", "B", "--epic", "compliance", "--tasks", "T01,T03"],
+            "sess-2",
+            self.repo_dir,
+        )
+        self.assertEqual(code, 1)
+        self.assertIn("T01 is in quest alpha-q of party alpha", err)
+
+    def test_conflict_via_claim(self):
+        self.run_cli(["claim", "task:compliance/T02", "--ttl", "8h"], "sess-1", self.repo_dir)
+        code, out, err = self.run_cli(
+            ["quest", "add", "beta-q", "--title", "B", "--epic", "compliance", "--tasks", "T02"],
+            "sess-2",
+            self.repo_dir,
+        )
+        self.assertEqual(code, 1)
+        self.assertIn("T02 is claimed by party alpha until", err)
+
+    def test_several_conflicts_all_listed(self):
+        self.run_cli(
+            ["quest", "add", "alpha-q", "--title", "A", "--epic", "compliance", "--tasks", "T01"],
+            "sess-1",
+            self.repo_dir,
+        )
+        self.run_cli(["claim", "task:compliance/T05", "--ttl", "8h"], "sess-1", self.repo_dir)
+        code, out, err = self.run_cli(
+            [
+                "quest", "add", "beta-q", "--title", "B", "--epic", "compliance",
+                "--tasks", "T01,T02,T05",
+            ],
+            "sess-2",
+            self.repo_dir,
+        )
+        self.assertEqual(code, 1)
+        self.assertIn("T01 is in quest alpha-q of party alpha", err)
+        self.assertIn("T05 is claimed by party alpha until", err)
+        self.assertNotIn("T02", err)
+
+    def test_own_quest_allowed(self):
+        self.run_cli(
+            ["quest", "add", "alpha-q", "--title", "A", "--epic", "compliance", "--tasks", "T01"],
+            "sess-1",
+            self.repo_dir,
+        )
+        code, out, err = self.run_cli(
+            ["quest", "add", "alpha-q2", "--title", "A2", "--epic", "compliance", "--tasks", "T01"],
+            "sess-1",
+            self.repo_dir,
+        )
+        self.assertEqual(code, 0)
+
+    def test_closed_quest_does_not_conflict(self):
+        self.run_cli(
+            ["quest", "add", "alpha-q", "--title", "A", "--epic", "compliance", "--tasks", "T01"],
+            "sess-1",
+            self.repo_dir,
+        )
+        self.run_cli(["quest", "done", "alpha-q"], "sess-1", self.repo_dir)
+        code, out, err = self.run_cli(
+            ["quest", "add", "beta-q", "--title", "B", "--epic", "compliance", "--tasks", "T01"],
+            "sess-2",
+            self.repo_dir,
+        )
+        self.assertEqual(code, 0)
+
+    def test_expired_claim_does_not_conflict(self):
+        self.run_cli(["claim", "task:compliance/T01", "--ttl", "30m"], "sess-1", self.repo_dir)
+        future = timeutil.utcnow() + timedelta(hours=1)
+        with mock.patch("guild.timeutil.utcnow", return_value=future):
+            code, out, err = self.run_cli(
+                ["quest", "add", "beta-q", "--title", "B", "--epic", "compliance", "--tasks", "T01"],
+                "sess-2",
+                self.repo_dir,
+            )
+        self.assertEqual(code, 0)
+
+    def test_other_epic_does_not_conflict(self):
+        self.sync_sdd(
+            self.repo_dir,
+            "sess-1",
+            "acme",
+            "billing",
+            "## T01 — Billing first task\n\n**Deps:** —\n\n**Status:** [ ] pending\n",
+        )
+        self.run_cli(
+            ["quest", "add", "alpha-q", "--title", "A", "--epic", "compliance", "--tasks", "T01"],
+            "sess-1",
+            self.repo_dir,
+        )
+        code, out, err = self.run_cli(
+            ["quest", "add", "beta-q", "--title", "B", "--epic", "billing", "--tasks", "T01"],
+            "sess-2",
+            self.repo_dir,
+        )
+        self.assertEqual(code, 0)
+
+    def test_nothing_written_on_rejection(self):
+        self.run_cli(
+            ["quest", "add", "alpha-q", "--title", "A", "--epic", "compliance", "--tasks", "T01"],
+            "sess-1",
+            self.repo_dir,
+        )
+        code, out, err = self.run_cli(
+            ["quest", "add", "beta-q", "--title", "B", "--epic", "compliance", "--tasks", "T01"],
+            "sess-2",
+            self.repo_dir,
+        )
+        self.assertEqual(code, 1)
+        code, out, err = self.run_cli(["board"], "sess-1", self.repo_dir)
+        self.assertNotIn("beta-q", out)
 
 
 class TaskLifecycleTests(GuildTestCase):

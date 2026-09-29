@@ -30,6 +30,68 @@ class RaidJoinLeaveTests(GuildTestCase):
         self.assertIn("ci:", out)
         self.assertIn("alpha", out)
 
+    def test_join_requires_ttl_or_until_leave(self):
+        code, out, err = self.run_cli(["raid", "join", "ci"], "sess-1", self.repo_dir)
+        self.assertEqual(code, 2)
+        self.assertIn("one of the arguments --ttl --until-leave is required", err)
+
+    def test_join_rejects_both_ttl_and_until_leave(self):
+        code, out, err = self.run_cli(
+            ["raid", "join", "ci", "--ttl", "1h", "--until-leave"], "sess-1", self.repo_dir
+        )
+        self.assertEqual(code, 2)
+        self.assertIn("not allowed with argument", err)
+
+    def _raid_member_row(self, raid_name, party):
+        conn = sqlite3.connect(str(self.data_home / "guild" / "guild.db"))
+        conn.row_factory = sqlite3.Row
+        row = conn.execute(
+            "SELECT expires_at FROM raid_members WHERE raid = ? AND party = ?", (raid_name, party)
+        ).fetchone()
+        conn.close()
+        return row
+
+    def test_join_until_leave_stores_null_expiry(self):
+        code, out, err = self.run_cli(
+            ["raid", "join", "ci", "--until-leave"], "sess-1", self.repo_dir
+        )
+        self.assertEqual(code, 0, err)
+        self.assertIn("party 'alpha' joined raid 'ci' until leave", out)
+        row = self._raid_member_row("ci", "alpha")
+        self.assertIsNone(row["expires_at"])
+
+    def test_until_leave_never_expires(self):
+        self.run_cli(["raid", "join", "ci", "--until-leave"], "sess-1", self.repo_dir)
+        far_future = timeutil.utcnow() + timedelta(days=365)
+        with mock.patch("guild.timeutil.utcnow", return_value=far_future):
+            code, out, err = self.run_cli(["raids"], None, None)
+        self.assertIn("ci:", out)
+        self.assertIn("alpha (until leave)", out)
+
+    def test_until_leave_member_can_still_leave(self):
+        self.run_cli(["raid", "join", "ci", "--until-leave"], "sess-1", self.repo_dir)
+        far_future = timeutil.utcnow() + timedelta(days=365)
+        with mock.patch("guild.timeutil.utcnow", return_value=far_future):
+            code, out, err = self.run_cli(["raid", "leave", "ci"], "sess-1", self.repo_dir)
+        self.assertEqual(code, 0, err)
+        self.assertIn("party 'alpha' left raid 'ci'", out)
+
+    def test_ttl_join_then_until_leave_switches_mode(self):
+        self.run_cli(["raid", "join", "ci", "--ttl", "30m"], "sess-1", self.repo_dir)
+        code, out, err = self.run_cli(
+            ["raid", "join", "ci", "--until-leave"], "sess-1", self.repo_dir
+        )
+        self.assertEqual(code, 0, err)
+        row = self._raid_member_row("ci", "alpha")
+        self.assertIsNone(row["expires_at"])
+
+    def test_until_leave_then_ttl_switches_mode(self):
+        self.run_cli(["raid", "join", "ci", "--until-leave"], "sess-1", self.repo_dir)
+        code, out, err = self.run_cli(["raid", "join", "ci", "--ttl", "1h"], "sess-1", self.repo_dir)
+        self.assertEqual(code, 0, err)
+        row = self._raid_member_row("ci", "alpha")
+        self.assertIsNotNone(row["expires_at"])
+
     def test_join_again_refreshes_ttl(self):
         self.run_cli(["raid", "join", "ci", "--ttl", "30m"], "sess-1", self.repo_dir)
         code, out, err = self.run_cli(["raid", "join", "ci", "--ttl", "8h"], "sess-1", self.repo_dir)
@@ -167,6 +229,17 @@ class RaidNoticeTests(GuildTestCase):
         code, out, err = self.run_hook("post-tool-use", {"session_id": "sess-2", "cwd": str(self.repo_dir)})
         self.assertEqual(out, "")
 
+    def test_until_leave_member_receives_notice_long_after_ttl_would_have_expired(self):
+        self.run_cli(["raid", "join", "ci", "--until-leave"], "sess-1", self.repo_dir)
+        self.run_cli(["raid", "join", "ci", "--ttl", "1h"], "sess-2", self.repo_dir)
+        far_future = timeutil.utcnow() + timedelta(days=10)
+        with mock.patch("guild.timeutil.utcnow", return_value=far_future):
+            self.run_cli(
+                ["notice", "create", "ci flaky", "--to", "raid:ci", "--ttl", "1h"], "sess-2", self.repo_dir
+            )
+            code, out, err = self.run_cli(["inbox", "--since-last"], "sess-1", self.repo_dir)
+        self.assertIn("ci flaky", out)
+
 
 class RaidBoardTests(GuildTestCase):
     def test_board_shows_raid_scope_and_party_membership(self):
@@ -182,6 +255,14 @@ class RaidBoardTests(GuildTestCase):
         self.assertIn("raids: ci (", out)
         self.assertIn("left)", out)
 
+    def test_board_shows_until_leave_membership(self):
+        repo_dir = self.register_project("acme", ["acme/app"])
+        self.run_cli(["party", "start", "alpha"], "sess-1", repo_dir)
+        self.run_cli(["raid", "join", "ci", "--until-leave"], "sess-1", repo_dir)
+        code, out, err = self.run_cli(["board"], None, None)
+        self.assertEqual(code, 0, err)
+        self.assertIn("raids: ci (until leave)", out)
+
 
 class RaidPartyCloseTests(GuildTestCase):
     def setUp(self):
@@ -189,6 +270,7 @@ class RaidPartyCloseTests(GuildTestCase):
         self.repo_dir = self.register_project("acme", ["acme/app"])
         self.run_cli(["party", "start", "alpha"], "sess-1", self.repo_dir)
         self.run_cli(["raid", "join", "ci", "--ttl", "5h"], "sess-1", self.repo_dir)
+        self.run_cli(["raid", "join", "ci-ul", "--until-leave"], "sess-1", self.repo_dir)
 
     def _row(self, query, params):
         conn = sqlite3.connect(str(self.data_home / "guild" / "guild.db"))
@@ -204,12 +286,26 @@ class RaidPartyCloseTests(GuildTestCase):
             self._row("SELECT raid FROM raid_members WHERE raid = ? AND party = ?", ("ci", "alpha"))
         )
 
+    def test_close_leaves_until_leave_raid(self):
+        code, out, err = self.run_cli(["party", "close", "alpha"], None, None)
+        self.assertEqual(code, 0, err)
+        self.assertIsNone(
+            self._row("SELECT raid FROM raid_members WHERE raid = ? AND party = ?", ("ci-ul", "alpha"))
+        )
+
     def test_rebuild_reproduces_raid_cascade(self):
         self.run_cli(["party", "close", "alpha"], None, None)
         self.run_cli(["rebuild"], None, None)
         self.assertIsNone(
             self._row("SELECT raid FROM raid_members WHERE raid = ? AND party = ?", ("ci", "alpha"))
         )
+
+    def test_rebuild_reproduces_until_leave_membership(self):
+        self.run_cli(["rebuild"], None, None)
+        row = self._row(
+            "SELECT expires_at FROM raid_members WHERE raid = ? AND party = ?", ("ci-ul", "alpha")
+        )
+        self.assertIsNone(row["expires_at"])
 
 
 if __name__ == "__main__":

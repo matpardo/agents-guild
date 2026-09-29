@@ -1,9 +1,11 @@
+import fnmatch
 import json
 from pathlib import Path
 
 from guild import config, db, events, timeutil
 from guild.adapters import github, jira_acli, sdd
 from guild.commands import notice as notice_commands
+from guild.commands import raid as raid_commands
 from guild.errors import GuildError
 
 _TRACKER_SUPPORTED_KINDS = ("jira-acli",)
@@ -13,6 +15,11 @@ _SDD_OPTIONAL_PATTERN_KEYS = ("order_list", "key_line")
 
 _FAILING_CONCLUSIONS = ("FAILURE", "CANCELLED", "TIMED_OUT", "ACTION_REQUIRED")
 _SUCCESS_CONCLUSION = "SUCCESS"
+
+_MERGED_GH_STATE = "MERGED"
+_MERGE_NOTICE_TTL = "12h"
+_MERGE_NOTICE_TEMPLATE = "{}#{} merged in main ({}/{}: {}). Parties with open branches: rebase."
+_MERGE_NOTICE_SHARED_AREAS_SUFFIX = " Shared areas touched: {}"
 
 
 def _count_checks(rollup):
@@ -73,6 +80,62 @@ def _sync_pr(ctx, row):
                 "synced_at": timeutil.to_iso(ctx.now),
             },
         )
+    return lifecycle
+
+
+def _became_merged(row, lifecycle):
+    return lifecycle == "merged" and row["gh_state"] != _MERGED_GH_STATE
+
+
+def _project_for_repo(projects, repo):
+    for project in projects:
+        if repo in project["github"]["repos"]:
+            return project
+    return None
+
+
+def _touched_shared_areas(shared_areas, changed_files):
+    return [area for area in shared_areas if any(fnmatch.fnmatch(path, area) for path in changed_files)]
+
+
+def _shared_areas_line(ctx, project, row, failures):
+    shared_areas = project.get("shared_areas") if project is not None else None
+    if not shared_areas:
+        return ""
+    try:
+        changed_files = github.pr_files(ctx.cwd, row["repo"], row["number"])
+    except github.GhCommandError as error:
+        failures.append(
+            "{}#{}: shared areas check failed: {}".format(row["repo"], row["number"], error)
+        )
+        return ""
+    touched = _touched_shared_areas(shared_areas, changed_files)
+    if not touched:
+        return ""
+    return _MERGE_NOTICE_SHARED_AREAS_SUFFIX.format(", ".join(touched))
+
+
+def _merge_notice_text(row, shared_line):
+    base = _MERGE_NOTICE_TEMPLATE.format(
+        row["repo"], row["number"], row["task_quest"], row["task_tid"], row["what"]
+    )
+    return base + shared_line
+
+
+def _announce_merge(ctx, projects, row, failures):
+    raids = raid_commands.member_raids(ctx.conn, ctx.now, row["party"])
+    if not raids:
+        return
+    announces = "pr:{}#{}".format(row["repo"], row["number"])
+    if notice_commands.announced(ctx.conn, announces):
+        return
+    project = _project_for_repo(projects, row["repo"])
+    shared_line = _shared_areas_line(ctx, project, row, failures)
+    text = _merge_notice_text(row, shared_line)
+    for raid_row in raids:
+        notice_commands.create_announcing(
+            ctx, row["party"], text, "raid:{}".format(raid_row["raid"]), _MERGE_NOTICE_TTL, announces
+        )
 
 
 def _close_met_notices(ctx):
@@ -106,11 +169,15 @@ def _sync_gh(ctx):
         "SELECT * FROM prs WHERE lifecycle NOT IN ('merged', 'closed')"
     ).fetchall()
     failures = []
+    projects = config.load_all_projects(ctx.projects_dir)
     for row in rows:
         try:
-            _sync_pr(ctx, row)
+            lifecycle = _sync_pr(ctx, row)
         except github.GhCommandError as error:
             failures.append("{}#{}: {}".format(row["repo"], row["number"], error))
+            continue
+        if _became_merged(row, lifecycle):
+            _announce_merge(ctx, projects, row, failures)
     _close_met_notices(ctx)
     return failures
 

@@ -28,7 +28,10 @@ def main():
         number = args[2]
         repo_index = args.index("--repo") + 1
         repo = args[repo_index]
-        _respond("view_{}_{}".format(repo.replace("/", "-"), number))
+        json_index = args.index("--json") + 1
+        fields = args[json_index]
+        prefix = "view_files" if fields == "files" else "view"
+        _respond("{}_{}_{}".format(prefix, repo.replace("/", "-"), number))
         return
     if args[:2] == ["pr", "list"]:
         head_index = args.index("--head") + 1

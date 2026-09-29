@@ -89,10 +89,12 @@ guild notice close <id>
 guild notices
 
 guild claim <area> --ttl <dur>          # area, or task:<epic>/<tid> / task:<quest>/<tid>
+guild claim check <area>                # read-only, no event; exit 0 free/yours, exit 1 someone else's
 guild release <area>
 guild claims
 
 guild raid join <name> --ttl <dur>      # the caller's bound party joins; joining again refreshes the TTL
+guild raid join <name> --until-leave    # joins with no expiry; ends only on `raid leave` or `party close`
 guild raid leave <name>
 guild raids
 
@@ -187,6 +189,38 @@ category is used instead of status names, so it works in any tracker
 language without a configured list. No opinion anywhere → not done, never
 assumed done. When more than one source has an opinion and they disagree,
 the disagreement is returned and surfaced by `guild next`.
+
+### Merge notices (`sync --source gh`)
+
+When `guild sync --source gh` observes a tracked PR whose lifecycle flips to
+`merged` during that sync (it was not `merged` before — a PR already merged
+at `pr track` time does not count, since `pr track` never inspects
+`mergedAt`), it posts one notice per raid the PR's owning party is currently
+an active member of. The notice's author is the owning party, so the owner
+never receives its own notice back while every other member does (same rule
+as every other notice). The notice's TTL is a fixed 12h and its text is:
+
+```
+<repo>#<n> merged in main (<quest>/<tid>: <what>). Parties with open branches: rebase.
+```
+
+If the project config has a `shared_areas` key (globs relative to the repo
+root, matched with `fnmatch`) and the owning party is in at least one raid,
+`sync` makes one extra `gh pr view --json files` call to list the PR's
+changed files; any glob one of them matches is appended as
+`Shared areas touched: <glob1>, <glob2>`. If that extra call fails, the
+notice still posts without the shared-areas line, and the failure is
+reported the same way any other `gh` failure is — as a sync failure, so the
+command's exit code is non-zero. A PR whose owning party is in no raid gets
+no notice, same as today. The merge is announced at most once, ever: the
+notice payload carries `announces: pr:<repo>#<n>`, and `sync` skips posting
+if a notice (active or not) with that `announces` value already exists —
+safe across a re-sync or a `rebuild` followed by a `sync`.
+
+`guild` has no daemon, so this only fires when someone runs the sync. A raid
+lead should keep a watcher running for the duration of the raid, e.g.
+`watch -n 300 guild sync --source gh` from a terminal, or `/loop 5m guild
+sync --source gh` from a session that supports it.
 
 ### `guild drift`
 
@@ -304,13 +338,25 @@ name is not found.
 
 A raid is a named channel parties join so a shared concern (CI, a shared
 file) has a deterministic audience: it exists while it has at least one
-active (non-expired) member, there is no separate create command. `guild
-raid join <name> --ttl <dur>` makes the caller's bound party an active
-member; joining again refreshes the TTL. `guild raid leave <name>` removes
-the caller's bound party; leaving when not an active member is a clear
-error. `guild raids` lists every raid with its active members and each
-member's time left. `guild party close` cascades into every raid the
-closing party belongs to, same as claims.
+active (non-expired, or until-leave) member, there is no separate create
+command. `guild raid join <name>` takes exactly one of `--ttl <dur>` or
+`--until-leave` (argparse enforces it, one required): a TTL join makes the
+caller's bound party an active member until it expires, joining again
+refreshes the TTL; `--until-leave` makes it a member with no expiry, ending
+only with `guild raid leave <name>` or the `party close` cascade. Joining
+again switches mode — a TTL join over an until-leave membership sets a TTL,
+and an until-leave join over a TTL membership clears it. `guild raid leave
+<name>` removes the caller's bound party; leaving when not an active member
+is a clear error. `guild raids` lists every raid with its active members and
+each member's time left, or `until leave` for an until-leave member. `guild
+party close` cascades into every raid the closing party belongs to (TTL or
+until-leave), same as claims.
+
+A TTL membership due to expire within `MEMBERSHIP_WARNING_WINDOW` (12h) is
+warned once per (session, raid, expiry) in `prompt-submit`, `post-tool-use`
+and the session-start brief: `guild: raid <name> membership expires in <Nh>
+— renew with guild raid join <name> --ttl <dur> or --until-leave`. Renewing
+changes the expiry, so a later warning can fire again.
 
 `guild notice create --to raid:<name> ...` is valid only while the raid has
 at least one active member (a clear error otherwise); any bound party, or
@@ -323,6 +369,41 @@ targeting` is the single place that resolves whether a notice's `project:`,
 `guild` or `raid:` scope matches the caller. `guild board` shows the raw
 `raid:<name>` scope on a raid notice, and lists each party's raids
 (`raids: ci (5h left)`) at the end of its block.
+
+### No overlapping task lists
+
+`guild quest add <slug> --epic <slug> --tasks T01,T02,...` rejects the whole
+command, writing nothing, if any listed task is either in an **active** quest
+of **another** party for the same project and epic, or task-claimed
+(`task:<epic>/<tid>`) by another party. The error lists every conflicting
+task with its holder, e.g. `T02 is in quest raid-wave1 of party alpha; T05 is
+claimed by party beta until 14:30`. A task in the caller's own other quests
+never conflicts — that party's own overlap is its own business. A closed
+quest or an expired claim never conflicts either. Seed stays exempt, same as
+before (`guild seed` writes `quest.added` events directly).
+
+`guild claim check <area>` is a read-only orchestrator helper: it fires no
+event. Exit 0 and `free` when the area has no active claim; exit 0 and `held
+by you until HH:MM` when the caller's bound party holds it; exit 1 and `held
+by party <p> until HH:MM` (printed to stdout, so a script can parse it) when
+another party holds it. From an unbound session or the human terminal,
+"held by you" never applies — any active holder gives exit 1. It accepts any
+area string, including `task:<epic>/<tid>` and a shared-area glob string.
+
+### Design note: `claim check`
+
+`guild claim <area> --ttl <dur>` takes the area as a bare positional with no
+subcommand keyword, so a native `argparse` subparsers dispatch for `check`
+cannot sit next to it: subparsers greedily claim the first positional and
+reject anything that is not one of their declared choices, which would break
+plain `guild claim ci.yml --ttl 30m` (`ci.yml` is not a valid "subcommand").
+Instead, `claim`'s parser declares two positionals (`area`, an optional
+`check_area`) and an optional `--ttl`; the handler dispatches on
+`area == "check"`. This keeps the legacy form working unchanged and makes
+`check` a reserved word: `guild claim check <area>` and
+`guild claim check --ttl ...` (rejected clearly, `check` takes no TTL) both
+work, but an area literally named `check` can never be claimed or read this
+way — a deliberate, documented gap rather than an ambiguous parse.
 
 ### Design note: `notice`
 

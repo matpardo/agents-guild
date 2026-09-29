@@ -18,21 +18,21 @@ updated: 2026-09-29
 ## T02 — Merges announce themselves
 
 **Depends on:** —
-**Status:** [ ] pending
+**Status:** [x] done — #22
 
 **What:** `sync --source gh` posts one raid notice per tracked PR that became merged, with shared areas it touched.
 
 ## T03 — Membership until leave
 
 **Depends on:** —
-**Status:** [ ] pending
+**Status:** [x] done — #23
 
 **What:** `raid join` takes exactly one of `--ttl` or `--until-leave`; warn once before a membership expires.
 
 ## T04 — No overlapping task lists
 
 **Depends on:** —
-**Status:** [ ] pending
+**Status:** [x] done — #20
 
 **What:** `quest add` rejects tasks in another party's active quest or task-claimed by another party; `guild claim check <area>` for orchestrators.
 

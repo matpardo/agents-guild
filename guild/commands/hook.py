@@ -1,4 +1,5 @@
 import fnmatch
+import hashlib
 import json
 import os
 import re
@@ -82,12 +83,42 @@ def _auto_resume_lines(ctx, resume_party):
     return [party_commands.resume(ctx, resume_party, None).splitlines()[0]]
 
 
+def _membership_warning_marker_path(ctx, raid_name, expires_at):
+    digest = hashlib.sha256("{}|{}".format(raid_name, expires_at).encode()).hexdigest()[:16]
+    return ctx.state_dir / "hints" / "raid-warn-{}-{}".format(identity.cursor_key(ctx.session_id), digest)
+
+
+def _membership_warning_lines(ctx, binding):
+    if binding is None:
+        return []
+    lines = []
+    for row in raid_commands.member_raids(ctx.conn, ctx.now, binding["party"]):
+        if row["expires_at"] is None:
+            continue
+        remaining = timeutil.from_iso(row["expires_at"]) - ctx.now
+        if remaining > timeutil.MEMBERSHIP_WARNING_WINDOW:
+            continue
+        marker = _membership_warning_marker_path(ctx, row["raid"], row["expires_at"])
+        if marker.exists():
+            continue
+        marker.parent.mkdir(parents=True, exist_ok=True)
+        marker.touch()
+        lines.append(
+            "guild: raid {} membership expires in {}h"
+            " — renew with guild raid join {} --ttl <dur> or --until-leave".format(
+                row["raid"], timeutil.hours_until(ctx.now, row["expires_at"]), row["raid"]
+            )
+        )
+    return lines
+
+
 def session_start(ctx, resume_party):
     lines = _auto_resume_lines(ctx, resume_party)
     binding = identity.resolve_binding(ctx.conn, ctx.session_id)
     if binding is not None:
         lines.extend(_resume_lines(ctx, binding))
     lines.extend(brief_commands.render_brief(ctx))
+    lines.extend(_membership_warning_lines(ctx, binding))
     _spawn_background_sync(ctx.cwd)
     return "\n".join(lines)
 
@@ -129,7 +160,7 @@ def prompt_submit(ctx):
             marker.touch()
             lines = [UNBOUND_HINT] + lines
     project = binding["project"] if binding is not None else None
-    lines = lines + _ctx_nudge_lines(ctx, project)
+    lines = lines + _ctx_nudge_lines(ctx, project) + _membership_warning_lines(ctx, binding)
     with db.writing(ctx.conn):
         inbox_commands.advance_cursor(ctx.conn, identity.cursor_key(ctx.session_id), seq)
     return "\n".join(lines)
@@ -140,7 +171,7 @@ def post_tool_use(ctx):
     message_lines, seq = inbox_commands.new_lines(ctx, binding)
     lines = inbox_commands.framed(message_lines)
     project = binding["project"] if binding is not None else None
-    lines = lines + _ctx_nudge_lines(ctx, project)
+    lines = lines + _ctx_nudge_lines(ctx, project) + _membership_warning_lines(ctx, binding)
     with db.writing(ctx.conn):
         inbox_commands.advance_cursor(ctx.conn, identity.cursor_key(ctx.session_id), seq)
     if not lines:

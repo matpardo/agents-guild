@@ -1,3 +1,4 @@
+import math
 import re
 from datetime import datetime, timedelta, timezone
 
@@ -5,6 +6,8 @@ from guild.errors import GuildError
 
 _DURATION_RE = re.compile(r"^(\d+)([mhd])$")
 _UNIT_SECONDS = {"m": 60, "h": 3600, "d": 86400}
+
+MEMBERSHIP_WARNING_WINDOW = timedelta(hours=12)
 
 
 def utcnow():
@@ -34,7 +37,13 @@ def expires_at_iso(now, duration_text):
 
 
 def is_expired(now, expires_at_text):
+    if expires_at_text is None:
+        return False
     return now > from_iso(expires_at_text)
+
+
+def clock_label(expires_at_text):
+    return from_iso(expires_at_text).strftime("%H:%M")
 
 
 def time_left_label(now, expires_at_text):
@@ -43,3 +52,14 @@ def time_left_label(now, expires_at_text):
     if hours >= 1:
         return "{}h left".format(hours)
     return "{}m left".format(int(remaining.total_seconds() // 60))
+
+
+def membership_left_label(now, expires_at_text):
+    if expires_at_text is None:
+        return "until leave"
+    return time_left_label(now, expires_at_text)
+
+
+def hours_until(now, expires_at_text):
+    remaining = from_iso(expires_at_text) - now
+    return max(1, math.ceil(remaining.total_seconds() / 3600))
