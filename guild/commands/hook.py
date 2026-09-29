@@ -29,14 +29,16 @@ _EDIT_TOOL_PATH_FIELDS = {
 }
 
 
+_ISOLATED_LAUNCHER = (
+    "import runpy, sys; sys.path.insert(0, sys.argv.pop(1)); sys.argv[0] = 'guild'; "
+    "runpy.run_module('guild', run_name='__main__', alter_sys=True)"
+)
+
+
 def _spawn_background_sync(cwd):
-    env = dict(os.environ)
-    existing_path = env.get("PYTHONPATH")
-    env["PYTHONPATH"] = str(_REPO_ROOT) if not existing_path else "{}:{}".format(_REPO_ROOT, existing_path)
     subprocess.Popen(
-        [sys.executable, "-m", "guild", "sync", "--source", "gh"],
+        [sys.executable, "-I", "-c", _ISOLATED_LAUNCHER, str(_REPO_ROOT), "sync", "--source", "gh"],
         cwd=str(cwd),
-        env=env,
         stdin=subprocess.DEVNULL,
         stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL,

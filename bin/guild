@@ -13,5 +13,5 @@ done
 DIR="$(cd -P "$(dirname "$SOURCE")" >/dev/null && pwd)"
 REPO_ROOT="$(dirname "$DIR")"
 
-export PYTHONPATH="$REPO_ROOT${PYTHONPATH:+:$PYTHONPATH}"
-exec python3 -m guild "$@"
+LAUNCHER="import runpy, sys; sys.path.insert(0, sys.argv.pop(1)); sys.argv[0] = 'guild'; runpy.run_module('guild', run_name='__main__', alter_sys=True)"
+exec python3 -I -c "$LAUNCHER" "$REPO_ROOT" "$@"
