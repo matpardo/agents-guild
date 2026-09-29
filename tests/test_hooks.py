@@ -420,6 +420,67 @@ class PrePushUnresolvedBranchTests(GuildTestCase):
         self.assertIn("could not determine the branch for this push", out)
 
 
+class RaidMembershipWarningTests(GuildTestCase):
+    def setUp(self):
+        super().setUp()
+        self.repo_dir = self.register_project("acme", ["acme/app"])
+        self.run_cli(["party", "start", "alpha"], "sess-1", self.repo_dir)
+
+    def test_warning_fires_once_within_window_on_prompt_submit(self):
+        self.run_cli(["raid", "join", "ci", "--ttl", "10h"], "sess-1", self.repo_dir)
+        payload = {"session_id": "sess-1", "cwd": str(self.repo_dir)}
+
+        code, out, err = self.run_hook("prompt-submit", payload)
+        self.assertIn("guild: raid ci membership expires in", out)
+        self.assertIn("guild raid join ci --ttl <dur> or --until-leave", out)
+
+        code, out, err = self.run_hook("prompt-submit", payload)
+        self.assertNotIn("membership expires in", out)
+
+    def test_no_warning_outside_window(self):
+        self.run_cli(["raid", "join", "ci", "--ttl", "13h"], "sess-1", self.repo_dir)
+        code, out, err = self.run_hook(
+            "prompt-submit", {"session_id": "sess-1", "cwd": str(self.repo_dir)}
+        )
+        self.assertNotIn("membership expires in", out)
+
+    def test_no_warning_for_until_leave_membership(self):
+        self.run_cli(["raid", "join", "ci", "--until-leave"], "sess-1", self.repo_dir)
+        code, out, err = self.run_hook(
+            "prompt-submit", {"session_id": "sess-1", "cwd": str(self.repo_dir)}
+        )
+        self.assertNotIn("membership expires in", out)
+
+    def test_warning_fires_again_after_renewal(self):
+        self.run_cli(["raid", "join", "ci", "--ttl", "10h"], "sess-1", self.repo_dir)
+        payload = {"session_id": "sess-1", "cwd": str(self.repo_dir)}
+        self.run_hook("prompt-submit", payload)
+
+        self.run_cli(["raid", "join", "ci", "--ttl", "10h"], "sess-1", self.repo_dir)
+        code, out, err = self.run_hook("prompt-submit", payload)
+        self.assertIn("membership expires in", out)
+
+    def test_warning_fires_via_post_tool_use(self):
+        self.run_cli(["raid", "join", "ci", "--ttl", "10h"], "sess-1", self.repo_dir)
+        code, out, err = self.run_hook(
+            "post-tool-use", {"session_id": "sess-1", "cwd": str(self.repo_dir)}
+        )
+        self.assertIn("membership expires in", out)
+
+    def test_warning_fires_via_session_start_brief(self):
+        self.run_cli(["raid", "join", "ci", "--ttl", "10h"], "sess-1", self.repo_dir)
+        code, out, err = self.run_hook(
+            "session-start", {"session_id": "sess-1", "cwd": str(self.repo_dir)}
+        )
+        self.assertIn("membership expires in", out)
+
+    def test_unbound_session_gets_no_warning(self):
+        code, out, err = self.run_hook(
+            "prompt-submit", {"session_id": "sess-unbound", "cwd": str(self.repo_dir)}
+        )
+        self.assertNotIn("membership expires in", out)
+
+
 if __name__ == "__main__":
     import unittest
 

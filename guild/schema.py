@@ -163,7 +163,7 @@ _CREATE_STATEMENTS = (
     CREATE TABLE IF NOT EXISTS raid_members (
         raid TEXT NOT NULL,
         party TEXT NOT NULL,
-        expires_at TEXT NOT NULL,
+        expires_at TEXT,
         PRIMARY KEY (raid, party)
     )
     """,
