@@ -311,8 +311,8 @@ unknown-ask errors apply, and a rejected request shows the server's message
 under the buttons. An empty answer is not sent. Buttons are disabled while a
 request is in flight; on success the board is re-fetched. The 15-second
 refresh keeps whatever you typed (and the focus) in each answer field.
-Project `pii_patterns` are matched against the project of the directory
-`guild web` was started from, as with `guild answer` run in that directory.
+Project `pii_patterns` are those of the project of the party that asked, wherever
+`guild web` (or `guild answer`) is started from.
 
 **Security model**: the server binds to `127.0.0.1` only, on the stdlib's
 `http.server.ThreadingHTTPServer` — no third-party dependency, no build
@@ -735,7 +735,7 @@ personal data:
   ask context 2000, answer 1000, handoff `--in-flight`/`--learned` 4000 each.
 - An embedded email address is always rejected.
 - A project's `pii_patterns` (see "Project config") are checked too, scoped
-  to the caller's project.
+  to the caller's project; for an answer, to the project of the party that asked.
 - Every successful `notice create`, `ask` and `handoff` prints one reminder
   line afterward: never put names or identifiers of real people (students,
   guardians, staff) in these fields — use ids and roles instead.

@@ -1,3 +1,4 @@
+import json
 from datetime import timedelta
 
 from guild import db, events, paths, timeutil
@@ -247,6 +248,25 @@ class AskTests(GuildTestCase):
         code, out, err = self.run_cli(["answer", "1", "ping jane.doe@example.com"], None, None)
         self.assertEqual(code, 1)
         self.assertIn("must not contain an email address", err)
+
+
+class AnswerPiiScopeTests(GuildTestCase):
+    def test_answer_uses_the_asking_partys_project_patterns_from_any_directory(self):
+        repo_dir = self.register_project("acme", ["acme/app"])
+        config_file = self.config_home / "guild" / "projects" / "acme.json"
+        data = json.loads(config_file.read_text())
+        data["pii_patterns"] = [r"\bID-\d{6}\b"]
+        config_file.write_text(json.dumps(data))
+        self.run_cli(["party", "start", "alpha"], "sess-1", repo_dir)
+        self.run_cli(["quest", "add", "demo", "--title", "Demo", "--no-epic"], "sess-1", repo_dir)
+        self.run_cli(["task", "add", "demo/T01", "--title", "First"], "sess-1", repo_dir)
+        self.run_cli(["ask", "who?", "--context", "c", "--ref", "task:demo/T01"], "sess-1", repo_dir)
+        outside = self.root / "elsewhere"
+        outside.mkdir()
+        code, out, err = self.run_cli(["answer", "1", "it is ID-123456"], None, outside)
+        self.assertEqual(code, 1)
+        self.assertIn("answer", err)
+        self.assertNotIn("ID-123456", err)
 
 
 if __name__ == "__main__":
