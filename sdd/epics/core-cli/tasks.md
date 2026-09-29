@@ -46,6 +46,6 @@ updated: 2026-09-28
 ## T06 — Closing a party cleans up
 
 **Depends on:** T02
-**Status:** [x] done
+**Status:** [x] done — #10
 
 **What:** `guild party close [<party>]` works from a terminal once the session is gone; closing marks the party's quests done, dismisses its open asks, releases its claims and lists tracked PRs still open. `guild quest done <slug>` finishes a single quest.
