@@ -551,7 +551,7 @@ def build_parser():
     hook = subparsers.add_parser("hook")
     hook.add_argument(
         "hook_name",
-        choices=["session-start", "prompt-submit", "pre-push", "post-tool-use", "pre-edit"],
+        choices=["session-start", "prompt-submit", "pre-push", "post-tool-use", "pre-edit", "pre-commit"],
     )
 
     seed = subparsers.add_parser("seed")
@@ -642,7 +642,22 @@ def _run_stateful_hook(hook_name, stdin_data):
     return 0
 
 
+def _run_pre_commit_hook():
+    try:
+        cwd = Path.cwd()
+        ctx = _build_context(session_info.current_session_id(), cwd)
+        reasons = hook_commands.pre_commit(ctx, hook_commands.staged_paths(cwd))
+    except Exception as error:
+        sys.stderr.write("guild hook error: {}\n".format(error))
+        return 0
+    for reason in reasons:
+        sys.stderr.write(reason + "\n")
+    return 1 if reasons else 0
+
+
 def _dispatch_hook(args):
+    if args.hook_name == "pre-commit":
+        return _run_pre_commit_hook()
     raw = sys.stdin.read()
     try:
         stdin_data = json.loads(raw) if raw.strip() else {}

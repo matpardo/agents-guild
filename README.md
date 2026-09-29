@@ -127,6 +127,7 @@ guild hook prompt-submit
 guild hook post-tool-use
 guild hook pre-push
 guild hook pre-edit
+guild hook pre-commit      # git hook: no stdin, session from CLAUDE_CODE_SESSION_ID
 
 guild seed <file.json>
 guild rebuild
@@ -810,6 +811,32 @@ Wired from `~/.claude/settings.json` (not part of this repo):
   }
 }
 ```
+
+**Commit guard (git).** `pre-edit` only sees the Edit/Write family of tools.
+Agents that write files through Bash (`cat > file <<EOF`, `python3 -`,
+generators) never trigger it — observed in the first real raid, where the
+`coder` subagents made every change with Bash. `guild hook pre-commit` closes
+that gap at commit time, whatever wrote the file: it reads the staged paths
+(`git diff --cached --name-only`), and for the caller's bound party (from
+`CLAUDE_CODE_SESSION_ID`, which the Bash tool passes to git) claims every
+staged shared area, or exits 1 naming the holder when another party holds
+one (nothing is claimed then). Unbound sessions, human commits, projects
+without `shared_areas` and anything outside git pass untouched; internal
+errors print `guild hook error: ...` and never block the commit. It never
+reads stdin.
+
+Wire it without touching the project's repository. With husky (it sources a
+per-user init file before every hook, with the hook name in `$n`):
+
+```sh
+# ~/.config/husky/init.sh
+if [ "$n" = "pre-commit" ]; then
+  /home/<you>/.local/bin/guild hook pre-commit || exit 1
+fi
+```
+
+Without a hooks manager, add the same call to the repository's
+`.git/hooks/pre-commit` (shared by all its worktrees).
 
 - `session-start`: prints `guild brief` to stdout (becomes context), then
   spawns `guild sync --source gh` in the background, detached. If this
