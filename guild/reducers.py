@@ -293,8 +293,8 @@ def _ask_dismissed(conn, event):
 def _notice_created(conn, event):
     payload = event["payload"]
     conn.execute(
-        "INSERT INTO notices (id, party, scope, text, until_condition, expires_at, state, created_at)"
-        " VALUES (?, ?, ?, ?, ?, ?, 'active', ?)",
+        "INSERT INTO notices (id, party, scope, text, until_condition, expires_at, state, created_at,"
+        " announces) VALUES (?, ?, ?, ?, ?, ?, 'active', ?, ?)",
         (
             payload["id"],
             payload["party"],
@@ -303,6 +303,7 @@ def _notice_created(conn, event):
             payload["until_condition"],
             payload["expires_at"],
             event["ts"],
+            payload.get("announces"),
         ),
     )
 

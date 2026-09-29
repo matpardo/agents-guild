@@ -18,7 +18,7 @@ updated: 2026-09-29
 ## T02 — Merges announce themselves
 
 **Depends on:** —
-**Status:** [ ] pending
+**Status:** [x] done — #22
 
 **What:** `sync --source gh` posts one raid notice per tracked PR that became merged, with shared areas it touched.
 

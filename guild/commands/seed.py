@@ -129,6 +129,7 @@ def _seed_notice(ctx, notice):
             "text": notice["text"],
             "until_condition": notice.get("until"),
             "expires_at": expires_at,
+            "announces": notice.get("announces"),
         },
     )
 

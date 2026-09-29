@@ -16,6 +16,19 @@ CREATE TABLE leaders (
 )
 """
 
+_OLD_NOTICES = """
+CREATE TABLE notices (
+    id INTEGER PRIMARY KEY,
+    party TEXT,
+    scope TEXT NOT NULL,
+    text TEXT NOT NULL,
+    until_condition TEXT,
+    expires_at TEXT NOT NULL,
+    state TEXT NOT NULL,
+    created_at TEXT NOT NULL
+)
+"""
+
 _OLD_PRS = """
 CREATE TABLE prs (
     repo TEXT NOT NULL,
@@ -43,6 +56,7 @@ def _make_old_schema_db(path):
     conn = sqlite3.connect(str(path))
     conn.row_factory = sqlite3.Row
     conn.execute(_OLD_LEADERS)
+    conn.execute(_OLD_NOTICES)
     conn.execute(_OLD_PRS)
     conn.execute(
         "INSERT INTO leaders (party, generation, session_id, session_name, started_at, ended_at)"
@@ -95,6 +109,15 @@ class MigrationTests(GuildTestCase):
             {"project", "key", "status", "status_category", "issue_type", "parent_key"},
         )
         self.assertEqual(conn.execute("SELECT COUNT(*) AS n FROM cards").fetchone()["n"], 0)
+
+    def test_old_schema_db_gains_notices_announces_column(self):
+        db_path = self.data_home / "guild.db"
+        _make_old_schema_db(db_path)
+
+        conn = db.connect(db_path)
+
+        notices_columns = {row["name"] for row in conn.execute("PRAGMA table_info(notices)").fetchall()}
+        self.assertIn("announces", notices_columns)
 
     def test_old_schema_db_gains_raid_members_table(self):
         db_path = self.data_home / "guild.db"
