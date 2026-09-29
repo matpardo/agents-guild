@@ -18,9 +18,9 @@ updated: 2026-09-28
 ## T02 — guild web server
 
 **Depends on:** T01
-**Status:** [ ] pending
+**Status:** [x] done
 
-**What:** `guild web --port <n>` on 127.0.0.1; routes `/` (page), `/app.js`, `/app.css`, `/api/board`; `Host` check, CSP and `nosniff` headers, 404 and 405.
+**What:** `guild web --port <n>` (`guild/webserver.py`, `ThreadingHTTPServer` on 127.0.0.1, `--port 0` lets the OS pick, prints the real URL); routes `/` (page), `/app.js`, `/app.css`, `/api/board`; `Host` check (421), CSP/`nosniff`/`Referrer-Policy` headers on every response, `Cache-Control: no-store` on `/api/*`, 404 and 405; quiet access log, Ctrl-C exits 0.
 
 ## T03 — Page
 
