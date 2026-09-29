@@ -1,8 +1,9 @@
 import json
 import textwrap
 
-from guild import sanitize, timeutil
+from guild import config, sanitize, timeutil
 from guild.commands import claim as claim_commands
+from guild.commands import drift as drift_commands
 from guild.commands import notice as notice_commands
 from guild.commands import raid as raid_commands
 
@@ -171,12 +172,17 @@ def _ask_sort_key(conn, row):
     return (-_blocked_ref_count(conn, ref_list), row["created_at"], row["id"])
 
 
-def render_asks(ctx, party_filter, color, width, detailed):
-    painter = _Painter(color, width)
-    rows = ctx.conn.execute("SELECT * FROM asks WHERE state = 'open'").fetchall()
-    rows = sorted(rows, key=lambda row: _ask_sort_key(ctx.conn, row))
+def _sorted_open_asks(conn, party_filter):
+    rows = conn.execute("SELECT * FROM asks WHERE state = 'open'").fetchall()
+    rows = sorted(rows, key=lambda row: _ask_sort_key(conn, row))
     if party_filter is not None:
         rows = [row for row in rows if row["party"] == party_filter]
+    return rows
+
+
+def render_asks(ctx, party_filter, color, width, detailed):
+    painter = _Painter(color, width)
+    rows = _sorted_open_asks(ctx.conn, party_filter)
     if not rows:
         return [painter.paint("NEEDS YOU · nothing", "green"), ""]
     label = "open ask" if len(rows) == 1 else "open asks"
@@ -228,13 +234,17 @@ def _task_lines(painter, task_row, task_prs):
     return lines
 
 
+def _open_task_rows(conn, quest_slug):
+    return conn.execute(
+        "SELECT * FROM quest_tasks WHERE quest = ? AND state != 'done' ORDER BY tid ASC",
+        (quest_slug,),
+    ).fetchall()
+
+
 def _quest_lines(ctx, painter, quest_row, prs_by_task):
     title = sanitize.strip_control_sequences(quest_row["title"])
     lines = ["  {} — {}".format(painter.paint(quest_row["slug"], "bold"), title)]
-    task_rows = ctx.conn.execute(
-        "SELECT * FROM quest_tasks WHERE quest = ? AND state != 'done' ORDER BY tid ASC",
-        (quest_row["slug"],),
-    ).fetchall()
+    task_rows = _open_task_rows(ctx.conn, quest_row["slug"])
     queued = []
     for task_row in task_rows:
         if task_row["state"] == "queued":
@@ -268,13 +278,52 @@ def _visible_task_keys(ctx, quests):
     return keys
 
 
-def _leader_label(ctx, party_row):
-    leader = ctx.conn.execute(
+def _leader_session_name(conn, party_name):
+    leader = conn.execute(
         "SELECT session_name FROM leaders WHERE party = ? ORDER BY generation DESC LIMIT 1",
-        (party_row["name"],),
+        (party_name,),
     ).fetchone()
-    session_name = leader["session_name"] if leader is not None and leader["session_name"] else "no leader"
+    if leader is None:
+        return None
+    return leader["session_name"]
+
+
+def _leader_label(ctx, party_row):
+    session_name = _leader_session_name(ctx.conn, party_row["name"]) or "no leader"
     return "{} (gen {}, {})".format(session_name, party_row["generation"], party_row["state"])
+
+
+def _party_pr_rows(conn, party_name):
+    return conn.execute(
+        "SELECT * FROM prs WHERE party = ? ORDER BY repo ASC, number ASC", (party_name,)
+    ).fetchall()
+
+
+def _prs_by_task(pr_rows):
+    result = {}
+    for pr_row in pr_rows:
+        result.setdefault((pr_row["task_quest"], pr_row["task_tid"]), []).append(pr_row)
+    return result
+
+
+def _active_quests(conn, party_name):
+    return conn.execute(
+        "SELECT * FROM quests WHERE party = ? AND state = 'active' ORDER BY slug ASC", (party_name,)
+    ).fetchall()
+
+
+def _orphan_pr_rows(ctx, quests, pr_rows):
+    visible_keys = _visible_task_keys(ctx, quests)
+    return [
+        pr_row
+        for pr_row in pr_rows
+        if (pr_row["task_quest"], pr_row["task_tid"]) not in visible_keys
+        and not _finished_with_task(ctx, pr_row)
+    ]
+
+
+def _party_claims(ctx, party_name):
+    return [row for row in claim_commands.list_claims(ctx.conn, ctx.now) if row["party"] == party_name]
 
 
 def _party_section(ctx, painter, party_row):
@@ -285,29 +334,17 @@ def _party_section(ctx, painter, party_row):
             painter.paint(_leader_label(ctx, party_row), "dim"),
         )
     ]
-    pr_rows = ctx.conn.execute(
-        "SELECT * FROM prs WHERE party = ? ORDER BY repo ASC, number ASC", (party_row["name"],)
-    ).fetchall()
-    prs_by_task = {}
-    for pr_row in pr_rows:
-        prs_by_task.setdefault((pr_row["task_quest"], pr_row["task_tid"]), []).append(pr_row)
-    quests = ctx.conn.execute(
-        "SELECT * FROM quests WHERE party = ? AND state = 'active' ORDER BY slug ASC", (party_row["name"],)
-    ).fetchall()
+    pr_rows = _party_pr_rows(ctx.conn, party_row["name"])
+    prs_by_task = _prs_by_task(pr_rows)
+    quests = _active_quests(ctx.conn, party_row["name"])
     for quest_row in quests:
         lines.extend(_quest_lines(ctx, painter, quest_row, prs_by_task))
-    visible_keys = _visible_task_keys(ctx, quests)
-    orphan_prs = [
-        pr_row
-        for pr_row in pr_rows
-        if (pr_row["task_quest"], pr_row["task_tid"]) not in visible_keys
-        and not _finished_with_task(ctx, pr_row)
-    ]
+    orphan_prs = _orphan_pr_rows(ctx, quests, pr_rows)
     if orphan_prs:
         lines.append(painter.paint("  PRs outside active tasks", "dim"))
         for pr_row in orphan_prs:
             lines.extend(_pr_lines(painter, pr_row, "    "))
-    claims = [row for row in claim_commands.list_claims(ctx.conn, ctx.now) if row["party"] == party_row["name"]]
+    claims = _party_claims(ctx, party_row["name"])
     if claims:
         claim_text = ", ".join(
             "{} ({})".format(row["area"], timeutil.time_left_label(ctx.now, row["expires_at"])) for row in claims
@@ -335,3 +372,147 @@ def render_board(ctx, party_filter, color, width):
     for party_row in party_rows:
         lines.extend(_party_section(ctx, painter, party_row))
     return lines
+
+
+def _optional_text(value):
+    if not value:
+        return None
+    return sanitize.strip_control_sequences(value)
+
+
+def _pr_model(pr_row):
+    return {
+        "repo": pr_row["repo"],
+        "number": pr_row["number"],
+        "lifecycle": pr_row["lifecycle"],
+        "checks_failing": pr_row["checks_failing"] or 0,
+        "checks_passing": pr_row["checks_passing"] or 0,
+        "what": sanitize.strip_control_sequences(pr_row["what"]),
+        "waits": _optional_text(pr_row["waits"]),
+        "url": "https://github.com/{}/pull/{}".format(pr_row["repo"], pr_row["number"]),
+    }
+
+
+def _task_card_key(conn, project, epic, tid):
+    if project is None or epic is None:
+        return None
+    row = conn.execute(
+        "SELECT jira_key FROM tasks WHERE project = ? AND epic = ? AND tid = ?",
+        (project, epic, tid),
+    ).fetchone()
+    if row is None:
+        return None
+    return row["jira_key"]
+
+
+def _card_url(project_config, key):
+    if key is None or project_config is None:
+        return None
+    tracker_config = project_config.get("tracker")
+    if tracker_config is None:
+        return None
+    browse_url = tracker_config.get("browse_url")
+    if browse_url is None:
+        return None
+    return browse_url + key
+
+
+def _ask_model(conn, row):
+    ref_list = json.loads(row["refs"])
+    return {
+        "id": row["id"],
+        "party": row["party"],
+        "question": sanitize.strip_control_sequences(row["question"]),
+        "context": sanitize.strip_control_sequences(row["context"]),
+        "options": json.loads(row["options"]),
+        "refs": ref_list,
+        "blocked": _blocked_ref_count(conn, ref_list),
+        "total_refs": len(ref_list),
+        "created_at": row["created_at"],
+    }
+
+
+def _notice_model(row):
+    return {
+        "id": row["id"],
+        "party": row["party"],
+        "scope": row["scope"],
+        "text": sanitize.strip_control_sequences(row["text"]),
+        "expires_at": row["expires_at"],
+    }
+
+
+def _task_model(conn, project, epic, task_row, task_prs, project_config):
+    key = _task_card_key(conn, project, epic, task_row["tid"])
+    return {
+        "tid": task_row["tid"],
+        "title": sanitize.strip_control_sequences(task_row["title"]),
+        "state": task_row["state"],
+        "summary": _optional_text(task_row["summary"]),
+        "blocked_reason": _optional_text(task_row["blocked_reason"]),
+        "card_url": _card_url(project_config, key),
+        "prs": [_pr_model(pr_row) for pr_row in task_prs],
+    }
+
+
+def _quest_model(conn, project, quest_row, prs_by_task, project_config):
+    task_rows = _open_task_rows(conn, quest_row["slug"])
+    tasks = [
+        _task_model(
+            conn,
+            project,
+            quest_row["epic"],
+            task_row,
+            prs_by_task.get((quest_row["slug"], task_row["tid"]), []),
+            project_config,
+        )
+        for task_row in task_rows
+    ]
+    return {
+        "slug": quest_row["slug"],
+        "title": sanitize.strip_control_sequences(quest_row["title"]),
+        "tasks": tasks,
+    }
+
+
+def _party_model(ctx, party_row, project_config):
+    pr_rows = _party_pr_rows(ctx.conn, party_row["name"])
+    prs_by_task = _prs_by_task(pr_rows)
+    quests = _active_quests(ctx.conn, party_row["name"])
+    quest_models = [
+        _quest_model(ctx.conn, party_row["project"], quest_row, prs_by_task, project_config)
+        for quest_row in quests
+    ]
+    orphan_prs = _orphan_pr_rows(ctx, quests, pr_rows)
+    claims = _party_claims(ctx, party_row["name"])
+    raids = raid_commands.member_raids(ctx.conn, ctx.now, party_row["name"])
+    return {
+        "name": party_row["name"],
+        "state": party_row["state"],
+        "generation": party_row["generation"],
+        "leader_session_name": _leader_session_name(ctx.conn, party_row["name"]),
+        "quests": quest_models,
+        "prs": [_pr_model(pr_row) for pr_row in orphan_prs],
+        "raids": [{"raid": row["raid"], "expires_at": row["expires_at"]} for row in raids],
+        "claims": [{"area": row["area"], "expires_at": row["expires_at"]} for row in claims],
+    }
+
+
+def board_model(ctx):
+    party_rows = ctx.conn.execute(
+        "SELECT * FROM parties WHERE state != 'closed' ORDER BY name ASC"
+    ).fetchall()
+    projects_by_name = {project["name"]: project for project in config.load_all_projects(ctx.projects_dir)}
+    ask_rows = _sorted_open_asks(ctx.conn, None)
+    notice_rows = notice_commands.active_notices(ctx.conn, ctx.now)
+    project_names = sorted({row["project"] for row in party_rows if row["project"] is not None})
+    return {
+        "generated_at": timeutil.to_iso(ctx.now),
+        "asks": [_ask_model(ctx.conn, row) for row in ask_rows],
+        "notices": [_notice_model(row) for row in notice_rows],
+        "parties": [
+            _party_model(ctx, party_row, projects_by_name.get(party_row["project"]))
+            for party_row in party_rows
+        ],
+        "drift": [drift_commands.board_findings(ctx, project_name) for project_name in project_names],
+    }

@@ -35,6 +35,38 @@ class ValidateProjectConfigTests(unittest.TestCase):
             }
         )
 
+    def test_accepts_tracker_without_browse_url(self):
+        config.validate_project_config(
+            {"name": "acme", "paths": ["/tmp/*"], "github": {"repos": []}, "tracker": {"kind": "jira-acli"}}
+        )
+
+    def test_accepts_tracker_browse_url_starting_with_https(self):
+        config.validate_project_config(
+            {
+                "name": "acme",
+                "paths": ["/tmp/*"],
+                "github": {"repos": []},
+                "tracker": {"browse_url": "https://tracker.example/browse/"},
+            }
+        )
+
+    def test_rejects_tracker_browse_url_without_https(self):
+        with self.assertRaises(GuildError):
+            config.validate_project_config(
+                {
+                    "name": "acme",
+                    "paths": ["/tmp/*"],
+                    "github": {"repos": []},
+                    "tracker": {"browse_url": "http://tracker.example/browse/"},
+                }
+            )
+
+    def test_rejects_tracker_that_is_not_an_object(self):
+        with self.assertRaises(GuildError):
+            config.validate_project_config(
+                {"name": "acme", "paths": ["/tmp/*"], "github": {"repos": []}, "tracker": "jira"}
+            )
+
 
 class ResolveProjectTests(unittest.TestCase):
     def test_matches_direct_child_of_glob(self):

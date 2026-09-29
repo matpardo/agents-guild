@@ -11,9 +11,9 @@ updated: 2026-09-28
 ## T01 — Board data model
 
 **Depends on:** —
-**Status:** [ ] pending
+**Status:** [x] done
 
-**What:** one function that returns the board as plain data (asks with blocked counts, notices, parties with quests, tasks, PRs, raids and claims, and default-scope drift findings), reusing the existing queries. The JSON endpoint serves it.
+**What:** `board_model(ctx)` in `guild/commands/board.py` returns the board as plain dicts/lists (asks with blocked counts, notices, parties with quests, tasks, PRs, raids and claims, and default-scope drift findings per project), reusing the existing queries (extracted into small helpers shared with the terminal renderer, which is unchanged). The JSON endpoint serves it.
 
 ## T02 — guild web server
 

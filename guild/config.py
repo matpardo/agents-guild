@@ -6,6 +6,22 @@ from guild import names
 from guild.errors import GuildError
 
 _REQUIRED_KEYS = ("name", "paths", "github")
+_TRACKER_BROWSE_URL_PREFIX = "https://"
+
+
+def _validate_tracker_config(tracker_config):
+    if not isinstance(tracker_config, dict):
+        raise GuildError("project config 'tracker' must be an object", 1)
+    browse_url = tracker_config.get("browse_url")
+    if browse_url is None:
+        return
+    if not isinstance(browse_url, str) or not browse_url.startswith(_TRACKER_BROWSE_URL_PREFIX):
+        raise GuildError(
+            "project config 'tracker.browse_url' must start with '{}'".format(
+                _TRACKER_BROWSE_URL_PREFIX
+            ),
+            1,
+        )
 
 
 def validate_project_config(data):
@@ -18,6 +34,9 @@ def validate_project_config(data):
         raise GuildError("project config 'paths' must be a non-empty list", 1)
     if not isinstance(data["github"], dict) or not isinstance(data["github"].get("repos"), list):
         raise GuildError("project config 'github.repos' must be a list", 1)
+    tracker_config = data.get("tracker")
+    if tracker_config is not None:
+        _validate_tracker_config(tracker_config)
 
 
 def load_project_file(config_file):
