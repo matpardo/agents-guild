@@ -114,6 +114,45 @@ class ValidateProjectConfigTests(unittest.TestCase):
             )
 
 
+class LoadProjectUnknownProjectTests(unittest.TestCase):
+    def test_unknown_project_lists_known_project_names(self):
+        with TemporaryDirectory() as tmp:
+            directory = Path(tmp)
+            (directory / "acme.json").write_text(
+                json.dumps({"name": "acme", "paths": ["/tmp/*"], "github": {"repos": []}})
+            )
+            (directory / "zeta.json").write_text(
+                json.dumps({"name": "zeta", "paths": ["/tmp/*"], "github": {"repos": []}})
+            )
+            with self.assertRaises(GuildError) as raised:
+                config.load_project(directory, "ghost")
+            self.assertEqual(
+                raised.exception.message,
+                "unknown project 'ghost': known projects are acme, zeta",
+            )
+
+    def test_unknown_project_with_no_projects_registered(self):
+        with TemporaryDirectory() as tmp:
+            directory = Path(tmp)
+            with self.assertRaises(GuildError) as raised:
+                config.load_project(directory, "ghost")
+            self.assertEqual(
+                raised.exception.message, "unknown project 'ghost': known projects are none"
+            )
+
+
+class RequireProjectUnknownProjectTests(unittest.TestCase):
+    def test_no_match_lists_known_project_names(self):
+        with TemporaryDirectory() as tmp:
+            directory = Path(tmp)
+            (directory / "acme.json").write_text(
+                json.dumps({"name": "acme", "paths": ["/tmp/_fixture/acme/*"], "github": {"repos": []}})
+            )
+            with self.assertRaises(GuildError) as raised:
+                config.require_project(Path("/tmp/_fixture/other"), directory)
+            self.assertIn("known projects are acme", raised.exception.message)
+
+
 class ResolveProjectTests(unittest.TestCase):
     def test_matches_direct_child_of_glob(self):
         projects = [{"name": "acme", "paths": ["/tmp/_fixture/acme/*"]}]

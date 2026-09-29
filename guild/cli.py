@@ -220,7 +220,7 @@ def _handle_claims(ctx, args):
 def _handle_raid_join(ctx, args):
     from guild.commands import raid as raid_commands
 
-    _print(raid_commands.join(ctx, args.name, args.ttl, args.until_leave))
+    _print(raid_commands.join(ctx, args.name, args.ttl, args.until_leave, args.lead))
     return 0
 
 
@@ -241,7 +241,11 @@ def _handle_raids(ctx, args):
 def _handle_board(ctx, args):
     from guild.commands import board as board_commands
 
-    _print_lines(board_commands.render_board(ctx, args.party, _stdout_is_colored(), _terminal_width()))
+    _print_lines(
+        board_commands.render_board(
+            ctx, args.party, args.raid, _stdout_is_colored(), _terminal_width()
+        )
+    )
     return 0
 
 
@@ -437,6 +441,7 @@ def _add_raid_parser(subparsers):
     join_mode = join.add_mutually_exclusive_group(required=True)
     join_mode.add_argument("--ttl")
     join_mode.add_argument("--until-leave", action="store_true")
+    join.add_argument("--lead", action="store_true")
     join.set_defaults(handler=_handle_raid_join)
 
     leave = actions.add_parser("leave")
@@ -507,7 +512,9 @@ def build_parser():
     raids.set_defaults(handler=_handle_raids)
 
     board = subparsers.add_parser("board")
-    board.add_argument("--party")
+    board_filter = board.add_mutually_exclusive_group()
+    board_filter.add_argument("--party")
+    board_filter.add_argument("--raid")
     board.set_defaults(handler=_handle_board)
 
     next_parser = subparsers.add_parser("next")

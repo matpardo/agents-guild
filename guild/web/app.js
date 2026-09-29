@@ -7,6 +7,7 @@
   var state = {
     partyFilter: "all",
     stateFilter: "all",
+    raidFilter: "all",
     openParties: {},
     openContexts: {},
   };
@@ -246,16 +247,35 @@
       details.appendChild(textEl("p", "claims: " + claimsText));
     }
 
-    if (party.raids.length > 0) {
-      var raidsText = party.raids
-        .map(function (raid) {
-          return raid.raid;
-        })
-        .join(", ");
-      details.appendChild(textEl("p", "raids: " + raidsText));
+    var raidsList = renderRaidMembershipList(party.raids);
+    if (raidsList) {
+      details.appendChild(textEl("h4", "raids"));
+      details.appendChild(raidsList);
     }
 
     return details;
+  }
+
+  function renderRaidMembership(raid) {
+    var item = el("li");
+    item.className = "raid";
+    item.appendChild(textEl("span", raid.raid));
+    if (raid.lead) {
+      var badge = textEl("span", "lead");
+      badge.className = "badge";
+      item.appendChild(badge);
+    }
+    return item;
+  }
+
+  function renderRaidMembershipList(raids) {
+    if (raids.length === 0) {
+      return null;
+    }
+    var list = el("ul");
+    list.className = "raid-list";
+    appendAll(list, raids.map(renderRaidMembership));
+    return list;
   }
 
   function renderParties(parties) {
@@ -303,13 +323,59 @@
         return party.name === state.partyFilter;
       }),
       drift: data.drift,
+      raids: data.raids,
+    };
+  }
+
+  function refreshRaidFilterOptions(raids) {
+    var select = document.getElementById("raid-filter");
+    var previous = select.value;
+    clear(select);
+    select.appendChild(option("all"));
+    raids.forEach(function (raid) {
+      select.appendChild(option(raid.name));
+    });
+    var stillPresent = Array.prototype.some.call(select.options, function (option) {
+      return option.value === previous;
+    });
+    select.value = stillPresent ? previous : "all";
+    state.raidFilter = select.value;
+  }
+
+  function raidMembers(raids, raidName) {
+    var match = raids.filter(function (raid) {
+      return raid.name === raidName;
+    });
+    return match.length > 0 ? match[0].members : [];
+  }
+
+  function applyRaidFilter(data) {
+    if (state.raidFilter === "all") {
+      return data;
+    }
+    var members = raidMembers(data.raids, state.raidFilter);
+    var scope = "raid:" + state.raidFilter;
+    return {
+      generated_at: data.generated_at,
+      asks: data.asks.filter(function (ask) {
+        return members.indexOf(ask.party) !== -1;
+      }),
+      notices: data.notices.filter(function (notice) {
+        return notice.scope === scope;
+      }),
+      parties: data.parties.filter(function (party) {
+        return members.indexOf(party.name) !== -1;
+      }),
+      drift: data.drift,
+      raids: data.raids,
     };
   }
 
   function render(data) {
     document.getElementById("generated-at").textContent = "generated at " + data.generated_at;
     refreshPartyFilterOptions(data.parties);
-    var filtered = applyPartyFilter(data);
+    refreshRaidFilterOptions(data.raids);
+    var filtered = applyRaidFilter(applyPartyFilter(data));
     renderAsks(filtered.asks);
     renderNotices(filtered.notices);
     renderDrift(filtered.drift);
@@ -332,6 +398,10 @@
     });
     document.getElementById("state-filter").addEventListener("change", function (event) {
       state.stateFilter = event.target.value;
+      fetchBoard();
+    });
+    document.getElementById("raid-filter").addEventListener("change", function (event) {
+      state.raidFilter = event.target.value;
       fetchBoard();
     });
     fetchBoard();

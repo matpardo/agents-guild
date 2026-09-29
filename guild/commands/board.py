@@ -172,17 +172,17 @@ def _ask_sort_key(conn, row):
     return (-_blocked_ref_count(conn, ref_list), row["created_at"], row["id"])
 
 
-def _sorted_open_asks(conn, party_filter):
+def _sorted_open_asks(conn, party_names):
     rows = conn.execute("SELECT * FROM asks WHERE state = 'open'").fetchall()
     rows = sorted(rows, key=lambda row: _ask_sort_key(conn, row))
-    if party_filter is not None:
-        rows = [row for row in rows if row["party"] == party_filter]
+    if party_names is not None:
+        rows = [row for row in rows if row["party"] in party_names]
     return rows
 
 
-def render_asks(ctx, party_filter, color, width, detailed):
+def render_asks(ctx, party_names, color, width, detailed):
     painter = _Painter(color, width)
-    rows = _sorted_open_asks(ctx.conn, party_filter)
+    rows = _sorted_open_asks(ctx.conn, party_names)
     if not rows:
         return [painter.paint("NEEDS YOU · nothing", "green"), ""]
     label = "open ask" if len(rows) == 1 else "open asks"
@@ -198,10 +198,19 @@ def render_asks(ctx, party_filter, color, width, detailed):
     return lines
 
 
-def _notices_section(ctx, painter, party_filter):
+def _party_scoped_notices(ctx, party_filter):
     rows = notice_commands.active_notices(ctx.conn, ctx.now)
-    if party_filter is not None:
-        rows = [row for row in rows if row["party"] == party_filter]
+    if party_filter is None:
+        return rows
+    return [row for row in rows if row["party"] == party_filter]
+
+
+def _raid_scoped_notices(ctx, raid_name):
+    scope = "raid:{}".format(raid_name)
+    return [row for row in notice_commands.active_notices(ctx.conn, ctx.now) if row["scope"] == scope]
+
+
+def _notices_section(ctx, painter, rows):
     if not rows:
         return []
     lines = [painter.paint("NOTICES · {} active".format(len(rows)), "bold")]
@@ -353,7 +362,7 @@ def _party_section(ctx, painter, party_row):
     raids = raid_commands.member_raids(ctx.conn, ctx.now, party_row["name"])
     if raids:
         raid_text = ", ".join(
-            "{} ({})".format(row["raid"], timeutil.membership_left_label(ctx.now, row["expires_at"]))
+            "{} ({})".format(row["raid"], raid_commands.membership_label(ctx.now, row))
             for row in raids
         )
         lines.append(painter.paint("  raids: {}".format(raid_text), "dim"))
@@ -361,15 +370,32 @@ def _party_section(ctx, painter, party_row):
     return lines
 
 
-def render_board(ctx, party_filter, color, width):
+def _party_rows_for_names(conn, party_names):
+    if not party_names:
+        return []
+    placeholders = ", ".join("?" for _ in party_names)
+    query = "SELECT * FROM parties WHERE name IN ({}) ORDER BY name ASC".format(placeholders)
+    return conn.execute(query, tuple(party_names)).fetchall()
+
+
+def render_board(ctx, party_filter, raid_filter, color, width):
     painter = _Painter(color, width)
-    if party_filter is not None:
+    if raid_filter is not None:
+        members = raid_commands.require_active_raid(ctx.conn, ctx.now, raid_filter)
+        party_names = {row["party"] for row in members}
+        party_rows = _party_rows_for_names(ctx.conn, party_names)
+        notice_rows = _raid_scoped_notices(ctx, raid_filter)
+    elif party_filter is not None:
+        party_names = {party_filter}
         party_rows = ctx.conn.execute("SELECT * FROM parties WHERE name = ?", (party_filter,)).fetchall()
+        notice_rows = _party_scoped_notices(ctx, party_filter)
     else:
+        party_names = None
         party_rows = ctx.conn.execute(
             "SELECT * FROM parties WHERE state != 'closed' ORDER BY name ASC"
         ).fetchall()
-    lines = render_asks(ctx, party_filter, color, width, False) + _notices_section(ctx, painter, party_filter)
+        notice_rows = _party_scoped_notices(ctx, None)
+    lines = render_asks(ctx, party_names, color, width, False) + _notices_section(ctx, painter, notice_rows)
     for party_row in party_rows:
         lines.extend(_party_section(ctx, painter, party_row))
     return lines
@@ -494,9 +520,26 @@ def _party_model(ctx, party_row, project_config):
         "leader_session_name": _leader_session_name(ctx.conn, party_row["name"]),
         "quests": quest_models,
         "prs": [_pr_model(pr_row) for pr_row in orphan_prs],
-        "raids": [{"raid": row["raid"], "expires_at": row["expires_at"]} for row in raids],
+        "raids": [
+            {"raid": row["raid"], "expires_at": row["expires_at"], "lead": bool(row["lead"])}
+            for row in raids
+        ],
         "claims": [{"area": row["area"], "expires_at": row["expires_at"]} for row in claims],
     }
+
+
+def _raid_model(raid_name, members):
+    lead_row = next((row for row in members if row["lead"]), None)
+    return {
+        "name": raid_name,
+        "lead": lead_row["party"] if lead_row is not None else None,
+        "members": [row["party"] for row in members],
+    }
+
+
+def _raid_models(conn, now):
+    grouped = raid_commands.active_raids_grouped(conn, now)
+    return [_raid_model(raid_name, grouped[raid_name]) for raid_name in sorted(grouped)]
 
 
 def board_model(ctx):
@@ -516,4 +559,5 @@ def board_model(ctx):
             for party_row in party_rows
         ],
         "drift": [drift_commands.board_findings(ctx, project_name) for project_name in project_names],
+        "raids": _raid_models(ctx.conn, ctx.now),
     }
