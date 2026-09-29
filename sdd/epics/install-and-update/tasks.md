@@ -39,6 +39,6 @@ updated: 2026-09-29
 ## T05 — The installed guild ignores the working directory
 
 **Depends on:** T01
-**Status:** [x] done
+**Status:** [x] done — #26
 
 **What:** `python3 -m guild` put the current directory ahead of `PYTHONPATH`, so running `guild` from inside any guild checkout (the development one included) ran that checkout's code instead of the installed one — the hole behind the earlier "edits go live" incident. `bin/guild` and the background sync spawned by `session-start` now start Python in isolated mode (`-I`) and put their own repo first explicitly.
