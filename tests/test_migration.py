@@ -16,6 +16,19 @@ CREATE TABLE leaders (
 )
 """
 
+_OLD_NOTICES = """
+CREATE TABLE notices (
+    id INTEGER PRIMARY KEY,
+    party TEXT,
+    scope TEXT NOT NULL,
+    text TEXT NOT NULL,
+    until_condition TEXT,
+    expires_at TEXT NOT NULL,
+    state TEXT NOT NULL,
+    created_at TEXT NOT NULL
+)
+"""
+
 _OLD_PRS = """
 CREATE TABLE prs (
     repo TEXT NOT NULL,
@@ -43,6 +56,7 @@ def _make_old_schema_db(path):
     conn = sqlite3.connect(str(path))
     conn.row_factory = sqlite3.Row
     conn.execute(_OLD_LEADERS)
+    conn.execute(_OLD_NOTICES)
     conn.execute(_OLD_PRS)
     conn.execute(
         "INSERT INTO leaders (party, generation, session_id, session_name, started_at, ended_at)"
@@ -96,6 +110,15 @@ class MigrationTests(GuildTestCase):
         )
         self.assertEqual(conn.execute("SELECT COUNT(*) AS n FROM cards").fetchone()["n"], 0)
 
+    def test_old_schema_db_gains_notices_announces_column(self):
+        db_path = self.data_home / "guild.db"
+        _make_old_schema_db(db_path)
+
+        conn = db.connect(db_path)
+
+        notices_columns = {row["name"] for row in conn.execute("PRAGMA table_info(notices)").fetchall()}
+        self.assertIn("announces", notices_columns)
+
     def test_old_schema_db_gains_raid_members_table(self):
         db_path = self.data_home / "guild.db"
         _make_old_schema_db(db_path)
@@ -107,6 +130,28 @@ class MigrationTests(GuildTestCase):
         }
         self.assertEqual(raid_members_columns, {"raid", "party", "expires_at"})
         self.assertEqual(conn.execute("SELECT COUNT(*) AS n FROM raid_members").fetchone()["n"], 0)
+
+    def test_not_null_raid_expiry_is_relaxed_and_rows_kept(self):
+        db_path = self.data_home / "guild.db"
+        legacy = sqlite3.connect(str(db_path))
+        legacy.execute(
+            "CREATE TABLE raid_members (raid TEXT NOT NULL, party TEXT NOT NULL,"
+            " expires_at TEXT NOT NULL, PRIMARY KEY (raid, party))"
+        )
+        legacy.execute("INSERT INTO raid_members VALUES ('ci', 'alpha', '2099-01-01T00:00:00+00:00')")
+        legacy.commit()
+        legacy.close()
+
+        conn = db.connect(db_path)
+
+        expiry = next(
+            row for row in conn.execute("PRAGMA table_info(raid_members)").fetchall()
+            if row["name"] == "expires_at"
+        )
+        self.assertEqual(expiry["notnull"], 0)
+        rows = conn.execute("SELECT raid, party, expires_at FROM raid_members").fetchall()
+        self.assertEqual([tuple(row) for row in rows], [("ci", "alpha", "2099-01-01T00:00:00+00:00")])
+        conn.execute("INSERT INTO raid_members VALUES ('ci', 'beta', NULL)")
 
     def test_rebuild_works_after_migration(self):
         db_path = self.data_home / "guild.db"

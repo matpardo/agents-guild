@@ -1,3 +1,8 @@
+import json
+import sqlite3
+from datetime import timedelta
+from unittest import mock
+
 from guild import db, origin, paths, timeutil
 from guild.commands import sync as sync_commands
 from guild.context import RunContext
@@ -69,6 +74,158 @@ class SyncTests(GuildTestCase):
             sync_commands.run(ctx, "bogus")
         conn.close()
         self.assertIn("not implemented", raised.exception.message)
+
+
+class GhMergeNoticeTests(GuildTestCase):
+    def setUp(self):
+        super().setUp()
+        self.repo_dir = self.register_project("acme", ["acme/app"])
+        self.run_cli(["party", "start", "alpha"], "sess-1", self.repo_dir)
+        self.run_cli(["party", "start", "beta"], "sess-2", self.repo_dir)
+        self.run_cli(["quest", "add", "demo", "--title", "Demo", "--no-epic"], "sess-1", self.repo_dir)
+        self.run_cli(["task", "add", "demo/T01", "--title", "First"], "sess-1", self.repo_dir)
+        self.write_gh_fixture(
+            "view_acme-app_1",
+            {"state": "OPEN", "isDraft": True, "headRefName": "feature/x", "title": "t"},
+        )
+        self.run_cli(
+            ["pr", "track", "acme/app#1", "--task", "demo/T01", "--what", "ship the thing", "--waits", "y"],
+            "sess-1", self.repo_dir,
+        )
+
+    def _merge_fixture(self):
+        self.write_gh_fixture(
+            "view_acme-app_1",
+            {
+                "state": "MERGED", "isDraft": False, "headRefName": "feature/x", "title": "t",
+                "mergedAt": "2026-01-01T00:00:00Z", "statusCheckRollup": [],
+            },
+        )
+
+    def _set_shared_areas(self, globs):
+        config_file = self.config_home / "guild" / "projects" / "acme.json"
+        data = json.loads(config_file.read_text())
+        data["shared_areas"] = globs
+        config_file.write_text(json.dumps(data))
+
+    def _notices_rows(self, announces):
+        conn = sqlite3.connect(str(self.data_home / "guild" / "guild.db"))
+        conn.row_factory = sqlite3.Row
+        rows = conn.execute("SELECT * FROM notices WHERE announces = ?", (announces,)).fetchall()
+        conn.close()
+        return rows
+
+    def test_merge_posts_one_notice_per_owner_raid(self):
+        self.run_cli(["raid", "join", "release", "--ttl", "1h"], "sess-1", self.repo_dir)
+        self.run_cli(["raid", "join", "ci", "--ttl", "1h"], "sess-1", self.repo_dir)
+        self._merge_fixture()
+        code, out, err = self.run_cli(["sync", "--source", "gh"], "sess-1", self.repo_dir)
+        self.assertEqual(code, 0, err)
+        code, out, err = self.run_cli(["notices"], None, None)
+        matches = [line for line in out.splitlines() if "acme/app#1 merged in main" in line]
+        self.assertEqual(len(matches), 2)
+
+    def test_notice_delivered_to_other_member_not_owner(self):
+        self.run_cli(["raid", "join", "release", "--ttl", "1h"], "sess-1", self.repo_dir)
+        self.run_cli(["raid", "join", "release", "--ttl", "1h"], "sess-2", self.repo_dir)
+        self._merge_fixture()
+        code, out, err = self.run_cli(["sync", "--source", "gh"], "sess-1", self.repo_dir)
+        self.assertEqual(code, 0, err)
+        code, out, err = self.run_cli(["inbox", "--since-last"], "sess-2", self.repo_dir)
+        self.assertIn("acme/app#1 merged in main (demo/T01: ship the thing)", out)
+        code, out, err = self.run_cli(["inbox", "--since-last"], "sess-1", self.repo_dir)
+        self.assertNotIn("acme/app#1 merged", out)
+
+    def test_no_notice_when_owner_in_no_raid(self):
+        self._merge_fixture()
+        code, out, err = self.run_cli(["sync", "--source", "gh"], "sess-1", self.repo_dir)
+        self.assertEqual(code, 0, err)
+        code, out, err = self.run_cli(["notices"], None, None)
+        self.assertEqual(out, "")
+
+    def test_no_duplicate_notice_on_resync(self):
+        self.run_cli(["raid", "join", "release", "--ttl", "1h"], "sess-1", self.repo_dir)
+        self._merge_fixture()
+        self.run_cli(["sync", "--source", "gh"], "sess-1", self.repo_dir)
+        self.run_cli(["sync", "--source", "gh"], "sess-1", self.repo_dir)
+        self.assertEqual(len(self._notices_rows("pr:acme/app#1")), 1)
+
+    def test_no_duplicate_notice_after_rebuild_then_sync(self):
+        self.run_cli(["raid", "join", "release", "--ttl", "1h"], "sess-1", self.repo_dir)
+        self._merge_fixture()
+        self.run_cli(["sync", "--source", "gh"], "sess-1", self.repo_dir)
+        self.run_cli(["rebuild"], None, None)
+        self.run_cli(["sync", "--source", "gh"], "sess-1", self.repo_dir)
+        self.assertEqual(len(self._notices_rows("pr:acme/app#1")), 1)
+
+    def test_shared_areas_line_present_when_touched(self):
+        self._set_shared_areas(["shared/**"])
+        self.write_gh_fixture("view_files_acme-app_1", {"files": [{"path": "shared/config.yml"}]})
+        self.run_cli(["raid", "join", "release", "--ttl", "1h"], "sess-1", self.repo_dir)
+        self._merge_fixture()
+        self.run_cli(["sync", "--source", "gh"], "sess-1", self.repo_dir)
+        code, out, err = self.run_cli(["notices"], None, None)
+        self.assertIn("Shared areas touched: shared/**", out)
+
+    def test_shared_areas_line_absent_when_not_configured(self):
+        self.run_cli(["raid", "join", "release", "--ttl", "1h"], "sess-1", self.repo_dir)
+        self._merge_fixture()
+        self.run_cli(["sync", "--source", "gh"], "sess-1", self.repo_dir)
+        code, out, err = self.run_cli(["notices"], None, None)
+        self.assertNotIn("Shared areas touched", out)
+
+    def test_shared_areas_line_absent_when_no_files_match(self):
+        self._set_shared_areas(["shared/**"])
+        self.write_gh_fixture("view_files_acme-app_1", {"files": [{"path": "src/app.py"}]})
+        self.run_cli(["raid", "join", "release", "--ttl", "1h"], "sess-1", self.repo_dir)
+        self._merge_fixture()
+        self.run_cli(["sync", "--source", "gh"], "sess-1", self.repo_dir)
+        code, out, err = self.run_cli(["notices"], None, None)
+        self.assertNotIn("Shared areas touched", out)
+
+    def test_files_fetch_failure_still_posts_notice_and_fails_sync(self):
+        self._set_shared_areas(["shared/**"])
+        self.write_gh_error("view_files_acme-app_1", "boom")
+        self.run_cli(["raid", "join", "release", "--ttl", "1h"], "sess-1", self.repo_dir)
+        self._merge_fixture()
+        code, out, err = self.run_cli(["sync", "--source", "gh"], "sess-1", self.repo_dir)
+        self.assertEqual(code, 1)
+        self.assertIn("acme/app#1", err)
+        code, out, err = self.run_cli(["notices"], None, None)
+        self.assertIn("acme/app#1 merged in main", out)
+        self.assertNotIn("Shared areas touched", out)
+
+    def test_already_merged_at_track_time_does_not_announce(self):
+        self.write_gh_fixture(
+            "view_acme-app_2",
+            {"state": "MERGED", "isDraft": False, "headRefName": "feature/y", "title": "t2"},
+        )
+        self.run_cli(
+            ["pr", "track", "acme/app#2", "--task", "demo/T01", "--what", "already merged", "--waits", "y"],
+            "sess-1", self.repo_dir,
+        )
+        self.run_cli(["raid", "join", "release", "--ttl", "1h"], "sess-1", self.repo_dir)
+        self.write_gh_fixture(
+            "view_acme-app_2",
+            {
+                "state": "MERGED", "isDraft": False, "headRefName": "feature/y", "title": "t2",
+                "mergedAt": "2026-01-01T00:00:00Z", "statusCheckRollup": [],
+            },
+        )
+        code, out, err = self.run_cli(["sync", "--source", "gh"], "sess-1", self.repo_dir)
+        self.assertEqual(code, 0, err)
+        code, out, err = self.run_cli(["notices"], None, None)
+        self.assertEqual(out, "")
+
+    def test_expired_raid_membership_not_announced(self):
+        self.run_cli(["raid", "join", "release", "--ttl", "30m"], "sess-1", self.repo_dir)
+        self._merge_fixture()
+        future = timeutil.utcnow() + timedelta(hours=1)
+        with mock.patch("guild.timeutil.utcnow", return_value=future):
+            code, out, err = self.run_cli(["sync", "--source", "gh"], "sess-1", self.repo_dir)
+        self.assertEqual(code, 0, err)
+        code, out, err = self.run_cli(["notices"], None, None)
+        self.assertEqual(out, "")
 
 
 if __name__ == "__main__":

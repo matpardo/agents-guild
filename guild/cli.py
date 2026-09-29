@@ -176,6 +176,18 @@ def _handle_notices(ctx, args):
 def _handle_claim(ctx, args):
     from guild.commands import claim as claim_commands
 
+    if args.area == "check":
+        if args.ttl is not None:
+            raise GuildError("`guild claim check` does not take --ttl", 1)
+        if args.check_area is None:
+            raise GuildError("`guild claim check` requires an area", 1)
+        message, exit_code = claim_commands.check(ctx, args.check_area)
+        _print(message)
+        return exit_code
+    if args.check_area is not None:
+        raise GuildError("unexpected extra argument '{}'".format(args.check_area), 1)
+    if args.ttl is None:
+        raise GuildError("--ttl is required", 1)
     _print(claim_commands.claim(ctx, args.area, args.ttl))
     return 0
 
@@ -200,7 +212,7 @@ def _handle_claims(ctx, args):
 def _handle_raid_join(ctx, args):
     from guild.commands import raid as raid_commands
 
-    _print(raid_commands.join(ctx, args.name, args.ttl))
+    _print(raid_commands.join(ctx, args.name, args.ttl, args.until_leave))
     return 0
 
 
@@ -308,6 +320,12 @@ def _handle_export(ctx, args):
     return 0
 
 
+def _handle_web(ctx, args):
+    from guild.commands import web as web_commands
+
+    return web_commands.run(args.port)
+
+
 def _add_party_parser(subparsers):
     parser = subparsers.add_parser("party")
     actions = parser.add_subparsers(dest="party_action", required=True)
@@ -408,7 +426,9 @@ def _add_raid_parser(subparsers):
 
     join = actions.add_parser("join")
     join.add_argument("name")
-    join.add_argument("--ttl", required=True)
+    join_mode = join.add_mutually_exclusive_group(required=True)
+    join_mode.add_argument("--ttl")
+    join_mode.add_argument("--until-leave", action="store_true")
     join.set_defaults(handler=_handle_raid_join)
 
     leave = actions.add_parser("leave")
@@ -459,7 +479,8 @@ def build_parser():
 
     claim = subparsers.add_parser("claim")
     claim.add_argument("area")
-    claim.add_argument("--ttl", required=True)
+    claim.add_argument("check_area", nargs="?")
+    claim.add_argument("--ttl")
     claim.set_defaults(handler=_handle_claim)
 
     release = subparsers.add_parser("release")
@@ -524,6 +545,10 @@ def build_parser():
     export = subparsers.add_parser("export")
     export.add_argument("--visibility", required=True, choices=["guild"])
     export.set_defaults(handler=_handle_export)
+
+    web = subparsers.add_parser("web")
+    web.add_argument("--port", type=int, required=True)
+    web.set_defaults(handler=_handle_web)
 
     return parser
 

@@ -1,0 +1,175 @@
+:root {
+  --bg: #f7f7f8;
+  --fg: #1a1a1a;
+  --muted: #666666;
+  --card-bg: #ffffff;
+  --border: #d8d8dc;
+  --accent: #2b5fb8;
+  --danger: #b23b3b;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #14151a;
+    --fg: #e8e8ea;
+    --muted: #a0a0aa;
+    --card-bg: #1d1e24;
+    --border: #33343c;
+    --accent: #7aa6ff;
+    --danger: #ff8f8f;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  padding: 1rem;
+  background: var(--bg);
+  color: var(--fg);
+  font-family: -apple-system, "Segoe UI", system-ui, sans-serif;
+  line-height: 1.4;
+}
+
+header {
+  margin-bottom: 1.5rem;
+}
+
+h1 {
+  margin: 0 0 0.25rem 0;
+  font-size: 1.4rem;
+}
+
+h2 {
+  font-size: 1.1rem;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 0.25rem;
+}
+
+h3, h4 {
+  margin: 0.5rem 0 0.25rem 0;
+}
+
+.muted {
+  color: var(--muted);
+  font-size: 0.85rem;
+  margin: 0;
+}
+
+.filters {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin-top: 0.5rem;
+}
+
+.filters label {
+  display: flex;
+  flex-direction: column;
+  font-size: 0.8rem;
+  gap: 0.15rem;
+}
+
+select {
+  padding: 0.25rem;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+  background: var(--card-bg);
+  color: var(--fg);
+}
+
+main {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  max-width: 60rem;
+}
+
+.card {
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0.75rem;
+  margin-bottom: 0.5rem;
+}
+
+.card-head {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  align-items: baseline;
+}
+
+.card.ask {
+  border-left: 4px solid var(--danger);
+}
+
+.card.notice {
+  border-left: 4px solid var(--accent);
+}
+
+details.party {
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0.5rem 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
+details.party summary {
+  display: flex;
+  gap: 0.75rem;
+  cursor: pointer;
+  align-items: baseline;
+  flex-wrap: wrap;
+}
+
+.quest {
+  margin: 0.5rem 0 0.5rem 0.5rem;
+}
+
+ul.task-list, ul.pr-list {
+  list-style: none;
+  margin: 0.25rem 0;
+  padding-left: 0.75rem;
+}
+
+li.task {
+  border-left: 2px solid var(--border);
+  padding-left: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.task-head {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+li.pr {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  padding: 0.15rem 0;
+}
+
+a {
+  color: var(--accent);
+}
+
+@media (max-width: 480px) {
+  body {
+    padding: 0.5rem;
+  }
+
+  .filters {
+    flex-direction: column;
+  }
+
+  .card-head, .task-head, li.pr, details.party summary {
+    flex-direction: column;
+    gap: 0.15rem;
+  }
+}

@@ -2,11 +2,17 @@ from guild import config, db, events, identity, names, timeutil
 from guild.errors import GuildError
 
 
-def join(ctx, name, ttl):
+def _join_label(expires_at):
+    if expires_at is None:
+        return "until leave"
+    return "until {}".format(expires_at)
+
+
+def join(ctx, name, ttl, until_leave):
     names.validate_name(name, "raid name")
     binding = identity.require_binding(ctx.conn, ctx.session_id)
     project = config.resolve_project(ctx.cwd, config.load_all_projects(ctx.projects_dir))
-    expires_at = timeutil.expires_at_iso(ctx.now, ttl)
+    expires_at = None if until_leave else timeutil.expires_at_iso(ctx.now, ttl)
     with db.writing(ctx.conn):
         events.record(
             ctx.conn,
@@ -19,7 +25,7 @@ def join(ctx, name, ttl):
             "local",
             {"raid": name, "party": binding["party"], "expires_at": expires_at},
         )
-    return "party '{}' joined raid '{}' until {}".format(binding["party"], name, expires_at)
+    return "party '{}' joined raid '{}' {}".format(binding["party"], name, _join_label(expires_at))
 
 
 def leave(ctx, name):
@@ -77,6 +83,6 @@ def list_raids(ctx):
         lines.append("{}:".format(raid_name))
         for row in by_raid[raid_name]:
             lines.append(
-                "  {} ({})".format(row["party"], timeutil.time_left_label(ctx.now, row["expires_at"]))
+                "  {} ({})".format(row["party"], timeutil.membership_left_label(ctx.now, row["expires_at"]))
             )
     return lines

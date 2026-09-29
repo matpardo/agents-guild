@@ -40,6 +40,20 @@ def claim(ctx, area, ttl):
     return "area '{}' claimed until {}".format(area, expires_at)
 
 
+def check(ctx, area):
+    project = config.require_project(ctx.cwd, ctx.projects_dir)
+    binding = identity.resolve_binding(ctx.conn, ctx.session_id)
+    row = ctx.conn.execute(
+        "SELECT party, expires_at FROM claims WHERE project = ? AND area = ?", (project, area)
+    ).fetchone()
+    if row is None or timeutil.is_expired(ctx.now, row["expires_at"]):
+        return "free", 0
+    clock = timeutil.clock_label(row["expires_at"])
+    if binding is not None and row["party"] == binding["party"]:
+        return "held by you until {}".format(clock), 0
+    return "held by party {} until {}".format(row["party"], clock), 1
+
+
 def release(ctx, area):
     binding = identity.require_binding(ctx.conn, ctx.session_id)
     project = config.require_project(ctx.cwd, ctx.projects_dir)
