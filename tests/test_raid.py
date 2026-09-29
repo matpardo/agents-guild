@@ -264,6 +264,74 @@ class RaidBoardTests(GuildTestCase):
         self.assertIn("raids: ci (until leave)", out)
 
 
+class BoardRaidFilterTests(GuildTestCase):
+    def setUp(self):
+        super().setUp()
+        self.repo_dir = self.register_project("acme", ["acme/app"])
+        self.run_cli(["party", "start", "alpha"], "sess-1", self.repo_dir)
+        self.run_cli(["party", "start", "beta"], "sess-2", self.repo_dir)
+        self.run_cli(["raid", "join", "ci", "--ttl", "1h"], "sess-1", self.repo_dir)
+
+    def test_shows_only_raid_member_parties(self):
+        code, out, err = self.run_cli(["board", "--raid", "ci"], None, None)
+        self.assertEqual(code, 0, err)
+        self.assertIn("━━ alpha", out)
+        self.assertNotIn("━━ beta", out)
+
+    def test_shows_asks_only_from_raid_members(self):
+        self.run_cli(["quest", "add", "demo-a", "--title", "A", "--no-epic"], "sess-1", self.repo_dir)
+        self.run_cli(["task", "add", "demo-a/T01", "--title", "First"], "sess-1", self.repo_dir)
+        self.run_cli(
+            ["ask", "alpha ready?", "--context", "x", "--ref", "task:demo-a/T01"], "sess-1", self.repo_dir
+        )
+        self.run_cli(["quest", "add", "demo-b", "--title", "B", "--no-epic"], "sess-2", self.repo_dir)
+        self.run_cli(["task", "add", "demo-b/T01", "--title", "First"], "sess-2", self.repo_dir)
+        self.run_cli(
+            ["ask", "beta ready?", "--context", "x", "--ref", "task:demo-b/T01"], "sess-2", self.repo_dir
+        )
+        code, out, err = self.run_cli(["board", "--raid", "ci"], None, None)
+        self.assertEqual(code, 0, err)
+        self.assertIn("alpha ready?", out)
+        self.assertNotIn("beta ready?", out)
+
+    def test_shows_only_notices_scoped_to_that_raid(self):
+        self.run_cli(
+            ["notice", "create", "ci flaky", "--to", "raid:ci", "--ttl", "1h"], "sess-1", self.repo_dir
+        )
+        self.run_cli(["notice", "create", "guild wide", "--to", "guild", "--ttl", "1h"], "sess-1", self.repo_dir)
+        code, out, err = self.run_cli(["board", "--raid", "ci"], None, None)
+        self.assertEqual(code, 0, err)
+        self.assertIn("ci flaky", out)
+        self.assertNotIn("guild wide", out)
+
+    def test_shows_claims_only_of_raid_members(self):
+        self.run_cli(["claim", "src/a.py", "--ttl", "30m"], "sess-1", self.repo_dir)
+        self.run_cli(["claim", "src/b.py", "--ttl", "30m"], "sess-2", self.repo_dir)
+        code, out, err = self.run_cli(["board", "--raid", "ci"], None, None)
+        self.assertEqual(code, 0, err)
+        self.assertIn("src/a.py", out)
+        self.assertNotIn("src/b.py", out)
+
+    def test_unknown_raid_is_a_clear_error(self):
+        code, out, err = self.run_cli(["board", "--raid", "ghost"], None, None)
+        self.assertEqual(code, 1)
+        self.assertIn("raid 'ghost' has no active members", err)
+
+    def test_empty_raid_is_a_clear_error(self):
+        future = timeutil.utcnow() + timedelta(hours=2)
+        with mock.patch("guild.timeutil.utcnow", return_value=future):
+            code, out, err = self.run_cli(["board", "--raid", "ci"], None, None)
+        self.assertEqual(code, 1)
+        self.assertIn("raid 'ci' has no active members", err)
+
+    def test_party_and_raid_are_mutually_exclusive(self):
+        code, out, err = self.run_cli(
+            ["board", "--party", "alpha", "--raid", "ci"], None, None
+        )
+        self.assertEqual(code, 2)
+        self.assertIn("not allowed with argument", err)
+
+
 class RaidPartyCloseTests(GuildTestCase):
     def setUp(self):
         super().setUp()

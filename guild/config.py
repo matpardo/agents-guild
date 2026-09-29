@@ -61,11 +61,23 @@ def load_all_projects(projects_dir):
     return projects
 
 
+def _known_projects_label(projects_dir):
+    project_names = sorted(project["name"] for project in load_all_projects(projects_dir))
+    if not project_names:
+        return "none"
+    return ", ".join(project_names)
+
+
 def load_project(projects_dir, name):
     names.validate_name(name, "project name")
     config_file = projects_dir / "{}.json".format(name)
     if not config_file.is_file():
-        raise GuildError("unknown project '{}': run guild init-project first".format(name), 1)
+        raise GuildError(
+            "unknown project '{}': known projects are {}".format(
+                name, _known_projects_label(projects_dir)
+            ),
+            1,
+        )
     return load_project_file(config_file)
 
 
@@ -93,6 +105,9 @@ def require_project(cwd, projects_dir):
     name = resolve_project(cwd, projects)
     if name is None:
         raise GuildError(
-            "no project config matches '{}': run guild init-project".format(cwd), 1
+            "no project config matches '{}': known projects are {} (run guild init-project)".format(
+                cwd, _known_projects_label(projects_dir)
+            ),
+            1,
         )
     return name

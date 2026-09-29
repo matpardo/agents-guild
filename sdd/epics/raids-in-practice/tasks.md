@@ -53,6 +53,6 @@ updated: 2026-09-29
 ## T07 — Raid views and clearer project errors
 
 **Depends on:** T05
-**Status:** [ ] pending
+**Status:** [x] done
 
 **What:** `guild board --raid <name>`, raid filter in `guild web`; unknown-project errors list known project names.

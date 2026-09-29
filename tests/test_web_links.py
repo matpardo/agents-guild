@@ -29,5 +29,20 @@ class RaidLeadBadgeTests(unittest.TestCase):
         self.assertIn('badge.className = "badge"', self.source)
 
 
+class RaidFilterTests(unittest.TestCase):
+    def setUp(self):
+        self.source = (_WEB_DIR / "app.js").read_text()
+
+    def test_raid_filter_select_is_populated_from_raids(self):
+        self.assertIn("raid-filter", self.source)
+        self.assertIn("function refreshRaidFilterOptions(raids) {", self.source)
+
+    def test_raid_filter_narrows_parties_asks_and_notices(self):
+        self.assertIn("function applyRaidFilter(data) {", self.source)
+        self.assertIn("members.indexOf(ask.party)", self.source)
+        self.assertIn("members.indexOf(party.name)", self.source)
+        self.assertIn("notice.scope === scope", self.source)
+
+
 if __name__ == "__main__":
     unittest.main()

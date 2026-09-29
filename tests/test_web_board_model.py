@@ -169,6 +169,47 @@ class BoardModelShapeTests(BoardModelTestCase):
         self.assertIsInstance(entry["findings"], dict)
 
 
+class BoardModelRaidsTests(BoardModelTestCase):
+    def test_raids_model_lists_name_lead_and_members(self):
+        self.repo_dir = self.register_project("acme", ["acme/app"])
+        self.run_cli(["party", "start", "alpha"], "sess-1", self.repo_dir)
+        self.run_cli(["party", "start", "beta"], "sess-2", self.repo_dir)
+        self.run_cli(["raid", "join", "ci", "--ttl", "1h", "--lead"], "sess-1", self.repo_dir)
+        self.run_cli(["raid", "join", "ci", "--ttl", "1h"], "sess-2", self.repo_dir)
+
+        ctx = self._ctx()
+        model = board_commands.board_model(ctx)
+        ctx.conn.close()
+
+        self.assertEqual(len(model["raids"]), 1)
+        raid = model["raids"][0]
+        self.assertEqual(set(raid), {"name", "lead", "members"})
+        self.assertEqual(raid["name"], "ci")
+        self.assertEqual(raid["lead"], "alpha")
+        self.assertEqual(set(raid["members"]), {"alpha", "beta"})
+
+    def test_raids_model_has_no_lead_when_none_joined_as_lead(self):
+        self.repo_dir = self.register_project("acme", ["acme/app"])
+        self.run_cli(["party", "start", "alpha"], "sess-1", self.repo_dir)
+        self.run_cli(["raid", "join", "ci", "--ttl", "1h"], "sess-1", self.repo_dir)
+
+        ctx = self._ctx()
+        model = board_commands.board_model(ctx)
+        ctx.conn.close()
+
+        self.assertIsNone(model["raids"][0]["lead"])
+
+    def test_raids_model_empty_when_no_raids(self):
+        self.repo_dir = self.register_project("acme", ["acme/app"])
+        self.run_cli(["party", "start", "alpha"], "sess-1", self.repo_dir)
+
+        ctx = self._ctx()
+        model = board_commands.board_model(ctx)
+        ctx.conn.close()
+
+        self.assertEqual(model["raids"], [])
+
+
 class BoardModelPartyWithoutProjectTests(BoardModelTestCase):
     def test_party_without_project_is_skipped_from_drift(self):
         self.repo_dir = self.register_project("acme", ["acme/app"])

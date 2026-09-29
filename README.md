@@ -102,7 +102,7 @@ guild raids
 guild next [--all]     # ranked action queue for the caller's party
 guild handoff --in-flight "..." --learned "..."
 
-guild board [--party <name>]
+guild board [--party <name> | --raid <name>]
 guild web --port <n>
 guild sync --source gh|sdd|tracker
 guild drift [--epic <slug> | --all]
@@ -277,9 +277,11 @@ drift findings for the default scope (grouped by rule, one block per
 project resolved from the parties shown, skipping parties without a
 project), then one collapsible block per party with its quests, tasks and
 PRs, plus PRs outside active tasks, raids (each with a `lead` badge when
-that membership is the raid's lead) and claims. A party filter and a
-state filter (`all`/`needs-human`/`converging`/`ready`/`draft`/`merged`)
-narrow what is shown; the page re-fetches `/api/board` every 15 seconds,
+that membership is the raid's lead) and claims. A party filter, a state
+filter (`all`/`needs-human`/`converging`/`ready`/`draft`/`merged`) and a
+raid filter (`all` plus one option per raid, narrowing parties, asks and
+notices the same way `guild board --raid` does) narrow what is shown; the
+page re-fetches `/api/board` every 15 seconds,
 keeping the current filters and which blocks are collapsed. PR links open
 `https://github.com/<repo>/pull/<n>` in a new tab; a task also links to its
 tracker card when the project configures `tracker.browse_url` (see
@@ -384,8 +386,8 @@ its membership expiring clears the raid's lead, after which the next
 `--lead` join succeeds. The lead is shown everywhere raid membership is
 shown: `guild raids` (`alpha (lead, 5h left)`), `guild board`'s party block
 (`raids: ci (lead, until leave)`), `guild web`'s per-party raid list (a
-`lead` badge), and every member's session-start brief
-(`raid ci — lead: alpha`).
+`lead` badge) and top-level raid filter model, and every member's
+session-start brief (`raid ci — lead: alpha`).
 
 When a party that belongs to a raid creates an ask, the lead of each such
 raid (if any, and not the asker) receives it once in its inbox
@@ -395,6 +397,26 @@ The ask still goes to the human queue as always. `guild answer` is not
 restricted to the human terminal — any bound session, including the raid
 lead, may answer an ask and the answer reaches the asker through the normal
 inbox path.
+
+### Raid views and clearer project errors
+
+`guild board --raid <name>` narrows the board to that raid: only parties
+that are currently active members, asks from those parties, notices scoped
+`raid:<name>` (not `guild`- or `project:`-scoped notices, even from a
+member), and claims held by those parties. An unknown raid name and a raid
+with no active members give the same clear error
+(`raid '<name>' has no active members`). `--raid` and `--party` are
+mutually exclusive. `guild web`'s board model gains a top-level
+`raids: [{name, lead, members}]` list, and the page gains a raid filter
+select (`all` plus one option per raid) that narrows parties, asks and
+notices the same way the terminal `--raid` filter does.
+
+Every "unknown project" error — `guild notice create --to project:<name>`
+with an unregistered name, a project that cannot be resolved from `cwd`,
+and any other project-name lookup — lists the known project names, e.g.
+`unknown project 'x': known projects are acme, zeta` (or `known projects
+are none` when none are registered yet). A single helper in `guild/config.py`
+builds this list and is reused everywhere a project lookup can fail.
 
 ### No overlapping task lists
 
