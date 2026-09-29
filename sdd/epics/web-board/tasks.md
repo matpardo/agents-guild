@@ -25,9 +25,9 @@ updated: 2026-09-28
 ## T03 — Page
 
 **Depends on:** T02
-**Status:** [ ] pending
+**Status:** [x] done
 
-**What:** asks first, notices, party blocks with PRs under tasks; filters by party and state; collapsible blocks; refresh every 15 seconds; all text via `textContent`.
+**What:** `guild/web/index.html`, `app.js`, `app.css`: asks first (question, party, options, refs, blocks count, collapsible context), then notices, then drift findings, then one collapsible block per party with quests → tasks → PRs; a party filter and a state filter that apply to PRs; refresh every 15 seconds keeping filter and collapse state; every node built with `document.createElement`/`textContent`, never HTML injection; light/dark via `prefers-color-scheme`, responsive to phone width, no external fonts.
 
 ## T04 — Links to PRs and cards
 

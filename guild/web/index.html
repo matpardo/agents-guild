@@ -2,11 +2,40 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>guild board</title>
 <link rel="stylesheet" href="/app.css">
 </head>
 <body>
-<main id="app"></main>
-<script src="/app.js"></script>
+<header>
+  <h1>guild board</h1>
+  <p id="generated-at" class="muted"></p>
+  <div id="filters" class="filters">
+    <label>
+      party
+      <select id="party-filter">
+        <option value="all">all</option>
+      </select>
+    </label>
+    <label>
+      state
+      <select id="state-filter">
+        <option value="all">all</option>
+        <option value="needs-human">needs-human</option>
+        <option value="converging">converging</option>
+        <option value="ready">ready</option>
+        <option value="draft">draft</option>
+        <option value="merged">merged</option>
+      </select>
+    </label>
+  </div>
+</header>
+<main>
+  <section id="asks" aria-label="asks"></section>
+  <section id="notices" aria-label="notices"></section>
+  <section id="drift" aria-label="drift"></section>
+  <section id="parties" aria-label="parties"></section>
+</main>
+<script src="/app.js" defer></script>
 </body>
 </html>
