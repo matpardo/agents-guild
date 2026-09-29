@@ -4,6 +4,7 @@ import textwrap
 from guild import sanitize, timeutil
 from guild.commands import claim as claim_commands
 from guild.commands import notice as notice_commands
+from guild.commands import raid as raid_commands
 
 _STYLES = {
     "bold": "1",
@@ -45,14 +46,6 @@ class _Painter:
             subsequent_indent=indent,
             break_on_hyphens=False,
         )
-
-
-def _time_left(now, expires_at_text):
-    remaining = timeutil.from_iso(expires_at_text) - now
-    hours = int(remaining.total_seconds() // 3600)
-    if hours >= 1:
-        return "{}h left".format(hours)
-    return "{}m left".format(int(remaining.total_seconds() // 60))
 
 
 def _checks_parts(pr_row):
@@ -211,7 +204,7 @@ def _notices_section(ctx, painter, party_filter):
             "  {} {} · {}".format(
                 painter.paint("#{}".format(row["id"]), "yellow"),
                 painter.paint(row["party"] or "human", "cyan"),
-                painter.paint("{} · {}".format(row["scope"], _time_left(ctx.now, row["expires_at"])), "dim"),
+                painter.paint("{} · {}".format(row["scope"], timeutil.time_left_label(ctx.now, row["expires_at"])), "dim"),
             )
         )
         lines.extend(painter.wrap(row["text"], "     "))
@@ -317,9 +310,15 @@ def _party_section(ctx, painter, party_row):
     claims = [row for row in claim_commands.list_claims(ctx.conn, ctx.now) if row["party"] == party_row["name"]]
     if claims:
         claim_text = ", ".join(
-            "{} ({})".format(row["area"], _time_left(ctx.now, row["expires_at"])) for row in claims
+            "{} ({})".format(row["area"], timeutil.time_left_label(ctx.now, row["expires_at"])) for row in claims
         )
         lines.append(painter.paint("  claims: {}".format(claim_text), "dim"))
+    raids = raid_commands.member_raids(ctx.conn, ctx.now, party_row["name"])
+    if raids:
+        raid_text = ", ".join(
+            "{} ({})".format(row["raid"], timeutil.time_left_label(ctx.now, row["expires_at"])) for row in raids
+        )
+        lines.append(painter.paint("  raids: {}".format(raid_text), "dim"))
     lines.append("")
     return lines
 

@@ -35,3 +35,11 @@ def expires_at_iso(now, duration_text):
 
 def is_expired(now, expires_at_text):
     return now > from_iso(expires_at_text)
+
+
+def time_left_label(now, expires_at_text):
+    remaining = from_iso(expires_at_text) - now
+    hours = int(remaining.total_seconds() // 3600)
+    if hours >= 1:
+        return "{}h left".format(hours)
+    return "{}m left".format(int(remaining.total_seconds() // 60))

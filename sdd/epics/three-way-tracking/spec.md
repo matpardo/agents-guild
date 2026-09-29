@@ -2,7 +2,7 @@
 epic: three-way-tracking
 type: spec
 title: Track work across guild, SDD, tracker and GitHub
-status: active
+status: done
 owner: matpardo
 created: 2026-09-27
 updated: 2026-09-28
@@ -31,8 +31,8 @@ The same task lives in up to four places that drift silently: SDD lags because i
 
 ## Success criteria
 
-- [ ] `guild drift` on real data lists discordances that a human confirms by hand.
-- [ ] `guild next` uses tracker status when guild has no opinion.
+- [x] `guild drift` on real data lists discordances that a human confirms by hand.
+- [x] `guild next` uses tracker status when guild has no opinion.
 
 ## Security and data
 

@@ -2,6 +2,7 @@ from guild import config, identity, render
 from guild.commands import claim as claim_commands
 from guild.commands import inbox as inbox_commands
 from guild.commands import notice as notice_commands
+from guild.commands import raid as raid_commands
 from guild.identity import UNBOUND_HINT
 
 
@@ -10,8 +11,8 @@ def _resolve_project(ctx):
     return config.resolve_project(ctx.cwd, projects)
 
 
-def _targeting_lines(rows, project):
-    matched = notice_commands.targeting(rows, project, True)
+def _targeting_lines(rows, project, raid_member_of):
+    matched = notice_commands.targeting(rows, project, True, raid_member_of)
     lines = [notice_commands.format_notice_line(row["id"], row["party"], row["text"]) for row in matched]
     return inbox_commands.framed(lines)
 
@@ -24,7 +25,7 @@ def render_brief(ctx):
     if binding is None:
         project = _resolve_project(ctx)
         lines = [UNBOUND_HINT]
-        lines.extend(_targeting_lines(active, project))
+        lines.extend(_targeting_lines(active, project, set()))
         return lines
 
     lines = ["party: {} (generation {})".format(binding["party"], binding["generation"])]
@@ -50,7 +51,8 @@ def render_brief(ctx):
     ).fetchone()["n"]
     lines.append("open asks: {} mine, {} total".format(my_open_asks, total_open_asks))
 
-    lines.extend(_targeting_lines(active, binding["project"]))
+    raid_member_of = raid_commands.member_raid_names(ctx.conn, ctx.now, binding["party"])
+    lines.extend(_targeting_lines(active, binding["project"], raid_member_of))
 
     claims = [row for row in claim_commands.list_claims(ctx.conn, ctx.now) if row["party"] == binding["party"]]
     for claim_row in claims:

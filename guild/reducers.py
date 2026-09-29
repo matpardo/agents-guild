@@ -44,6 +44,7 @@ def _party_closed(conn, event):
     conn.execute("UPDATE quests SET state = 'done' WHERE party = ? AND state = 'active'", (payload["party"],))
     conn.execute("UPDATE asks SET state = 'dismissed' WHERE party = ? AND state = 'open'", (payload["party"],))
     conn.execute("DELETE FROM claims WHERE party = ?", (payload["party"],))
+    conn.execute("DELETE FROM raid_members WHERE party = ?", (payload["party"],))
     conn.execute(
         "UPDATE leaders SET ended_at = ? WHERE party = ? AND generation = ? AND ended_at IS NULL",
         (event["ts"], payload["party"], payload["generation"]),
@@ -327,6 +328,23 @@ def _claim_released(conn, event):
     )
 
 
+def _raid_joined(conn, event):
+    payload = event["payload"]
+    conn.execute(
+        "INSERT INTO raid_members (raid, party, expires_at) VALUES (?, ?, ?)"
+        " ON CONFLICT(raid, party) DO UPDATE SET expires_at = excluded.expires_at",
+        (payload["raid"], payload["party"], payload["expires_at"]),
+    )
+
+
+def _raid_left(conn, event):
+    payload = event["payload"]
+    conn.execute(
+        "DELETE FROM raid_members WHERE raid = ? AND party = ?",
+        (payload["raid"], payload["party"]),
+    )
+
+
 def _dump(value):
     return json.dumps(value)
 
@@ -355,6 +373,8 @@ _REDUCERS = {
     "notice.closed": _notice_closed,
     "claim.created": _claim_created,
     "claim.released": _claim_released,
+    "raid.joined": _raid_joined,
+    "raid.left": _raid_left,
 }
 
 

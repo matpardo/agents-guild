@@ -2,7 +2,7 @@
 epic: three-way-tracking
 type: tasks
 title: Track work across guild, SDD, tracker and GitHub
-status: active
+status: done
 updated: 2026-09-28
 ---
 
@@ -39,9 +39,9 @@ updated: 2026-09-28
 ## T05 — Raids
 
 **Depends on:** —
-**Status:** [ ] pending
+**Status:** [x] done — #13
 
-**What:** `raid join|leave` with TTL; notices `--to raid:<name>`.
+**What:** `guild raid join <name> --ttl <dur>` (refreshes on repeat join) / `guild raid leave <name>` for the caller's bound party; a raid exists while it has at least one active (non-expired) member, no separate create command; `guild raids` lists raids with active members and time left. `notice create --to raid:<name>` requires at least one active member; a session's inbox (`prompt-submit`/`post-tool-use`/`brief`) delivers a raid notice only to sessions whose bound party is an active member at delivery time, resolved by the single `notice.targeting` function shared with `guild board`/`guild statusline`. `party close` cascades into leaving every raid, `rebuild`-safe.
 
 ## T06 — Asks ordered by what they unblock today
 

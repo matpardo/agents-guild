@@ -10,6 +10,7 @@ PROJECTION_TABLES = (
     "asks",
     "notices",
     "claims",
+    "raid_members",
 )
 
 _CREATE_STATEMENTS = (
@@ -156,6 +157,14 @@ _CREATE_STATEMENTS = (
         party TEXT NOT NULL,
         expires_at TEXT NOT NULL,
         PRIMARY KEY (project, area)
+    )
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS raid_members (
+        raid TEXT NOT NULL,
+        party TEXT NOT NULL,
+        expires_at TEXT NOT NULL,
+        PRIMARY KEY (raid, party)
     )
     """,
     """

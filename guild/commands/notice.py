@@ -1,17 +1,29 @@
 import json
 
-from guild import config, db, events, identity, pii, refs, sanitize, timeutil
+from guild import config, db, events, identity, names, pii, refs, sanitize, timeutil
+from guild.commands import raid as raid_commands
 from guild.ids import next_id
 from guild.errors import GuildError
+
+_PROJECT_SCOPE_PREFIX = "project:"
+_RAID_SCOPE_PREFIX = "raid:"
 
 
 def _validate_scope(ctx, to):
     if to == "guild":
         return
-    if not to.startswith("project:"):
-        raise GuildError("invalid --to '{}': expected project:<name> or guild".format(to), 1)
-    name = to[len("project:"):]
-    config.load_project(ctx.projects_dir, name)
+    if to.startswith(_PROJECT_SCOPE_PREFIX):
+        config.load_project(ctx.projects_dir, to[len(_PROJECT_SCOPE_PREFIX):])
+        return
+    if to.startswith(_RAID_SCOPE_PREFIX):
+        raid_name = to[len(_RAID_SCOPE_PREFIX):]
+        names.validate_name(raid_name, "raid name")
+        if not raid_commands.active_members(ctx.conn, ctx.now, raid_name):
+            raise GuildError("raid '{}' has no active members".format(raid_name), 1)
+        return
+    raise GuildError(
+        "invalid --to '{}': expected project:<name>, raid:<name> or guild".format(to), 1
+    )
 
 
 def _reject_duplicate(ctx, actor_party, to, text):
@@ -95,12 +107,14 @@ def format_notice_line(notice_id, party, text):
     return '- notice #{} from {}: "{}"'.format(notice_id, author, clean_text)
 
 
-def targeting(rows, project, scope_guild_always):
+def targeting(rows, project, scope_guild_always, raid_member_of):
     matched = []
     for row in rows:
         if row["scope"] == "guild" and scope_guild_always:
             matched.append(row)
         elif project is not None and row["scope"] == "project:{}".format(project):
+            matched.append(row)
+        elif row["scope"].startswith(_RAID_SCOPE_PREFIX) and row["scope"][len(_RAID_SCOPE_PREFIX):] in raid_member_of:
             matched.append(row)
     return matched
 

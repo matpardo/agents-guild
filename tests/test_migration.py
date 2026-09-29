@@ -96,6 +96,18 @@ class MigrationTests(GuildTestCase):
         )
         self.assertEqual(conn.execute("SELECT COUNT(*) AS n FROM cards").fetchone()["n"], 0)
 
+    def test_old_schema_db_gains_raid_members_table(self):
+        db_path = self.data_home / "guild.db"
+        _make_old_schema_db(db_path)
+
+        conn = db.connect(db_path)
+
+        raid_members_columns = {
+            row["name"] for row in conn.execute("PRAGMA table_info(raid_members)").fetchall()
+        }
+        self.assertEqual(raid_members_columns, {"raid", "party", "expires_at"})
+        self.assertEqual(conn.execute("SELECT COUNT(*) AS n FROM raid_members").fetchone()["n"], 0)
+
     def test_rebuild_works_after_migration(self):
         db_path = self.data_home / "guild.db"
         _make_old_schema_db(db_path)
