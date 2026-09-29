@@ -588,6 +588,7 @@ class PreEditHookTests(GuildTestCase):
         self._set_shared_areas("acme", ["config/routes.rb"], "2h")
         self.run_cli(["party", "start", "alpha"], "sess-1", repo_dir)
         self.run_cli(["party", "start", "beta"], "sess-2", repo_dir)
+        self.run_cli(["raid", "join", "epic-alpha", "--ttl", "2h"], "sess-1", repo_dir)
         self.run_cli(["raid", "join", "epic-alpha", "--ttl", "2h"], "sess-2", repo_dir)
         (repo_dir / "config").mkdir()
         file_path = repo_dir / "config" / "routes.rb"
@@ -598,6 +599,40 @@ class PreEditHookTests(GuildTestCase):
         reason = json.loads(out)["hookSpecificOutput"]["permissionDecisionReason"]
         self.assertIn("epic-alpha", reason)
         self.assertIn("guild notice --to raid:epic-alpha", reason)
+
+    def test_deny_names_the_raid_shared_with_the_holder(self):
+        repo_dir = self.register_project("acme", ["acme/app"])
+        self._git_init(repo_dir)
+        self._set_shared_areas("acme", ["config/routes.rb"], "2h")
+        self.run_cli(["party", "start", "alpha"], "sess-1", repo_dir)
+        self.run_cli(["party", "start", "beta"], "sess-2", repo_dir)
+        self.run_cli(["raid", "join", "zeta", "--ttl", "2h"], "sess-1", repo_dir)
+        self.run_cli(["raid", "join", "aaa", "--ttl", "2h"], "sess-2", repo_dir)
+        self.run_cli(["raid", "join", "zeta", "--ttl", "2h"], "sess-2", repo_dir)
+        (repo_dir / "config").mkdir()
+        file_path = repo_dir / "config" / "routes.rb"
+        file_path.write_text("x")
+
+        self.run_hook("pre-edit", self._edit_payload("sess-1", repo_dir, file_path))
+        code, out, err = self.run_hook("pre-edit", self._edit_payload("sess-2", repo_dir, file_path))
+        reason = json.loads(out)["hookSpecificOutput"]["permissionDecisionReason"]
+        self.assertIn("guild notice --to raid:zeta", reason)
+
+    def test_deny_points_to_the_holder_when_no_raid_is_shared(self):
+        repo_dir = self.register_project("acme", ["acme/app"])
+        self._git_init(repo_dir)
+        self._set_shared_areas("acme", ["config/routes.rb"], "2h")
+        self.run_cli(["party", "start", "alpha"], "sess-1", repo_dir)
+        self.run_cli(["party", "start", "beta"], "sess-2", repo_dir)
+        self.run_cli(["raid", "join", "epic-alpha", "--ttl", "2h"], "sess-2", repo_dir)
+        (repo_dir / "config").mkdir()
+        file_path = repo_dir / "config" / "routes.rb"
+        file_path.write_text("x")
+
+        self.run_hook("pre-edit", self._edit_payload("sess-1", repo_dir, file_path))
+        code, out, err = self.run_hook("pre-edit", self._edit_payload("sess-2", repo_dir, file_path))
+        reason = json.loads(out)["hookSpecificOutput"]["permissionDecisionReason"]
+        self.assertIn("coordinate with party 'alpha'", reason)
 
     def test_worktree_path_resolves_to_same_relative_path(self):
         repo_dir = self.register_project("acme", ["acme/app"])

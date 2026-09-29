@@ -358,8 +358,10 @@ def _matching_shared_area(relative_path, shared_areas):
 def _shared_area_deny_reason(ctx, binding, holder_party, holder_expires_at, matched_glob):
     local_time = timeutil.from_iso(holder_expires_at).astimezone().strftime("%H:%M")
     caller_raids = raid_commands.member_raid_names(ctx.conn, ctx.now, binding["party"])
-    if caller_raids:
-        raid_name = sorted(caller_raids)[0]
+    holder_raids = raid_commands.member_raid_names(ctx.conn, ctx.now, holder_party)
+    shared_raids = set(caller_raids) & set(holder_raids)
+    if shared_raids:
+        raid_name = sorted(shared_raids)[0]
         coordination = "coordinate in the raid (guild notice --to raid:{}) or wait".format(raid_name)
     else:
         coordination = "coordinate with party '{}' or wait".format(holder_party)
