@@ -176,6 +176,18 @@ def _handle_notices(ctx, args):
 def _handle_claim(ctx, args):
     from guild.commands import claim as claim_commands
 
+    if args.area == "check":
+        if args.ttl is not None:
+            raise GuildError("`guild claim check` does not take --ttl", 1)
+        if args.check_area is None:
+            raise GuildError("`guild claim check` requires an area", 1)
+        message, exit_code = claim_commands.check(ctx, args.check_area)
+        _print(message)
+        return exit_code
+    if args.check_area is not None:
+        raise GuildError("unexpected extra argument '{}'".format(args.check_area), 1)
+    if args.ttl is None:
+        raise GuildError("--ttl is required", 1)
     _print(claim_commands.claim(ctx, args.area, args.ttl))
     return 0
 
@@ -465,7 +477,8 @@ def build_parser():
 
     claim = subparsers.add_parser("claim")
     claim.add_argument("area")
-    claim.add_argument("--ttl", required=True)
+    claim.add_argument("check_area", nargs="?")
+    claim.add_argument("--ttl")
     claim.set_defaults(handler=_handle_claim)
 
     release = subparsers.add_parser("release")

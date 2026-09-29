@@ -1,5 +1,7 @@
-from guild import config, db, events, identity, names
+from guild import config, db, events, identity, names, timeutil
 from guild.errors import GuildError
+
+_TASK_CLAIM_PREFIX = "task:{}/"
 
 
 def _resolve_epic_tasks(conn, project, epic, tasks_csv):
@@ -25,6 +27,59 @@ def _resolve_epic_tasks(conn, project, epic, tasks_csv):
             )
         tasks.append({"tid": task_row["tid"], "title": task_row["title"]})
     return tasks
+
+
+def _quest_holders(conn, project, epic, party):
+    rows = conn.execute(
+        "SELECT q.slug AS slug, q.party AS party, qt.tid AS tid"
+        " FROM quests q JOIN quest_tasks qt ON qt.quest = q.slug"
+        " WHERE q.project = ? AND q.epic = ? AND q.state = 'active' AND q.party != ?"
+        " ORDER BY q.slug, qt.tid",
+        (project, epic, party),
+    ).fetchall()
+    holders = {}
+    for row in rows:
+        holders.setdefault(row["tid"], row)
+    return holders
+
+
+def _claim_holders(conn, now, project, epic, party):
+    prefix = _TASK_CLAIM_PREFIX.format(epic)
+    rows = conn.execute(
+        "SELECT area, party, expires_at FROM claims WHERE project = ? AND party != ?",
+        (project, party),
+    ).fetchall()
+    holders = {}
+    for row in rows:
+        if not row["area"].startswith(prefix):
+            continue
+        if timeutil.is_expired(now, row["expires_at"]):
+            continue
+        holders[row["area"][len(prefix):]] = row
+    return holders
+
+
+def _reject_taken_tasks(conn, now, project, epic, tasks, party):
+    quest_holders = _quest_holders(conn, project, epic, party)
+    claim_holders = _claim_holders(conn, now, project, epic, party)
+    conflicts = []
+    for task in tasks:
+        tid = task["tid"]
+        quest_holder = quest_holders.get(tid)
+        if quest_holder is not None:
+            conflicts.append(
+                "{} is in quest {} of party {}".format(tid, quest_holder["slug"], quest_holder["party"])
+            )
+            continue
+        claim_holder = claim_holders.get(tid)
+        if claim_holder is not None:
+            conflicts.append(
+                "{} is claimed by party {} until {}".format(
+                    tid, claim_holder["party"], timeutil.clock_label(claim_holder["expires_at"])
+                )
+            )
+    if conflicts:
+        raise GuildError("; ".join(conflicts), 1)
 
 
 def done(ctx, slug):
@@ -67,6 +122,7 @@ def add(ctx, slug, title, epic, tasks_csv, no_epic):
     tasks = []
     if not no_epic:
         tasks = _resolve_epic_tasks(ctx.conn, project, epic, tasks_csv)
+        _reject_taken_tasks(ctx.conn, ctx.now, project, epic, tasks, binding["party"])
     with db.writing(ctx.conn):
         events.record(
             ctx.conn,

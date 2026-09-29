@@ -89,6 +89,7 @@ guild notice close <id>
 guild notices
 
 guild claim <area> --ttl <dur>          # area, or task:<epic>/<tid> / task:<quest>/<tid>
+guild claim check <area>                # read-only, no event; exit 0 free/yours, exit 1 someone else's
 guild release <area>
 guild claims
 
@@ -322,6 +323,41 @@ targeting` is the single place that resolves whether a notice's `project:`,
 `guild` or `raid:` scope matches the caller. `guild board` shows the raw
 `raid:<name>` scope on a raid notice, and lists each party's raids
 (`raids: ci (5h left)`) at the end of its block.
+
+### No overlapping task lists
+
+`guild quest add <slug> --epic <slug> --tasks T01,T02,...` rejects the whole
+command, writing nothing, if any listed task is either in an **active** quest
+of **another** party for the same project and epic, or task-claimed
+(`task:<epic>/<tid>`) by another party. The error lists every conflicting
+task with its holder, e.g. `T02 is in quest raid-wave1 of party alpha; T05 is
+claimed by party beta until 14:30`. A task in the caller's own other quests
+never conflicts — that party's own overlap is its own business. A closed
+quest or an expired claim never conflicts either. Seed stays exempt, same as
+before (`guild seed` writes `quest.added` events directly).
+
+`guild claim check <area>` is a read-only orchestrator helper: it fires no
+event. Exit 0 and `free` when the area has no active claim; exit 0 and `held
+by you until HH:MM` when the caller's bound party holds it; exit 1 and `held
+by party <p> until HH:MM` (printed to stdout, so a script can parse it) when
+another party holds it. From an unbound session or the human terminal,
+"held by you" never applies — any active holder gives exit 1. It accepts any
+area string, including `task:<epic>/<tid>` and a shared-area glob string.
+
+### Design note: `claim check`
+
+`guild claim <area> --ttl <dur>` takes the area as a bare positional with no
+subcommand keyword, so a native `argparse` subparsers dispatch for `check`
+cannot sit next to it: subparsers greedily claim the first positional and
+reject anything that is not one of their declared choices, which would break
+plain `guild claim ci.yml --ttl 30m` (`ci.yml` is not a valid "subcommand").
+Instead, `claim`'s parser declares two positionals (`area`, an optional
+`check_area`) and an optional `--ttl`; the handler dispatches on
+`area == "check"`. This keeps the legacy form working unchanged and makes
+`check` a reserved word: `guild claim check <area>` and
+`guild claim check --ttl ...` (rejected clearly, `check` takes no TTL) both
+work, but an area literally named `check` can never be claimed or read this
+way — a deliberate, documented gap rather than an ambiguous parse.
 
 ### Design note: `notice`
 
