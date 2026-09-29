@@ -39,6 +39,6 @@ updated: 2026-09-29
 ## T05 — Answer and dismiss asks from the page
 
 **Depends on:** T03
-**Status:** [x] done
+**Status:** [x] done — #27
 
 **What:** `GET /api/session` serves a per-start token; `POST /api/asks/<id>/answer` and `/dismiss` require the loopback `Host` and `Origin`, the token in `X-Guild-Token`, `application/json` and a body of at most 16384 bytes, then call `ask.answer` / `ask.dismiss` as the human actor (`GuildError` becomes 422); `OPTIONS` stays 405 with no CORS headers. Each ask card gets option buttons that fill the answer field, an answer field, `Answer` and `Dismiss` (with confirmation); drafts survive the 15-second refresh.
