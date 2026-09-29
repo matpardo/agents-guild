@@ -46,9 +46,16 @@ updated: 2026-09-28
 ## T06 — Asks ordered by what they unblock today
 
 **Depends on:** T04
-**Status:** [ ] pending
+**Status:** [x] done — f9bc116
 
-**What:** count only refs still blocked at render time.
+**What:** `guild asks` and the board summary sort open asks by how many refs
+are still blocked *right now*, computed at render time: blocked count desc,
+then `created_at` asc, then id asc. A `pr:` ref is blocked while the tracked
+PR's lifecycle is not `merged`/`closed` (untracked counts as blocked); a
+`task:` ref is blocked while the quest task's state is not `done` (unknown
+counts as blocked). The board summary line adds `· blocks <n>` when `n > 0`;
+`guild asks` prints `blocks: <n> of <total> refs still open`, or `blocks: 0
+of <total> refs still open (may be stale)` when nothing is blocked anymore.
 
 ## T07 — Drift defaults to work in progress
 
