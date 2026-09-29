@@ -86,6 +86,28 @@ class RouteTests(WebServerTestCase):
         conn.close()
         self.assertEqual(response.status, 405)
 
+    def test_put_patch_delete_and_head_are_405(self):
+        for method in ("PUT", "PATCH", "DELETE", "HEAD"):
+            with self.subTest(method=method):
+                conn = self._connection()
+                conn.request(method, "/", headers={"Host": self._host()})
+                response = conn.getresponse()
+                response.read()
+                conn.close()
+                self.assertEqual(response.status, 405)
+
+    def test_malformed_request_line_is_logged_as_a_server_error(self):
+        import socket
+
+        stderr_capture = io.StringIO()
+        sock = socket.create_connection(("127.0.0.1", self.port), timeout=5)
+        with contextlib.redirect_stderr(stderr_capture):
+            sock.sendall(b"not a valid http request line at all\r\n\r\n")
+            response = sock.recv(4096)
+        sock.close()
+        self.assertIn(b"400", response)
+        self.assertIn("guild web:", stderr_capture.getvalue())
+
 
 class SecurityHeaderTests(WebServerTestCase):
     def _assert_security_headers(self, response):
