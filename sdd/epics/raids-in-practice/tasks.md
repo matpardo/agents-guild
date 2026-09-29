@@ -32,7 +32,7 @@ updated: 2026-09-29
 ## T04 — No overlapping task lists
 
 **Depends on:** —
-**Status:** [x] done
+**Status:** [x] done — #20
 
 **What:** `quest add` rejects tasks in another party's active quest or task-claimed by another party; `guild claim check <area>` for orchestrators.
 
