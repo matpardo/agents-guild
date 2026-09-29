@@ -1,4 +1,5 @@
 import json
+from pathlib import Path
 
 from guild import config, db, events, timeutil
 from guild.adapters import github, jira_acli, sdd
@@ -161,6 +162,9 @@ def _sync_sdd(ctx):
     patterns = _sdd_patterns(sdd_config)
     epic_key_field = sdd_config.get("epic_key_field")
     epic_status_field = sdd_config.get("epic_status_field")
+    epics_path = Path(sdd_config["root"]).expanduser() / sdd_config["epics_dir"]
+    if not epics_path.is_dir():
+        raise GuildError("sdd epics directory {} does not exist: check sdd.root".format(epics_path), 1)
     epic_files = sdd.discover_epic_files(sdd_config["root"], sdd_config["epics_dir"])
     failures = []
     for epic, path in epic_files:

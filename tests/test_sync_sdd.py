@@ -149,6 +149,14 @@ class SyncSddTests(GuildTestCase):
         self.assertIsNone(row["jira_key"])
         self.assertIsNone(row["sdd_status"])
 
+    def test_missing_sdd_root_fails_instead_of_syncing_nothing(self):
+        self._write_project_config(
+            sdd_config=dict(_PATTERNS, root=str(self.project_root / "gone"), epics_dir="epics")
+        )
+        code, out, err = self.run_cli(["sync", "--source", "sdd"], "sess-1", self.repo_dir)
+        self.assertEqual(code, 1)
+        self.assertIn("does not exist", err)
+
     def test_sync_reports_unparseable_file_and_exits_nonzero(self):
         (self.sdd_root / "epics" / "letters").mkdir(parents=True)
         (self.sdd_root / "epics" / "letters" / "tasks.md").write_text("## A1 — no match\n")
