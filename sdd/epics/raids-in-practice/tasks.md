@@ -46,7 +46,7 @@ updated: 2026-09-29
 ## T06 — Notices reach /goal sessions
 
 **Depends on:** —
-**Status:** [x] done
+**Status:** [x] done — #25
 
 **What:** confirmed in the first raid: the cursors of the three `/goal` parties advanced to the latest events while they ran unattended, and only the prompt-submit/post-tool-use hooks move a cursor. No code needed.
 
@@ -60,6 +60,6 @@ updated: 2026-09-29
 ## T08 — Commit-time guard for shared areas
 
 **Depends on:** T01
-**Status:** [x] done
+**Status:** [x] done — #25
 
 **What:** the first raid showed `coder` subagents writing every file through Bash, so `pre-edit` never fired and shared files went unclaimed. `guild hook pre-commit` claims the staged shared areas for the committing party, or rejects the commit naming the holder; wired per user through husky's `~/.config/husky/init.sh`, never in the project repository.
