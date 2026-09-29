@@ -29,6 +29,14 @@ def _print_lines(lines):
         sys.stdout.write(line + "\n")
 
 
+def _handle_doctor(ctx, args):
+    from guild.commands import doctor as doctor_commands
+
+    message, exit_code = doctor_commands.run(ctx)
+    _print(message)
+    return exit_code
+
+
 def _handle_whoami(ctx, args):
     from guild.commands import whoami as whoami_commands
 
@@ -442,6 +450,9 @@ def build_parser():
 
     whoami = subparsers.add_parser("whoami")
     whoami.set_defaults(handler=_handle_whoami)
+
+    doctor = subparsers.add_parser("doctor")
+    doctor.set_defaults(handler=_handle_doctor)
 
     init_project = subparsers.add_parser("init-project")
     init_project.add_argument("name")
