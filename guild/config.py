@@ -2,7 +2,7 @@ import fnmatch
 import json
 from pathlib import Path
 
-from guild import names
+from guild import names, timeutil
 from guild.errors import GuildError
 
 _REQUIRED_KEYS = ("name", "paths", "github")
@@ -24,6 +24,20 @@ def _validate_tracker_config(tracker_config):
         )
 
 
+def _validate_shared_areas_config(data):
+    shared_areas = data.get("shared_areas")
+    if shared_areas is None:
+        return
+    if not isinstance(shared_areas, list) or not all(isinstance(item, str) for item in shared_areas):
+        raise GuildError("project config 'shared_areas' must be a list of strings", 1)
+    ttl = data.get("shared_area_claim_ttl")
+    if ttl is None:
+        raise GuildError(
+            "project config 'shared_area_claim_ttl' is required when 'shared_areas' is set", 1
+        )
+    timeutil.parse_duration(ttl)
+
+
 def validate_project_config(data):
     for key in _REQUIRED_KEYS:
         if key not in data:
@@ -37,6 +51,7 @@ def validate_project_config(data):
     tracker_config = data.get("tracker")
     if tracker_config is not None:
         _validate_tracker_config(tracker_config)
+    _validate_shared_areas_config(data)
 
 
 def load_project_file(config_file):

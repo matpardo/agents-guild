@@ -67,6 +67,52 @@ class ValidateProjectConfigTests(unittest.TestCase):
                 {"name": "acme", "paths": ["/tmp/*"], "github": {"repos": []}, "tracker": "jira"}
             )
 
+    def test_accepts_shared_areas_with_ttl(self):
+        config.validate_project_config(
+            {
+                "name": "acme",
+                "paths": ["/tmp/*"],
+                "github": {"repos": []},
+                "shared_areas": ["config/routes.rb", "db/migrate/*"],
+                "shared_area_claim_ttl": "2h",
+            }
+        )
+
+    def test_rejects_shared_areas_without_ttl(self):
+        with self.assertRaises(GuildError):
+            config.validate_project_config(
+                {
+                    "name": "acme",
+                    "paths": ["/tmp/*"],
+                    "github": {"repos": []},
+                    "shared_areas": ["config/routes.rb"],
+                }
+            )
+
+    def test_rejects_shared_areas_that_is_not_a_list_of_strings(self):
+        with self.assertRaises(GuildError):
+            config.validate_project_config(
+                {
+                    "name": "acme",
+                    "paths": ["/tmp/*"],
+                    "github": {"repos": []},
+                    "shared_areas": [1, 2],
+                    "shared_area_claim_ttl": "2h",
+                }
+            )
+
+    def test_rejects_shared_area_claim_ttl_with_bad_format(self):
+        with self.assertRaises(GuildError):
+            config.validate_project_config(
+                {
+                    "name": "acme",
+                    "paths": ["/tmp/*"],
+                    "github": {"repos": []},
+                    "shared_areas": ["config/routes.rb"],
+                    "shared_area_claim_ttl": "soon",
+                }
+            )
+
 
 class ResolveProjectTests(unittest.TestCase):
     def test_matches_direct_child_of_glob(self):
