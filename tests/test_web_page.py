@@ -24,6 +24,22 @@ class AppJsSafeRenderingTests(unittest.TestCase):
         self.assertIn(".textContent", self.source)
 
 
+class AppJsWriteTests(unittest.TestCase):
+    def setUp(self):
+        self.source = (_WEB_DIR / "app.js").read_text()
+
+    def test_sends_the_session_token_header(self):
+        self.assertIn("X-Guild-Token", self.source)
+
+    def test_never_persists_the_token_in_the_browser(self):
+        for banned in ("localStorage", "sessionStorage", "document.cookie"):
+            with self.subTest(api=banned):
+                self.assertNotIn(banned, self.source)
+
+    def test_asks_for_confirmation_before_dismissing(self):
+        self.assertIn("window.confirm", self.source)
+
+
 class IndexHtmlCspComplianceTests(unittest.TestCase):
     def setUp(self):
         self.source = (_WEB_DIR / "index.html").read_text()
