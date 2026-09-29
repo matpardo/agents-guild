@@ -11,7 +11,7 @@ updated: 2026-09-29
 ## T01 — Shared-area edit guard
 
 **Depends on:** —
-**Status:** [x] done
+**Status:** [x] done — #21
 
 **What:** project `shared_areas` globs and `shared_area_claim_ttl`; `guild hook pre-edit` auto-claims for the editing party and denies areas held by another party, for sessions and subagents alike.
 
