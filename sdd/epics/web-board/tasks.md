@@ -2,7 +2,7 @@
 epic: web-board
 type: tasks
 title: Web view of the guild board
-status: active
+status: done
 updated: 2026-09-28
 ---
 
@@ -32,6 +32,6 @@ updated: 2026-09-28
 ## T04 — Links to PRs and cards
 
 **Depends on:** T03
-**Status:** [ ] pending
+**Status:** [x] done
 
-**What:** PR links to GitHub; card links built from an optional explicit `tracker.browse_url` in the project config (no link when absent).
+**What:** PR `url` (`https://github.com/<repo>/pull/<n>`) and a task's `card_url` render as `<a target="_blank" rel="noopener noreferrer">` links; `card_url` is present only when the task has a tracker key and the project configures `tracker.browse_url` (`browse_url + key`). `tracker.browse_url` is validated when the project config is loaded — it must start with `https://`, otherwise a clear error — and documented in the README's "Project config" section.

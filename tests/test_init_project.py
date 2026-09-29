@@ -30,6 +30,37 @@ class InitProjectTests(GuildTestCase):
         code, out, err = self.run_cli(["init-project", "acme", "--config", str(bad_file)], None, None)
         self.assertEqual(code, 1)
 
+    def test_rejects_tracker_browse_url_without_https(self):
+        config_file = self.root / "acme.json"
+        config_file.write_text(
+            json.dumps(
+                {
+                    "name": "acme",
+                    "paths": ["/tmp/acme/*"],
+                    "github": {"repos": ["acme/app"]},
+                    "tracker": {"browse_url": "http://tracker.example/browse/"},
+                }
+            )
+        )
+        code, out, err = self.run_cli(["init-project", "acme", "--config", str(config_file)], None, None)
+        self.assertEqual(code, 1)
+        self.assertIn("tracker.browse_url", err)
+
+    def test_accepts_tracker_browse_url_with_https(self):
+        config_file = self.root / "acme.json"
+        config_file.write_text(
+            json.dumps(
+                {
+                    "name": "acme",
+                    "paths": ["/tmp/acme/*"],
+                    "github": {"repos": ["acme/app"]},
+                    "tracker": {"browse_url": "https://tracker.example/browse/"},
+                }
+            )
+        )
+        code, out, err = self.run_cli(["init-project", "acme", "--config", str(config_file)], None, None)
+        self.assertEqual(code, 0, err)
+
     def test_rejects_path_traversal_name(self):
         config_file = self.write_project_config("../../tmp/x", ["/tmp/acme/*"], ["acme/app"])
         code, out, err = self.run_cli(

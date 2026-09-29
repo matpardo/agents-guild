@@ -2,7 +2,7 @@
 epic: web-board
 type: spec
 title: Web view of the guild board
-status: active
+status: done
 owner: matpardo
 created: 2026-09-28
 updated: 2026-09-28
@@ -33,8 +33,8 @@ See the guild board, asks and notices in a browser, with a clearer layout than t
 
 ## Success criteria
 
-- [ ] A human finds every open ask and its context without opening a terminal.
-- [ ] The page never executes text coming from agents, SDD, GitHub or the tracker.
+- [x] A human finds every open ask and its context without opening a terminal.
+- [x] The page never executes text coming from agents, SDD, GitHub or the tracker.
 
 ## Security and data
 
