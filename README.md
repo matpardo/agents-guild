@@ -30,8 +30,10 @@ are updated in the same PR as the code.
   for phase 1; guild never writes to it).
 - **task** — a step of an epic, or a step of a no-epic quest. Guild tracks
   its work state (queued/active/blocked/done), not its plan.
-- **raid** — a named channel several parties join for a shared concern.
-  Phase 2, not implemented yet.
+- **raid** — a named channel several parties join for a shared concern (e.g.
+  CI), so a notice can reach exactly that audience. Exists while it has at
+  least one active (non-expired) member; join/leave with `guild raid
+  join|leave`, post to it with `guild notice create ... --to raid:<name>`.
 
 ## Install
 
@@ -82,13 +84,17 @@ guild answer <id> "<text>"
 guild dismiss <id>
 guild asks
 
-guild notice create "<text>" --to project:<name>|guild --ttl <dur> [--until pr:<owner/repo>#<n>:merged|closed]
+guild notice create "<text>" --to project:<name>|guild|raid:<name> --ttl <dur> [--until pr:<owner/repo>#<n>:merged|closed]
 guild notice close <id>
 guild notices
 
 guild claim <area> --ttl <dur>          # area, or task:<epic>/<tid> / task:<quest>/<tid>
 guild release <area>
 guild claims
+
+guild raid join <name> --ttl <dur>      # the caller's bound party joins; joining again refreshes the TTL
+guild raid leave <name>
+guild raids
 
 guild next [--all]     # ranked action queue for the caller's party
 guild handoff --in-flight "..." --learned "..."
@@ -238,6 +244,30 @@ a session that already exists but was never bound (resolves the session id
 via `~/.claude/sessions` by its `/rename` name). It is refused from inside a
 Claude Code session (use the plain form there) and fails clearly when the
 name is not found.
+
+### `guild raid`
+
+A raid is a named channel parties join so a shared concern (CI, a shared
+file) has a deterministic audience: it exists while it has at least one
+active (non-expired) member, there is no separate create command. `guild
+raid join <name> --ttl <dur>` makes the caller's bound party an active
+member; joining again refreshes the TTL. `guild raid leave <name>` removes
+the caller's bound party; leaving when not an active member is a clear
+error. `guild raids` lists every raid with its active members and each
+member's time left. `guild party close` cascades into every raid the
+closing party belongs to, same as claims.
+
+`guild notice create --to raid:<name> ...` is valid only while the raid has
+at least one active member (a clear error otherwise); any bound party, or
+the human, may post to it. A raid notice reaches a session's inbox
+(`prompt-submit`/`post-tool-use`/`brief`) only if that session's bound party
+is an active member of the raid at delivery time — unbound sessions and the
+human terminal never receive raid notices, and the sender's own party never
+gets its own notice back, same as every other notice scope. `guild notice
+targeting` is the single place that resolves whether a notice's `project:`,
+`guild` or `raid:` scope matches the caller. `guild board` shows the raw
+`raid:<name>` scope on a raid notice, and lists each party's raids
+(`raids: ci (5h left)`) at the end of its block.
 
 ### Design note: `notice`
 
@@ -639,8 +669,8 @@ Phase 3 (three-way tracking, in progress): card keys read from a dedicated
 `key_line`, the epic key and status read from `sdd.epic_key_field` and
 `sdd.epic_status_field` frontmatter, the read-only `jira-acli` tracker
 adapter (`guild sync --source tracker`, observed `cards`), the resolver's
-tracker opinion, and the read-only `guild drift` report are done. `raid` is
-still pending.
+tracker opinion, the read-only `guild drift` report, and `raid` (`raid
+join|leave`, `guild raids`, notices scoped `--to raid:<name>`) are done.
 
 **Idle-session wake: no-go (spike, this release).** The design considered
 having a resumed leader auto-spawn (`claude -n ...`) instead of asking a
