@@ -1,4 +1,7 @@
 import json
+import sqlite3
+import statistics
+import subprocess
 import time
 from unittest import mock
 
@@ -418,6 +421,296 @@ class PrePushUnresolvedBranchTests(GuildTestCase):
         )
         self.assertEqual(code, 0)
         self.assertIn("could not determine the branch for this push", out)
+
+
+class PreEditHookTests(GuildTestCase):
+    def _git_init(self, repo_dir):
+        subprocess.run(["git", "init", "-q"], cwd=str(repo_dir), check=True)
+        subprocess.run(["git", "config", "user.email", "t@t.com"], cwd=str(repo_dir), check=True)
+        subprocess.run(["git", "config", "user.name", "t"], cwd=str(repo_dir), check=True)
+        subprocess.run(
+            ["git", "commit", "--allow-empty", "-q", "-m", "init"], cwd=str(repo_dir), check=True
+        )
+
+    def _set_shared_areas(self, project_name, shared_areas, ttl):
+        config_file = self.config_home / "guild" / "projects" / "{}.json".format(project_name)
+        data = json.loads(config_file.read_text())
+        data["shared_areas"] = shared_areas
+        data["shared_area_claim_ttl"] = ttl
+        config_file.write_text(json.dumps(data))
+
+    def _edit_payload(self, session_id, cwd, file_path):
+        return {
+            "session_id": session_id,
+            "cwd": str(cwd),
+            "tool_name": "Edit",
+            "tool_input": {"file_path": str(file_path)},
+        }
+
+    def _last_claim_created_payload(self):
+        conn = sqlite3.connect(str(self.data_home / "guild" / "guild.db"))
+        conn.row_factory = sqlite3.Row
+        row = conn.execute(
+            "SELECT payload FROM events WHERE kind = 'claim.created' ORDER BY seq DESC LIMIT 1"
+        ).fetchone()
+        conn.close()
+        return json.loads(row["payload"])
+
+    def test_allow_when_unbound(self):
+        repo_dir = self.register_project("acme", ["acme/app"])
+        self._git_init(repo_dir)
+        self._set_shared_areas("acme", ["config/routes.rb"], "2h")
+        (repo_dir / "config").mkdir()
+        file_path = repo_dir / "config" / "routes.rb"
+        file_path.write_text("x")
+        code, out, err = self.run_hook("pre-edit", self._edit_payload("sess-1", repo_dir, file_path))
+        self.assertEqual(code, 0)
+        self.assertEqual(out, "")
+
+    def test_allow_when_no_project(self):
+        repo_dir = self.register_project("acme", ["acme/app"])
+        self.run_cli(["party", "start", "alpha"], "sess-1", repo_dir)
+        unrelated_dir = self.root / "unrelated"
+        unrelated_dir.mkdir()
+        file_path = unrelated_dir / "somewhere.txt"
+        file_path.write_text("x")
+        code, out, err = self.run_hook(
+            "pre-edit", self._edit_payload("sess-1", unrelated_dir, file_path)
+        )
+        self.assertEqual(code, 0)
+        self.assertEqual(out, "")
+
+    def test_allow_when_no_shared_areas_configured(self):
+        repo_dir = self.register_project("acme", ["acme/app"])
+        self._git_init(repo_dir)
+        self.run_cli(["party", "start", "alpha"], "sess-1", repo_dir)
+        (repo_dir / "config").mkdir()
+        file_path = repo_dir / "config" / "routes.rb"
+        file_path.write_text("x")
+        code, out, err = self.run_hook("pre-edit", self._edit_payload("sess-1", repo_dir, file_path))
+        self.assertEqual(code, 0)
+        self.assertEqual(out, "")
+
+    def test_allow_when_path_does_not_match_any_area(self):
+        repo_dir = self.register_project("acme", ["acme/app"])
+        self._git_init(repo_dir)
+        self._set_shared_areas("acme", ["config/routes.rb"], "2h")
+        self.run_cli(["party", "start", "alpha"], "sess-1", repo_dir)
+        file_path = repo_dir / "app.rb"
+        file_path.write_text("x")
+        code, out, err = self.run_hook("pre-edit", self._edit_payload("sess-1", repo_dir, file_path))
+        self.assertEqual(code, 0)
+        self.assertEqual(out, "")
+
+    def test_allow_outside_git(self):
+        repo_dir = self.register_project("acme", ["acme/app"])
+        self._set_shared_areas("acme", ["config/routes.rb"], "2h")
+        self.run_cli(["party", "start", "alpha"], "sess-1", repo_dir)
+        (repo_dir / "config").mkdir()
+        file_path = repo_dir / "config" / "routes.rb"
+        file_path.write_text("x")
+        code, out, err = self.run_hook("pre-edit", self._edit_payload("sess-1", repo_dir, file_path))
+        self.assertEqual(code, 0)
+        self.assertEqual(out, "")
+
+    def test_allow_for_other_tools(self):
+        repo_dir = self.register_project("acme", ["acme/app"])
+        self._git_init(repo_dir)
+        self._set_shared_areas("acme", ["config/routes.rb"], "2h")
+        self.run_cli(["party", "start", "alpha"], "sess-1", repo_dir)
+        payload = {
+            "session_id": "sess-1",
+            "cwd": str(repo_dir),
+            "tool_name": "Bash",
+            "tool_input": {"command": "ls"},
+        }
+        code, out, err = self.run_hook("pre-edit", payload)
+        self.assertEqual(code, 0)
+        self.assertEqual(out, "")
+
+    def test_allow_when_no_file_path(self):
+        repo_dir = self.register_project("acme", ["acme/app"])
+        self._git_init(repo_dir)
+        self._set_shared_areas("acme", ["config/routes.rb"], "2h")
+        self.run_cli(["party", "start", "alpha"], "sess-1", repo_dir)
+        payload = {"session_id": "sess-1", "cwd": str(repo_dir), "tool_name": "Edit", "tool_input": {}}
+        code, out, err = self.run_hook("pre-edit", payload)
+        self.assertEqual(code, 0)
+        self.assertEqual(out, "")
+
+    def test_auto_claims_and_refreshes(self):
+        repo_dir = self.register_project("acme", ["acme/app"])
+        self._git_init(repo_dir)
+        self._set_shared_areas("acme", ["config/routes.rb"], "2h")
+        self.run_cli(["party", "start", "alpha"], "sess-1", repo_dir)
+        (repo_dir / "config").mkdir()
+        file_path = repo_dir / "config" / "routes.rb"
+        file_path.write_text("x")
+        payload = self._edit_payload("sess-1", repo_dir, file_path)
+
+        code, out, err = self.run_hook("pre-edit", payload)
+        self.assertEqual(code, 0)
+        self.assertEqual(out, "")
+        code, out, err = self.run_cli(["claims"], "sess-1", repo_dir)
+        self.assertIn("area:config/routes.rb — alpha", out)
+
+        code, out, err = self.run_hook("pre-edit", payload)
+        self.assertEqual(code, 0)
+        self.assertEqual(out, "")
+
+    def test_deny_when_another_party_holds_claim_without_raid(self):
+        repo_dir = self.register_project("acme", ["acme/app"])
+        self._git_init(repo_dir)
+        self._set_shared_areas("acme", ["config/routes.rb"], "2h")
+        self.run_cli(["party", "start", "alpha"], "sess-1", repo_dir)
+        self.run_cli(["party", "start", "beta"], "sess-2", repo_dir)
+        (repo_dir / "config").mkdir()
+        file_path = repo_dir / "config" / "routes.rb"
+        file_path.write_text("x")
+
+        code, out, err = self.run_hook("pre-edit", self._edit_payload("sess-1", repo_dir, file_path))
+        self.assertEqual(out, "")
+
+        code, out, err = self.run_hook("pre-edit", self._edit_payload("sess-2", repo_dir, file_path))
+        self.assertEqual(code, 0)
+        payload = json.loads(out)
+        output = payload["hookSpecificOutput"]
+        self.assertEqual(output["hookEventName"], "PreToolUse")
+        self.assertEqual(output["permissionDecision"], "deny")
+        reason = output["permissionDecisionReason"]
+        self.assertIn("alpha", reason)
+        self.assertIn("config/routes.rb", reason)
+        self.assertNotIn("raid", reason)
+
+    def test_deny_mentions_raid_when_caller_is_a_member(self):
+        repo_dir = self.register_project("acme", ["acme/app"])
+        self._git_init(repo_dir)
+        self._set_shared_areas("acme", ["config/routes.rb"], "2h")
+        self.run_cli(["party", "start", "alpha"], "sess-1", repo_dir)
+        self.run_cli(["party", "start", "beta"], "sess-2", repo_dir)
+        self.run_cli(["raid", "join", "epic-alpha", "--ttl", "2h"], "sess-2", repo_dir)
+        (repo_dir / "config").mkdir()
+        file_path = repo_dir / "config" / "routes.rb"
+        file_path.write_text("x")
+
+        self.run_hook("pre-edit", self._edit_payload("sess-1", repo_dir, file_path))
+        code, out, err = self.run_hook("pre-edit", self._edit_payload("sess-2", repo_dir, file_path))
+        reason = json.loads(out)["hookSpecificOutput"]["permissionDecisionReason"]
+        self.assertIn("epic-alpha", reason)
+        self.assertIn("guild notice --to raid:epic-alpha", reason)
+
+    def test_worktree_path_resolves_to_same_relative_path(self):
+        repo_dir = self.register_project("acme", ["acme/app"])
+        self._git_init(repo_dir)
+        self._set_shared_areas("acme", ["config/routes.rb"], "2h")
+        self.run_cli(["party", "start", "alpha"], "sess-1", repo_dir)
+        self.run_cli(["party", "start", "beta"], "sess-2", repo_dir)
+
+        worktree_dir = repo_dir.parent / "worktree"
+        subprocess.run(
+            ["git", "worktree", "add", "-q", str(worktree_dir), "-b", "wt-branch"],
+            cwd=str(repo_dir), check=True,
+        )
+        (worktree_dir / "config").mkdir()
+        file_in_worktree = worktree_dir / "config" / "routes.rb"
+        file_in_worktree.write_text("wt")
+
+        code, out, err = self.run_hook(
+            "pre-edit", self._edit_payload("sess-1", worktree_dir, file_in_worktree)
+        )
+        self.assertEqual(out, "")
+
+        (repo_dir / "config").mkdir()
+        file_in_main = repo_dir / "config" / "routes.rb"
+        file_in_main.write_text("main")
+        code, out, err = self.run_hook("pre-edit", self._edit_payload("sess-2", repo_dir, file_in_main))
+        reason = json.loads(out)["hookSpecificOutput"]["permissionDecisionReason"]
+        self.assertIn("alpha", reason)
+
+    def test_notebook_edit_uses_notebook_path(self):
+        repo_dir = self.register_project("acme", ["acme/app"])
+        self._git_init(repo_dir)
+        self._set_shared_areas("acme", ["notebooks/*.ipynb"], "2h")
+        self.run_cli(["party", "start", "alpha"], "sess-1", repo_dir)
+        (repo_dir / "notebooks").mkdir()
+        notebook_path = repo_dir / "notebooks" / "explore.ipynb"
+        notebook_path.write_text("{}")
+        payload = {
+            "session_id": "sess-1",
+            "cwd": str(repo_dir),
+            "tool_name": "NotebookEdit",
+            "tool_input": {"notebook_path": str(notebook_path)},
+        }
+        code, out, err = self.run_hook("pre-edit", payload)
+        self.assertEqual(code, 0)
+        self.assertEqual(out, "")
+        code, out, err = self.run_cli(["claims"], "sess-1", repo_dir)
+        self.assertIn("area:notebooks/*.ipynb — alpha", out)
+
+    def test_write_to_new_file_in_new_subdirectory(self):
+        repo_dir = self.register_project("acme", ["acme/app"])
+        self._git_init(repo_dir)
+        self._set_shared_areas("acme", ["db/migrate/*"], "2h")
+        self.run_cli(["party", "start", "alpha"], "sess-1", repo_dir)
+        new_file = repo_dir / "db" / "migrate" / "003_new.rb"
+        payload = {
+            "session_id": "sess-1",
+            "cwd": str(repo_dir),
+            "tool_name": "Write",
+            "tool_input": {"file_path": str(new_file)},
+        }
+        code, out, err = self.run_hook("pre-edit", payload)
+        self.assertEqual(code, 0)
+        self.assertEqual(out, "")
+        code, out, err = self.run_cli(["claims"], "sess-1", repo_dir)
+        self.assertIn("area:db/migrate/* — alpha", out)
+
+    def test_subagent_payload_behaves_like_parent(self):
+        repo_dir = self.register_project("acme", ["acme/app"])
+        self._git_init(repo_dir)
+        self._set_shared_areas("acme", ["config/routes.rb"], "2h")
+        self.run_cli(["party", "start", "alpha"], "sess-1", repo_dir)
+        (repo_dir / "config").mkdir()
+        file_path = repo_dir / "config" / "routes.rb"
+        file_path.write_text("x")
+        payload = self._edit_payload("sess-1", repo_dir, file_path)
+        payload["agent_id"] = "agent-123"
+        payload["agent_type"] = "coder"
+
+        code, out, err = self.run_hook("pre-edit", payload)
+        self.assertEqual(code, 0)
+        self.assertEqual(out, "")
+
+        claim_payload = self._last_claim_created_payload()
+        self.assertEqual(claim_payload["party"], "alpha")
+        self.assertEqual(claim_payload["claimed_by_agent"], "coder")
+
+    def test_error_containment(self):
+        repo_dir = self.register_project("acme", ["acme/app"])
+        with mock.patch("guild.commands.hook.pre_edit", side_effect=RuntimeError("boom")):
+            code, out, err = self.run_hook(
+                "pre-edit", self._edit_payload("sess-1", repo_dir, repo_dir / "x.txt")
+            )
+        self.assertEqual(code, 0)
+        self.assertIn("guild hook error: boom", out)
+
+    def test_latency_median_under_100ms(self):
+        repo_dir = self.register_project("acme", ["acme/app"])
+        self._git_init(repo_dir)
+        self._set_shared_areas("acme", ["config/routes.rb"], "2h")
+        self.run_cli(["party", "start", "alpha"], "sess-1", repo_dir)
+        (repo_dir / "config").mkdir()
+        file_path = repo_dir / "config" / "routes.rb"
+        file_path.write_text("x")
+        payload = self._edit_payload("sess-1", repo_dir, file_path)
+
+        durations_ms = []
+        for _ in range(10):
+            started = time.monotonic()
+            self.run_hook("pre-edit", payload)
+            durations_ms.append((time.monotonic() - started) * 1000)
+        median_ms = statistics.median(durations_ms)
+        self.assertLess(median_ms, 100, "pre-edit hook median took {:.1f}ms".format(median_ms))
 
 
 if __name__ == "__main__":
