@@ -246,16 +246,35 @@
       details.appendChild(textEl("p", "claims: " + claimsText));
     }
 
-    if (party.raids.length > 0) {
-      var raidsText = party.raids
-        .map(function (raid) {
-          return raid.raid;
-        })
-        .join(", ");
-      details.appendChild(textEl("p", "raids: " + raidsText));
+    var raidsList = renderRaidMembershipList(party.raids);
+    if (raidsList) {
+      details.appendChild(textEl("h4", "raids"));
+      details.appendChild(raidsList);
     }
 
     return details;
+  }
+
+  function renderRaidMembership(raid) {
+    var item = el("li");
+    item.className = "raid";
+    item.appendChild(textEl("span", raid.raid));
+    if (raid.lead) {
+      var badge = textEl("span", "lead");
+      badge.className = "badge";
+      item.appendChild(badge);
+    }
+    return item;
+  }
+
+  function renderRaidMembershipList(raids) {
+    if (raids.length === 0) {
+      return null;
+    }
+    var list = el("ul");
+    list.className = "raid-list";
+    appendAll(list, raids.map(renderRaidMembership));
+    return list;
   }
 
   function renderParties(parties) {

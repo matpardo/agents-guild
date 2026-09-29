@@ -212,7 +212,7 @@ def _handle_claims(ctx, args):
 def _handle_raid_join(ctx, args):
     from guild.commands import raid as raid_commands
 
-    _print(raid_commands.join(ctx, args.name, args.ttl, args.until_leave))
+    _print(raid_commands.join(ctx, args.name, args.ttl, args.until_leave, args.lead))
     return 0
 
 
@@ -429,6 +429,7 @@ def _add_raid_parser(subparsers):
     join_mode = join.add_mutually_exclusive_group(required=True)
     join_mode.add_argument("--ttl")
     join_mode.add_argument("--until-leave", action="store_true")
+    join.add_argument("--lead", action="store_true")
     join.set_defaults(handler=_handle_raid_join)
 
     leave = actions.add_parser("leave")

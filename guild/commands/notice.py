@@ -18,8 +18,7 @@ def _validate_scope(ctx, to):
     if to.startswith(_RAID_SCOPE_PREFIX):
         raid_name = to[len(_RAID_SCOPE_PREFIX):]
         names.validate_name(raid_name, "raid name")
-        if not raid_commands.active_members(ctx.conn, ctx.now, raid_name):
-            raise GuildError("raid '{}' has no active members".format(raid_name), 1)
+        raid_commands.require_active_raid(ctx.conn, ctx.now, raid_name)
         return
     raise GuildError(
         "invalid --to '{}': expected project:<name>, raid:<name> or guild".format(to), 1

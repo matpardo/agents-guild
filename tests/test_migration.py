@@ -128,8 +128,28 @@ class MigrationTests(GuildTestCase):
         raid_members_columns = {
             row["name"] for row in conn.execute("PRAGMA table_info(raid_members)").fetchall()
         }
-        self.assertEqual(raid_members_columns, {"raid", "party", "expires_at"})
+        self.assertEqual(raid_members_columns, {"raid", "party", "expires_at", "lead"})
         self.assertEqual(conn.execute("SELECT COUNT(*) AS n FROM raid_members").fetchone()["n"], 0)
+
+    def test_old_raid_members_table_gains_lead_column(self):
+        db_path = self.data_home / "guild.db"
+        legacy = sqlite3.connect(str(db_path))
+        legacy.execute(
+            "CREATE TABLE raid_members (raid TEXT NOT NULL, party TEXT NOT NULL,"
+            " expires_at TEXT, PRIMARY KEY (raid, party))"
+        )
+        legacy.execute("INSERT INTO raid_members VALUES ('ci', 'alpha', NULL)")
+        legacy.commit()
+        legacy.close()
+
+        conn = db.connect(db_path)
+
+        raid_members_columns = {
+            row["name"] for row in conn.execute("PRAGMA table_info(raid_members)").fetchall()
+        }
+        self.assertIn("lead", raid_members_columns)
+        row = conn.execute("SELECT * FROM raid_members WHERE raid = 'ci' AND party = 'alpha'").fetchone()
+        self.assertIsNone(row["lead"])
 
     def test_not_null_raid_expiry_is_relaxed_and_rows_kept(self):
         db_path = self.data_home / "guild.db"
@@ -151,7 +171,7 @@ class MigrationTests(GuildTestCase):
         self.assertEqual(expiry["notnull"], 0)
         rows = conn.execute("SELECT raid, party, expires_at FROM raid_members").fetchall()
         self.assertEqual([tuple(row) for row in rows], [("ci", "alpha", "2099-01-01T00:00:00+00:00")])
-        conn.execute("INSERT INTO raid_members VALUES ('ci', 'beta', NULL)")
+        conn.execute("INSERT INTO raid_members (raid, party, expires_at) VALUES ('ci', 'beta', NULL)")
 
     def test_rebuild_works_after_migration(self):
         db_path = self.data_home / "guild.db"

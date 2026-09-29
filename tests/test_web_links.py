@@ -20,5 +20,14 @@ class PrAndCardLinkRenderingTests(unittest.TestCase):
         self.assertIn("link(task.card_url,", self.source)
 
 
+class RaidLeadBadgeTests(unittest.TestCase):
+    def setUp(self):
+        self.source = (_WEB_DIR / "app.js").read_text()
+
+    def test_raid_membership_shows_lead_badge_when_lead(self):
+        self.assertIn("if (raid.lead) {", self.source)
+        self.assertIn('badge.className = "badge"', self.source)
+
+
 if __name__ == "__main__":
     unittest.main()

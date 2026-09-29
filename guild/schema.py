@@ -18,6 +18,7 @@ _RAID_MEMBERS_TABLE = """
         raid TEXT NOT NULL,
         party TEXT NOT NULL,
         expires_at TEXT,
+        lead INTEGER,
         PRIMARY KEY (raid, party)
     )
     """
@@ -184,6 +185,7 @@ _COLUMN_MIGRATIONS = (
     ("prs", "last_notified_comment_count", "INTEGER"),
     ("prs", "last_activity_at", "TEXT"),
     ("notices", "announces", "TEXT"),
+    ("raid_members", "lead", "INTEGER"),
 )
 
 

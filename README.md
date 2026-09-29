@@ -95,6 +95,7 @@ guild claims
 
 guild raid join <name> --ttl <dur>      # the caller's bound party joins; joining again refreshes the TTL
 guild raid join <name> --until-leave    # joins with no expiry; ends only on `raid leave` or `party close`
+guild raid join <name> (--ttl <dur> | --until-leave) --lead  # also becomes the raid's lead
 guild raid leave <name>
 guild raids
 
@@ -275,7 +276,8 @@ refs, how many refs still block it, a collapsible context), active notices,
 drift findings for the default scope (grouped by rule, one block per
 project resolved from the parties shown, skipping parties without a
 project), then one collapsible block per party with its quests, tasks and
-PRs, plus PRs outside active tasks, raids and claims. A party filter and a
+PRs, plus PRs outside active tasks, raids (each with a `lead` badge when
+that membership is the raid's lead) and claims. A party filter and a
 state filter (`all`/`needs-human`/`converging`/`ready`/`draft`/`merged`)
 narrow what is shown; the page re-fetches `/api/board` every 15 seconds,
 keeping the current filters and which blocks are collapsed. PR links open
@@ -368,6 +370,31 @@ targeting` is the single place that resolves whether a notice's `project:`,
 `guild` or `raid:` scope matches the caller. `guild board` shows the raw
 `raid:<name>` scope on a raid notice, and lists each party's raids
 (`raids: ci (5h left)`) at the end of its block.
+
+### Raid lead
+
+`guild raid join <name> (--ttl <dur> | --until-leave) --lead` makes the
+caller's bound party the raid's lead. At most one lead per raid: a second
+party's `--lead` join fails, naming the current lead
+(`raid '<name>' already has a lead: party '<party>'`), while that lead is
+still an active member. The same party re-joining with `--lead` is always
+fine, and a plain renewal (no `--lead`) of an already-lead party keeps its
+lead status — only the lead leaving (`raid leave`), its party closing, or
+its membership expiring clears the raid's lead, after which the next
+`--lead` join succeeds. The lead is shown everywhere raid membership is
+shown: `guild raids` (`alpha (lead, 5h left)`), `guild board`'s party block
+(`raids: ci (lead, until leave)`), `guild web`'s per-party raid list (a
+`lead` badge), and every member's session-start brief
+(`raid ci — lead: alpha`).
+
+When a party that belongs to a raid creates an ask, the lead of each such
+raid (if any, and not the asker) receives it once in its inbox
+(`prompt-submit`/`post-tool-use`), framed the same way as other
+cross-session messages: `- ask #N from <party> (raid <name>): "<question>"`.
+The ask still goes to the human queue as always. `guild answer` is not
+restricted to the human terminal — any bound session, including the raid
+lead, may answer an ask and the answer reaches the asker through the normal
+inbox path.
 
 ### No overlapping task lists
 

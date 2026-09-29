@@ -39,7 +39,7 @@ updated: 2026-09-29
 ## T05 — Raid lead
 
 **Depends on:** T03
-**Status:** [ ] pending
+**Status:** [x] done
 
 **What:** `raid join --lead`, one lead per raid, shown in raids, board, web and briefs; members' new asks reach the lead's inbox.
 

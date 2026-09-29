@@ -45,6 +45,16 @@ def new_lines(ctx, binding):
                 lines.append(
                     notice.format_notice_line(payload["id"], payload["party"], payload["text"])
                 )
+        elif event["kind"] == "ask.created" and caller_party is not None and payload["party"] != caller_party:
+            question = sanitize.collapse_to_single_line(payload["question"])
+            for raid_name in raid_commands.raid_names_led_by_for_member(
+                ctx.conn, ctx.now, caller_party, payload["party"]
+            ):
+                lines.append(
+                    '- ask #{} from {} (raid {}): "{}"'.format(
+                        payload["id"], payload["party"], raid_name, question
+                    )
+                )
         elif event["kind"] in ("ask.answered", "ask.dismissed") and caller_party is not None:
             ask_row = ctx.conn.execute(
                 "SELECT party FROM asks WHERE id = ?", (payload["id"],)

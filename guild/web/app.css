@@ -155,6 +155,29 @@ li.pr {
   padding: 0.15rem 0;
 }
 
+ul.raid-list {
+  list-style: none;
+  margin: 0.25rem 0;
+  padding-left: 0.75rem;
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+li.raid {
+  display: flex;
+  gap: 0.35rem;
+  align-items: baseline;
+}
+
+.badge {
+  background: var(--accent);
+  color: var(--card-bg);
+  border-radius: 3px;
+  padding: 0 0.35rem;
+  font-size: 0.75rem;
+}
+
 a {
   color: var(--accent);
 }

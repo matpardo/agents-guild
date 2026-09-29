@@ -154,6 +154,8 @@ class BoardModelShapeTests(BoardModelTestCase):
         self.assertEqual(party["claims"][0]["area"], "src/x")
         self.assertEqual(len(party["raids"]), 1)
         self.assertEqual(party["raids"][0]["raid"], "ci")
+        self.assertEqual(set(party["raids"][0]), {"raid", "expires_at", "lead"})
+        self.assertFalse(party["raids"][0]["lead"])
 
     def test_drift_shape_for_projects_in_scope(self):
         ctx = self._ctx()

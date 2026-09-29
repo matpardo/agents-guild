@@ -332,9 +332,9 @@ def _claim_released(conn, event):
 def _raid_joined(conn, event):
     payload = event["payload"]
     conn.execute(
-        "INSERT INTO raid_members (raid, party, expires_at) VALUES (?, ?, ?)"
-        " ON CONFLICT(raid, party) DO UPDATE SET expires_at = excluded.expires_at",
-        (payload["raid"], payload["party"], payload["expires_at"]),
+        "INSERT INTO raid_members (raid, party, expires_at, lead) VALUES (?, ?, ?, ?)"
+        " ON CONFLICT(raid, party) DO UPDATE SET expires_at = excluded.expires_at, lead = excluded.lead",
+        (payload["raid"], payload["party"], payload["expires_at"], 1 if payload.get("lead") else 0),
     )
 
 

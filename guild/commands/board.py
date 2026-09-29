@@ -353,7 +353,7 @@ def _party_section(ctx, painter, party_row):
     raids = raid_commands.member_raids(ctx.conn, ctx.now, party_row["name"])
     if raids:
         raid_text = ", ".join(
-            "{} ({})".format(row["raid"], timeutil.membership_left_label(ctx.now, row["expires_at"]))
+            "{} ({})".format(row["raid"], raid_commands.membership_label(ctx.now, row))
             for row in raids
         )
         lines.append(painter.paint("  raids: {}".format(raid_text), "dim"))
@@ -494,7 +494,10 @@ def _party_model(ctx, party_row, project_config):
         "leader_session_name": _leader_session_name(ctx.conn, party_row["name"]),
         "quests": quest_models,
         "prs": [_pr_model(pr_row) for pr_row in orphan_prs],
-        "raids": [{"raid": row["raid"], "expires_at": row["expires_at"]} for row in raids],
+        "raids": [
+            {"raid": row["raid"], "expires_at": row["expires_at"], "lead": bool(row["lead"])}
+            for row in raids
+        ],
         "claims": [{"area": row["area"], "expires_at": row["expires_at"]} for row in claims],
     }
 

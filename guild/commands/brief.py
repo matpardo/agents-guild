@@ -51,8 +51,13 @@ def render_brief(ctx):
     ).fetchone()["n"]
     lines.append("open asks: {} mine, {} total".format(my_open_asks, total_open_asks))
 
-    raid_member_of = raid_commands.member_raid_names(ctx.conn, ctx.now, binding["party"])
+    raids = raid_commands.member_raids(ctx.conn, ctx.now, binding["party"])
+    raid_member_of = {row["raid"] for row in raids}
     lines.extend(_targeting_lines(active, binding["project"], raid_member_of))
+    for raid_row in raids:
+        lead_row = raid_commands.active_lead(ctx.conn, ctx.now, raid_row["raid"])
+        if lead_row is not None:
+            lines.append("raid {} — lead: {}".format(raid_row["raid"], lead_row["party"]))
 
     claims = [row for row in claim_commands.list_claims(ctx.conn, ctx.now) if row["party"] == binding["party"]]
     for claim_row in claims:
