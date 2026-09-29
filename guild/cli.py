@@ -308,6 +308,12 @@ def _handle_export(ctx, args):
     return 0
 
 
+def _handle_web(ctx, args):
+    from guild.commands import web as web_commands
+
+    return web_commands.run(args.port)
+
+
 def _add_party_parser(subparsers):
     parser = subparsers.add_parser("party")
     actions = parser.add_subparsers(dest="party_action", required=True)
@@ -524,6 +530,10 @@ def build_parser():
     export = subparsers.add_parser("export")
     export.add_argument("--visibility", required=True, choices=["guild"])
     export.set_defaults(handler=_handle_export)
+
+    web = subparsers.add_parser("web")
+    web.add_argument("--port", type=int, required=True)
+    web.set_defaults(handler=_handle_web)
 
     return parser
 

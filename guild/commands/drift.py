@@ -252,6 +252,13 @@ def _render(groups):
     return lines
 
 
+def board_findings(ctx, project):
+    epics, party_states, scope_line = _resolve_scope(ctx.conn, project, None, False)
+    groups = _collect(ctx.conn, project, epics, party_states, ctx.sessions_dir)
+    findings = {name: rule_findings for name, rule_findings in groups if rule_findings}
+    return {"project": project, "scope": scope_line, "findings": findings}
+
+
 def _resolve_scope(conn, project, epic, all_scope):
     if all_scope:
         return None, None, "scope: whole project"

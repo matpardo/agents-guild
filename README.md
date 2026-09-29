@@ -100,6 +100,7 @@ guild next [--all]     # ranked action queue for the caller's party
 guild handoff --in-flight "..." --learned "..."
 
 guild board [--party <name>]
+guild web --port <n>
 guild sync --source gh|sdd|tracker
 guild drift [--epic <slug> | --all]
 guild brief
@@ -223,6 +224,46 @@ naming the refs and what each source says:
 
 The last line is `N findings` or `no drift`. `guild drift` never writes to
 SDD or the tracker: fixing drift stays with humans and the normal skills.
+
+### `guild web`
+
+`guild web --port <n>` serves the same board in a browser, with more room
+than a terminal for filtering, collapsing and linking out. `--port` is
+required; pass `--port 0` to let the OS pick a free port. It always prints
+the real, resolved URL before serving:
+
+```
+guild web: http://127.0.0.1:<port>/
+```
+
+**What it shows**, in this order: open asks (question, party, options,
+refs, how many refs still block it, a collapsible context), active notices,
+drift findings for the default scope (grouped by rule, one block per
+project resolved from the parties shown, skipping parties without a
+project), then one collapsible block per party with its quests, tasks and
+PRs, plus PRs outside active tasks, raids and claims. A party filter and a
+state filter (`all`/`needs-human`/`converging`/`ready`/`draft`/`merged`)
+narrow what is shown; the page re-fetches `/api/board` every 15 seconds,
+keeping the current filters and which blocks are collapsed. PR links open
+`https://github.com/<repo>/pull/<n>` in a new tab; a task also links to its
+tracker card when the project configures `tracker.browse_url` (see
+"Project config").
+
+**Security model**: the server binds to `127.0.0.1` only, on the stdlib's
+`http.server.ThreadingHTTPServer` — no third-party dependency, no build
+step. It is read-only: every route is `GET`, anything else is `405`.
+Requests whose `Host` header is not exactly `127.0.0.1:<port>` or
+`localhost:<port>` get `421`, which blocks DNS rebinding from a page on
+another origin. Every response carries a strict `Content-Security-Policy`
+(`default-src 'self'`, no inline or third-party scripts, no external
+assets), `X-Content-Type-Options: nosniff` and `Referrer-Policy:
+no-referrer`; `/api/*` additionally sends `Cache-Control: no-store`. The
+page (`guild/web/app.js`) builds every node with `document.createElement`
+and sets text with `textContent` only — it never uses `innerHTML` or any
+HTML-injecting API, so text coming from agents, SDD, GitHub or the tracker
+is never executed. `guild web` never writes to the database and logs no
+per-request access noise to stderr (server errors still do). Ctrl-C exits
+cleanly.
 
 ### `guild handoff` and resuming a party
 
@@ -349,7 +390,7 @@ against path traversal, not an identity boundary.
     "epic_key_field": "jira",
     "epic_status_field": "status"
   },
-  "tracker": {"kind": "jira-acli"},
+  "tracker": {"kind": "jira-acli", "browse_url": "https://acme.atlassian.net/browse/"},
   "next": {"stale_hours": 8},
   "handoff_threshold": 80
 }
@@ -391,6 +432,12 @@ against path traversal, not an identity boundary.
 - `tracker` (optional): drives `guild sync --source tracker`. `kind` is
   required when this block exists; only `"jira-acli"` is supported today,
   anything else is a clear error. See "Tracker sync" below.
+  - `browse_url` (optional, explicit — no hidden default): the base URL
+    `guild web` prepends to a task's tracker key to build its card link
+    (`browse_url + key`, e.g. `https://acme.atlassian.net/browse/DEMO-1`).
+    Validated when the config is loaded: it must start with `https://`,
+    otherwise `guild init-project`/every command that loads the project
+    fails with a clear error. Absent → tasks never carry a `card_url`.
 - `next.stale_hours` (optional): threshold for `guild next` tier 3
   (`converging` PR with no activity). Absent → that tier is skipped, never
   defaulted.
