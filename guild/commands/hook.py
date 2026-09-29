@@ -401,19 +401,19 @@ def _shared_area_deny_reason(ctx, binding, holder_party, holder_expires_at, matc
     )
 
 
-def _claim_shared_area_or_deny(ctx, binding, project, project_data, matched_glob, agent_type):
-    claim_key = "area:{}".format(matched_glob)
+def _foreign_holder_reason(ctx, binding, project, matched_glob):
     row = ctx.conn.execute(
         "SELECT party, expires_at FROM claims WHERE project = ? AND area = ?",
-        (project, claim_key),
+        (project, "area:{}".format(matched_glob)),
     ).fetchone()
-    held_by_other_party = (
-        row is not None
-        and not timeutil.is_expired(ctx.now, row["expires_at"])
-        and row["party"] != binding["party"]
-    )
-    if held_by_other_party:
-        reason = _shared_area_deny_reason(ctx, binding, row["party"], row["expires_at"], matched_glob)
+    if row is None or timeutil.is_expired(ctx.now, row["expires_at"]) or row["party"] == binding["party"]:
+        return None
+    return _shared_area_deny_reason(ctx, binding, row["party"], row["expires_at"], matched_glob)
+
+
+def _claim_shared_area_or_deny(ctx, binding, project, project_data, matched_glob, agent_type):
+    reason = _foreign_holder_reason(ctx, binding, project, matched_glob)
+    if reason is not None:
         return {
             "hookSpecificOutput": {
                 "hookEventName": "PreToolUse",
@@ -421,8 +421,7 @@ def _claim_shared_area_or_deny(ctx, binding, project, project_data, matched_glob
                 "permissionDecisionReason": reason,
             }
         }
-    ttl = project_data["shared_area_claim_ttl"]
-    claim_commands.claim(ctx, claim_key, ttl, agent_type)
+    claim_commands.claim(ctx, "area:{}".format(matched_glob), project_data["shared_area_claim_ttl"], agent_type)
     return None
 
 
@@ -448,3 +447,40 @@ def pre_edit(ctx, tool_name, tool_input, agent_type):
     if matched_glob is None:
         return None
     return _claim_shared_area_or_deny(ctx, binding, project, project_data, matched_glob, agent_type)
+
+
+def staged_paths(cwd):
+    result = subprocess.run(
+        ["git", "-C", str(cwd), "diff", "--cached", "--name-only"],
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode != 0:
+        return []
+    return [line for line in result.stdout.splitlines() if line]
+
+
+def pre_commit(ctx, paths_in_commit):
+    binding = identity.resolve_binding(ctx.conn, ctx.session_id)
+    if binding is None:
+        return []
+    project = config.resolve_project(ctx.cwd, config.load_all_projects(ctx.projects_dir))
+    if project is None:
+        return []
+    project_data = config.load_project(ctx.projects_dir, project)
+    shared_areas = project_data.get("shared_areas")
+    if not shared_areas:
+        return []
+    matched_globs = sorted(
+        {glob for glob in (_matching_shared_area(path, shared_areas) for path in paths_in_commit) if glob}
+    )
+    reasons = [
+        reason
+        for reason in (_foreign_holder_reason(ctx, binding, project, glob) for glob in matched_globs)
+        if reason is not None
+    ]
+    if reasons:
+        return reasons
+    for glob in matched_globs:
+        claim_commands.claim(ctx, "area:{}".format(glob), project_data["shared_area_claim_ttl"], None)
+    return []
