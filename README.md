@@ -55,7 +55,19 @@ git worktree add --detach ../agents-guild-live main
 git -C ../agents-guild-live fetch && git -C ../agents-guild-live checkout --detach origin/main
 ```
 
-The last line is the update step, after each merge.
+After each merge, update the installed worktree with one command:
+
+```
+./update.sh ../agents-guild-live
+```
+
+It refuses if the installed worktree has local changes, moves it to
+`origin/main`, lists the commits it brought, re-runs `install.sh` and runs
+`guild doctor`. It never edits `~/.claude/settings.json` or project configs.
+
+`guild doctor` checks, read-only, that every guild hook is wired in
+`~/.claude/settings.json`, that `~/.claude/GUILD.md` exists and that every
+project config loads; it exits 1 and names what is missing.
 
 ## Commands
 

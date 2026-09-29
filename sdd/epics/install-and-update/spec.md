@@ -2,7 +2,7 @@
 epic: install-and-update
 type: spec
 title: Versioned install and self-update
-status: draft
+status: active
 owner: matpardo
 created: 2026-09-29
 updated: 2026-09-29
