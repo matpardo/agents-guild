@@ -187,6 +187,38 @@ language without a configured list. No opinion anywhere → not done, never
 assumed done. When more than one source has an opinion and they disagree,
 the disagreement is returned and surfaced by `guild next`.
 
+### Merge notices (`sync --source gh`)
+
+When `guild sync --source gh` observes a tracked PR whose lifecycle flips to
+`merged` during that sync (it was not `merged` before — a PR already merged
+at `pr track` time does not count, since `pr track` never inspects
+`mergedAt`), it posts one notice per raid the PR's owning party is currently
+an active member of. The notice's author is the owning party, so the owner
+never receives its own notice back while every other member does (same rule
+as every other notice). The notice's TTL is a fixed 12h and its text is:
+
+```
+<repo>#<n> merged in main (<quest>/<tid>: <what>). Parties with open branches: rebase.
+```
+
+If the project config has a `shared_areas` key (globs relative to the repo
+root, matched with `fnmatch`) and the owning party is in at least one raid,
+`sync` makes one extra `gh pr view --json files` call to list the PR's
+changed files; any glob one of them matches is appended as
+`Shared areas touched: <glob1>, <glob2>`. If that extra call fails, the
+notice still posts without the shared-areas line, and the failure is
+reported the same way any other `gh` failure is — as a sync failure, so the
+command's exit code is non-zero. A PR whose owning party is in no raid gets
+no notice, same as today. The merge is announced at most once, ever: the
+notice payload carries `announces: pr:<repo>#<n>`, and `sync` skips posting
+if a notice (active or not) with that `announces` value already exists —
+safe across a re-sync or a `rebuild` followed by a `sync`.
+
+`guild` has no daemon, so this only fires when someone runs the sync. A raid
+lead should keep a watcher running for the duration of the raid, e.g.
+`watch -n 300 guild sync --source gh` from a terminal, or `/loop 5m guild
+sync --source gh` from a session that supports it.
+
 ### `guild drift`
 
 `guild drift [--epic <slug> | --all]` reports, for the project resolved from
