@@ -25,7 +25,7 @@ Every document under `epics/` starts with a YAML frontmatter block. It is the si
 - `epic` equals the directory name; `type` equals the file name (`spec`, `tasks`, `discovery`).
 - `tasks.md` and `discovery.md` inherit `status` and `title` from their `spec.md`.
 - `updated` >= `created`. Update `updated` whenever you edit a document.
-- `status`: `draft` (registered, not prioritized) | `active` | `done` | `archived`.
+- `status`: `active` | `done` | `archived`. There is no `draft`: specs are always true, so an epic enters `sdd/` only when work on it starts. Ideas that have not started live as GitHub issues.
 
 `tests/test_sdd_docs.py` enforces these rules and checks that every `tasks.md` parses with guild's own SDD adapter, so a broken spec fails the test suite like broken code.
 
@@ -70,5 +70,5 @@ Register this repo as a guild project; point `sdd.root` at the checkout that fol
 ## Conventions
 
 - English content; epic slugs in kebab-case describing the goal.
-- An epic moves `draft` → `active` when it is prioritized and its `tasks.md` exists; → `done` when every task is done.
+- An epic is created `active`, with its `tasks.md`, in the PR that starts the work; it moves to `done` when every task is done.
 - Decisions scoped to one epic go in its `discovery.md` under `## Decisions`; decisions with global impact go in `decisions/`.

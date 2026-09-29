@@ -6,7 +6,7 @@ from guild.adapters import sdd
 
 _SDD_ROOT = Path(__file__).resolve().parent.parent / "sdd"
 _EPICS_DIR = _SDD_ROOT / "epics"
-_STATUSES = {"draft", "active", "done", "archived"}
+_STATUSES = {"active", "done", "archived"}
 _SPEC_KEYS = {"epic", "type", "title", "status", "owner", "created", "updated"}
 _CHILD_KEYS = {"epic", "type", "title", "status", "updated"}
 _PATTERNS = {

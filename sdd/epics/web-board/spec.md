@@ -28,7 +28,7 @@ See the guild board, asks and notices in a browser, with a clearer layout than t
 ## Out of scope
 
 - Writing from the page (answering asks). A later task, with its own security design.
-- Other machines (see `federation`).
+- Other machines (idea: issue #18).
 - Replacing the terminal board.
 
 ## Success criteria

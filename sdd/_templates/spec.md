@@ -2,7 +2,7 @@
 epic: slug-kebab-case
 type: spec
 title: Human name of the epic
-status: draft
+status: active
 owner: alias
 created: YYYY-MM-DD
 updated: YYYY-MM-DD

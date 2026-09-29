@@ -2,7 +2,7 @@
 epic: slug-kebab-case
 type: discovery
 title: Human name of the epic
-status: draft
+status: active
 updated: YYYY-MM-DD
 ---
 
