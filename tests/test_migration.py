@@ -108,6 +108,28 @@ class MigrationTests(GuildTestCase):
         self.assertEqual(raid_members_columns, {"raid", "party", "expires_at"})
         self.assertEqual(conn.execute("SELECT COUNT(*) AS n FROM raid_members").fetchone()["n"], 0)
 
+    def test_not_null_raid_expiry_is_relaxed_and_rows_kept(self):
+        db_path = self.data_home / "guild.db"
+        legacy = sqlite3.connect(str(db_path))
+        legacy.execute(
+            "CREATE TABLE raid_members (raid TEXT NOT NULL, party TEXT NOT NULL,"
+            " expires_at TEXT NOT NULL, PRIMARY KEY (raid, party))"
+        )
+        legacy.execute("INSERT INTO raid_members VALUES ('ci', 'alpha', '2099-01-01T00:00:00+00:00')")
+        legacy.commit()
+        legacy.close()
+
+        conn = db.connect(db_path)
+
+        expiry = next(
+            row for row in conn.execute("PRAGMA table_info(raid_members)").fetchall()
+            if row["name"] == "expires_at"
+        )
+        self.assertEqual(expiry["notnull"], 0)
+        rows = conn.execute("SELECT raid, party, expires_at FROM raid_members").fetchall()
+        self.assertEqual([tuple(row) for row in rows], [("ci", "alpha", "2099-01-01T00:00:00+00:00")])
+        conn.execute("INSERT INTO raid_members VALUES ('ci', 'beta', NULL)")
+
     def test_rebuild_works_after_migration(self):
         db_path = self.data_home / "guild.db"
         _make_old_schema_db(db_path)
