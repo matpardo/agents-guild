@@ -197,6 +197,27 @@ def _handle_claims(ctx, args):
     return 0
 
 
+def _handle_raid_join(ctx, args):
+    from guild.commands import raid as raid_commands
+
+    _print(raid_commands.join(ctx, args.name, args.ttl))
+    return 0
+
+
+def _handle_raid_leave(ctx, args):
+    from guild.commands import raid as raid_commands
+
+    _print(raid_commands.leave(ctx, args.name))
+    return 0
+
+
+def _handle_raids(ctx, args):
+    from guild.commands import raid as raid_commands
+
+    _print_lines(raid_commands.list_raids(ctx))
+    return 0
+
+
 def _handle_board(ctx, args):
     from guild.commands import board as board_commands
 
@@ -381,6 +402,20 @@ def _add_notice_parser(subparsers):
     close.set_defaults(handler=_handle_notice_close)
 
 
+def _add_raid_parser(subparsers):
+    parser = subparsers.add_parser("raid")
+    actions = parser.add_subparsers(dest="raid_action", required=True)
+
+    join = actions.add_parser("join")
+    join.add_argument("name")
+    join.add_argument("--ttl", required=True)
+    join.set_defaults(handler=_handle_raid_join)
+
+    leave = actions.add_parser("leave")
+    leave.add_argument("name")
+    leave.set_defaults(handler=_handle_raid_leave)
+
+
 def build_parser():
     parser = argparse.ArgumentParser(prog="guild")
     subparsers = parser.add_subparsers(dest="command", required=True)
@@ -433,6 +468,11 @@ def build_parser():
 
     claims = subparsers.add_parser("claims")
     claims.set_defaults(handler=_handle_claims)
+
+    _add_raid_parser(subparsers)
+
+    raids = subparsers.add_parser("raids")
+    raids.set_defaults(handler=_handle_raids)
 
     board = subparsers.add_parser("board")
     board.add_argument("--party")
