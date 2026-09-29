@@ -1,7 +1,11 @@
+import json
+import sqlite3
 from datetime import timedelta
 from unittest import mock
 
-from guild import timeutil
+from guild import db, origin, paths, timeutil
+from guild.commands import claim as claim_commands
+from guild.context import RunContext
 from tests.testutil import GuildTestCase
 
 
@@ -10,6 +14,45 @@ class ClaimTests(GuildTestCase):
         super().setUp()
         self.repo_dir = self.register_project("acme", ["acme/app"])
         self.run_cli(["party", "start", "alpha"], "sess-1", self.repo_dir)
+
+    def _last_claim_created_payload(self):
+        conn = sqlite3.connect(str(self.data_home / "guild" / "guild.db"))
+        conn.row_factory = sqlite3.Row
+        row = conn.execute(
+            "SELECT payload FROM events WHERE kind = 'claim.created' ORDER BY seq DESC LIMIT 1"
+        ).fetchone()
+        conn.close()
+        return json.loads(row["payload"])
+
+    def test_claim_records_claimed_by_agent_when_given(self):
+        ctx = RunContext(
+            db.connect(paths.db_path()),
+            "sess-1",
+            self.repo_dir,
+            timeutil.utcnow(),
+            origin.current_origin(),
+            None,
+            self.config_home / "guild" / "projects",
+            None,
+        )
+        claim_commands.claim(ctx, "area:config/routes.rb", "2h", "coder")
+        payload = self._last_claim_created_payload()
+        self.assertEqual(payload["claimed_by_agent"], "coder")
+
+    def test_claim_omits_claimed_by_agent_when_not_given(self):
+        ctx = RunContext(
+            db.connect(paths.db_path()),
+            "sess-1",
+            self.repo_dir,
+            timeutil.utcnow(),
+            origin.current_origin(),
+            None,
+            self.config_home / "guild" / "projects",
+            None,
+        )
+        claim_commands.claim(ctx, "ci.yml", "30m", None)
+        payload = self._last_claim_created_payload()
+        self.assertNotIn("claimed_by_agent", payload)
 
     def test_claim_and_list(self):
         code, out, err = self.run_cli(["claim", "ci.yml", "--ttl", "30m"], "sess-1", self.repo_dir)
@@ -61,6 +104,14 @@ class ClaimTests(GuildTestCase):
         self.assertEqual(code, 0)
         code, out, err = self.run_cli(["claims"], "sess-1", self.repo_dir)
         self.assertEqual(out, "")
+
+    def test_claim_by_area_prefixed_string_accepted(self):
+        code, out, err = self.run_cli(
+            ["claim", "area:config/routes.rb", "--ttl", "2h"], "sess-1", self.repo_dir
+        )
+        self.assertEqual(code, 0)
+        code, out, err = self.run_cli(["claims"], "sess-1", self.repo_dir)
+        self.assertIn("area:config/routes.rb — alpha", out)
 
 
 if __name__ == "__main__":

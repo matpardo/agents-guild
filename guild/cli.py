@@ -176,7 +176,7 @@ def _handle_notices(ctx, args):
 def _handle_claim(ctx, args):
     from guild.commands import claim as claim_commands
 
-    _print(claim_commands.claim(ctx, args.area, args.ttl))
+    _print(claim_commands.claim(ctx, args.area, args.ttl, None))
     return 0
 
 
