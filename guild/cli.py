@@ -196,7 +196,7 @@ def _handle_claim(ctx, args):
         raise GuildError("unexpected extra argument '{}'".format(args.check_area), 1)
     if args.ttl is None:
         raise GuildError("--ttl is required", 1)
-    _print(claim_commands.claim(ctx, args.area, args.ttl))
+    _print(claim_commands.claim(ctx, args.area, args.ttl, None))
     return 0
 
 
@@ -543,7 +543,8 @@ def build_parser():
 
     hook = subparsers.add_parser("hook")
     hook.add_argument(
-        "hook_name", choices=["session-start", "prompt-submit", "pre-push", "post-tool-use"]
+        "hook_name",
+        choices=["session-start", "prompt-submit", "pre-push", "post-tool-use", "pre-edit"],
     )
 
     seed = subparsers.add_parser("seed")
@@ -599,6 +600,23 @@ def _run_pre_push_hook(stdin_data):
     return 0
 
 
+def _run_pre_edit_hook(stdin_data):
+    try:
+        session_id = stdin_data.get("session_id")
+        cwd = Path(stdin_data.get("cwd", str(Path.cwd())))
+        ctx = _build_context(session_id, cwd)
+        tool_name = stdin_data.get("tool_name")
+        tool_input = stdin_data.get("tool_input", {})
+        agent_type = stdin_data.get("agent_type")
+        result = hook_commands.pre_edit(ctx, tool_name, tool_input, agent_type)
+    except Exception as error:
+        sys.stdout.write(json.dumps({"systemMessage": "guild hook error: {}".format(error)}) + "\n")
+        return 0
+    if result is not None:
+        sys.stdout.write(json.dumps(result) + "\n")
+    return 0
+
+
 def _run_stateful_hook(hook_name, stdin_data):
     try:
         session_id = stdin_data.get("session_id")
@@ -625,6 +643,8 @@ def _dispatch_hook(args):
         stdin_data = {}
     if args.hook_name == "pre-push":
         return _run_pre_push_hook(stdin_data)
+    if args.hook_name == "pre-edit":
+        return _run_pre_edit_hook(stdin_data)
     return _run_stateful_hook(args.hook_name, stdin_data)
 
 

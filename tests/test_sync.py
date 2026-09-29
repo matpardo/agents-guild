@@ -106,6 +106,7 @@ class GhMergeNoticeTests(GuildTestCase):
         config_file = self.config_home / "guild" / "projects" / "acme.json"
         data = json.loads(config_file.read_text())
         data["shared_areas"] = globs
+        data["shared_area_claim_ttl"] = "2h"
         config_file.write_text(json.dumps(data))
 
     def _notices_rows(self, announces):

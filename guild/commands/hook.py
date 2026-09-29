@@ -1,3 +1,4 @@
+import fnmatch
 import hashlib
 import json
 import os
@@ -10,6 +11,7 @@ from pathlib import Path
 from guild import config, db, identity, names, timeutil
 from guild.adapters import github
 from guild.commands import brief as brief_commands
+from guild.commands import claim as claim_commands
 from guild.commands import inbox as inbox_commands
 from guild.commands import next as next_commands
 from guild.commands import party as party_commands
@@ -19,6 +21,12 @@ from guild.errors import GuildError
 from guild.identity import UNBOUND_HINT
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
+_EDIT_TOOL_PATH_FIELDS = {
+    "Edit": "file_path",
+    "Write": "file_path",
+    "MultiEdit": "file_path",
+    "NotebookEdit": "notebook_path",
+}
 
 
 def _spawn_background_sync(cwd):
@@ -333,3 +341,110 @@ def pre_push(command, cwd):
                 "system_message": None,
             }
     return {"blocked": False, "message": None, "system_message": None}
+
+
+def _edit_file_path(tool_name, tool_input):
+    field = _EDIT_TOOL_PATH_FIELDS.get(tool_name)
+    if field is None:
+        return None
+    return tool_input.get(field) or None
+
+
+def _first_existing_ancestor(path):
+    current = path.parent
+    while not current.exists():
+        parent = current.parent
+        if parent == current:
+            return current
+        current = parent
+    return current
+
+
+def _git_toplevel(file_path):
+    start_dir = _first_existing_ancestor(Path(file_path))
+    try:
+        result = subprocess.run(
+            ["git", "-C", str(start_dir), "rev-parse", "--show-toplevel"],
+            capture_output=True,
+            text=True,
+        )
+    except OSError:
+        return None
+    if result.returncode != 0:
+        return None
+    return result.stdout.strip()
+
+
+def _relative_posix_path(file_path, toplevel):
+    return os.path.relpath(str(file_path), toplevel).replace(os.sep, "/")
+
+
+def _matching_shared_area(relative_path, shared_areas):
+    for pattern in shared_areas:
+        if fnmatch.fnmatch(relative_path, pattern):
+            return pattern
+    return None
+
+
+def _shared_area_deny_reason(ctx, binding, holder_party, holder_expires_at, matched_glob):
+    local_time = timeutil.from_iso(holder_expires_at).astimezone().strftime("%H:%M")
+    caller_raids = raid_commands.member_raid_names(ctx.conn, ctx.now, binding["party"])
+    holder_raids = raid_commands.member_raid_names(ctx.conn, ctx.now, holder_party)
+    shared_raids = set(caller_raids) & set(holder_raids)
+    if shared_raids:
+        raid_name = sorted(shared_raids)[0]
+        coordination = "coordinate in the raid (guild notice --to raid:{}) or wait".format(raid_name)
+    else:
+        coordination = "coordinate with party '{}' or wait".format(holder_party)
+    return "guild: '{}' is claimed by party '{}' until {} — {}".format(
+        matched_glob, holder_party, local_time, coordination
+    )
+
+
+def _claim_shared_area_or_deny(ctx, binding, project, project_data, matched_glob, agent_type):
+    claim_key = "area:{}".format(matched_glob)
+    row = ctx.conn.execute(
+        "SELECT party, expires_at FROM claims WHERE project = ? AND area = ?",
+        (project, claim_key),
+    ).fetchone()
+    held_by_other_party = (
+        row is not None
+        and not timeutil.is_expired(ctx.now, row["expires_at"])
+        and row["party"] != binding["party"]
+    )
+    if held_by_other_party:
+        reason = _shared_area_deny_reason(ctx, binding, row["party"], row["expires_at"], matched_glob)
+        return {
+            "hookSpecificOutput": {
+                "hookEventName": "PreToolUse",
+                "permissionDecision": "deny",
+                "permissionDecisionReason": reason,
+            }
+        }
+    ttl = project_data["shared_area_claim_ttl"]
+    claim_commands.claim(ctx, claim_key, ttl, agent_type)
+    return None
+
+
+def pre_edit(ctx, tool_name, tool_input, agent_type):
+    file_path = _edit_file_path(tool_name, tool_input)
+    if file_path is None:
+        return None
+    binding = identity.resolve_binding(ctx.conn, ctx.session_id)
+    if binding is None:
+        return None
+    project = config.resolve_project(ctx.cwd, config.load_all_projects(ctx.projects_dir))
+    if project is None:
+        return None
+    project_data = config.load_project(ctx.projects_dir, project)
+    shared_areas = project_data.get("shared_areas")
+    if not shared_areas:
+        return None
+    toplevel = _git_toplevel(file_path)
+    if toplevel is None:
+        return None
+    relative_path = _relative_posix_path(file_path, toplevel)
+    matched_glob = _matching_shared_area(relative_path, shared_areas)
+    if matched_glob is None:
+        return None
+    return _claim_shared_area_or_deny(ctx, binding, project, project_data, matched_glob, agent_type)

@@ -9,7 +9,7 @@ def _validate_area(area):
         refs.parse_task_ref(area[len(_TASK_AREA_PREFIX):])
 
 
-def claim(ctx, area, ttl):
+def claim(ctx, area, ttl, agent_type):
     _validate_area(area)
     binding = identity.require_binding(ctx.conn, ctx.session_id)
     project = config.require_project(ctx.cwd, ctx.projects_dir)
@@ -25,6 +25,9 @@ def claim(ctx, area, ttl):
                 1,
             )
     expires_at = timeutil.expires_at_iso(ctx.now, ttl)
+    payload = {"project": project, "area": area, "party": binding["party"], "expires_at": expires_at}
+    if agent_type is not None:
+        payload["claimed_by_agent"] = agent_type
     with db.writing(ctx.conn):
         events.record(
             ctx.conn,
@@ -35,7 +38,7 @@ def claim(ctx, area, ttl):
             project,
             "claim.created",
             "guild",
-            {"project": project, "area": area, "party": binding["party"], "expires_at": expires_at},
+            payload,
         )
     return "area '{}' claimed until {}".format(area, expires_at)
 
