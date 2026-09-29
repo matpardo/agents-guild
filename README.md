@@ -113,6 +113,19 @@ guild export --visibility guild
 Refs use two literal formats: `pr:<owner/repo>#<n>` and `task:<quest>/<tid>`.
 Durations: `30m`, `8h`, `3d` — anything else is rejected.
 
+### Ask ordering
+
+`guild asks` and the board summary sort open asks by how many of their refs
+are still blocked *right now*, computed at render time (not by the raw
+number of refs): blocked count desc, then `created_at` asc, then id asc. A
+`pr:` ref is blocked while the tracked PR's lifecycle is not `merged`/
+`closed`; an untracked PR ref counts as blocked (we can't know, and never
+assume done). A `task:` ref is blocked while that quest task's state is not
+`done`; an unknown task ref counts as blocked. The board summary line adds
+`· blocks <n>` when `n > 0`; `guild asks` prints `blocks: <n> of <total> refs
+still open`, or `blocks: 0 of <total> refs still open (may be stale)` when
+every ref has resolved — a hint the ask can probably be dismissed.
+
 ### `guild next`
 
 Deterministic, per-party ranking, evaluated in order:
@@ -639,8 +652,8 @@ Phase 3 (three-way tracking, in progress): card keys read from a dedicated
 `key_line`, the epic key and status read from `sdd.epic_key_field` and
 `sdd.epic_status_field` frontmatter, the read-only `jira-acli` tracker
 adapter (`guild sync --source tracker`, observed `cards`), the resolver's
-tracker opinion, and the read-only `guild drift` report are done. `raid` is
-still pending.
+tracker opinion, the read-only `guild drift` report, and asks ordered by how
+many refs are still blocked right now are done. `raid` is still pending.
 
 **Idle-session wake: no-go (spike, this release).** The design considered
 having a resumed leader auto-spawn (`claude -n ...`) instead of asking a

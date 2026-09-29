@@ -106,7 +106,38 @@ def _pr_lines(painter, pr_row, indent):
     return head_lines + painter.wrap("waits: {}".format(pr_row["waits"]), indent + "  ")
 
 
-def _ask_detail_lines(painter, row):
+def _pr_ref_blocked(conn, ref):
+    repo, number = ref[len("pr:"):].rsplit("#", 1)
+    row = conn.execute(
+        "SELECT lifecycle FROM prs WHERE repo = ? AND number = ?", (repo, int(number))
+    ).fetchone()
+    if row is None:
+        return True
+    return row["lifecycle"] not in ("merged", "closed")
+
+
+def _task_ref_blocked(conn, ref):
+    quest, tid = ref[len("task:"):].split("/", 1)
+    row = conn.execute(
+        "SELECT state FROM quest_tasks WHERE quest = ? AND tid = ?", (quest, tid)
+    ).fetchone()
+    if row is None:
+        return True
+    return row["state"] != "done"
+
+
+def _blocked_ref_count(conn, ref_list):
+    count = 0
+    for ref in ref_list:
+        blocked = _pr_ref_blocked(conn, ref) if ref.startswith("pr:") else _task_ref_blocked(conn, ref)
+        if blocked:
+            count += 1
+    return count
+
+
+def _ask_detail_lines(painter, conn, row):
+    ref_list = json.loads(row["refs"])
+    blocked_count = _blocked_ref_count(conn, ref_list)
     lines = [
         "  {} {} · {}".format(
             painter.paint("#{}".format(row["id"]), "red"),
@@ -118,28 +149,39 @@ def _ask_detail_lines(painter, row):
     option_list = json.loads(row["options"])
     if option_list:
         lines.append("     options: {}".format(" | ".join(option_list)))
-    lines.append(painter.paint("     refs: {}".format(", ".join(json.loads(row["refs"]))), "dim"))
+    lines.append(painter.paint("     refs: {}".format(", ".join(ref_list)), "dim"))
+    if blocked_count > 0:
+        blocks_text = "blocks: {} of {} refs still open".format(blocked_count, len(ref_list))
+    else:
+        blocks_text = "blocks: 0 of {} refs still open (may be stale)".format(len(ref_list))
+    lines.append(painter.paint("     {}".format(blocks_text), "dim"))
     lines.append(painter.paint('     → guild answer {} "..."'.format(row["id"]), "dim"))
     lines.append("")
     return lines
 
 
-def _ask_summary_lines(painter, row):
+def _ask_summary_lines(painter, conn, row):
+    ref_list = json.loads(row["refs"])
+    blocked_count = _blocked_ref_count(conn, ref_list)
     option_list = json.loads(row["options"])
     options_text = "  [{}]".format(" | ".join(option_list)) if option_list else ""
-    wrapped = painter.wrap("{} · {}{}".format(row["party"], row["question"], options_text), "      ")
+    blocks_text = "  · blocks {}".format(blocked_count) if blocked_count > 0 else ""
+    wrapped = painter.wrap(
+        "{} · {}{}{}".format(row["party"], row["question"], options_text, blocks_text), "      "
+    )
     first = "  {} {}".format(painter.paint("#{}".format(row["id"]), "red"), wrapped[0].strip())
     return [first] + wrapped[1:]
 
 
-def _ask_sort_key(row):
-    return (-len(json.loads(row["refs"])), row["created_at"], row["id"])
+def _ask_sort_key(conn, row):
+    ref_list = json.loads(row["refs"])
+    return (-_blocked_ref_count(conn, ref_list), row["created_at"], row["id"])
 
 
 def render_asks(ctx, party_filter, color, width, detailed):
     painter = _Painter(color, width)
     rows = ctx.conn.execute("SELECT * FROM asks WHERE state = 'open'").fetchall()
-    rows = sorted(rows, key=_ask_sort_key)
+    rows = sorted(rows, key=lambda row: _ask_sort_key(ctx.conn, row))
     if party_filter is not None:
         rows = [row for row in rows if row["party"] == party_filter]
     if not rows:
@@ -148,10 +190,10 @@ def render_asks(ctx, party_filter, color, width, detailed):
     lines = [painter.paint("NEEDS YOU · {} {}".format(len(rows), label), "bold")]
     if detailed:
         for row in rows:
-            lines.extend(_ask_detail_lines(painter, row))
+            lines.extend(_ask_detail_lines(painter, ctx.conn, row))
         return lines
     for row in rows:
-        lines.extend(_ask_summary_lines(painter, row))
+        lines.extend(_ask_summary_lines(painter, ctx.conn, row))
     lines.append(painter.paint('  → guild asks (context) · guild answer <id> "..."', "dim"))
     lines.append("")
     return lines

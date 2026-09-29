@@ -1,3 +1,7 @@
+from datetime import timedelta
+
+from guild import db, events, paths, timeutil
+from guild.ids import next_id
 from tests.testutil import GuildTestCase
 
 
@@ -8,6 +12,47 @@ class AskTests(GuildTestCase):
         self.run_cli(["party", "start", "alpha"], "sess-1", self.repo_dir)
         self.run_cli(["quest", "add", "demo", "--title", "Demo", "--no-epic"], "sess-1", self.repo_dir)
         self.run_cli(["task", "add", "demo/T01", "--title", "First"], "sess-1", self.repo_dir)
+        self.conn = db.connect(paths.db_path())
+
+    def _create_ask_event(self, party, question, ref_list, seconds_offset):
+        ask_id = next_id(self.conn, "asks")
+        moment = timeutil.utcnow() + timedelta(seconds=seconds_offset)
+        with db.writing(self.conn):
+            events.record(
+                self.conn, moment, "test@host", party, None, "acme",
+                "ask.created", "local",
+                {
+                    "id": ask_id, "party": party, "question": question, "context": "x",
+                    "refs": ref_list, "options": [],
+                },
+            )
+        return ask_id
+
+    def _track_pr(self, number, quest, tid):
+        self.write_gh_fixture(
+            "view_acme-app_{}".format(number),
+            {"state": "OPEN", "isDraft": True, "headRefName": "feature/{}".format(number), "title": "t"},
+        )
+        code, out, err = self.run_cli(
+            [
+                "pr", "track", "acme/app#{}".format(number), "--task", "{}/{}".format(quest, tid),
+                "--what", "x", "--waits", "y",
+            ],
+            "sess-1", self.repo_dir,
+        )
+        self.assertEqual(code, 0, err)
+
+    def _set_pr_lifecycle(self, number, lifecycle):
+        with db.writing(self.conn):
+            events.record(
+                self.conn, timeutil.utcnow(), "test@host", None, None, None,
+                "pr.synced", "guild",
+                {
+                    "repo": "acme/app", "number": number, "gh_state": None, "gh_draft": False,
+                    "branch": None, "title": None, "checks_failing": 0, "checks_passing": 0,
+                    "lifecycle": lifecycle, "synced_at": timeutil.to_iso(timeutil.utcnow()),
+                },
+            )
 
     def test_create_requires_at_least_one_ref(self):
         code, out, err = self.run_cli(
@@ -65,7 +110,7 @@ class AskTests(GuildTestCase):
         code, out, err = self.run_cli(["asks"], None, None)
         self.assertIn("NEEDS YOU · nothing", out)
 
-    def test_asks_sorted_by_ref_count_desc_then_created_then_id(self):
+    def test_asks_sorted_by_blocked_count_desc_then_created_then_id(self):
         self.run_cli(["task", "add", "demo/T02", "--title", "Second"], "sess-1", self.repo_dir)
         self.run_cli(
             ["ask", "single ref?", "--context", "x", "--ref", "task:demo/T01"], "sess-1", self.repo_dir
@@ -79,6 +124,79 @@ class AskTests(GuildTestCase):
         )
         code, out, err = self.run_cli(["asks"], None, None)
         self.assertLess(out.index("two refs?"), out.index("single ref?"))
+
+    def test_ordering_uses_blocked_count_not_raw_ref_count(self):
+        self.run_cli(["task", "add", "demo/T02", "--title", "Second"], "sess-1", self.repo_dir)
+        self.run_cli(["task", "done", "demo/T02"], "sess-1", self.repo_dir)
+        self._create_ask_event("alpha", "one blocked ref?", ["task:demo/T01"], 0)
+        self._create_ask_event(
+            "alpha", "two refs but one done?", ["task:demo/T01", "task:demo/T02"], 1
+        )
+        code, out, err = self.run_cli(["asks"], None, None)
+        self.assertLess(out.index("one blocked ref?"), out.index("two refs but one done?"))
+
+    def test_merged_pr_ref_no_longer_counts_as_blocked(self):
+        self._track_pr(1, "demo", "T01")
+        self.run_cli(
+            ["ask", "ready?", "--context", "x", "--ref", "pr:acme/app#1", "--ref", "task:demo/T01"],
+            "sess-1", self.repo_dir,
+        )
+        self._set_pr_lifecycle(1, "merged")
+        code, out, err = self.run_cli(["asks"], None, None)
+        self.assertIn("blocks: 1 of 2 refs still open", out)
+
+    def test_done_task_ref_no_longer_counts_as_blocked(self):
+        self.run_cli(
+            ["ask", "ready?", "--context", "x", "--ref", "task:demo/T01"], "sess-1", self.repo_dir
+        )
+        self.run_cli(["task", "done", "demo/T01"], "sess-1", self.repo_dir)
+        code, out, err = self.run_cli(["asks"], None, None)
+        self.assertIn("blocks: 0 of 1 refs still open (may be stale)", out)
+
+    def test_untracked_pr_ref_counts_as_blocked(self):
+        self._create_ask_event("alpha", "ghost pr?", ["pr:acme/app#99"], 0)
+        code, out, err = self.run_cli(["asks"], None, None)
+        self.assertIn("blocks: 1 of 1 refs still open", out)
+
+    def test_unknown_task_ref_counts_as_blocked(self):
+        self._create_ask_event("alpha", "ghost task?", ["task:demo/T99"], 0)
+        code, out, err = self.run_cli(["asks"], None, None)
+        self.assertIn("blocks: 1 of 1 refs still open", out)
+
+    def test_asks_tie_break_by_id_when_blocked_count_and_created_at_match(self):
+        moment = timeutil.utcnow()
+        with db.writing(self.conn):
+            for question, ask_id in (("first?", 1), ("second?", 2)):
+                events.record(
+                    self.conn, moment, "test@host", "alpha", None, "acme",
+                    "ask.created", "local",
+                    {
+                        "id": ask_id, "party": "alpha", "question": question, "context": "x",
+                        "refs": ["task:demo/T01"], "options": [],
+                    },
+                )
+        code, out, err = self.run_cli(["asks"], None, None)
+        self.assertLess(out.index("first?"), out.index("second?"))
+
+    def test_board_summary_shows_blocks_count(self):
+        self.run_cli(["task", "add", "demo/T02", "--title", "Second"], "sess-1", self.repo_dir)
+        self.run_cli(
+            [
+                "ask", "two refs?", "--context", "x",
+                "--ref", "task:demo/T01", "--ref", "task:demo/T02",
+            ],
+            "sess-1", self.repo_dir,
+        )
+        code, out, err = self.run_cli(["board"], None, None)
+        self.assertIn("· blocks 2", out)
+
+    def test_board_summary_omits_blocks_when_zero(self):
+        self.run_cli(
+            ["ask", "ready?", "--context", "x", "--ref", "task:demo/T01"], "sess-1", self.repo_dir
+        )
+        self.run_cli(["task", "done", "demo/T01"], "sess-1", self.repo_dir)
+        code, out, err = self.run_cli(["board"], None, None)
+        self.assertNotIn("blocks", out)
 
     def test_unknown_ask_id(self):
         code, out, err = self.run_cli(["answer", "42", "x"], None, None)
