@@ -117,6 +117,53 @@ class QuestAddValidationTests(GuildTestCase):
         )
         self.assertEqual(code, 0)
 
+    def test_no_epic_quest_created_with_tasks_using_ids_as_titles(self):
+        code, out, err = self.run_cli(
+            ["quest", "add", "demo", "--title", "Demo", "--no-epic", "--tasks", "A,B"],
+            "sess-1",
+            self.repo_dir,
+        )
+        self.assertEqual(code, 0, err)
+        code, out, err = self.run_cli(["board"], "sess-1", self.repo_dir)
+        self.assertIn("queued: A, B", out)
+
+    def test_no_epic_quest_created_with_task_titles(self):
+        code, out, err = self.run_cli(
+            [
+                "quest", "add", "demo", "--title", "Demo", "--no-epic", "--tasks", "A,B",
+                "--titles", "First,Second",
+            ],
+            "sess-1",
+            self.repo_dir,
+        )
+        self.assertEqual(code, 0, err)
+        self.run_cli(["task", "start", "demo/A"], "sess-1", self.repo_dir)
+        self.run_cli(["task", "start", "demo/B"], "sess-1", self.repo_dir)
+        code, out, err = self.run_cli(["board"], "sess-1", self.repo_dir)
+        self.assertIn("First", out)
+        self.assertIn("Second", out)
+
+    def test_titles_length_must_match_tasks(self):
+        code, out, err = self.run_cli(
+            [
+                "quest", "add", "demo", "--title", "Demo", "--no-epic", "--tasks", "A,B",
+                "--titles", "First",
+            ],
+            "sess-1",
+            self.repo_dir,
+        )
+        self.assertEqual(code, 1)
+        self.assertIn("--titles", err)
+
+    def test_titles_require_tasks(self):
+        code, out, err = self.run_cli(
+            ["quest", "add", "demo", "--title", "Demo", "--no-epic", "--titles", "First"],
+            "sess-1",
+            self.repo_dir,
+        )
+        self.assertEqual(code, 1)
+        self.assertIn("--titles", err)
+
     def test_rejects_path_traversal_slug(self):
         code, out, err = self.run_cli(
             ["quest", "add", "../../tmp/x", "--title", "Demo", "--no-epic"], "sess-1", self.repo_dir

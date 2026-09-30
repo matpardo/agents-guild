@@ -82,7 +82,7 @@ def _handle_quest_done(ctx, args):
 def _handle_quest_add(ctx, args):
     from guild.commands import quest as quest_commands
 
-    _print(quest_commands.add(ctx, args.slug, args.title, args.epic, args.tasks, args.no_epic))
+    _print(quest_commands.add(ctx, args.slug, args.title, args.epic, args.tasks, args.titles, args.no_epic))
     return 0
 
 
@@ -290,7 +290,7 @@ def _handle_board(ctx, args):
 def _handle_handoff(ctx, args):
     from guild.commands import handoff as handoff_commands
 
-    _print(handoff_commands.run(ctx, args.in_flight, args.learned))
+    _print(handoff_commands.run(ctx, args.in_flight, args.learned, args.model))
     return 0
 
 
@@ -403,6 +403,7 @@ def _add_quest_parser(subparsers):
     add.add_argument("--title", required=True)
     add.add_argument("--epic")
     add.add_argument("--tasks")
+    add.add_argument("--titles")
     add.add_argument("--no-epic", action="store_true")
     add.set_defaults(handler=_handle_quest_add)
 
@@ -593,6 +594,7 @@ def build_parser():
     handoff = subparsers.add_parser("handoff")
     handoff.add_argument("--in-flight", required=True)
     handoff.add_argument("--learned", required=True)
+    handoff.add_argument("--model")
     handoff.set_defaults(handler=_handle_handoff)
 
     sync = subparsers.add_parser("sync")
