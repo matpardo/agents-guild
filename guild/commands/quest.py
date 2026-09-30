@@ -108,10 +108,26 @@ def done(ctx, slug):
     return "quest '{}' done".format(slug)
 
 
-def add(ctx, slug, title, epic, tasks_csv, no_epic):
+def _split_csv(csv):
+    return [item.strip() for item in csv.split(",") if item.strip()]
+
+
+def _free_tasks(tasks_csv, titles_csv):
+    tids = _split_csv(tasks_csv)
+    if titles_csv is None:
+        return [{"tid": tid, "title": tid} for tid in tids]
+    titles = _split_csv(titles_csv)
+    if len(titles) != len(tids):
+        raise GuildError("--titles must have the same number of items as --tasks", 1)
+    return [{"tid": tid, "title": task_title} for tid, task_title in zip(tids, titles)]
+
+
+def add(ctx, slug, title, epic, tasks_csv, titles_csv, no_epic):
     names.validate_name(slug, "quest slug")
-    if no_epic and (epic is not None or tasks_csv is not None):
-        raise GuildError("--no-epic cannot be combined with --epic or --tasks", 1)
+    if no_epic and epic is not None:
+        raise GuildError("--no-epic cannot be combined with --epic", 1)
+    if titles_csv is not None and (not no_epic or tasks_csv is None):
+        raise GuildError("--titles requires --no-epic and --tasks", 1)
     if not no_epic and (epic is None or tasks_csv is None):
         raise GuildError("epic quests require --epic and --tasks, or pass --no-epic", 1)
     existing = ctx.conn.execute("SELECT slug FROM quests WHERE slug = ?", (slug,)).fetchone()
@@ -120,6 +136,8 @@ def add(ctx, slug, title, epic, tasks_csv, no_epic):
     binding = identity.require_binding(ctx.conn, ctx.session_id)
     project = config.require_project(ctx.cwd, ctx.projects_dir)
     tasks = []
+    if no_epic and tasks_csv is not None:
+        tasks = _free_tasks(tasks_csv, titles_csv)
     if not no_epic:
         tasks = _resolve_epic_tasks(ctx.conn, project, epic, tasks_csv)
         _reject_taken_tasks(ctx.conn, ctx.now, project, epic, tasks, binding["party"])

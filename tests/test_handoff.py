@@ -155,6 +155,27 @@ class ResumeCommandShellTests(GuildTestCase):
         )
 
 
+class ResumeModelFlagTests(GuildTestCase):
+    def setUp(self):
+        super().setUp()
+        self.repo_dir = self.register_project("acme", ["acme/app"])
+        self.run_cli(["party", "start", "alpha"], "sess-1", self.repo_dir)
+
+    def test_model_flag_is_appended_to_resume_command(self):
+        code, out, err = self.run_cli(
+            ["handoff", "--in-flight", "x", "--learned", "y", "--model", "opus"],
+            "sess-1", self.repo_dir,
+        )
+        self.assertEqual(code, 0)
+        self.assertIn("claude -n alpha-g2 --model opus 'Continue", out.splitlines()[0])
+
+    def test_resume_command_has_no_model_without_flag(self):
+        code, out, err = self.run_cli(
+            ["handoff", "--in-flight", "x", "--learned", "y"], "sess-1", self.repo_dir
+        )
+        self.assertNotIn("--model", out)
+
+
 class AutoResumeTests(GuildTestCase):
     def setUp(self):
         super().setUp()
