@@ -4,6 +4,7 @@ from pathlib import Path
 
 from guild import config, db, events, timeutil
 from guild.adapters import github, jira_acli, sdd
+from guild.commands import claim as claim_commands
 from guild.commands import notice as notice_commands
 from guild.commands import raid as raid_commands
 from guild.errors import GuildError
@@ -20,6 +21,8 @@ _MERGED_GH_STATE = "MERGED"
 _MERGE_NOTICE_TTL = "12h"
 _MERGE_NOTICE_TEMPLATE = "{}#{} merged in main ({}/{}: {}). Parties with open branches: rebase."
 _MERGE_NOTICE_SHARED_AREAS_SUFFIX = " Shared areas touched: {}"
+_MERGE_NOTICE_RELEASED_SUFFIX = " Released: {}."
+_AREA_PREFIX = "area:"
 
 
 def _count_checks(rollup):
@@ -98,44 +101,75 @@ def _touched_shared_areas(shared_areas, changed_files):
     return [area for area in shared_areas if any(fnmatch.fnmatch(path, area) for path in changed_files)]
 
 
-def _shared_areas_line(ctx, project, row, failures):
-    shared_areas = project.get("shared_areas") if project is not None else None
-    if not shared_areas:
-        return ""
+def _fetch_changed_files(ctx, row, failures):
     try:
-        changed_files = github.pr_files(ctx.cwd, row["repo"], row["number"])
+        return github.pr_files(ctx.cwd, row["repo"], row["number"])
     except github.GhCommandError as error:
         failures.append(
             "{}#{}: shared areas check failed: {}".format(row["repo"], row["number"], error)
         )
-        return ""
-    touched = _touched_shared_areas(shared_areas, changed_files)
+        return None
+
+
+def _shared_areas_line(touched):
     if not touched:
         return ""
     return _MERGE_NOTICE_SHARED_AREAS_SUFFIX.format(", ".join(touched))
 
 
-def _merge_notice_text(row, shared_line):
+def _released_line(released):
+    if not released:
+        return ""
+    return _MERGE_NOTICE_RELEASED_SUFFIX.format(", ".join(released))
+
+
+def _merge_notice_text(row, shared_line, released_line):
     base = _MERGE_NOTICE_TEMPLATE.format(
         row["repo"], row["number"], row["task_quest"], row["task_tid"], row["what"]
     )
-    return base + shared_line
+    return base + shared_line + released_line
 
 
-def _announce_merge(ctx, projects, row, failures):
-    raids = raid_commands.member_raids(ctx.conn, ctx.now, row["party"])
-    if not raids:
-        return
+def _release_owned_claims(ctx, project, row, touched):
+    held = set(claim_commands.held_areas(ctx, project["name"], row["party"]))
+    released = []
+    for glob in touched:
+        area = "{}{}".format(_AREA_PREFIX, glob)
+        if area not in held:
+            continue
+        claim_commands.release_for_party(ctx, project["name"], row["party"], area)
+        released.append(glob)
+    return released
+
+
+def _post_merge_notice(ctx, row, raids, text):
     announces = "pr:{}#{}".format(row["repo"], row["number"])
     if notice_commands.announced(ctx.conn, announces):
         return
-    project = _project_for_repo(projects, row["repo"])
-    shared_line = _shared_areas_line(ctx, project, row, failures)
-    text = _merge_notice_text(row, shared_line)
     for raid_row in raids:
         notice_commands.create_announcing(
             ctx, row["party"], text, "raid:{}".format(raid_row["raid"]), _MERGE_NOTICE_TTL, announces
         )
+
+
+def _handle_merge(ctx, projects, row, failures):
+    raids = raid_commands.member_raids(ctx.conn, ctx.now, row["party"])
+    project = _project_for_repo(projects, row["repo"])
+    shared_areas = project.get("shared_areas") if project is not None else None
+    holds_areas = bool(shared_areas) and bool(
+        claim_commands.held_areas(ctx, project["name"], row["party"])
+    )
+    touched = []
+    released = []
+    if shared_areas and (raids or holds_areas):
+        changed_files = _fetch_changed_files(ctx, row, failures)
+        if changed_files is not None:
+            touched = _touched_shared_areas(shared_areas, changed_files)
+            released = _release_owned_claims(ctx, project, row, touched)
+    if not raids:
+        return
+    text = _merge_notice_text(row, _shared_areas_line(touched), _released_line(released))
+    _post_merge_notice(ctx, row, raids, text)
 
 
 def _close_met_notices(ctx):
@@ -177,7 +211,7 @@ def _sync_gh(ctx):
             failures.append("{}#{}: {}".format(row["repo"], row["number"], error))
             continue
         if _became_merged(row, lifecycle):
-            _announce_merge(ctx, projects, row, failures)
+            _handle_merge(ctx, projects, row, failures)
     _close_met_notices(ctx)
     return failures
 
