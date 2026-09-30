@@ -26,10 +26,11 @@ See the guild board, asks and notices in a browser, with a clearer layout than t
 - Links to PRs on GitHub and, when configured, to cards in the tracker.
 - Writing from the page: answering and dismissing open asks, with the same validation as `guild answer` and `guild dismiss`, acting as the human actor.
 - Status colors, matching the terminal board: PR lifecycle badges, check counts and task states, light and dark.
+- Marking notices seen from the human's view: a `new` marker on unseen notices in `guild notices`, the board and the web page, with buttons to mark one or all seen, without changing what is shown or delivered.
 
 ## Out of scope
 
-- Writing anything from the page other than answering and dismissing asks.
+- Writing anything from the page other than answering and dismissing asks and marking notices seen or unseen.
 - Other machines (see `federation`).
 - Replacing the terminal board.
 
@@ -41,9 +42,10 @@ See the guild board, asks and notices in a browser, with a clearer layout than t
 ## Security and data
 
 - Bound to 127.0.0.1; requests whose `Host` header is not the loopback address and port are rejected (blocks DNS rebinding).
-- Writes are limited to `POST /api/asks/<id>/answer` and `POST /api/asks/<id>/dismiss`; every other method, including `OPTIONS`, is 405, and no response carries CORS headers.
+- Writes are limited to `POST /api/asks/<id>/answer`, `POST /api/asks/<id>/dismiss`, `POST /api/notices/<id>/seen`, `POST /api/notices/<id>/unseen` and `POST /api/notices/seen-all`; every other method, including `OPTIONS`, is 405, and no response carries CORS headers.
 - Each write must carry an `Origin` equal to the loopback address and port (403), a per-start session token in `X-Guild-Token` compared in constant time (403), `Content-Type: application/json` (415), a `Content-Length` of at most 16384 bytes (411/413) and a valid JSON object (400).
 - The session token comes from `secrets.token_urlsafe(32)`, lives in memory only, is never logged, and is served only by `GET /api/session`; the page keeps it in a script variable, not in storage, cookies or the URL.
+- Notice writes reuse `guild notice seen` / `unseen` as the human actor and go through the same header, token and body checks as the ask writes.
 - Writes reuse `guild answer` / `guild dismiss` (length cap, email and `pii_patterns` rejection, "not open", unknown ask) as the human actor; failures are 422 with a message that never echoes the submitted text.
 - All text is inserted with `textContent`, never as HTML. A strict `Content-Security-Policy` (`default-src 'self'`) forbids inline and third-party scripts; no external assets.
 - The JSON carries the same free text as the terminal board; it never leaves the machine.

@@ -101,8 +101,9 @@ class BoardModelShapeTests(BoardModelTestCase):
         ctx.conn.close()
         self.assertEqual(len(model["notices"]), 1)
         notice = model["notices"][0]
-        self.assertEqual(set(notice), {"id", "party", "scope", "text", "expires_at", "time_left"})
+        self.assertEqual(set(notice), {"id", "party", "scope", "text", "expires_at", "time_left", "seen"})
         self.assertEqual(notice["time_left"], "1h left")
+        self.assertIs(notice["seen"], False)
         self.assertEqual(notice["text"], "pipeline down")
         self.assertEqual(notice["scope"], "guild")
 
@@ -223,6 +224,35 @@ class BoardModelPartyWithoutProjectTests(BoardModelTestCase):
 
         self.assertEqual({party["name"] for party in model["parties"]}, {"alpha", "gamma"})
         self.assertEqual([entry["project"] for entry in model["drift"]], ["acme"])
+
+
+class BoardModelSeenNoticeTests(BoardModelTestCase):
+    def setUp(self):
+        super().setUp()
+        self.run_cli(["notice", "create", "pipeline down", "--to", "guild", "--ttl", "5h"], None, None)
+        self.run_cli(["notice", "create", "ci flaky", "--to", "guild", "--ttl", "2h"], None, None)
+
+    def _model(self):
+        ctx = self._ctx()
+        try:
+            return board_commands.board_model(ctx)
+        finally:
+            ctx.conn.close()
+
+    def test_new_notice_count_and_seen_flags_reflect_the_mark(self):
+        self.run_cli(["notice", "seen", "1"], None, None)
+        model = self._model()
+        self.assertEqual([(n["id"], n["seen"]) for n in model["notices"]], [(1, True), (2, False)])
+        self.assertEqual(model["new_notice_count"], 1)
+
+    def test_every_notice_stays_listed_when_seen(self):
+        self.run_cli(["notice", "seen", "--all"], None, None)
+        model = self._model()
+        self.assertEqual(len(model["notices"]), 2)
+        self.assertEqual(model["new_notice_count"], 0)
+
+    def test_unseen_notices_count_as_new(self):
+        self.assertEqual(self._model()["new_notice_count"], 2)
 
 
 if __name__ == "__main__":

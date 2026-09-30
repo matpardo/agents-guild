@@ -328,3 +328,29 @@ a {
 .state-queued {
   color: var(--muted);
 }
+
+.notice-actions {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  margin-top: 0.5rem;
+}
+
+.notice-actions button {
+  font: inherit;
+  cursor: pointer;
+}
+
+.notice-actions button:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.notice-unseen-button {
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.notice.card .notice-new {
+  font-weight: bold;
+}

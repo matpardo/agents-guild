@@ -10,6 +10,7 @@ from urllib.parse import urlsplit
 from guild import context, db, origin, paths, timeutil
 from guild.commands import ask as ask_commands
 from guild.commands import board as board_commands
+from guild.commands import notice as notice_commands
 from guild.errors import GuildError
 
 _WEB_DIR = Path(__file__).resolve().parent / "web"
@@ -21,6 +22,8 @@ _STATIC_FILES = {
 
 _MAX_BODY_BYTES = 16384
 _ASK_ACTION_RE = re.compile(r"^/api/asks/([^/]+)/(answer|dismiss)$")
+_NOTICE_ACTION_RE = re.compile(r"^/api/notices/([^/]+)/(seen|unseen)$")
+_SEEN_ALL_PATH = "/api/notices/seen-all"
 _ASK_ID_RE = re.compile(r"^[1-9][0-9]{0,17}$")
 _JSON_CONTENT_TYPE = "application/json; charset=utf-8"
 
@@ -57,6 +60,24 @@ def _run_ask_action(action, ask_id, payload):
         if action == "answer":
             return ask_commands.answer(ctx, ask_id, payload["answer"])
         return ask_commands.dismiss(ctx, ask_id)
+    finally:
+        ctx.conn.close()
+
+
+def _run_notice_action(action, notice_id):
+    ctx = _action_context()
+    try:
+        if action == "seen":
+            return notice_commands.mark_seen(ctx, notice_id)
+        return notice_commands.mark_unseen(ctx, notice_id)
+    finally:
+        ctx.conn.close()
+
+
+def _run_seen_all():
+    ctx = _action_context()
+    try:
+        return notice_commands.mark_all_seen(ctx)
     finally:
         ctx.conn.close()
 
@@ -170,7 +191,15 @@ class BoardRequestHandler(http_server.BaseHTTPRequestHandler):
             if not _ASK_ID_RE.match(ask_id):
                 return self._not_found()
             return self._post_action(action, lambda payload: _run_ask_action(action, int(ask_id), payload))
-        return self._method_not_allowed()
+        if path == _SEEN_ALL_PATH:
+            return self._post_action("seen-all", lambda payload: _run_seen_all())
+        notice_match = _NOTICE_ACTION_RE.match(path)
+        if notice_match is None:
+            return self._method_not_allowed()
+        notice_id, action = notice_match.groups()
+        if not _ASK_ID_RE.match(notice_id):
+            return self._not_found()
+        return self._post_action(action, lambda payload: _run_notice_action(action, int(notice_id)))
 
     def _serve_session(self):
         self._write_json(200, {"token": self.server.session_token})

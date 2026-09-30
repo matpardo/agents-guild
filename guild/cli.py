@@ -174,6 +174,23 @@ def _handle_notice_close(ctx, args):
     return 0
 
 
+def _handle_notice_seen(ctx, args):
+    from guild.commands import notice as notice_commands
+
+    if args.all:
+        _print(notice_commands.mark_all_seen(ctx))
+        return 0
+    _print(notice_commands.mark_seen(ctx, args.id))
+    return 0
+
+
+def _handle_notice_unseen(ctx, args):
+    from guild.commands import notice as notice_commands
+
+    _print(notice_commands.mark_unseen(ctx, args.id))
+    return 0
+
+
 def _handle_notices(ctx, args):
     from guild.commands import notice as notice_commands
 
@@ -430,6 +447,16 @@ def _add_notice_parser(subparsers):
     close = actions.add_parser("close")
     close.add_argument("id", type=int)
     close.set_defaults(handler=_handle_notice_close)
+
+    seen = actions.add_parser("seen")
+    seen_target = seen.add_mutually_exclusive_group(required=True)
+    seen_target.add_argument("id", type=int, nargs="?")
+    seen_target.add_argument("--all", action="store_true")
+    seen.set_defaults(handler=_handle_notice_seen)
+
+    unseen = actions.add_parser("unseen")
+    unseen.add_argument("id", type=int)
+    unseen.set_defaults(handler=_handle_notice_unseen)
 
 
 def _add_raid_parser(subparsers):

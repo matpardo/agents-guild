@@ -143,7 +143,7 @@ class BoardEndpointTests(WebServerTestCase):
         self.assertEqual(response.status, 200)
         self.assertEqual(response.getheader("Content-Type"), "application/json; charset=utf-8")
         payload = json.loads(body)
-        self.assertEqual(set(payload), {"generated_at", "asks", "notices", "parties", "drift", "raids"})
+        self.assertEqual(set(payload), {"generated_at", "asks", "notices", "new_notice_count", "parties", "drift", "raids"})
         self.assertEqual([party["name"] for party in payload["parties"]], ["alpha"])
 
 

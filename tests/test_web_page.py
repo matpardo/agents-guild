@@ -58,6 +58,13 @@ class AppJsWriteTests(unittest.TestCase):
     def setUp(self):
         self.source = (_WEB_DIR / "app.js").read_text()
 
+    def test_notice_buttons_use_the_notice_routes(self):
+        self.assertIn('"/api/notices/"', self.source)
+        self.assertIn('"/api/notices/seen-all"', self.source)
+        for label in ("Mark seen", "Mark unseen", "Mark all seen"):
+            with self.subTest(label=label):
+                self.assertIn('"{}"'.format(label), self.source)
+
     def test_asks_for_confirmation_before_dismissing(self):
         self.assertIn("window.confirm", self.source)
 
