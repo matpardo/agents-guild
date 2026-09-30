@@ -255,6 +255,13 @@ def _handle_raids(ctx, args):
     return 0
 
 
+def _handle_merge_queue(ctx, args):
+    from guild.commands import merge_queue as merge_queue_commands
+
+    _print_lines(merge_queue_commands.run(ctx, args.raid, args.party))
+    return 0
+
+
 def _handle_merge_queue_pin(ctx, args):
     from guild.commands import merge_queue as merge_queue_commands
 
@@ -492,7 +499,11 @@ def _add_raid_parser(subparsers):
 
 def _add_merge_queue_parser(subparsers):
     parser = subparsers.add_parser("merge-queue")
-    actions = parser.add_subparsers(dest="merge_queue_action", required=True)
+    scope = parser.add_mutually_exclusive_group()
+    scope.add_argument("--raid")
+    scope.add_argument("--party")
+    parser.set_defaults(handler=_handle_merge_queue)
+    actions = parser.add_subparsers(dest="merge_queue_action", required=False)
 
     pin = actions.add_parser("pin")
     pin.add_argument("ref")

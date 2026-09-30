@@ -154,7 +154,7 @@ def _overlap_edges(eligible, hard_pairs):
     pairs = list(hard_pairs)
     edges = []
     for first, second, globs in _oriented_overlaps(eligible):
-        if find_path(pairs, first["ref"], second["ref"]) or find_path(pairs, second["ref"], first["ref"]):
+        if find_path(pairs, second["ref"], first["ref"]):
             continue
         pairs.append((first["ref"], second["ref"]))
         shared = ", ".join(globs)

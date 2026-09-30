@@ -32,7 +32,7 @@ updated: 2026-09-29
 ## T04 — CLI
 
 **Depends on:** T02, T03
-**Status:** [ ] pending
+**Status:** [x] done
 
 **What:** `guild merge-queue [--raid | --party]` with default scope rules and read-only output, and a `next to merge` line on `guild board`.
 

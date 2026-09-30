@@ -1,10 +1,11 @@
 import json
 
-from guild import config, db, events, identity, merge_queue, refs, resolve
+from guild import config, db, events, identity, merge_queue, refs, resolve, sanitize, timeutil
 from guild.commands import raid as raid_commands
 from guild.errors import GuildError
 
 _CLOSED_LIFECYCLES = ("merged", "closed")
+NEVER_MERGES_REMINDER = "guild never merges: merge in this order by hand; re-run after each merge"
 
 
 def _ref_text(repo, number):
@@ -249,3 +250,92 @@ def unpin(ctx, first_text, second_text):
     _require_authority(ctx, actor, first, second)
     _record_pin_event(ctx, "merge_queue.unpinned", actor, first, second)
     return "unpinned '{}' before '{}'".format(first_ref, second_ref)
+
+
+def scoped_queue(records, pins, party_names):
+    scoped = [record for record in records if record["party"] in party_names]
+    synced = [record["synced_at"] for record in scoped if record["synced_at"] is not None]
+    result = merge_queue.compute(scoped, pins)
+    return {
+        "queue": result["queue"],
+        "blocked": result["blocked"],
+        "synced_at": max(synced) if synced else None,
+        "has_prs": bool(scoped),
+    }
+
+
+def _resolve_scope(ctx, raid, party):
+    if raid is not None:
+        members = raid_commands.require_active_raid(ctx.conn, ctx.now, raid)
+        return "raid", raid, {row["party"] for row in members}
+    if party is not None:
+        return "party", party, {_require_party(ctx.conn, party)}
+    binding = identity.resolve_binding(ctx.conn, ctx.session_id)
+    if binding is None:
+        raise GuildError("no bound party: pass --raid <name> or --party <name>", 1)
+    raids = raid_commands.member_raids(ctx.conn, ctx.now, binding["party"])
+    if len(raids) > 1:
+        raise GuildError(
+            "party '{}' is in several raids: {}; pass --raid <name> or --party <name>".format(
+                binding["party"], ", ".join(sorted(row["raid"] for row in raids))
+            ),
+            1,
+        )
+    if raids:
+        return _resolve_scope(ctx, raids[0]["raid"], None)
+    return "party", binding["party"], {binding["party"]}
+
+
+def _require_party(conn, party):
+    row = conn.execute("SELECT name FROM parties WHERE name = ?", (party,)).fetchone()
+    if row is None:
+        raise GuildError("unknown party '{}'".format(party), 1)
+    return row["name"]
+
+
+def _synced_label(now, synced_at):
+    if synced_at is None:
+        return "never synced"
+    minutes = int((now - timeutil.from_iso(synced_at)).total_seconds() // 60)
+    return "synced {} min ago".format(max(minutes, 0))
+
+
+def _queue_line(position, entry):
+    return "{}. {}  {}  {} \u2014 {}".format(
+        position, entry["ref"], entry["party"], entry["task"] or "-", entry["reason"]
+    )
+
+
+def _blocked_line(entry):
+    return "  {}  {}  {} \u2014 {}".format(
+        entry["ref"], entry["party"], entry["task"] or "-", "; ".join(entry["reasons"])
+    )
+
+
+def _body_lines(scoped):
+    if not scoped["has_prs"]:
+        return ["no open tracked PRs"]
+    lines = []
+    if scoped["queue"]:
+        lines.extend(_queue_line(index, entry) for index, entry in enumerate(scoped["queue"], start=1))
+    else:
+        lines.append("nothing ready to merge")
+    if scoped["blocked"]:
+        lines.append("blocked:")
+        lines.extend(_blocked_line(entry) for entry in scoped["blocked"])
+    return lines
+
+
+def run(ctx, raid, party):
+    kind, name, party_names = _resolve_scope(ctx, raid, party)
+    scoped = scoped_queue(open_pr_records(ctx.conn), load_pins(ctx.conn), party_names)
+    header = "merge queue \u00b7 {} {} \u00b7 {}".format(kind, name, _synced_label(ctx.now, scoped["synced_at"]))
+    lines = [header] + _body_lines(scoped) + [NEVER_MERGES_REMINDER]
+    return [sanitize.strip_control_sequences(line) for line in lines]
+
+
+def next_to_merge(conn, party_names):
+    scoped = scoped_queue(open_pr_records(conn), load_pins(conn), party_names)
+    if not scoped["queue"]:
+        return None
+    return scoped["queue"][0]["ref"]

@@ -102,6 +102,19 @@ class OrderingTests(unittest.TestCase):
         result = merge_queue.compute(prs, [])
         self.assertIn("(shares a, b, lower number)", _reasons(result)[_ref(1)])
 
+    def test_overlap_along_a_task_dependency_keeps_both_reasons(self):
+        prs = [
+            _pr(1, globs=["a"], additions=9, dep_keys=[("acme", "epic", "T02")]),
+            _pr(2, globs=["a"], additions=1),
+        ]
+        result = merge_queue.compute(prs, [])
+        self.assertEqual(_refs(result["queue"]), [_ref(2), _ref(1)])
+        self.assertEqual(
+            _reasons(result)[_ref(2)],
+            "ready, checks \u27133; before acme/app#1 (task T01 depends on T02);"
+            " before acme/app#1 (shares a, smaller diff)",
+        )
+
     def test_overlap_across_repos_is_not_sequential(self):
         prs = [_pr(2, globs=["a"], additions=1), _pr(1, repo="acme/web", ref="acme/web#1", globs=["a"])]
         result = merge_queue.compute(prs, [])

@@ -4,6 +4,7 @@ import textwrap
 from guild import config, sanitize, timeutil
 from guild.commands import claim as claim_commands
 from guild.commands import drift as drift_commands
+from guild.commands import merge_queue as merge_queue_commands
 from guild.commands import notice as notice_commands
 from guild.commands import raid as raid_commands
 
@@ -349,6 +350,9 @@ def _party_section(ctx, painter, party_row):
             painter.paint(_leader_label(ctx, party_row), "dim"),
         )
     ]
+    next_ref = merge_queue_commands.next_to_merge(ctx.conn, {party_row["name"]})
+    if next_ref is not None:
+        lines.append(painter.paint("  next to merge: {}".format(next_ref), "green"))
     pr_rows = _party_pr_rows(ctx.conn, party_row["name"])
     prs_by_task = _prs_by_task(pr_rows)
     quests = _active_quests(ctx.conn, party_row["name"])
@@ -384,6 +388,13 @@ def _party_rows_for_names(conn, party_names):
     return conn.execute(query, tuple(party_names)).fetchall()
 
 
+def _raid_next_to_merge_lines(ctx, painter, party_names):
+    next_ref = merge_queue_commands.next_to_merge(ctx.conn, party_names)
+    if next_ref is None:
+        return []
+    return [painter.paint("next to merge: {}".format(next_ref), "green"), ""]
+
+
 def render_board(ctx, party_filter, raid_filter, color, width):
     painter = _Painter(color, width)
     if raid_filter is not None:
@@ -401,7 +412,11 @@ def render_board(ctx, party_filter, raid_filter, color, width):
             "SELECT * FROM parties WHERE state != 'closed' ORDER BY name ASC"
         ).fetchall()
         notice_rows = _party_scoped_notices(ctx, None)
-    lines = render_asks(ctx, party_names, color, width, False) + _notices_section(ctx, painter, notice_rows)
+    lines = []
+    if raid_filter is not None:
+        lines.extend(_raid_next_to_merge_lines(ctx, painter, party_names))
+    lines.extend(render_asks(ctx, party_names, color, width, False))
+    lines.extend(_notices_section(ctx, painter, notice_rows))
     for party_row in party_rows:
         lines.extend(_party_section(ctx, painter, party_row))
     return lines
