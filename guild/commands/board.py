@@ -462,13 +462,14 @@ def _ask_model(conn, row):
     }
 
 
-def _notice_model(row):
+def _notice_model(ctx, row):
     return {
         "id": row["id"],
         "party": row["party"],
         "scope": row["scope"],
         "text": sanitize.strip_control_sequences(row["text"]),
         "expires_at": row["expires_at"],
+        "time_left": timeutil.time_left_label(ctx.now, row["expires_at"]),
     }
 
 
@@ -551,16 +552,27 @@ def board_model(ctx):
     ).fetchall()
     projects_by_name = {project["name"]: project for project in config.load_all_projects(ctx.projects_dir)}
     ask_rows = _sorted_open_asks(ctx.conn, None)
-    notice_rows = notice_commands.active_notices(ctx.conn, ctx.now)
+    notice_rows, archived_rows = notice_commands.split_archived(
+        notice_commands.active_notices(ctx.conn, ctx.now)
+    )
     project_names = sorted({row["project"] for row in party_rows if row["project"] is not None})
     return {
         "generated_at": timeutil.to_iso(ctx.now),
         "asks": [_ask_model(ctx.conn, row) for row in ask_rows],
-        "notices": [_notice_model(row) for row in notice_rows],
+        "notices": [_notice_model(ctx, row) for row in notice_rows],
+        "archived_notice_count": len(archived_rows),
         "parties": [
             _party_model(ctx, party_row, projects_by_name.get(party_row["project"]))
             for party_row in party_rows
         ],
         "drift": [drift_commands.board_findings(ctx, project_name) for project_name in project_names],
         "raids": _raid_models(ctx.conn, ctx.now),
+    }
+
+
+def archived_notices_model(ctx):
+    archived_rows = notice_commands.split_archived(notice_commands.active_notices(ctx.conn, ctx.now))[1]
+    return {
+        "generated_at": timeutil.to_iso(ctx.now),
+        "notices": [_notice_model(ctx, row) for row in archived_rows],
     }

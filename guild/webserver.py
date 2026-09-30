@@ -10,6 +10,7 @@ from urllib.parse import urlsplit
 from guild import context, db, origin, paths, timeutil
 from guild.commands import ask as ask_commands
 from guild.commands import board as board_commands
+from guild.commands import notice as notice_commands
 from guild.errors import GuildError
 
 _WEB_DIR = Path(__file__).resolve().parent / "web"
@@ -17,10 +18,12 @@ _WEB_DIR = Path(__file__).resolve().parent / "web"
 _STATIC_FILES = {
     "/app.js": ("app.js", "application/javascript; charset=utf-8"),
     "/app.css": ("app.css", "text/css; charset=utf-8"),
+    "/archived.js": ("archived.js", "application/javascript; charset=utf-8"),
 }
 
 _MAX_BODY_BYTES = 16384
 _ASK_ACTION_RE = re.compile(r"^/api/asks/([^/]+)/(answer|dismiss)$")
+_NOTICE_ACTION_RE = re.compile(r"^/api/notices/([^/]+)/(archive|unarchive)$")
 _ASK_ID_RE = re.compile(r"^[1-9][0-9]{0,17}$")
 _JSON_CONTENT_TYPE = "application/json; charset=utf-8"
 
@@ -57,6 +60,16 @@ def _run_ask_action(action, ask_id, payload):
         if action == "answer":
             return ask_commands.answer(ctx, ask_id, payload["answer"])
         return ask_commands.dismiss(ctx, ask_id)
+    finally:
+        ctx.conn.close()
+
+
+def _run_notice_action(action, notice_id):
+    ctx = _action_context()
+    try:
+        if action == "archive":
+            return notice_commands.archive(ctx, notice_id)
+        return notice_commands.unarchive(ctx, notice_id)
     finally:
         ctx.conn.close()
 
@@ -150,26 +163,33 @@ class BoardRequestHandler(http_server.BaseHTTPRequestHandler):
             raise _RequestRejected(400, "answer must be a string")
         return payload
 
-    def _post_ask_action(self, ask_id, action):
+    def _post_action(self, action, run):
         try:
             self._check_write_headers()
             payload = self._read_action_payload(action)
         except _RequestRejected as rejected:
             return self._write_json(rejected.status, {"error": rejected.message})
         try:
-            message = _run_ask_action(action, ask_id, payload)
+            message = run(payload)
         except GuildError as error:
             return self._write_json(422, {"error": error.message})
         return self._write_json(200, {"ok": True, "message": message})
 
     def _route_post(self):
-        match = _ASK_ACTION_RE.match(urlsplit(self.path).path)
-        if match is None:
+        path = urlsplit(self.path).path
+        ask_match = _ASK_ACTION_RE.match(path)
+        if ask_match is not None:
+            ask_id, action = ask_match.groups()
+            if not _ASK_ID_RE.match(ask_id):
+                return self._not_found()
+            return self._post_action(action, lambda payload: _run_ask_action(action, int(ask_id), payload))
+        notice_match = _NOTICE_ACTION_RE.match(path)
+        if notice_match is None:
             return self._method_not_allowed()
-        ask_id, action = match.groups()
-        if not _ASK_ID_RE.match(ask_id):
+        notice_id, action = notice_match.groups()
+        if not _ASK_ID_RE.match(notice_id):
             return self._not_found()
-        return self._post_ask_action(int(ask_id), action)
+        return self._post_action(action, lambda payload: _run_notice_action(action, int(notice_id)))
 
     def _serve_session(self):
         self._write_json(200, {"token": self.server.session_token})
@@ -187,10 +207,10 @@ class BoardRequestHandler(http_server.BaseHTTPRequestHandler):
         body = (_WEB_DIR / name).read_bytes()
         self._write(200, body, content_type, None)
 
-    def _serve_board(self):
+    def _serve_model(self, build_model):
         ctx = _board_context()
         try:
-            payload = board_commands.board_model(ctx)
+            payload = build_model(ctx)
         finally:
             ctx.conn.close()
         body = json.dumps(payload).encode("utf-8")
@@ -200,8 +220,12 @@ class BoardRequestHandler(http_server.BaseHTTPRequestHandler):
         path = urlsplit(self.path).path
         if path == "/":
             return self._serve_file("index.html", "text/html; charset=utf-8")
+        if path == "/archived":
+            return self._serve_file("archived.html", "text/html; charset=utf-8")
         if path == "/api/board":
-            return self._serve_board()
+            return self._serve_model(board_commands.board_model)
+        if path == "/api/archived-notices":
+            return self._serve_model(board_commands.archived_notices_model)
         if path == "/api/session":
             return self._serve_session()
         if path in _STATIC_FILES:

@@ -17,6 +17,8 @@
     drafts: {},
     statuses: {},
     busy: {},
+    noticeStatuses: {},
+    noticeBusy: {},
     focusedAskId: null,
     focusStart: 0,
     focusEnd: 0,
@@ -79,16 +81,12 @@
     return "request failed";
   }
 
-  function postAskAction(askId, action, payload) {
-    if (sessionToken === null) {
-      state.statuses[askId] = NO_SESSION_MESSAGE;
-      fetchBoard();
-      return;
-    }
-    state.busy[askId] = true;
-    state.statuses[askId] = "sending...";
-    fetchBoard();
-    fetch(askUrl(askId, action), {
+  function noticeUrl(noticeId, action) {
+    return "/api/notices/" + noticeId + "/" + action;
+  }
+
+  function sendPost(url, payload) {
+    return fetch(url, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -108,17 +106,48 @@
       })
       .catch(function () {
         return { ok: false, body: null };
-      })
-      .then(function (result) {
-        delete state.busy[askId];
-        if (result.ok) {
-          delete state.drafts[askId];
-          delete state.statuses[askId];
-        } else {
-          state.statuses[askId] = errorMessage(result.body);
-        }
-        fetchBoard();
       });
+  }
+
+  function postNoticeAction(noticeId, action) {
+    if (sessionToken === null) {
+      state.noticeStatuses[noticeId] = NO_SESSION_MESSAGE;
+      fetchBoard();
+      return;
+    }
+    state.noticeBusy[noticeId] = true;
+    state.noticeStatuses[noticeId] = "sending...";
+    fetchBoard();
+    sendPost(noticeUrl(noticeId, action), {}).then(function (result) {
+      delete state.noticeBusy[noticeId];
+      if (result.ok) {
+        delete state.noticeStatuses[noticeId];
+      } else {
+        state.noticeStatuses[noticeId] = errorMessage(result.body);
+      }
+      fetchBoard();
+    });
+  }
+
+  function postAskAction(askId, action, payload) {
+    if (sessionToken === null) {
+      state.statuses[askId] = NO_SESSION_MESSAGE;
+      fetchBoard();
+      return;
+    }
+    state.busy[askId] = true;
+    state.statuses[askId] = "sending...";
+    fetchBoard();
+    sendPost(askUrl(askId, action), payload).then(function (result) {
+      delete state.busy[askId];
+      if (result.ok) {
+        delete state.drafts[askId];
+        delete state.statuses[askId];
+      } else {
+        state.statuses[askId] = errorMessage(result.body);
+      }
+      fetchBoard();
+    });
   }
 
   function submitAnswer(askId) {
@@ -253,15 +282,37 @@
     head.appendChild(textEl("span", "#" + notice.id));
     head.appendChild(textEl("span", notice.party || "human"));
     head.appendChild(textEl("span", notice.scope));
+    head.appendChild(textEl("span", notice.time_left));
     article.appendChild(head);
     article.appendChild(textEl("p", notice.text));
+    article.appendChild(renderNoticeActions(notice));
     return article;
   }
 
-  function renderNotices(notices) {
+  function renderNoticeActions(notice) {
+    var actions = el("div");
+    actions.className = "notice-actions";
+    var button = textEl("button", "Archive");
+    button.type = "button";
+    button.disabled = state.noticeBusy[notice.id] === true;
+    button.addEventListener("click", function () {
+      postNoticeAction(notice.id, "archive");
+    });
+    actions.appendChild(button);
+    var status = textEl("span", state.noticeStatuses[notice.id] || "");
+    status.className = "ask-status";
+    actions.appendChild(status);
+    return actions;
+  }
+
+  function renderNotices(notices, archivedCount) {
     var section = document.getElementById("notices");
     clear(section);
     section.appendChild(textEl("h2", "notices (" + notices.length + ")"));
+    var archivedLink = el("a");
+    archivedLink.href = "/archived";
+    archivedLink.textContent = archivedCount + " archived";
+    section.appendChild(archivedLink);
     appendAll(section, notices.map(renderNotice));
   }
 
@@ -570,7 +621,7 @@
     refreshRaidFilterOptions(data.raids);
     var filtered = applyRaidFilter(applyPartyFilter(data));
     renderAsks(filtered.asks);
-    renderNotices(filtered.notices);
+    renderNotices(filtered.notices, data.archived_notice_count);
     renderDrift(filtered.drift);
     renderParties(filtered.parties);
     restoreFocus();
