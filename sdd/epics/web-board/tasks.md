@@ -42,3 +42,17 @@ updated: 2026-09-29
 **Status:** [x] done — #27
 
 **What:** `GET /api/session` serves a per-start token; `POST /api/asks/<id>/answer` and `/dismiss` require the loopback `Host` and `Origin`, the token in `X-Guild-Token`, `application/json` and a body of at most 16384 bytes, then call `ask.answer` / `ask.dismiss` as the human actor (`GuildError` becomes 422); `OPTIONS` stays 405 with no CORS headers. Each ask card gets option buttons that fill the answer field, an answer field, `Answer` and `Dismiss` (with confirmation); drafts survive the 15-second refresh.
+
+## T06 — Status colors
+
+**Depends on:** T03
+**Status:** [x] done
+
+**What:** the page uses the terminal board's meanings through CSS classes only, with light and dark variants under `prefers-color-scheme`: a PR's lifecycle is a badge (`needs-human` red, `converging` amber, `ready` green, `draft` gray, `merged` purple, `closed` muted gray), checks show `✗N` red when N > 0 and muted otherwise, `✓N` green and `no checks` muted, and a task's state is colored (`active` blue, `blocked` red, `queued` muted). The text labels stay.
+
+## T07 — Archive notices from the view
+
+**Depends on:** T05
+**Status:** [x] done
+
+**What:** archiving hides an active notice from the human-facing lists only (`guild notices`, the board's notices section, the web notices section) and never changes delivery, the brief or the notice's state. `guild notice archive|unarchive <id>` (events `notice.archived` / `notice.unarchived`, column `notices.archived_at`), `guild notices --archived`, an `N archived` hint, and time left on every listed notice. The web model adds `archived_notice_count` and each notice's `time_left`; `POST /api/notices/<id>/archive` and `/unarchive` reuse the ask routes' checks; `/archived` (`archived.html`) lists archived notices with an `Unarchive` button and links back.

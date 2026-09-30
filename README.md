@@ -98,7 +98,9 @@ guild asks
 
 guild notice create "<text>" --to project:<name>|guild|raid:<name> --ttl <dur> [--until pr:<owner/repo>#<n>:merged|closed]
 guild notice close <id>
-guild notices
+guild notice archive <id>
+guild notice unarchive <id>
+guild notices [--archived]
 
 guild claim <area> --ttl <dur>          # area, or task:<epic>/<tid> / task:<quest>/<tid>
 guild claim check <area>                # read-only, no event; exit 0 free/yours, exit 1 someone else's
@@ -274,6 +276,32 @@ naming the refs and what each source says:
 The last line is `N findings` or `no drift`. `guild drift` never writes to
 SDD or the tracker: fixing drift stays with humans and the normal skills.
 
+### Archiving notices
+
+`guild notice archive <id>` hides an active notice from the human-facing
+lists only: `guild notices`, the NOTICES section of `guild board` and the web
+board's notices section. It changes nothing else. Delivery (inbox cursors,
+`prompt-submit`, `post-tool-use`), the `session-start` brief, `guild brief`
+and the notice's own state are untouched: the notice stays `active` until its
+TTL runs out, its `--until` condition holds or `guild notice close`. Expired
+and closed notices stop appearing, archived or not; archiving is not deletion.
+`guild notice unarchive <id>` undoes it. Both commands work for the human
+actor and for bound sessions, and fail for an unknown id, a notice that is
+already archived (or, for `unarchive`, not archived) and a notice that is
+not active (closed or expired). Guild is single-user, so there is one viewer:
+archiving is a per-guild flag, not per reader.
+
+`guild notices` lists active, non-archived notices, each with its time left
+(`#3 [human] pipeline down (guild, 5h left)`), and ends with `N archived
+(guild notices --archived)` when N > 0. `guild notices --archived` lists the
+active archived ones the same way. `guild board` (also `--party` and `--raid`)
+excludes archived notices and shows the same `N archived` hint under its
+NOTICES section, counting only the notices in that view.
+
+Storage: events `notice.archived` and `notice.unarchived`, and the projection
+column `notices.archived_at` (`TEXT`, `NULL` when not archived), added to
+existing databases by the column migration; `guild rebuild` replays it.
+
 ### `guild web`
 
 `guild web --port <n>` serves the same board in a browser, with more room
@@ -301,6 +329,26 @@ keeping the current filters and which blocks are collapsed. PR links open
 tracker card when the project configures `tracker.browse_url` (see
 "Project config").
 
+**Colors**: the page uses the terminal board's meanings, with CSS classes
+only (no inline style) and light and dark variants through
+`prefers-color-scheme`. A PR's lifecycle is a badge (`needs-human` red,
+`converging` amber, `ready` green, `draft` gray, `merged` purple, `closed`
+muted gray). Checks show `✗N` in red when N > 0 and muted otherwise, `✓N` in
+green, and `no checks` muted when there are none. A task's state is colored
+too (`active` blue, `blocked` red, `queued` muted). The text labels stay, so
+color is never the only signal.
+
+**Archiving notices from the page**: each notice card shows its time left
+(the model carries `expires_at` and a server-computed `time_left`) and an
+`Archive` button. The notices heading links to `/archived` (`N archived`,
+from the model's `archived_notice_count`). `/archived` is its own page
+(`archived.html`, `archived.js`, fed by `GET /api/archived-notices`): it
+lists archived active notices with their time left and an `Unarchive`
+button, links back to the board, and refreshes every 15 seconds like the main
+page. `POST /api/notices/<id>/archive` and `/unarchive` (body `{}`) run
+`guild notice archive` / `unarchive` as the human actor and go through the
+same validation as the ask routes.
+
 **Answering from the page**: each open ask card has one button per option
 (clicking it only copies the option's text into the answer field), an answer
 field, an `Answer` button and a `Dismiss` button (which asks for
@@ -317,8 +365,9 @@ Project `pii_patterns` are those of the project of the party that asked, whereve
 **Security model**: the server binds to `127.0.0.1` only, on the stdlib's
 `http.server.ThreadingHTTPServer` — no third-party dependency, no build
 step. Reads are `GET`; the only writes are `POST /api/asks/<id>/answer`
-(body `{"answer": "<text>"}`) and `POST /api/asks/<id>/dismiss` (body `{}`),
-with `<id>` a positive integer (otherwise `404`); every other method,
+(body `{"answer": "<text>"}`), `POST /api/asks/<id>/dismiss` (body `{}`),
+`POST /api/notices/<id>/archive` and `POST /api/notices/<id>/unarchive`
+(body `{}`), with `<id>` a positive integer (otherwise `404`); every other method,
 including `OPTIONS`, is `405`, and no response ever carries CORS headers, so
 cross-origin preflights fail. Requests whose `Host` header is not exactly
 `127.0.0.1:<port>` or `localhost:<port>` get `421`, which blocks DNS
@@ -341,8 +390,9 @@ scripts, no external assets), `X-Content-Type-Options: nosniff` and
 no-store`. The page (`guild/web/app.js`) builds every node with
 `document.createElement` and sets text with `textContent` only — it never
 uses `innerHTML` or any HTML-injecting API, so text coming from agents, SDD,
-GitHub or the tracker is never executed. Apart from answering and dismissing
-asks, `guild web` never writes to the database, and it logs no per-request
+GitHub or the tracker is never executed (`archived.js` follows the same
+rules). Apart from answering and dismissing asks and archiving and
+unarchiving notices, `guild web` never writes to the database, and it logs no per-request
 access noise to stderr (server errors still do). Ctrl-C exits cleanly.
 
 ### `guild handoff` and resuming a party
@@ -520,8 +570,8 @@ it gets refused with a hint to run `guild party start <name>` or
 `guild party resume <party>`. Reads always work.
 
 No session id at all (a plain terminal) resolves to the actor `human`,
-allowed only for `answer`, `dismiss`, `notice create`, `notice close`, and
-all reads.
+allowed only for `answer`, `dismiss`, `notice create`, `notice close`,
+`notice archive`, `notice unarchive`, and all reads.
 
 A project is resolved from the current working directory against every
 project config's `paths` globs (first match wins, configs read in filename
