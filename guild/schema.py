@@ -185,7 +185,6 @@ _COLUMN_MIGRATIONS = (
     ("prs", "last_notified_comment_count", "INTEGER"),
     ("prs", "last_activity_at", "TEXT"),
     ("notices", "announces", "TEXT"),
-    ("notices", "archived_at", "TEXT"),
     ("raid_members", "lead", "INTEGER"),
 )
 

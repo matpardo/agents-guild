@@ -8,8 +8,8 @@ _EVENT_HANDLER_ATTR_RE = re.compile(r"<[^>]+\son[a-z]+\s*=", re.IGNORECASE)
 _SCRIPT_TAG_RE = re.compile(r"<script\b([^>]*)>(.*?)</script>", re.IGNORECASE | re.DOTALL)
 
 
-_SCRIPTS = ("app.js", "archived.js")
-_PAGES = ("index.html", "archived.html")
+_SCRIPTS = ("app.js",)
+_PAGES = ("index.html",)
 
 
 class PageScriptSafeRenderingTests(unittest.TestCase):
@@ -53,14 +53,6 @@ class PageScriptWriteTests(unittest.TestCase):
                 with self.subTest(script=name, api=banned):
                     self.assertNotIn(banned, source)
 
-    def test_notice_buttons_use_the_notice_routes(self):
-        self.assertIn('"/api/notices/"', (_WEB_DIR / "app.js").read_text())
-        self.assertIn('"/api/notices/"', (_WEB_DIR / "archived.js").read_text())
-
-    def test_pages_link_to_each_other(self):
-        self.assertIn('"/archived"', (_WEB_DIR / "app.js").read_text())
-        self.assertIn('href="/"', (_WEB_DIR / "archived.html").read_text())
-
 
 class AppJsWriteTests(unittest.TestCase):
     def setUp(self):
@@ -99,11 +91,8 @@ class HtmlCspComplianceTests(unittest.TestCase):
 
     def test_references_local_static_assets(self):
         index = (_WEB_DIR / "index.html").read_text()
-        archived = (_WEB_DIR / "archived.html").read_text()
         self.assertIn('href="/app.css"', index)
         self.assertIn('src="/app.js"', index)
-        self.assertIn('href="/app.css"', archived)
-        self.assertIn('src="/archived.js"', archived)
 
 
 class AppCssTests(unittest.TestCase):

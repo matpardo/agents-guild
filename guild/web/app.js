@@ -17,8 +17,6 @@
     drafts: {},
     statuses: {},
     busy: {},
-    noticeStatuses: {},
-    noticeBusy: {},
     focusedAskId: null,
     focusStart: 0,
     focusEnd: 0,
@@ -81,10 +79,6 @@
     return "request failed";
   }
 
-  function noticeUrl(noticeId, action) {
-    return "/api/notices/" + noticeId + "/" + action;
-  }
-
   function sendPost(url, payload) {
     return fetch(url, {
       method: "POST",
@@ -107,26 +101,6 @@
       .catch(function () {
         return { ok: false, body: null };
       });
-  }
-
-  function postNoticeAction(noticeId, action) {
-    if (sessionToken === null) {
-      state.noticeStatuses[noticeId] = NO_SESSION_MESSAGE;
-      fetchBoard();
-      return;
-    }
-    state.noticeBusy[noticeId] = true;
-    state.noticeStatuses[noticeId] = "sending...";
-    fetchBoard();
-    sendPost(noticeUrl(noticeId, action), {}).then(function (result) {
-      delete state.noticeBusy[noticeId];
-      if (result.ok) {
-        delete state.noticeStatuses[noticeId];
-      } else {
-        state.noticeStatuses[noticeId] = errorMessage(result.body);
-      }
-      fetchBoard();
-    });
   }
 
   function postAskAction(askId, action, payload) {
@@ -285,34 +259,13 @@
     head.appendChild(textEl("span", notice.time_left));
     article.appendChild(head);
     article.appendChild(textEl("p", notice.text));
-    article.appendChild(renderNoticeActions(notice));
     return article;
   }
 
-  function renderNoticeActions(notice) {
-    var actions = el("div");
-    actions.className = "notice-actions";
-    var button = textEl("button", "Archive");
-    button.type = "button";
-    button.disabled = state.noticeBusy[notice.id] === true;
-    button.addEventListener("click", function () {
-      postNoticeAction(notice.id, "archive");
-    });
-    actions.appendChild(button);
-    var status = textEl("span", state.noticeStatuses[notice.id] || "");
-    status.className = "ask-status";
-    actions.appendChild(status);
-    return actions;
-  }
-
-  function renderNotices(notices, archivedCount) {
+  function renderNotices(notices) {
     var section = document.getElementById("notices");
     clear(section);
     section.appendChild(textEl("h2", "notices (" + notices.length + ")"));
-    var archivedLink = el("a");
-    archivedLink.href = "/archived";
-    archivedLink.textContent = archivedCount + " archived";
-    section.appendChild(archivedLink);
     appendAll(section, notices.map(renderNotice));
   }
 
@@ -621,7 +574,7 @@
     refreshRaidFilterOptions(data.raids);
     var filtered = applyRaidFilter(applyPartyFilter(data));
     renderAsks(filtered.asks);
-    renderNotices(filtered.notices, data.archived_notice_count);
+    renderNotices(filtered.notices);
     renderDrift(filtered.drift);
     renderParties(filtered.parties);
     restoreFocus();

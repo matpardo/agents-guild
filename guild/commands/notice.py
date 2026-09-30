@@ -116,15 +116,6 @@ def _record_notice_event(ctx, kind, notice_id):
         )
 
 
-def _require_live_notice(ctx, notice_id):
-    row = ctx.conn.execute("SELECT * FROM notices WHERE id = ?", (notice_id,)).fetchone()
-    if row is None:
-        raise GuildError("unknown notice #{}".format(notice_id), 1)
-    if row["state"] != "active" or timeutil.is_expired(ctx.now, row["expires_at"]):
-        raise GuildError("notice #{} is not active".format(notice_id), 1)
-    return row
-
-
 def close(ctx, notice_id):
     row = ctx.conn.execute("SELECT id, state FROM notices WHERE id = ?", (notice_id,)).fetchone()
     if row is None:
@@ -133,22 +124,6 @@ def close(ctx, notice_id):
         raise GuildError("notice #{} is not active".format(notice_id), 1)
     _record_notice_event(ctx, "notice.closed", notice_id)
     return "notice #{} closed".format(notice_id)
-
-
-def archive(ctx, notice_id):
-    row = _require_live_notice(ctx, notice_id)
-    if row["archived_at"] is not None:
-        raise GuildError("notice #{} is already archived".format(notice_id), 1)
-    _record_notice_event(ctx, "notice.archived", notice_id)
-    return "notice #{} archived".format(notice_id)
-
-
-def unarchive(ctx, notice_id):
-    row = _require_live_notice(ctx, notice_id)
-    if row["archived_at"] is None:
-        raise GuildError("notice #{} is not archived".format(notice_id), 1)
-    _record_notice_event(ctx, "notice.unarchived", notice_id)
-    return "notice #{} unarchived".format(notice_id)
 
 
 def active_notices(conn, now):
@@ -179,16 +154,6 @@ def targeting(rows, project, scope_guild_always, raid_member_of):
     return matched
 
 
-def split_archived(rows):
-    visible = [row for row in rows if row["archived_at"] is None]
-    archived = [row for row in rows if row["archived_at"] is not None]
-    return visible, archived
-
-
-def archived_hint(archived_count):
-    return "{} archived (guild notices --archived)".format(archived_count)
-
-
 def _list_line(ctx, row):
     author = row["party"] or "human"
     return "#{} [{}] {} ({}, {})".format(
@@ -196,14 +161,5 @@ def _list_line(ctx, row):
     )
 
 
-def list_visible(ctx):
-    visible, archived = split_archived(active_notices(ctx.conn, ctx.now))
-    lines = [_list_line(ctx, row) for row in visible]
-    if archived:
-        lines.append(archived_hint(len(archived)))
-    return lines
-
-
-def list_archived(ctx):
-    archived = split_archived(active_notices(ctx.conn, ctx.now))[1]
-    return [_list_line(ctx, row) for row in archived]
+def list_active(ctx):
+    return [_list_line(ctx, row) for row in active_notices(ctx.conn, ctx.now)]

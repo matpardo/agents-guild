@@ -174,27 +174,10 @@ def _handle_notice_close(ctx, args):
     return 0
 
 
-def _handle_notice_archive(ctx, args):
-    from guild.commands import notice as notice_commands
-
-    _print(notice_commands.archive(ctx, args.id))
-    return 0
-
-
-def _handle_notice_unarchive(ctx, args):
-    from guild.commands import notice as notice_commands
-
-    _print(notice_commands.unarchive(ctx, args.id))
-    return 0
-
-
 def _handle_notices(ctx, args):
     from guild.commands import notice as notice_commands
 
-    if args.archived:
-        _print_lines(notice_commands.list_archived(ctx))
-        return 0
-    _print_lines(notice_commands.list_visible(ctx))
+    _print_lines(notice_commands.list_active(ctx))
     return 0
 
 
@@ -448,14 +431,6 @@ def _add_notice_parser(subparsers):
     close.add_argument("id", type=int)
     close.set_defaults(handler=_handle_notice_close)
 
-    archive = actions.add_parser("archive")
-    archive.add_argument("id", type=int)
-    archive.set_defaults(handler=_handle_notice_archive)
-
-    unarchive = actions.add_parser("unarchive")
-    unarchive.add_argument("id", type=int)
-    unarchive.set_defaults(handler=_handle_notice_unarchive)
-
 
 def _add_raid_parser(subparsers):
     parser = subparsers.add_parser("raid")
@@ -516,7 +491,6 @@ def build_parser():
     _add_notice_parser(subparsers)
 
     notices = subparsers.add_parser("notices")
-    notices.add_argument("--archived", action="store_true")
     notices.set_defaults(handler=_handle_notices)
 
     claim = subparsers.add_parser("claim")

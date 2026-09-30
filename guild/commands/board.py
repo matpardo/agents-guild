@@ -210,9 +210,8 @@ def _raid_scoped_notices(ctx, raid_name):
     return [row for row in notice_commands.active_notices(ctx.conn, ctx.now) if row["scope"] == scope]
 
 
-def _notices_section(ctx, painter, scoped_rows):
-    rows, archived = notice_commands.split_archived(scoped_rows)
-    if not scoped_rows:
+def _notices_section(ctx, painter, rows):
+    if not rows:
         return []
     lines = [painter.paint("NOTICES · {} active".format(len(rows)), "bold")]
     for row in rows:
@@ -224,8 +223,6 @@ def _notices_section(ctx, painter, scoped_rows):
             )
         )
         lines.extend(painter.wrap(row["text"], "     "))
-    if archived:
-        lines.append(painter.paint("  {}".format(notice_commands.archived_hint(len(archived))), "dim"))
     lines.append("")
     return lines
 
@@ -552,15 +549,12 @@ def board_model(ctx):
     ).fetchall()
     projects_by_name = {project["name"]: project for project in config.load_all_projects(ctx.projects_dir)}
     ask_rows = _sorted_open_asks(ctx.conn, None)
-    notice_rows, archived_rows = notice_commands.split_archived(
-        notice_commands.active_notices(ctx.conn, ctx.now)
-    )
+    notice_rows = notice_commands.active_notices(ctx.conn, ctx.now)
     project_names = sorted({row["project"] for row in party_rows if row["project"] is not None})
     return {
         "generated_at": timeutil.to_iso(ctx.now),
         "asks": [_ask_model(ctx.conn, row) for row in ask_rows],
         "notices": [_notice_model(ctx, row) for row in notice_rows],
-        "archived_notice_count": len(archived_rows),
         "parties": [
             _party_model(ctx, party_row, projects_by_name.get(party_row["project"]))
             for party_row in party_rows
@@ -569,10 +563,3 @@ def board_model(ctx):
         "raids": _raid_models(ctx.conn, ctx.now),
     }
 
-
-def archived_notices_model(ctx):
-    archived_rows = notice_commands.split_archived(notice_commands.active_notices(ctx.conn, ctx.now))[1]
-    return {
-        "generated_at": timeutil.to_iso(ctx.now),
-        "notices": [_notice_model(ctx, row) for row in archived_rows],
-    }
