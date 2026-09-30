@@ -1,7 +1,7 @@
 import sqlite3
 import unittest
 
-from guild import db, schema
+from guild import db, paths, schema
 from tests.testutil import GuildTestCase
 
 _OLD_LEADERS = """
@@ -118,6 +118,22 @@ class MigrationTests(GuildTestCase):
 
         notices_columns = {row["name"] for row in conn.execute("PRAGMA table_info(notices)").fetchall()}
         self.assertIn("announces", notices_columns)
+
+    def test_old_schema_db_gains_notices_archived_at_column(self):
+        db_path = self.data_home / "guild.db"
+        _make_old_schema_db(db_path)
+
+        conn = db.connect(db_path)
+
+        notices_columns = {row["name"] for row in conn.execute("PRAGMA table_info(notices)").fetchall()}
+        self.assertIn("archived_at", notices_columns)
+
+    def test_migrated_db_can_archive_a_notice(self):
+        paths.ensure_private_dir(paths.db_path().parent)
+        _make_old_schema_db(paths.db_path())
+        self.run_cli(["notice", "create", "pipeline down", "--to", "guild", "--ttl", "5h"], None, None)
+        code, out, err = self.run_cli(["notice", "archive", "1"], None, None)
+        self.assertEqual(code, 0, err)
 
     def test_old_schema_db_gains_raid_members_table(self):
         db_path = self.data_home / "guild.db"

@@ -210,8 +210,9 @@ def _raid_scoped_notices(ctx, raid_name):
     return [row for row in notice_commands.active_notices(ctx.conn, ctx.now) if row["scope"] == scope]
 
 
-def _notices_section(ctx, painter, rows):
-    if not rows:
+def _notices_section(ctx, painter, scoped_rows):
+    rows, archived = notice_commands.split_archived(scoped_rows)
+    if not scoped_rows:
         return []
     lines = [painter.paint("NOTICES · {} active".format(len(rows)), "bold")]
     for row in rows:
@@ -223,6 +224,8 @@ def _notices_section(ctx, painter, rows):
             )
         )
         lines.extend(painter.wrap(row["text"], "     "))
+    if archived:
+        lines.append(painter.paint("  {}".format(notice_commands.archived_hint(len(archived))), "dim"))
     lines.append("")
     return lines
 
