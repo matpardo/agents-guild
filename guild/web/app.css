@@ -6,6 +6,21 @@
   --border: #d8d8dc;
   --accent: #2b5fb8;
   --danger: #b23b3b;
+  --red: #b3261e;
+  --green: #1e7a3a;
+  --blue: #2b5fb8;
+  --lifecycle-needs-human-fg: #8c1d18;
+  --lifecycle-needs-human-bg: #fbe3e1;
+  --lifecycle-converging-fg: #7a4b00;
+  --lifecycle-converging-bg: #fdefc7;
+  --lifecycle-ready-fg: #14602b;
+  --lifecycle-ready-bg: #d9f2df;
+  --lifecycle-draft-fg: #4a4a52;
+  --lifecycle-draft-bg: #e6e6ea;
+  --lifecycle-merged-fg: #5b2a9e;
+  --lifecycle-merged-bg: #ece0fa;
+  --lifecycle-closed-fg: #6b6b73;
+  --lifecycle-closed-bg: #f0f0f2;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -17,6 +32,21 @@
     --border: #33343c;
     --accent: #7aa6ff;
     --danger: #ff8f8f;
+    --red: #ff8f8f;
+    --green: #7fd99a;
+    --blue: #7aa6ff;
+    --lifecycle-needs-human-fg: #ffb3ad;
+    --lifecycle-needs-human-bg: #4a1c1a;
+    --lifecycle-converging-fg: #ffd479;
+    --lifecycle-converging-bg: #45340a;
+    --lifecycle-ready-fg: #8fe0a4;
+    --lifecycle-ready-bg: #14381f;
+    --lifecycle-draft-fg: #c4c4cc;
+    --lifecycle-draft-bg: #33343c;
+    --lifecycle-merged-fg: #d3b5ff;
+    --lifecycle-merged-bg: #3a2660;
+    --lifecycle-closed-fg: #9a9aa4;
+    --lifecycle-closed-bg: #26272e;
   }
 }
 
@@ -233,4 +263,68 @@ a {
 
 .ask-status {
   color: var(--danger);
+}
+
+.pill {
+  border-radius: 3px;
+  padding: 0 0.4rem;
+  font-size: 0.8rem;
+}
+
+.lifecycle-needs-human {
+  background: var(--lifecycle-needs-human-bg);
+  color: var(--lifecycle-needs-human-fg);
+}
+
+.lifecycle-converging {
+  background: var(--lifecycle-converging-bg);
+  color: var(--lifecycle-converging-fg);
+}
+
+.lifecycle-ready {
+  background: var(--lifecycle-ready-bg);
+  color: var(--lifecycle-ready-fg);
+}
+
+.lifecycle-draft {
+  background: var(--lifecycle-draft-bg);
+  color: var(--lifecycle-draft-fg);
+}
+
+.lifecycle-merged {
+  background: var(--lifecycle-merged-bg);
+  color: var(--lifecycle-merged-fg);
+}
+
+.lifecycle-closed {
+  background: var(--lifecycle-closed-bg);
+  color: var(--lifecycle-closed-fg);
+}
+
+.checks-failing {
+  color: var(--red);
+}
+
+.checks-clear {
+  color: var(--muted);
+}
+
+.checks-passing {
+  color: var(--green);
+}
+
+.checks-none {
+  color: var(--muted);
+}
+
+.state-active {
+  color: var(--blue);
+}
+
+.state-blocked {
+  color: var(--red);
+}
+
+.state-queued {
+  color: var(--muted);
 }

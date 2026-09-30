@@ -302,12 +302,32 @@
     return state.stateFilter === "all" || pr.lifecycle === state.stateFilter;
   }
 
+  function renderChecks(pr) {
+    var checks = el("span");
+    if (pr.checks_failing === 0 && pr.checks_passing === 0) {
+      var none = textEl("span", "no checks");
+      none.className = "checks-none";
+      checks.appendChild(none);
+      return checks;
+    }
+    var failing = textEl("span", "✗" + pr.checks_failing);
+    failing.className = pr.checks_failing > 0 ? "checks-failing" : "checks-clear";
+    var passing = textEl("span", "✓" + pr.checks_passing);
+    passing.className = "checks-passing";
+    checks.appendChild(failing);
+    checks.appendChild(document.createTextNode(" "));
+    checks.appendChild(passing);
+    return checks;
+  }
+
   function renderPr(pr) {
     var row = el("li");
     row.className = "pr";
     row.appendChild(link(pr.url, pr.repo + "#" + pr.number));
-    row.appendChild(textEl("span", pr.lifecycle));
-    row.appendChild(textEl("span", "checks ✗" + pr.checks_failing + " ✓" + pr.checks_passing));
+    var lifecycle = textEl("span", pr.lifecycle);
+    lifecycle.className = "pill lifecycle-" + pr.lifecycle;
+    row.appendChild(lifecycle);
+    row.appendChild(renderChecks(pr));
     row.appendChild(textEl("span", pr.what));
     if (pr.waits) {
       row.appendChild(textEl("span", "waits: " + pr.waits));
@@ -333,7 +353,9 @@
     head.className = "task-head";
     head.appendChild(textEl("span", task.tid));
     head.appendChild(textEl("span", task.title));
-    head.appendChild(textEl("span", task.state));
+    var taskState = textEl("span", task.state);
+    taskState.className = "state state-" + task.state;
+    head.appendChild(taskState);
     if (task.card_url) {
       head.appendChild(link(task.card_url, task.tid + " card"));
     }
