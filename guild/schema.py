@@ -12,6 +12,7 @@ PROJECTION_TABLES = (
     "claims",
     "raid_members",
     "pr_shared_areas",
+    "merge_queue_pins",
 )
 
 _RAID_MEMBERS_TABLE = """
@@ -177,6 +178,17 @@ _CREATE_STATEMENTS = (
         number INTEGER NOT NULL,
         glob TEXT NOT NULL,
         PRIMARY KEY (repo, number, glob)
+    )
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS merge_queue_pins (
+        first_repo TEXT NOT NULL,
+        first_number INTEGER NOT NULL,
+        second_repo TEXT NOT NULL,
+        second_number INTEGER NOT NULL,
+        party TEXT,
+        created_at TEXT NOT NULL,
+        PRIMARY KEY (first_repo, first_number, second_repo, second_number)
     )
     """,
     """

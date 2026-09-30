@@ -368,6 +368,32 @@ def _raid_left(conn, event):
     )
 
 
+def _merge_queue_pinned(conn, event):
+    payload = event["payload"]
+    conn.execute(
+        "INSERT OR REPLACE INTO merge_queue_pins"
+        " (first_repo, first_number, second_repo, second_number, party, created_at)"
+        " VALUES (?, ?, ?, ?, ?, ?)",
+        (
+            payload["first_repo"],
+            payload["first_number"],
+            payload["second_repo"],
+            payload["second_number"],
+            payload["author"],
+            event["ts"],
+        ),
+    )
+
+
+def _merge_queue_unpinned(conn, event):
+    payload = event["payload"]
+    conn.execute(
+        "DELETE FROM merge_queue_pins WHERE first_repo = ? AND first_number = ?"
+        " AND second_repo = ? AND second_number = ?",
+        (payload["first_repo"], payload["first_number"], payload["second_repo"], payload["second_number"]),
+    )
+
+
 def _dump(value):
     return json.dumps(value)
 
@@ -400,6 +426,8 @@ _REDUCERS = {
     "claim.released": _claim_released,
     "raid.joined": _raid_joined,
     "raid.left": _raid_left,
+    "merge_queue.pinned": _merge_queue_pinned,
+    "merge_queue.unpinned": _merge_queue_unpinned,
 }
 
 

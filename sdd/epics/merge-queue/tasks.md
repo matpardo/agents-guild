@@ -25,7 +25,7 @@ updated: 2026-09-29
 ## T03 — Pins
 
 **Depends on:** T02
-**Status:** [ ] pending
+**Status:** [x] done
 
 **What:** `guild merge-queue pin|unpin`, events `merge_queue.pinned|unpinned`, projection `merge_queue_pins`, authority rules and cycle rejection.
 
