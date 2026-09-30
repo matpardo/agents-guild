@@ -18,7 +18,7 @@ updated: 2026-09-29
 ## T02 — Queue ordering
 
 **Depends on:** T01
-**Status:** [ ] pending
+**Status:** [x] done
 
 **What:** pure `guild/merge_queue.py`: eligible and blocked PRs with exact reasons, topological order over task dependencies, pins and shared-area overlap, a reason per position.
 
