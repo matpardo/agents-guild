@@ -63,3 +63,10 @@ updated: 2026-09-29
 **Status:** [x] done — #25
 
 **What:** the first raid showed `coder` subagents writing every file through Bash, so `pre-edit` never fired and shared files went unclaimed. `guild hook pre-commit` claims the staged shared areas for the committing party, or rejects the commit naming the holder; wired per user through husky's `~/.config/husky/init.sh`, never in the project repository.
+
+## T09 — Release shared-area claims on merge
+
+**Depends on:** T02, T08
+**Status:** [x] done
+
+**What:** `sync --source gh` releases the `area:` claims of the owning party that the merged PR's changed files match, and lists them as `Released:` in the merge notice; claims of other parties and `task:` claims stay.

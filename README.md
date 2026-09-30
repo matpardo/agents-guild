@@ -231,6 +231,16 @@ notice payload carries `announces: pr:<repo>#<n>`, and `sync` skips posting
 if a notice (active or not) with that `announces` value already exists —
 safe across a re-sync or a `rebuild` followed by a `sync`.
 
+The same sync also releases shared-area claims: when the project has
+`shared_areas` and the owning party is in a raid or holds an active `area:`
+claim in that project, the changed files are fetched once (shared with the
+notice), and every `area:<glob>` claim of the owning party whose glob one of
+them matches is released with a normal `claim.released` event. Claims held
+by other parties and `task:` claims are never touched. If the files call
+fails nothing is released and the failure is a sync failure. When something
+was released and the owner is in a raid, the notice ends with
+` Released: <glob1>, <glob2>.`
+
 `guild` has no daemon, so this only fires when someone runs the sync. A raid
 lead should keep a watcher running for the duration of the raid, e.g.
 `watch -n 300 guild sync --source gh` from a terminal, or `/loop 5m guild
@@ -852,6 +862,11 @@ one (nothing is claimed then). Unbound sessions, human commits, projects
 without `shared_areas` and anything outside git pass untouched; internal
 errors print `guild hook error: ...` and never block the commit. It never
 reads stdin.
+
+Claims taken by either guard are released when the holder's PR that touched
+them is merged, as seen by `guild sync --source gh` (see "Merge notices"), so
+the raid lead's `/loop` sync is what frees the area for other parties before
+the TTL runs out.
 
 Wire it without touching the project's repository. With husky (it sources a
 per-user init file before every hook, with the hook name in `$n`):
