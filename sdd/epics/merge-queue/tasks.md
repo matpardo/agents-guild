@@ -2,7 +2,7 @@
 epic: merge-queue
 type: tasks
 title: Merge queue for raids and parties
-status: active
+status: done
 updated: 2026-09-29
 ---
 

@@ -2,7 +2,7 @@
 epic: merge-queue
 type: spec
 title: Merge queue for raids and parties
-status: active
+status: done
 owner: matpardo
 created: 2026-09-29
 updated: 2026-09-29
@@ -33,11 +33,11 @@ In the first raid several PRs became ready at once and some touched the same sha
 
 ## Success criteria
 
-- [ ] `guild merge-queue --raid <name>` lists ready PRs in an order where PRs sharing a shared-area glob are sequential, each position with its reason.
-- [ ] Blocked PRs are listed with exact reasons and never appear in the order.
-- [ ] A pin overrides the computed order, is limited to the raid lead, the owning party or the human, and drops out when a PR merges or closes.
-- [ ] `guild web` shows the same queue and reasons per raid and per party outside raids.
-- [ ] No command in this epic writes to GitHub or merges a PR.
+- [x] `guild merge-queue --raid <name>` lists ready PRs in an order where PRs sharing a shared-area glob are sequential, each position with its reason.
+- [x] Blocked PRs are listed with exact reasons and never appear in the order.
+- [x] A pin overrides the computed order, is limited to the raid lead, the owning party or the human, and drops out when a PR merges or closes.
+- [x] `guild web` shows the same queue and reasons per raid and per party outside raids.
+- [x] No command in this epic writes to GitHub or merges a PR.
 
 ## Security and data
 
