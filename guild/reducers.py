@@ -246,6 +246,20 @@ def _pr_synced(conn, event):
             payload["number"],
         ),
     )
+    if "change_set" in payload:
+        _store_change_set(conn, payload["repo"], payload["number"], payload["change_set"])
+
+
+def _store_change_set(conn, repo, number, change_set):
+    conn.execute(
+        "UPDATE prs SET additions = ?, deletions = ?, created_at = ? WHERE repo = ? AND number = ?",
+        (change_set["additions"], change_set["deletions"], change_set["created_at"], repo, number),
+    )
+    conn.execute("DELETE FROM pr_shared_areas WHERE repo = ? AND number = ?", (repo, number))
+    for glob in change_set["globs"]:
+        conn.execute(
+            "INSERT INTO pr_shared_areas (repo, number, glob) VALUES (?, ?, ?)", (repo, number, glob)
+        )
 
 
 def _pr_comments_acknowledged(conn, event):
@@ -354,6 +368,32 @@ def _raid_left(conn, event):
     )
 
 
+def _merge_queue_pinned(conn, event):
+    payload = event["payload"]
+    conn.execute(
+        "INSERT OR REPLACE INTO merge_queue_pins"
+        " (first_repo, first_number, second_repo, second_number, party, created_at)"
+        " VALUES (?, ?, ?, ?, ?, ?)",
+        (
+            payload["first_repo"],
+            payload["first_number"],
+            payload["second_repo"],
+            payload["second_number"],
+            payload["author"],
+            event["ts"],
+        ),
+    )
+
+
+def _merge_queue_unpinned(conn, event):
+    payload = event["payload"]
+    conn.execute(
+        "DELETE FROM merge_queue_pins WHERE first_repo = ? AND first_number = ?"
+        " AND second_repo = ? AND second_number = ?",
+        (payload["first_repo"], payload["first_number"], payload["second_repo"], payload["second_number"]),
+    )
+
+
 def _dump(value):
     return json.dumps(value)
 
@@ -386,6 +426,8 @@ _REDUCERS = {
     "claim.released": _claim_released,
     "raid.joined": _raid_joined,
     "raid.left": _raid_left,
+    "merge_queue.pinned": _merge_queue_pinned,
+    "merge_queue.unpinned": _merge_queue_unpinned,
 }
 
 

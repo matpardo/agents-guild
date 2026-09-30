@@ -255,6 +255,27 @@ def _handle_raids(ctx, args):
     return 0
 
 
+def _handle_merge_queue(ctx, args):
+    from guild.commands import merge_queue as merge_queue_commands
+
+    _print_lines(merge_queue_commands.run(ctx, args.raid, args.party))
+    return 0
+
+
+def _handle_merge_queue_pin(ctx, args):
+    from guild.commands import merge_queue as merge_queue_commands
+
+    _print(merge_queue_commands.pin(ctx, args.ref, args.before))
+    return 0
+
+
+def _handle_merge_queue_unpin(ctx, args):
+    from guild.commands import merge_queue as merge_queue_commands
+
+    _print(merge_queue_commands.unpin(ctx, args.ref, args.before))
+    return 0
+
+
 def _handle_board(ctx, args):
     from guild.commands import board as board_commands
 
@@ -476,6 +497,25 @@ def _add_raid_parser(subparsers):
     leave.set_defaults(handler=_handle_raid_leave)
 
 
+def _add_merge_queue_parser(subparsers):
+    parser = subparsers.add_parser("merge-queue")
+    scope = parser.add_mutually_exclusive_group()
+    scope.add_argument("--raid")
+    scope.add_argument("--party")
+    parser.set_defaults(handler=_handle_merge_queue)
+    actions = parser.add_subparsers(dest="merge_queue_action", required=False)
+
+    pin = actions.add_parser("pin")
+    pin.add_argument("ref")
+    pin.add_argument("--before", required=True)
+    pin.set_defaults(handler=_handle_merge_queue_pin)
+
+    unpin = actions.add_parser("unpin")
+    unpin.add_argument("ref")
+    unpin.add_argument("--before", required=True)
+    unpin.set_defaults(handler=_handle_merge_queue_unpin)
+
+
 def build_parser():
     parser = argparse.ArgumentParser(prog="guild")
     subparsers = parser.add_subparsers(dest="command", required=True)
@@ -537,6 +577,8 @@ def build_parser():
 
     raids = subparsers.add_parser("raids")
     raids.set_defaults(handler=_handle_raids)
+
+    _add_merge_queue_parser(subparsers)
 
     board = subparsers.add_parser("board")
     board_filter = board.add_mutually_exclusive_group()

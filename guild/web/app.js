@@ -35,6 +35,12 @@
     return node;
   }
 
+  function classedText(tag, value, className) {
+    var node = textEl(tag, value);
+    node.className = className;
+    return node;
+  }
+
   function clear(node) {
     while (node.firstChild) {
       node.removeChild(node.firstChild);
@@ -388,6 +394,74 @@
     appendAll(section, drift.map(renderDriftEntry));
   }
 
+  function renderQueueEntryHead(entry) {
+    var head = el("div");
+    head.className = "queue-entry-head";
+    head.appendChild(link(entry.url, entry.ref));
+    var lifecycle = textEl("span", entry.lifecycle);
+    lifecycle.className = "pill lifecycle-" + entry.lifecycle;
+    head.appendChild(lifecycle);
+    head.appendChild(renderChecks(entry));
+    head.appendChild(textEl("span", entry.party));
+    head.appendChild(textEl("span", entry.task || "-"));
+    return head;
+  }
+
+  function renderQueueEntry(entry) {
+    var item = el("li");
+    item.className = "queue-entry";
+    item.value = entry.position;
+    item.appendChild(renderQueueEntryHead(entry));
+    item.appendChild(classedText("p", entry.reason, "queue-reason"));
+    return item;
+  }
+
+  function renderBlockedEntry(entry) {
+    var item = el("li");
+    item.className = "queue-entry";
+    item.appendChild(renderQueueEntryHead(entry));
+    item.appendChild(classedText("p", entry.reasons.join("; "), "queue-reason"));
+    return item;
+  }
+
+  function renderMergeQueue(queue) {
+    var article = el("article");
+    article.className = "card merge-queue";
+    var head = el("div");
+    head.className = "card-head";
+    head.appendChild(textEl("strong", queue.scope));
+    head.appendChild(textEl("span", queue.synced_label));
+    article.appendChild(head);
+    if (queue.queue.length === 0) {
+      article.appendChild(textEl("p", "nothing ready to merge"));
+    } else {
+      var list = el("ol");
+      list.className = "queue-list";
+      appendAll(list, queue.queue.map(renderQueueEntry));
+      article.appendChild(list);
+    }
+    if (queue.blocked.length > 0) {
+      article.appendChild(textEl("h4", "blocked (" + queue.blocked.length + ")"));
+      var blockedList = el("ul");
+      blockedList.className = "queue-list";
+      appendAll(blockedList, queue.blocked.map(renderBlockedEntry));
+      article.appendChild(blockedList);
+    }
+    return article;
+  }
+
+  function renderMergeQueues(queues) {
+    var section = document.getElementById("merge-queues");
+    clear(section);
+    section.appendChild(textEl("h2", "merge queue"));
+    if (queues.length === 0) {
+      section.appendChild(textEl("p", "no open PRs in scope"));
+      return;
+    }
+    appendAll(section, queues.map(renderMergeQueue));
+    section.appendChild(classedText("p", "guild never merges: merge in this order by hand", "muted"));
+  }
+
   function prMatchesStateFilter(pr) {
     return state.stateFilter === "all" || pr.lifecycle === state.stateFilter;
   }
@@ -583,7 +657,27 @@
       }),
       drift: data.drift,
       raids: data.raids,
+      merge_queues: filterMergeQueuesByParty(data.merge_queues, state.partyFilter),
     };
+  }
+
+  function filterMergeQueuesByParty(queues, partyName) {
+    var matches = function (entry) {
+      return entry.party === partyName;
+    };
+    return queues
+      .map(function (queue) {
+        return {
+          scope: queue.scope,
+          synced_at: queue.synced_at,
+          synced_label: queue.synced_label,
+          queue: queue.queue.filter(matches),
+          blocked: queue.blocked.filter(matches),
+        };
+      })
+      .filter(function (queue) {
+        return queue.queue.length + queue.blocked.length > 0;
+      });
   }
 
   function refreshRaidFilterOptions(raids) {
@@ -627,6 +721,9 @@
       }),
       drift: data.drift,
       raids: data.raids,
+      merge_queues: data.merge_queues.filter(function (queue) {
+        return queue.scope === "raid:" + state.raidFilter;
+      }),
     };
   }
 
@@ -661,6 +758,7 @@
     var filtered = applyRaidFilter(applyPartyFilter(data));
     renderAsks(filtered.asks);
     renderNotices(filtered.notices);
+    renderMergeQueues(filtered.merge_queues);
     renderDrift(filtered.drift);
     renderParties(filtered.parties);
     restoreFocus();

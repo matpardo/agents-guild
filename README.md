@@ -116,6 +116,10 @@ guild raids
 guild next [--all]     # ranked action queue for the caller's party
 guild handoff --in-flight "..." --learned "..."
 
+guild merge-queue [--raid <name> | --party <name>]   # read-only: PRs in the order to merge by hand
+guild merge-queue pin   <owner/repo>#<a> --before <owner/repo>#<b>
+guild merge-queue unpin <owner/repo>#<a> --before <owner/repo>#<b>
+
 guild board [--party <name> | --raid <name>]
 guild web --port <n>
 guild sync --source gh|sdd|tracker
@@ -248,6 +252,88 @@ lead should keep a watcher running for the duration of the raid, e.g.
 `watch -n 300 guild sync --source gh` from a terminal, or `/loop 5m guild
 sync --source gh` from a session that supports it.
 
+### `guild merge-queue`
+
+`guild merge-queue [--raid <name> | --party <name>]` prints the open tracked
+PRs that are ready to merge in the order to merge them, with the reason for
+every position, plus the PRs that are not ready and why. It is read-only: no
+network call, no event. **Guild never merges**: the output is advice for a
+human, who merges by hand and re-runs the command after each merge (the
+last line of the output says so).
+
+**Scope.** `--raid` takes the open tracked PRs of the raid's active members,
+`--party` those of one party; the two flags are mutually exclusive. Without a
+flag, a bound session uses its raid when its party is in exactly one, errors
+listing them when it is in several, and uses its own party when it is in
+none; a human terminal (or an unbound session) must pass a flag.
+
+**Ready or blocked.** A PR is ready when its lifecycle is `ready`, no check
+is failing, `mergeable` is not `CONFLICTING`, and every task its own task
+depends on (SDD `Depends on`, through the quest's epic) is done by the same
+resolver `guild next` uses. Otherwise it goes to the `blocked:` section with
+every reason that applies: `needs-human`, `draft` or `converging` (its
+lifecycle), `checks failing (N)`, `merge conflict`, `waits on task Txx`.
+Merged and closed PRs never appear.
+
+**Hybrid order.** The ready PRs are put in a topological order over three
+kinds of constraint, ties broken by PR number:
+
+1. SDD task dependencies between the PRs' tasks.
+2. Pins: explicit `X before Y` agreements (below). Pins and task dependencies
+   are hard constraints; a pin that involves a merged, closed or blocked PR
+   is ignored, so stale pins drop out by themselves.
+3. Shared-area overlap: two ready PRs of the same repo that touch the same
+   project `shared_areas` glob are sequential. By default the one with the
+   smaller diff (additions plus deletions) goes first, then the one created
+   earlier, then the lower number. This is a heuristic (a smaller change
+   rebases less), never a rule: pin the pair to overrule it.
+
+Every position carries its reason, for example:
+
+```
+merge queue · raid ci · synced 4 min ago
+1. acme/app#1044  alpha  T01 — ready, checks ✓17; before acme/app#1047 (shares config/locales/es.yml, smaller diff)
+2. acme/app#1047  beta   T02 — ready, checks ✓9; after acme/app#1044 (shares config/locales/es.yml)
+blocked:
+  acme/app#1049  beta  T03 — checks failing (2)
+guild never merges: merge in this order by hand; re-run after each merge
+```
+
+A ready PR that must wait for an earlier one still sits in the list, with
+`after <ref> (...)`. If pins and task dependencies contradict each other, the
+PRs involved are listed as blocked with the cycle named rather than ordered
+arbitrarily.
+
+**Data and freshness.** The order is computed from stored data, so it is only
+as fresh as the last `guild sync --source gh` (the header says `synced N min
+ago`, the latest sync among the PRs shown). For every open PR whose party is
+an active raid member or holds an active `area:` claim, in a project that
+sets `shared_areas`, that sync makes one `gh pr view --json
+files,additions,deletions,createdAt` call and stores the matched globs
+(`pr_shared_areas`), the diff size and the creation time (`prs.additions`,
+`prs.deletions`, `prs.created_at`, added by the usual column migration, all
+rebuilt from the `pr.synced` event). PRs of parties outside raids with no
+claims cost no extra call, and their overlaps are unknown to the queue. A
+failed call is a sync failure (non-zero exit) and keeps the previous rows. A
+raid lead should keep the sync running (see "Merge notices").
+
+**Pins.** `guild merge-queue pin <repo>#<a> --before <repo>#<b>` records that
+`a` merges before `b` (event `merge_queue.pinned`, with the author party or
+`human`; projection `merge_queue_pins`, rebuild-safe); `unpin` removes it
+(`merge_queue.unpinned`). Both PRs must be tracked and open to pin. Who may
+pin: when both PRs belong to members of the same raid, only that raid's lead
+party or the human (also when one party owns both); otherwise only the party
+that owns both PRs, or the human. The human is a session-less terminal; a
+bound session acts as its party and an unbound session is refused. A pin that
+would close a cycle with existing pins or task dependencies is rejected
+naming the cycle (`pin would create a cycle: a -> b -> a`), a duplicate pin
+and an `unpin` of a missing pin are errors. `unpin` still works after a PR
+merges.
+
+`guild board --raid <name>` starts with `next to merge: <ref>` and each party
+block of `guild board` shows the same line for that party's own queue, when
+one exists. `guild web` shows the same queues, see below.
+
 ### `guild drift`
 
 `guild drift [--epic <slug> | --all]` reports, for the project resolved from
@@ -323,7 +409,12 @@ guild web: http://127.0.0.1:<port>/
 
 **What it shows**, in this order: open asks (question, party, options,
 refs, how many refs still block it, a collapsible context), active notices,
-drift findings for the default scope (grouped by rule, one block per
+the merge queue (one card per raid, plus one per party outside raids that has
+open PRs: numbered PR links with their lifecycle badge, checks, party, task
+and the reason of each position, then a `blocked` list; read-only, the same
+order as `guild merge-queue`, with `synced N min ago`; the party filter keeps
+only that party's PRs and the raid filter only that raid's card; the model
+key is `merge_queues`), drift findings for the default scope (grouped by rule, one block per
 project resolved from the parties shown, skipping parties without a
 project), then one collapsible block per party with its quests, tasks and
 PRs, plus PRs outside active tasks, raids (each with a `lead` badge when
@@ -750,7 +841,8 @@ not-found keys do not block the write. Any of these failures makes
 Append-only `events` table (SQLite, WAL, `busy_timeout=5000`, writes wrapped
 in `BEGIN IMMEDIATE`) plus projection tables kept in sync in the same
 transaction: `parties`, `leaders`, `quests`, `quest_tasks`, `epics`, `tasks`,
-`prs`, `cards`, `asks`, `notices`, `claims`, `cursors`. `guild rebuild` drops every
+`prs`, `cards`, `asks`, `notices`, `claims`, `raid_members`, `pr_shared_areas`,
+`merge_queue_pins`, `cursors`. `guild rebuild` drops every
 projection and replays all events from scratch — the only exception is
 `cursors`, which is a per-session read position, not domain state, and is
 left untouched by rebuild.
