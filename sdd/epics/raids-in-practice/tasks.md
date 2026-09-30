@@ -67,6 +67,6 @@ updated: 2026-09-29
 ## T09 — Release shared-area claims on merge
 
 **Depends on:** T02, T08
-**Status:** [x] done
+**Status:** [x] done — #29
 
 **What:** `sync --source gh` releases the `area:` claims of the owning party that the merged PR's changed files match, and lists them as `Released:` in the merge notice; claims of other parties and `task:` claims stay.
