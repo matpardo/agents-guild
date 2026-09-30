@@ -313,6 +313,14 @@ def _notice_closed(conn, event):
     conn.execute("UPDATE notices SET state = 'closed' WHERE id = ?", (payload["id"],))
 
 
+def _notice_seen(conn, event):
+    conn.execute("UPDATE notices SET seen_at = ? WHERE id = ?", (event["ts"], event["payload"]["id"]))
+
+
+def _notice_unseen(conn, event):
+    conn.execute("UPDATE notices SET seen_at = NULL WHERE id = ?", (event["payload"]["id"],))
+
+
 def _claim_created(conn, event):
     payload = event["payload"]
     conn.execute(
@@ -372,6 +380,8 @@ _REDUCERS = {
     "ask.dismissed": _ask_dismissed,
     "notice.created": _notice_created,
     "notice.closed": _notice_closed,
+    "notice.seen": _notice_seen,
+    "notice.unseen": _notice_unseen,
     "claim.created": _claim_created,
     "claim.released": _claim_released,
     "raid.joined": _raid_joined,

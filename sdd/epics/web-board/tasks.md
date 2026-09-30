@@ -42,3 +42,17 @@ updated: 2026-09-29
 **Status:** [x] done — #27
 
 **What:** `GET /api/session` serves a per-start token; `POST /api/asks/<id>/answer` and `/dismiss` require the loopback `Host` and `Origin`, the token in `X-Guild-Token`, `application/json` and a body of at most 16384 bytes, then call `ask.answer` / `ask.dismiss` as the human actor (`GuildError` becomes 422); `OPTIONS` stays 405 with no CORS headers. Each ask card gets option buttons that fill the answer field, an answer field, `Answer` and `Dismiss` (with confirmation); drafts survive the 15-second refresh.
+
+## T06 — Status colors
+
+**Depends on:** T03
+**Status:** [x] done — #28
+
+**What:** the page uses the terminal board's meanings through CSS classes only, with light and dark variants under `prefers-color-scheme`: a PR's lifecycle is a badge (`needs-human` red, `converging` amber, `ready` green, `draft` gray, `merged` purple, `closed` muted gray), checks show `✗N` red when N > 0 and muted otherwise, `✓N` green and `no checks` muted, and a task's state is colored (`active` blue, `blocked` red, `queued` muted). The text labels stay.
+
+## T07 — Mark notices seen from the view
+
+**Depends on:** T05
+**Status:** [x] done — #28
+
+**What:** a seen mark lets the human tell new notices from read ones without changing what is shown or delivered: every active notice stays listed everywhere and delivery, the brief and the notice's state are untouched. `guild notice seen <id>|--all` and `guild notice unseen <id>` (events `notice.seen` / `notice.unseen`, column `notices.seen_at`); `guild notices` and the board prefix unseen notices with `new` and count them, with time left on every notice. The web model adds `seen` per notice, `time_left` and `new_notice_count`; unseen cards get a `new` badge and `Mark seen`, seen cards `Mark unseen`, and the heading has `Mark all seen`; `POST /api/notices/<id>/seen`, `/unseen` and `POST /api/notices/seen-all` reuse the ask routes' checks.

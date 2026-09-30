@@ -98,6 +98,8 @@ guild asks
 
 guild notice create "<text>" --to project:<name>|guild|raid:<name> --ttl <dur> [--until pr:<owner/repo>#<n>:merged|closed]
 guild notice close <id>
+guild notice seen <id>|--all
+guild notice unseen <id>
 guild notices
 
 guild claim <area> --ttl <dur>          # area, or task:<epic>/<tid> / task:<quest>/<tid>
@@ -274,6 +276,30 @@ naming the refs and what each source says:
 The last line is `N findings` or `no drift`. `guild drift` never writes to
 SDD or the tracker: fixing drift stays with humans and the normal skills.
 
+### Marking notices seen
+
+`guild notice seen <id>` marks an active notice as seen so new messages stand
+out; `guild notice unseen <id>` undoes it, and `guild notice seen --all` marks
+every active notice at once (`N notices marked seen`). The id and `--all` are
+mutually exclusive and one of them is required. A seen notice is only a mark
+for the human view: it stays listed everywhere while active, and delivery
+(inbox cursors, `prompt-submit`, `post-tool-use`), the `session-start` brief
+and `guild brief` are untouched. The commands work for the human actor and for
+bound sessions, and fail for an unknown id, a notice that is already seen (or,
+for `unseen`, not seen) and a notice that is not active (closed or expired).
+Guild is single-user, so the mark is per guild, not per reader.
+
+`guild notices` lists every active notice with its time left, unseen ones
+prefixed with `new` (`new #13 [party] text (scope, 5h left)`), and ends with
+`N new` when N > 0. The NOTICES section of `guild board` (also `--party` and
+`--raid`) lists the same notices, marks unseen ones with `new` (colored on a
+terminal only) and its header reads `NOTICES · N active (M new)`, the count
+only when M > 0.
+
+Storage: events `notice.seen` and `notice.unseen`, and the projection column
+`notices.seen_at` (`TEXT`, `NULL` when not seen), added to existing databases
+by the column migration; `guild rebuild` replays it.
+
 ### `guild web`
 
 `guild web --port <n>` serves the same board in a browser, with more room
@@ -301,6 +327,25 @@ keeping the current filters and which blocks are collapsed. PR links open
 tracker card when the project configures `tracker.browse_url` (see
 "Project config").
 
+**Colors**: the page uses the terminal board's meanings, with CSS classes
+only (no inline style) and light and dark variants through
+`prefers-color-scheme`. A PR's lifecycle is a badge (`needs-human` red,
+`converging` amber, `ready` green, `draft` gray, `merged` purple, `closed`
+muted gray). Checks show `✗N` in red when N > 0 and muted otherwise, `✓N` in
+green, and `no checks` muted when there are none. A task's state is colored
+too (`active` blue, `blocked` red, `queued` muted). The text labels stay, so
+color is never the only signal.
+
+**Marking notices seen from the page**: every active notice card shows its
+time left (the model carries `expires_at` and a server-computed `time_left`)
+and a `seen` flag. Unseen cards get a `new` badge and a `Mark seen` button;
+seen cards have no badge and a subtle `Mark unseen`. The notices heading reads
+`notices (N) · M new` and has a `Mark all seen` button; the model also carries
+`new_notice_count`. `POST /api/notices/<id>/seen`, `/unseen` and
+`POST /api/notices/seen-all` (body `{}`) run `guild notice seen` / `unseen` /
+`seen --all` as the human actor and go through the same validation as the ask
+routes.
+
 **Answering from the page**: each open ask card has one button per option
 (clicking it only copies the option's text into the answer field), an answer
 field, an `Answer` button and a `Dismiss` button (which asks for
@@ -317,8 +362,10 @@ Project `pii_patterns` are those of the project of the party that asked, whereve
 **Security model**: the server binds to `127.0.0.1` only, on the stdlib's
 `http.server.ThreadingHTTPServer` — no third-party dependency, no build
 step. Reads are `GET`; the only writes are `POST /api/asks/<id>/answer`
-(body `{"answer": "<text>"}`) and `POST /api/asks/<id>/dismiss` (body `{}`),
-with `<id>` a positive integer (otherwise `404`); every other method,
+(body `{"answer": "<text>"}`), `POST /api/asks/<id>/dismiss`,
+`POST /api/notices/<id>/seen`, `POST /api/notices/<id>/unseen` and
+`POST /api/notices/seen-all` (body `{}`), with `<id>` a positive integer
+(otherwise `404`); every other method,
 including `OPTIONS`, is `405`, and no response ever carries CORS headers, so
 cross-origin preflights fail. Requests whose `Host` header is not exactly
 `127.0.0.1:<port>` or `localhost:<port>` get `421`, which blocks DNS
@@ -342,7 +389,8 @@ no-store`. The page (`guild/web/app.js`) builds every node with
 `document.createElement` and sets text with `textContent` only — it never
 uses `innerHTML` or any HTML-injecting API, so text coming from agents, SDD,
 GitHub or the tracker is never executed. Apart from answering and dismissing
-asks, `guild web` never writes to the database, and it logs no per-request
+asks and marking notices seen or unseen, `guild web` never writes to the
+database, and it logs no per-request
 access noise to stderr (server errors still do). Ctrl-C exits cleanly.
 
 ### `guild handoff` and resuming a party
@@ -520,8 +568,8 @@ it gets refused with a hint to run `guild party start <name>` or
 `guild party resume <party>`. Reads always work.
 
 No session id at all (a plain terminal) resolves to the actor `human`,
-allowed only for `answer`, `dismiss`, `notice create`, `notice close`, and
-all reads.
+allowed only for `answer`, `dismiss`, `notice create`, `notice close`,
+`notice seen`, `notice unseen`, and all reads.
 
 A project is resolved from the current working directory against every
 project config's `paths` globs (first match wins, configs read in filename

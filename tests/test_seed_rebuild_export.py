@@ -92,6 +92,24 @@ class RebuildTests(GuildTestCase):
         self.assertEqual(before, after)
 
 
+class SeenNoticeRebuildTests(GuildTestCase):
+    def test_rebuild_keeps_seen_state(self):
+        self.run_cli(["notice", "create", "kept", "--to", "guild", "--ttl", "5h"], None, None)
+        self.run_cli(["notice", "create", "restored", "--to", "guild", "--ttl", "5h"], None, None)
+        self.run_cli(["notice", "seen", "1"], None, None)
+        self.run_cli(["notice", "seen", "2"], None, None)
+        self.run_cli(["notice", "unseen", "2"], None, None)
+        before = _dump_projections(db.connect(paths.db_path()))
+
+        code, out, err = self.run_cli(["rebuild"], None, None)
+        self.assertEqual(code, 0, err)
+
+        self.assertEqual(before, _dump_projections(db.connect(paths.db_path())))
+        code, out, err = self.run_cli(["notices"], None, None)
+        self.assertIn("#1 [human] kept", out)
+        self.assertIn("new #2 [human] restored", out)
+
+
 class ExportTests(GuildTestCase):
     def test_export_only_includes_guild_visibility(self):
         seed_file = self.root / "seed.json"

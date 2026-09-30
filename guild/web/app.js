@@ -17,6 +17,9 @@
     drafts: {},
     statuses: {},
     busy: {},
+    noticeStatuses: {},
+    noticeBusy: {},
+    noticeAllStatus: "",
     focusedAskId: null,
     focusStart: 0,
     focusEnd: 0,
@@ -72,6 +75,10 @@
     return "/api/asks/" + askId + "/" + action;
   }
 
+  function noticeUrl(noticeId, action) {
+    return "/api/notices/" + noticeId + "/" + action;
+  }
+
   function errorMessage(body) {
     if (body && typeof body.error === "string") {
       return body.error;
@@ -79,16 +86,8 @@
     return "request failed";
   }
 
-  function postAskAction(askId, action, payload) {
-    if (sessionToken === null) {
-      state.statuses[askId] = NO_SESSION_MESSAGE;
-      fetchBoard();
-      return;
-    }
-    state.busy[askId] = true;
-    state.statuses[askId] = "sending...";
-    fetchBoard();
-    fetch(askUrl(askId, action), {
+  function sendPost(url, payload) {
+    return fetch(url, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -108,17 +107,64 @@
       })
       .catch(function () {
         return { ok: false, body: null };
-      })
-      .then(function (result) {
-        delete state.busy[askId];
-        if (result.ok) {
-          delete state.drafts[askId];
-          delete state.statuses[askId];
-        } else {
-          state.statuses[askId] = errorMessage(result.body);
-        }
-        fetchBoard();
       });
+  }
+
+  function postNoticeAction(noticeId, action) {
+    if (sessionToken === null) {
+      state.noticeStatuses[noticeId] = NO_SESSION_MESSAGE;
+      fetchBoard();
+      return;
+    }
+    state.noticeBusy[noticeId] = true;
+    state.noticeStatuses[noticeId] = "sending...";
+    fetchBoard();
+    sendPost(noticeUrl(noticeId, action), {}).then(function (result) {
+      delete state.noticeBusy[noticeId];
+      if (result.ok) {
+        delete state.noticeStatuses[noticeId];
+      } else {
+        state.noticeStatuses[noticeId] = errorMessage(result.body);
+      }
+      fetchBoard();
+    });
+  }
+
+  function postSeenAll() {
+    if (sessionToken === null) {
+      state.noticeAllStatus = NO_SESSION_MESSAGE;
+      fetchBoard();
+      return;
+    }
+    state.noticeBusy.all = true;
+    state.noticeAllStatus = "sending...";
+    fetchBoard();
+    sendPost("/api/notices/seen-all", {}).then(function (result) {
+      delete state.noticeBusy.all;
+      state.noticeAllStatus = result.ok ? "" : errorMessage(result.body);
+      fetchBoard();
+    });
+  }
+
+  function postAskAction(askId, action, payload) {
+    if (sessionToken === null) {
+      state.statuses[askId] = NO_SESSION_MESSAGE;
+      fetchBoard();
+      return;
+    }
+    state.busy[askId] = true;
+    state.statuses[askId] = "sending...";
+    fetchBoard();
+    sendPost(askUrl(askId, action), payload).then(function (result) {
+      delete state.busy[askId];
+      if (result.ok) {
+        delete state.drafts[askId];
+        delete state.statuses[askId];
+      } else {
+        state.statuses[askId] = errorMessage(result.body);
+      }
+      fetchBoard();
+    });
   }
 
   function submitAnswer(askId) {
@@ -253,15 +299,59 @@
     head.appendChild(textEl("span", "#" + notice.id));
     head.appendChild(textEl("span", notice.party || "human"));
     head.appendChild(textEl("span", notice.scope));
+    head.appendChild(textEl("span", notice.time_left));
+    if (!notice.seen) {
+      var badge = textEl("span", "new");
+      badge.className = "badge notice-new";
+      head.appendChild(badge);
+    }
     article.appendChild(head);
     article.appendChild(textEl("p", notice.text));
+    article.appendChild(renderNoticeActions(notice));
     return article;
+  }
+
+  function renderNoticeActions(notice) {
+    var actions = el("div");
+    actions.className = "notice-actions";
+    var label = notice.seen ? "Mark unseen" : "Mark seen";
+    var action = notice.seen ? "unseen" : "seen";
+    var button = textEl("button", label);
+    button.type = "button";
+    button.className = notice.seen ? "notice-unseen-button" : "notice-seen-button";
+    button.disabled = state.noticeBusy[notice.id] === true;
+    button.addEventListener("click", function () {
+      postNoticeAction(notice.id, action);
+    });
+    actions.appendChild(button);
+    var status = textEl("span", state.noticeStatuses[notice.id] || "");
+    status.className = "ask-status";
+    actions.appendChild(status);
+    return actions;
+  }
+
+  function renderSeenAllControls(newCount) {
+    var controls = el("div");
+    controls.className = "notice-actions";
+    var button = textEl("button", "Mark all seen");
+    button.type = "button";
+    button.disabled = state.noticeBusy.all === true || newCount === 0;
+    button.addEventListener("click", postSeenAll);
+    controls.appendChild(button);
+    var status = textEl("span", state.noticeAllStatus);
+    status.className = "ask-status";
+    controls.appendChild(status);
+    return controls;
   }
 
   function renderNotices(notices) {
     var section = document.getElementById("notices");
     clear(section);
-    section.appendChild(textEl("h2", "notices (" + notices.length + ")"));
+    var newCount = notices.filter(function (notice) {
+      return !notice.seen;
+    }).length;
+    section.appendChild(textEl("h2", "notices (" + notices.length + ") · " + newCount + " new"));
+    section.appendChild(renderSeenAllControls(newCount));
     appendAll(section, notices.map(renderNotice));
   }
 
@@ -302,12 +392,32 @@
     return state.stateFilter === "all" || pr.lifecycle === state.stateFilter;
   }
 
+  function renderChecks(pr) {
+    var checks = el("span");
+    if (pr.checks_failing === 0 && pr.checks_passing === 0) {
+      var none = textEl("span", "no checks");
+      none.className = "checks-none";
+      checks.appendChild(none);
+      return checks;
+    }
+    var failing = textEl("span", "✗" + pr.checks_failing);
+    failing.className = pr.checks_failing > 0 ? "checks-failing" : "checks-clear";
+    var passing = textEl("span", "✓" + pr.checks_passing);
+    passing.className = "checks-passing";
+    checks.appendChild(failing);
+    checks.appendChild(document.createTextNode(" "));
+    checks.appendChild(passing);
+    return checks;
+  }
+
   function renderPr(pr) {
     var row = el("li");
     row.className = "pr";
     row.appendChild(link(pr.url, pr.repo + "#" + pr.number));
-    row.appendChild(textEl("span", pr.lifecycle));
-    row.appendChild(textEl("span", "checks ✗" + pr.checks_failing + " ✓" + pr.checks_passing));
+    var lifecycle = textEl("span", pr.lifecycle);
+    lifecycle.className = "pill lifecycle-" + pr.lifecycle;
+    row.appendChild(lifecycle);
+    row.appendChild(renderChecks(pr));
     row.appendChild(textEl("span", pr.what));
     if (pr.waits) {
       row.appendChild(textEl("span", "waits: " + pr.waits));
@@ -333,7 +443,9 @@
     head.className = "task-head";
     head.appendChild(textEl("span", task.tid));
     head.appendChild(textEl("span", task.title));
-    head.appendChild(textEl("span", task.state));
+    var taskState = textEl("span", task.state);
+    taskState.className = "state state-" + task.state;
+    head.appendChild(taskState);
     if (task.card_url) {
       head.appendChild(link(task.card_url, task.tid + " card"));
     }

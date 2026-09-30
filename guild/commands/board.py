@@ -213,10 +213,16 @@ def _raid_scoped_notices(ctx, raid_name):
 def _notices_section(ctx, painter, rows):
     if not rows:
         return []
-    lines = [painter.paint("NOTICES · {} active".format(len(rows)), "bold")]
+    new_count = notice_commands.count_new(rows)
+    header = "NOTICES · {} active".format(len(rows))
+    if new_count > 0:
+        header = "{} ({} new)".format(header, new_count)
+    lines = [painter.paint(header, "bold")]
     for row in rows:
+        marker = painter.paint("new", "green") + " " if notice_commands.is_new(row) else ""
         lines.append(
-            "  {} {} · {}".format(
+            "  {}{} {} · {}".format(
+                marker,
                 painter.paint("#{}".format(row["id"]), "yellow"),
                 painter.paint(row["party"] or "human", "cyan"),
                 painter.paint("{} · {}".format(row["scope"], timeutil.time_left_label(ctx.now, row["expires_at"])), "dim"),
@@ -459,13 +465,15 @@ def _ask_model(conn, row):
     }
 
 
-def _notice_model(row):
+def _notice_model(ctx, row):
     return {
         "id": row["id"],
         "party": row["party"],
         "scope": row["scope"],
         "text": sanitize.strip_control_sequences(row["text"]),
         "expires_at": row["expires_at"],
+        "time_left": timeutil.time_left_label(ctx.now, row["expires_at"]),
+        "seen": not notice_commands.is_new(row),
     }
 
 
@@ -553,7 +561,8 @@ def board_model(ctx):
     return {
         "generated_at": timeutil.to_iso(ctx.now),
         "asks": [_ask_model(ctx.conn, row) for row in ask_rows],
-        "notices": [_notice_model(row) for row in notice_rows],
+        "notices": [_notice_model(ctx, row) for row in notice_rows],
+        "new_notice_count": notice_commands.count_new(notice_rows),
         "parties": [
             _party_model(ctx, party_row, projects_by_name.get(party_row["project"]))
             for party_row in party_rows
@@ -561,3 +570,4 @@ def board_model(ctx):
         "drift": [drift_commands.board_findings(ctx, project_name) for project_name in project_names],
         "raids": _raid_models(ctx.conn, ctx.now),
     }
+

@@ -98,12 +98,7 @@ def announced(conn, announces):
     return row is not None
 
 
-def close(ctx, notice_id):
-    row = ctx.conn.execute("SELECT id, state FROM notices WHERE id = ?", (notice_id,)).fetchone()
-    if row is None:
-        raise GuildError("unknown notice #{}".format(notice_id), 1)
-    if row["state"] != "active":
-        raise GuildError("notice #{} is not active".format(notice_id), 1)
+def _record_notice_event(ctx, kind, notice_id):
     binding = identity.resolve_binding(ctx.conn, ctx.session_id)
     actor_party = binding["party"] if binding is not None else None
     project = config.resolve_project(ctx.cwd, config.load_all_projects(ctx.projects_dir))
@@ -115,11 +110,60 @@ def close(ctx, notice_id):
             actor_party,
             ctx.session_id,
             project,
-            "notice.closed",
+            kind,
             "guild",
             {"id": notice_id},
         )
+
+
+def _require_live_notice(ctx, notice_id):
+    row = ctx.conn.execute("SELECT * FROM notices WHERE id = ?", (notice_id,)).fetchone()
+    if row is None:
+        raise GuildError("unknown notice #{}".format(notice_id), 1)
+    if row["state"] != "active" or timeutil.is_expired(ctx.now, row["expires_at"]):
+        raise GuildError("notice #{} is not active".format(notice_id), 1)
+    return row
+
+
+def close(ctx, notice_id):
+    row = ctx.conn.execute("SELECT id, state FROM notices WHERE id = ?", (notice_id,)).fetchone()
+    if row is None:
+        raise GuildError("unknown notice #{}".format(notice_id), 1)
+    if row["state"] != "active":
+        raise GuildError("notice #{} is not active".format(notice_id), 1)
+    _record_notice_event(ctx, "notice.closed", notice_id)
     return "notice #{} closed".format(notice_id)
+
+
+def mark_seen(ctx, notice_id):
+    row = _require_live_notice(ctx, notice_id)
+    if row["seen_at"] is not None:
+        raise GuildError("notice #{} is already seen".format(notice_id), 1)
+    _record_notice_event(ctx, "notice.seen", notice_id)
+    return "notice #{} seen".format(notice_id)
+
+
+def mark_unseen(ctx, notice_id):
+    row = _require_live_notice(ctx, notice_id)
+    if row["seen_at"] is None:
+        raise GuildError("notice #{} is not seen".format(notice_id), 1)
+    _record_notice_event(ctx, "notice.unseen", notice_id)
+    return "notice #{} unseen".format(notice_id)
+
+
+def mark_all_seen(ctx):
+    unseen = [row for row in active_notices(ctx.conn, ctx.now) if row["seen_at"] is None]
+    for row in unseen:
+        _record_notice_event(ctx, "notice.seen", row["id"])
+    return "{} notices marked seen".format(len(unseen))
+
+
+def is_new(row):
+    return row["seen_at"] is None
+
+
+def count_new(rows):
+    return len([row for row in rows if is_new(row)])
 
 
 def active_notices(conn, now):
@@ -150,10 +194,18 @@ def targeting(rows, project, scope_guild_always, raid_member_of):
     return matched
 
 
+def _list_line(ctx, row):
+    author = row["party"] or "human"
+    prefix = "new " if is_new(row) else ""
+    return "{}#{} [{}] {} ({}, {})".format(
+        prefix, row["id"], author, row["text"], row["scope"], timeutil.time_left_label(ctx.now, row["expires_at"])
+    )
+
+
 def list_active(ctx):
     rows = active_notices(ctx.conn, ctx.now)
-    lines = []
-    for row in rows:
-        author = row["party"] or "human"
-        lines.append("#{} [{}] {} ({})".format(row["id"], author, row["text"], row["scope"]))
+    lines = [_list_line(ctx, row) for row in rows]
+    new_count = count_new(rows)
+    if new_count > 0:
+        lines.append("{} new".format(new_count))
     return lines
