@@ -584,5 +584,8 @@ def board_model(ctx):
         ],
         "drift": [drift_commands.board_findings(ctx, project_name) for project_name in project_names],
         "raids": _raid_models(ctx.conn, ctx.now),
+        "merge_queues": merge_queue_commands.board_models(
+            ctx.conn, ctx.now, [row["name"] for row in party_rows]
+        ),
     }
 

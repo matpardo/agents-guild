@@ -339,3 +339,64 @@ def next_to_merge(conn, party_names):
     if not scoped["queue"]:
         return None
     return scoped["queue"][0]["ref"]
+
+
+def _entry_model(entry):
+    return {
+        "ref": entry["ref"],
+        "repo": entry["repo"],
+        "number": entry["number"],
+        "party": entry["party"],
+        "task": entry["task"],
+        "lifecycle": entry["lifecycle"],
+        "checks_failing": entry["checks_failing"],
+        "checks_passing": entry["checks_passing"],
+        "url": "https://github.com/{}/pull/{}".format(entry["repo"], entry["number"]),
+    }
+
+
+def _queue_entry_model(position, entry):
+    return dict(
+        _entry_model(entry),
+        position=position,
+        reason=sanitize.strip_control_sequences(entry["reason"]),
+    )
+
+
+def _blocked_entry_model(entry):
+    return dict(
+        _entry_model(entry),
+        reasons=[sanitize.strip_control_sequences(reason) for reason in entry["reasons"]],
+    )
+
+
+def _scope_model(now, scope, scoped):
+    return {
+        "scope": scope,
+        "synced_at": scoped["synced_at"],
+        "synced_label": _synced_label(now, scoped["synced_at"]),
+        "queue": [
+            _queue_entry_model(position, entry)
+            for position, entry in enumerate(scoped["queue"], start=1)
+        ],
+        "blocked": [_blocked_entry_model(entry) for entry in scoped["blocked"]],
+    }
+
+
+def board_models(conn, now, party_names):
+    records = open_pr_records(conn)
+    pins = load_pins(conn)
+    grouped = raid_commands.active_raids_grouped(conn, now)
+    models = []
+    in_raid = set()
+    for raid_name in sorted(grouped):
+        members = {row["party"] for row in grouped[raid_name]}
+        in_raid |= members
+        models.append(_scope_model(now, "raid:{}".format(raid_name), scoped_queue(records, pins, members)))
+    for party in sorted(party_names):
+        if party in in_raid:
+            continue
+        scoped = scoped_queue(records, pins, {party})
+        if scoped["has_prs"]:
+            models.append(_scope_model(now, "party:{}".format(party), scoped))
+    return models

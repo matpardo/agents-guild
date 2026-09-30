@@ -39,6 +39,6 @@ updated: 2026-09-29
 ## T05 — Web
 
 **Depends on:** T02
-**Status:** [ ] pending
+**Status:** [x] done
 
 **What:** board model `merge_queues` and a read-only merge queue section on the page that respects the raid and party filters.

@@ -178,6 +178,27 @@ li.task {
   flex-wrap: wrap;
 }
 
+ol.queue-list {
+  margin: 0.25rem 0;
+  padding-left: 1.5rem;
+}
+
+li.queue-entry {
+  padding: 0.2rem 0;
+}
+
+.queue-entry-head {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.queue-reason {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
 li.pr {
   display: flex;
   gap: 0.5rem;
