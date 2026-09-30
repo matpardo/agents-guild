@@ -65,18 +65,7 @@ def release(ctx, area):
     ).fetchone()
     if row is None or row["party"] != binding["party"]:
         raise GuildError("party '{}' does not hold claim on '{}'".format(binding["party"], area), 1)
-    with db.writing(ctx.conn):
-        events.record(
-            ctx.conn,
-            ctx.now,
-            ctx.origin,
-            binding["party"],
-            ctx.session_id,
-            project,
-            "claim.released",
-            "guild",
-            {"project": project, "area": area},
-        )
+    release_for_party(ctx, project, binding["party"], area)
     return "area '{}' released".format(area)
 
 
@@ -88,3 +77,26 @@ def list_claims(conn, now):
             continue
         result.append(row)
     return result
+
+
+def held_areas(ctx, project, party):
+    rows = ctx.conn.execute(
+        "SELECT area, expires_at FROM claims WHERE project = ? AND party = ? AND area LIKE 'area:%'",
+        (project, party),
+    ).fetchall()
+    return [row["area"] for row in rows if not timeutil.is_expired(ctx.now, row["expires_at"])]
+
+
+def release_for_party(ctx, project, party, area):
+    with db.writing(ctx.conn):
+        events.record(
+            ctx.conn,
+            ctx.now,
+            ctx.origin,
+            party,
+            ctx.session_id,
+            project,
+            "claim.released",
+            "guild",
+            {"project": project, "area": area},
+        )
