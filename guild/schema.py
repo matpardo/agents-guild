@@ -11,6 +11,7 @@ PROJECTION_TABLES = (
     "notices",
     "claims",
     "raid_members",
+    "pr_shared_areas",
 )
 
 _RAID_MEMBERS_TABLE = """
@@ -171,6 +172,14 @@ _CREATE_STATEMENTS = (
     """,
     _RAID_MEMBERS_TABLE,
     """
+    CREATE TABLE IF NOT EXISTS pr_shared_areas (
+        repo TEXT NOT NULL,
+        number INTEGER NOT NULL,
+        glob TEXT NOT NULL,
+        PRIMARY KEY (repo, number, glob)
+    )
+    """,
+    """
     CREATE TABLE IF NOT EXISTS cursors (
         session_id TEXT PRIMARY KEY,
         last_seq INTEGER NOT NULL
@@ -187,6 +196,9 @@ _COLUMN_MIGRATIONS = (
     ("notices", "announces", "TEXT"),
     ("notices", "seen_at", "TEXT"),
     ("raid_members", "lead", "INTEGER"),
+    ("prs", "additions", "INTEGER"),
+    ("prs", "deletions", "INTEGER"),
+    ("prs", "created_at", "TEXT"),
 )
 
 

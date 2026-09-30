@@ -246,6 +246,20 @@ def _pr_synced(conn, event):
             payload["number"],
         ),
     )
+    if "change_set" in payload:
+        _store_change_set(conn, payload["repo"], payload["number"], payload["change_set"])
+
+
+def _store_change_set(conn, repo, number, change_set):
+    conn.execute(
+        "UPDATE prs SET additions = ?, deletions = ?, created_at = ? WHERE repo = ? AND number = ?",
+        (change_set["additions"], change_set["deletions"], change_set["created_at"], repo, number),
+    )
+    conn.execute("DELETE FROM pr_shared_areas WHERE repo = ? AND number = ?", (repo, number))
+    for glob in change_set["globs"]:
+        conn.execute(
+            "INSERT INTO pr_shared_areas (repo, number, glob) VALUES (?, ?, ?)", (repo, number, glob)
+        )
 
 
 def _pr_comments_acknowledged(conn, event):

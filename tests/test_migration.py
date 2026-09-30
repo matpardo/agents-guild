@@ -189,6 +189,18 @@ class MigrationTests(GuildTestCase):
         self.assertEqual([tuple(row) for row in rows], [("ci", "alpha", "2099-01-01T00:00:00+00:00")])
         conn.execute("INSERT INTO raid_members (raid, party, expires_at) VALUES ('ci', 'beta', NULL)")
 
+    def test_old_prs_table_gains_diff_columns_and_shared_areas_table(self):
+        db_path = self.data_home / "guild.db"
+        _make_old_schema_db(db_path)
+
+        conn = db.connect(db_path)
+
+        prs_columns = {row["name"] for row in conn.execute("PRAGMA table_info(prs)").fetchall()}
+        self.assertTrue({"additions", "deletions", "created_at"} <= prs_columns)
+        row = conn.execute("SELECT additions, deletions, created_at FROM prs WHERE number = 1").fetchone()
+        self.assertEqual(tuple(row), (None, None, None))
+        self.assertEqual(conn.execute("SELECT COUNT(*) AS n FROM pr_shared_areas").fetchone()["n"], 0)
+
     def test_rebuild_works_after_migration(self):
         db_path = self.data_home / "guild.db"
         _make_old_schema_db(db_path)

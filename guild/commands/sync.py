@@ -45,7 +45,7 @@ def _lifecycle_from_gh(current_lifecycle, gh_data):
     return current_lifecycle
 
 
-def _sync_pr(ctx, row):
+def _sync_pr(ctx, projects, row, failures):
     gh_data = github.pr_view(
         ctx.cwd,
         row["repo"],
@@ -58,6 +58,23 @@ def _sync_pr(ctx, row):
     failing, passing = _count_checks(gh_data.get("statusCheckRollup"))
     lifecycle = _lifecycle_from_gh(row["lifecycle"], gh_data)
     review_comment_count = len(gh_data.get("comments") or []) + len(gh_data.get("reviews") or [])
+    payload = {
+        "repo": row["repo"],
+        "number": row["number"],
+        "gh_state": gh_data.get("state"),
+        "gh_draft": gh_data.get("isDraft"),
+        "branch": gh_data.get("headRefName"),
+        "title": gh_data.get("title"),
+        "checks_failing": failing,
+        "checks_passing": passing,
+        "lifecycle": lifecycle,
+        "mergeable": gh_data.get("mergeable"),
+        "review_comment_count": review_comment_count,
+        "synced_at": timeutil.to_iso(ctx.now),
+    }
+    change_set = _open_pr_change_set(ctx, projects, row, lifecycle, failures)
+    if change_set is not None:
+        payload["change_set"] = change_set
     with db.writing(ctx.conn):
         events.record(
             ctx.conn,
@@ -68,20 +85,7 @@ def _sync_pr(ctx, row):
             None,
             "pr.synced",
             "guild",
-            {
-                "repo": row["repo"],
-                "number": row["number"],
-                "gh_state": gh_data.get("state"),
-                "gh_draft": gh_data.get("isDraft"),
-                "branch": gh_data.get("headRefName"),
-                "title": gh_data.get("title"),
-                "checks_failing": failing,
-                "checks_passing": passing,
-                "lifecycle": lifecycle,
-                "mergeable": gh_data.get("mergeable"),
-                "review_comment_count": review_comment_count,
-                "synced_at": timeutil.to_iso(ctx.now),
-            },
+            payload,
         )
     return lifecycle
 
@@ -103,12 +107,39 @@ def _touched_shared_areas(shared_areas, changed_files):
 
 def _fetch_changed_files(ctx, row, failures):
     try:
-        return github.pr_files(ctx.cwd, row["repo"], row["number"])
+        return github.pr_diff(ctx.cwd, row["repo"], row["number"])["paths"]
     except github.GhCommandError as error:
         failures.append(
             "{}#{}: shared areas check failed: {}".format(row["repo"], row["number"], error)
         )
         return None
+
+
+def _queue_data_wanted(ctx, project, row):
+    if raid_commands.member_raids(ctx.conn, ctx.now, row["party"]):
+        return True
+    return bool(claim_commands.held_areas(ctx, project["name"], row["party"]))
+
+
+def _open_pr_change_set(ctx, projects, row, lifecycle, failures):
+    if lifecycle in ("merged", "closed"):
+        return None
+    project = _project_for_repo(projects, row["repo"])
+    if project is None or not project.get("shared_areas"):
+        return None
+    if not _queue_data_wanted(ctx, project, row):
+        return None
+    try:
+        diff = github.pr_diff(ctx.cwd, row["repo"], row["number"])
+    except github.GhCommandError as error:
+        failures.append("{}#{}: merge queue data failed: {}".format(row["repo"], row["number"], error))
+        return None
+    return {
+        "additions": diff["additions"],
+        "deletions": diff["deletions"],
+        "created_at": diff["created_at"],
+        "globs": _touched_shared_areas(project["shared_areas"], diff["paths"]),
+    }
 
 
 def _shared_areas_line(touched):
@@ -206,7 +237,7 @@ def _sync_gh(ctx):
     projects = config.load_all_projects(ctx.projects_dir)
     for row in rows:
         try:
-            lifecycle = _sync_pr(ctx, row)
+            lifecycle = _sync_pr(ctx, projects, row, failures)
         except github.GhCommandError as error:
             failures.append("{}#{}: {}".format(row["repo"], row["number"], error))
             continue

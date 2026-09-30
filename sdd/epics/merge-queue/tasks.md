@@ -11,7 +11,7 @@ updated: 2026-09-29
 ## T01 — Diff data from gh sync
 
 **Depends on:** —
-**Status:** [ ] pending
+**Status:** [x] done
 
 **What:** `sync --source gh` fetches changed files, additions, deletions and creation time in one call for open PRs of raid members or parties holding `area:` claims; stores `prs.additions`, `prs.deletions`, `prs.created_at` and `pr_shared_areas`; a fetch failure is a sync failure and keeps the previous rows.
 

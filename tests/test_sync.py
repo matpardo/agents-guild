@@ -162,7 +162,7 @@ class GhMergeNoticeTests(GuildTestCase):
 
     def test_shared_areas_line_present_when_touched(self):
         self._set_shared_areas(["shared/**"])
-        self.write_gh_fixture("view_files_acme-app_1", {"files": [{"path": "shared/config.yml"}]})
+        self.write_gh_fixture("view_files_acme-app_1", {"files": [{"path": "shared/config.yml"}], "additions": 1, "deletions": 0, "createdAt": "2026-01-01T00:00:00Z"})
         self.run_cli(["raid", "join", "release", "--ttl", "1h"], "sess-1", self.repo_dir)
         self._merge_fixture()
         self.run_cli(["sync", "--source", "gh"], "sess-1", self.repo_dir)
@@ -178,7 +178,7 @@ class GhMergeNoticeTests(GuildTestCase):
 
     def test_shared_areas_line_absent_when_no_files_match(self):
         self._set_shared_areas(["shared/**"])
-        self.write_gh_fixture("view_files_acme-app_1", {"files": [{"path": "src/app.py"}]})
+        self.write_gh_fixture("view_files_acme-app_1", {"files": [{"path": "src/app.py"}], "additions": 1, "deletions": 0, "createdAt": "2026-01-01T00:00:00Z"})
         self.run_cli(["raid", "join", "release", "--ttl", "1h"], "sess-1", self.repo_dir)
         self._merge_fixture()
         self.run_cli(["sync", "--source", "gh"], "sess-1", self.repo_dir)
@@ -251,7 +251,7 @@ class GhMergeReleasesClaimsTests(GuildTestCase):
             ["pr", "track", "acme/app#1", "--task", "demo/T01", "--what", "ship", "--waits", "y"],
             "sess-1", self.repo_dir,
         )
-        self.write_gh_fixture("view_files_acme-app_1", {"files": [{"path": "shared/config.yml"}]})
+        self.write_gh_fixture("view_files_acme-app_1", {"files": [{"path": "shared/config.yml"}], "additions": 1, "deletions": 0, "createdAt": "2026-01-01T00:00:00Z"})
 
     def _merge_fixture(self):
         self.write_gh_fixture(
@@ -326,11 +326,15 @@ class GhMergeReleasesClaimsTests(GuildTestCase):
         self.run_cli(["raid", "join", "release", "--ttl", "1h"], "sess-1", self.repo_dir)
         self._merge_fixture()
         with mock.patch(
-            "guild.adapters.github.pr_files", return_value=["shared/config.yml"]
-        ) as pr_files:
+            "guild.adapters.github.pr_diff",
+            return_value={
+                "paths": ["shared/config.yml"], "additions": 1, "deletions": 0,
+                "created_at": "2026-01-01T00:00:00Z",
+            },
+        ) as pr_diff:
             code, out, err = self._sync()
         self.assertEqual(code, 0, err)
-        self.assertEqual(pr_files.call_count, 1)
+        self.assertEqual(pr_diff.call_count, 1)
 
     def test_files_fetch_failure_releases_nothing_and_fails_sync(self):
         self.run_cli(["claim", "area:shared/**", "--ttl", "2h"], "sess-1", self.repo_dir)
