@@ -316,6 +316,89 @@ class PrePushHookTests(GuildTestCase):
         self.assertEqual(code, 2)
 
 
+class PrePushSharedAreasTests(GuildTestCase):
+    def setUp(self):
+        super().setUp()
+        self.repo_dir = self.register_project("acme", ["acme/app"])
+        for command in (
+            ["git", "init", "-q", "-b", "main"],
+            ["git", "config", "user.email", "t@t.com"],
+            ["git", "config", "user.name", "t"],
+            ["git", "commit", "--allow-empty", "-q", "-m", "init"],
+            ["git", "update-ref", "refs/remotes/origin/main", "HEAD"],
+            ["git", "symbolic-ref", "refs/remotes/origin/HEAD", "refs/remotes/origin/main"],
+            ["git", "checkout", "-q", "-b", "feature/shared"],
+        ):
+            subprocess.run(command, cwd=str(self.repo_dir), check=True)
+        config_file = self.config_home / "guild" / "projects" / "acme.json"
+        data = json.loads(config_file.read_text())
+        data["shared_areas"] = ["config/routes.rb", "db/migrate/*"]
+        data["shared_area_claim_ttl"] = "2h"
+        config_file.write_text(json.dumps(data))
+        self.run_cli(["party", "start", "alpha"], "sess-1", self.repo_dir)
+        self.run_cli(["party", "start", "beta"], "sess-2", self.repo_dir)
+        self.write_gh_fixture("list_feature-shared", [])
+
+    def _commit_file(self, relative_path):
+        target = self.repo_dir / relative_path
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text("change")
+        subprocess.run(["git", "add", relative_path], cwd=str(self.repo_dir), check=True)
+        subprocess.run(["git", "commit", "-q", "-m", "change"], cwd=str(self.repo_dir), check=True)
+
+    def _push(self, session_id):
+        return self.run_hook(
+            "pre-push",
+            {
+                "session_id": session_id,
+                "tool_input": {"command": "git push origin feature/shared"},
+                "cwd": str(self.repo_dir),
+            },
+        )
+
+    def _claims(self):
+        conn = sqlite3.connect(str(self.data_home / "guild" / "guild.db"))
+        rows = conn.execute("SELECT area, party FROM claims ORDER BY area").fetchall()
+        conn.close()
+        return rows
+
+    def test_push_claims_shared_areas_in_diff(self):
+        self._commit_file("config/routes.rb")
+        self._commit_file("db/migrate/001_add.rb")
+        code, out, err = self._push("sess-1")
+        self.assertEqual(code, 0, err)
+        self.assertEqual(self._claims(), [("area:config/routes.rb", "alpha"), ("area:db/migrate/*", "alpha")])
+
+    def test_push_denied_when_another_party_holds_area(self):
+        self._commit_file("config/routes.rb")
+        self._push("sess-1")
+        code, out, err = self._push("sess-2")
+        self.assertEqual(code, 2)
+        self.assertIn("config/routes.rb", err)
+        self.assertIn("alpha", err)
+        self.assertEqual(self._claims(), [("area:config/routes.rb", "alpha")])
+
+    def test_push_without_shared_paths_makes_no_claims(self):
+        self._commit_file("README.md")
+        code, out, err = self._push("sess-1")
+        self.assertEqual(code, 0, err)
+        self.assertEqual(self._claims(), [])
+
+    def test_unbound_session_push_allowed_without_claims(self):
+        self._commit_file("config/routes.rb")
+        code, out, err = self._push("sess-unbound")
+        self.assertEqual(code, 0, err)
+        self.assertEqual(self._claims(), [])
+
+    def test_unresolvable_base_warns_without_blocking(self):
+        self._commit_file("config/routes.rb")
+        subprocess.run(["git", "symbolic-ref", "--delete", "refs/remotes/origin/HEAD"], cwd=str(self.repo_dir), check=True)
+        code, out, err = self._push("sess-1")
+        self.assertEqual(code, 0)
+        self.assertIn("could not determine base branch", out)
+        self.assertEqual(self._claims(), [])
+
+
 class PrePushObfuscatedCommandMatrixTests(GuildTestCase):
     def _init_repo(self, name, branch):
         import subprocess

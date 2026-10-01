@@ -8,3 +8,15 @@ class RunContext:
         self.sessions_dir = sessions_dir
         self.projects_dir = projects_dir
         self.state_dir = state_dir
+
+    def with_cwd(self, cwd):
+        return RunContext(
+            self.conn,
+            self.session_id,
+            cwd,
+            self.now,
+            self.origin,
+            self.sessions_dir,
+            self.projects_dir,
+            self.state_dir,
+        )
