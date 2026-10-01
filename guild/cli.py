@@ -292,6 +292,13 @@ def _handle_merge_queue_unpin(ctx, args):
     return 0
 
 
+def _handle_history(ctx, args):
+    from guild.commands import history as history_commands
+
+    _print_lines(history_commands.run(ctx, args.party, args.raid, args.project))
+    return 0
+
+
 def _handle_board(ctx, args):
     from guild.commands import board as board_commands
 
@@ -641,6 +648,12 @@ def build_parser():
     board_filter.add_argument("--party")
     board_filter.add_argument("--raid")
     board.set_defaults(handler=_handle_board)
+
+    history = subparsers.add_parser("history")
+    history.add_argument("--party")
+    history.add_argument("--raid")
+    history.add_argument("--project")
+    history.set_defaults(handler=_handle_history)
 
     next_parser = subparsers.add_parser("next")
     next_parser.add_argument("--all", action="store_true")
