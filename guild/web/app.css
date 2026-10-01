@@ -117,30 +117,22 @@ main {
   max-width: 60rem;
 }
 
-.column-content, .column-attention {
-  display: flex;
-  flex-direction: column;
-  gap: 1.5rem;
-  min-width: 0;
-}
-
 @media (min-width: 1000px) {
   main {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(24rem, 30rem);
+    grid-template-columns: minmax(0, 1fr) 20rem;
     align-items: start;
     gap: 1.5rem;
-    max-width: none;
   }
 
-  .column-content {
+  main > section {
     grid-column: 1;
-    grid-row: 1;
+    min-width: 0;
   }
 
-  .column-attention {
+  #merge-queues {
     grid-column: 2;
-    grid-row: 1;
+    grid-row: 1 / span 4;
     position: sticky;
     top: 1rem;
     max-height: calc(100vh - 2rem);
