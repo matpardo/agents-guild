@@ -174,7 +174,15 @@ Deterministic, per-party ranking, evaluated in order:
    `tasks.order_idx` (nulls last, then `tid`), whose dependencies (`tasks.deps`)
    all resolve `done` (see resolver below), that has no open ask referencing
    it and is not task-claimed by another party.
-5. Nothing actionable: the exact blockers (pending deps and who says so, open
+5. Raid lead work, only for a party that is the active lead of a raid: open
+   asks from the raid's other member parties (`raid <name>: ask #<id> from
+   <party>: "<question>"`), then the raid's merge queue entries for the other
+   members' PRs, ready ones with their position and reason and blocked ones
+   with their reasons (`raid <name>: merge queue <n>. <ref> <party> — <reason>`
+   / `raid <name>: blocked <ref> <party> — <reasons>`). Without `--all` only
+   the first item is printed. Read-only: guild never merges and nothing is
+   acknowledged.
+6. Nothing actionable: the exact blockers (pending deps and who says so, open
    ask ids, claim holders).
 
 Any disagreement the dependency resolver finds between sources it consulted
