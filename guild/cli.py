@@ -312,6 +312,34 @@ def _handle_sync(ctx, args):
     return 1 if failures else 0
 
 
+def _handle_sync_timer(ctx, args):
+    from guild.commands import timer as timer_commands
+
+    guild_executable = shutil.which("guild")
+    if args.timer_action == "print":
+        _print(timer_commands.print_units(guild_executable, args.every))
+        return 0
+    systemctl_available = shutil.which("systemctl") is not None
+    if args.timer_action == "uninstall":
+        _print(
+            timer_commands.uninstall(
+                paths.systemd_user_dir(), timer_commands.run_systemctl, sys.platform, systemctl_available
+            )
+        )
+        return 0
+    _print(
+        timer_commands.install(
+            paths.systemd_user_dir(),
+            guild_executable,
+            args.every,
+            timer_commands.run_systemctl,
+            sys.platform,
+            systemctl_available,
+        )
+    )
+    return 0
+
+
 def _handle_drift(ctx, args):
     from guild import config
     from guild.commands import drift as drift_commands
@@ -600,6 +628,15 @@ def build_parser():
     sync = subparsers.add_parser("sync")
     sync.add_argument("--source", required=True, choices=["gh", "sdd", "tracker"])
     sync.set_defaults(handler=_handle_sync)
+
+    sync_timer = subparsers.add_parser("sync-timer")
+    sync_timer_actions = sync_timer.add_subparsers(dest="timer_action", required=True)
+    for action in ("install", "print"):
+        action_parser = sync_timer_actions.add_parser(action)
+        action_parser.add_argument("--every", required=True)
+        action_parser.set_defaults(handler=_handle_sync_timer)
+    sync_timer_uninstall = sync_timer_actions.add_parser("uninstall")
+    sync_timer_uninstall.set_defaults(handler=_handle_sync_timer)
 
     drift = subparsers.add_parser("drift")
     drift_scope = drift.add_mutually_exclusive_group()
