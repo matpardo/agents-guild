@@ -100,3 +100,42 @@ class QuestDoneTests(GuildTestCase):
         code, out, err = self.run_cli(["quest", "done", "ghost"], "sess-1", self.repo_dir)
         self.assertEqual(code, 1)
         self.assertIn("unknown quest 'ghost'", err)
+
+
+class LeadCloseGuardTests(GuildTestCase):
+    def setUp(self):
+        super().setUp()
+        self.repo_dir = self.register_project("acme", ["acme/app"])
+        self.run_cli(["party", "start", "alpha"], "sess-1", self.repo_dir)
+        self.run_cli(["party", "start", "beta"], "sess-2", self.repo_dir)
+        self.run_cli(["raid", "join", "ci", "--until-leave", "--lead"], "sess-1", self.repo_dir)
+
+    def test_lead_close_fails_while_other_member_active(self):
+        self.run_cli(["raid", "join", "ci", "--until-leave"], "sess-2", self.repo_dir)
+        code, out, err = self.run_cli(["party", "close"], "sess-1", self.repo_dir)
+        self.assertEqual(code, 1)
+        self.assertIn("party 'alpha' leads raid 'ci'", err)
+        self.assertIn("beta", err)
+        self.assertIn("--force", err)
+
+    def test_lead_close_fails_while_member_ask_open(self):
+        self.run_cli(["raid", "join", "ci", "--until-leave"], "sess-2", self.repo_dir)
+        self.run_cli(["ask", "Ship it?", "--context", "green"], "sess-2", self.repo_dir)
+        code, out, err = self.run_cli(["party", "close"], "sess-1", self.repo_dir)
+        self.assertEqual(code, 1)
+        self.assertIn("active members: beta", err)
+
+    def test_lead_close_with_force_succeeds(self):
+        self.run_cli(["raid", "join", "ci", "--until-leave"], "sess-2", self.repo_dir)
+        code, out, err = self.run_cli(["party", "close", "--force"], "sess-1", self.repo_dir)
+        self.assertEqual(code, 0, err)
+        self.assertIn("party 'alpha' closed", out)
+
+    def test_lead_close_succeeds_when_alone_in_raid(self):
+        code, out, err = self.run_cli(["party", "close"], "sess-1", self.repo_dir)
+        self.assertEqual(code, 0, err)
+
+    def test_non_lead_member_close_unaffected(self):
+        self.run_cli(["raid", "join", "ci", "--until-leave"], "sess-2", self.repo_dir)
+        code, out, err = self.run_cli(["party", "close"], "sess-2", self.repo_dir)
+        self.assertEqual(code, 0, err)

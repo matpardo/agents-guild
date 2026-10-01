@@ -3,6 +3,7 @@ from pathlib import Path
 from guild import config, db, events, identity, names, session_info
 from guild.commands import claim as claim_commands
 from guild.commands import next as next_commands
+from guild.commands import raid as raid_commands
 from guild.errors import GuildError
 
 
@@ -132,7 +133,22 @@ def _open_pr_refs(conn, party):
     return ["{}#{}".format(row["repo"], row["number"]) for row in rows]
 
 
-def close(ctx, name):
+def _require_lead_close_allowed(conn, now, party):
+    for raid_name in raid_commands.led_raid_names(conn, now, party):
+        other_members = sorted(
+            {row["party"] for row in raid_commands.active_members(conn, now, raid_name)} - {party}
+        )
+        if other_members:
+            raise GuildError(
+                "party '{}' leads raid '{}' (active members: {}): "
+                "hand the raid over or pass --force to close anyway".format(
+                    party, raid_name, ", ".join(other_members)
+                ),
+                1,
+            )
+
+
+def close(ctx, name, force):
     party = _close_target(ctx, name)
     row = ctx.conn.execute(
         "SELECT project, generation, state FROM parties WHERE name = ?", (party,)
@@ -141,6 +157,8 @@ def close(ctx, name):
         raise GuildError("unknown party '{}'".format(party), 1)
     if row["state"] == "closed":
         raise GuildError("party '{}' is already closed".format(party), 1)
+    if not force:
+        _require_lead_close_allowed(ctx.conn, ctx.now, party)
     summary = _cleanup_summary(ctx, party)
     open_prs = _open_pr_refs(ctx.conn, party)
     with db.writing(ctx.conn):

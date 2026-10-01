@@ -79,6 +79,16 @@ def active_lead(conn, now, raid_name):
     return None
 
 
+def led_raid_names(conn, now, party):
+    rows = conn.execute("SELECT DISTINCT raid FROM raid_members WHERE lead = 1 AND party = ?", (party,)).fetchall()
+    led = []
+    for row in rows:
+        lead_row = active_lead(conn, now, row["raid"])
+        if lead_row is not None and lead_row["party"] == party:
+            led.append(row["raid"])
+    return sorted(led)
+
+
 def require_active_raid(conn, now, raid_name):
     members = active_members(conn, now, raid_name)
     if not members:

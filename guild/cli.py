@@ -68,7 +68,7 @@ def _handle_party_resume(ctx, args):
 def _handle_party_close(ctx, args):
     from guild.commands import party as party_commands
 
-    _print(party_commands.close(ctx, args.name))
+    _print(party_commands.close(ctx, args.name, args.force))
     return 0
 
 
@@ -391,6 +391,7 @@ def _add_party_parser(subparsers):
 
     close = actions.add_parser("close")
     close.add_argument("name", nargs="?")
+    close.add_argument("--force", action="store_true")
     close.set_defaults(handler=_handle_party_close)
 
 
