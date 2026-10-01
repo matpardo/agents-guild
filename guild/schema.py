@@ -11,6 +11,7 @@ PROJECTION_TABLES = (
     "notices",
     "claims",
     "raid_members",
+    "raid_pauses",
     "pr_shared_areas",
     "merge_queue_pins",
 )
@@ -172,6 +173,13 @@ _CREATE_STATEMENTS = (
     )
     """,
     _RAID_MEMBERS_TABLE,
+    """
+    CREATE TABLE IF NOT EXISTS raid_pauses (
+        raid TEXT PRIMARY KEY,
+        paused_at TEXT NOT NULL,
+        paused_by TEXT NOT NULL
+    )
+    """,
     """
     CREATE TABLE IF NOT EXISTS pr_shared_areas (
         repo TEXT NOT NULL,

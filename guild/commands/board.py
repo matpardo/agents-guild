@@ -372,7 +372,11 @@ def _party_section(ctx, painter, party_row):
     raids = raid_commands.member_raids(ctx.conn, ctx.now, party_row["name"])
     if raids:
         raid_text = ", ".join(
-            "{} ({})".format(row["raid"], raid_commands.membership_label(ctx.now, row))
+            "{} ({}{})".format(
+                row["raid"],
+                "PAUSED, " if raid_commands.is_paused(ctx.conn, row["raid"]) else "",
+                raid_commands.membership_label(ctx.now, row),
+            )
             for row in raids
         )
         lines.append(painter.paint("  raids: {}".format(raid_text), "dim"))
@@ -413,6 +417,8 @@ def render_board(ctx, party_filter, raid_filter, color, width):
         ).fetchall()
         notice_rows = _party_scoped_notices(ctx, None)
     lines = []
+    if raid_filter is not None and raid_commands.is_paused(ctx.conn, raid_filter):
+        lines.extend([painter.paint("raid {} PAUSED".format(raid_filter), "red"), ""])
     if raid_filter is not None:
         lines.extend(_raid_next_to_merge_lines(ctx, painter, party_names))
     lines.extend(render_asks(ctx, party_names, color, width, False))
@@ -544,25 +550,31 @@ def _party_model(ctx, party_row, project_config):
         "quests": quest_models,
         "prs": [_pr_model(pr_row) for pr_row in orphan_prs],
         "raids": [
-            {"raid": row["raid"], "expires_at": row["expires_at"], "lead": bool(row["lead"])}
+            {
+                "raid": row["raid"],
+                "expires_at": row["expires_at"],
+                "lead": bool(row["lead"]),
+                "paused": raid_commands.is_paused(ctx.conn, row["raid"]),
+            }
             for row in raids
         ],
         "claims": [{"area": row["area"], "expires_at": row["expires_at"]} for row in claims],
     }
 
 
-def _raid_model(raid_name, members):
+def _raid_model(conn, raid_name, members):
     lead_row = next((row for row in members if row["lead"]), None)
     return {
         "name": raid_name,
         "lead": lead_row["party"] if lead_row is not None else None,
         "members": [row["party"] for row in members],
+        "paused": raid_commands.is_paused(conn, raid_name),
     }
 
 
 def _raid_models(conn, now):
     grouped = raid_commands.active_raids_grouped(conn, now)
-    return [_raid_model(raid_name, grouped[raid_name]) for raid_name in sorted(grouped)]
+    return [_raid_model(conn, raid_name, grouped[raid_name]) for raid_name in sorted(grouped)]
 
 
 def board_model(ctx):

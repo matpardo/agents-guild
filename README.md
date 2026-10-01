@@ -111,6 +111,8 @@ guild raid join <name> --ttl <dur>      # the caller's bound party joins; joinin
 guild raid join <name> --until-leave    # joins with no expiry; ends only on `raid leave` or `party close`
 guild raid join <name> (--ttl <dur> | --until-leave) --lead  # also becomes the raid's lead
 guild raid leave <name>
+guild raid pause <name>               # lead only (any member if no lead): ask every member party to stop
+guild raid resume <name>              # lifts the pause and posts a notice to raid:<name>
 guild raids
 
 guild next [--all]     # ranked action queue for the caller's party
@@ -563,6 +565,29 @@ targeting` is the single place that resolves whether a notice's `project:`,
 `guild` or `raid:` scope matches the caller. `guild board` shows the raw
 `raid:<name>` scope on a raid notice, and lists each party's raids
 (`raids: ci (5h left)`) at the end of its block.
+
+### Raid pause
+
+`guild raid pause <name>` marks the raid paused (events `raid.paused` /
+`raid.resumed`, projection table `raid_pauses`, rebuilt like everything else).
+Only the raid's lead may pause or resume; with no lead any active member may.
+Pausing an already paused raid, or resuming one that is not paused, is a clear
+error. While paused:
+
+- `prompt-submit` and `post-tool-use` inject `raid <name> paused: finish
+  current step and leave guild handoff` for every bound session whose party is
+  an active member, once per (session, raid, pause) via a marker file shared by
+  both hooks. There is no every-turn repetition; a later pause injects again.
+- `guild next` (single and `--all`) returns `nothing actionable` plus
+  `raid paused: <name>` for those parties and does not advance their PRs or
+  tasks.
+- `guild raids` shows `<name> (paused):`, `guild board` shows `PAUSED` in the
+  party's `raids:` line and a `raid <name> PAUSED` header with `--raid`, and the
+  web board model carries `paused` on each raid and membership.
+
+`guild raid resume <name>` deletes the pause state and posts the notice `raid
+<name> resumed` to `raid:<name>` (8h TTL), which reaches members through the
+normal notice injection.
 
 ### Raid lead
 

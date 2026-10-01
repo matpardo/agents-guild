@@ -156,7 +156,7 @@ class BoardModelShapeTests(BoardModelTestCase):
         self.assertEqual(party["claims"][0]["area"], "src/x")
         self.assertEqual(len(party["raids"]), 1)
         self.assertEqual(party["raids"][0]["raid"], "ci")
-        self.assertEqual(set(party["raids"][0]), {"raid", "expires_at", "lead"})
+        self.assertEqual(set(party["raids"][0]), {"raid", "expires_at", "lead", "paused"})
         self.assertFalse(party["raids"][0]["lead"])
 
     def test_drift_shape_for_projects_in_scope(self):
@@ -185,7 +185,7 @@ class BoardModelRaidsTests(BoardModelTestCase):
 
         self.assertEqual(len(model["raids"]), 1)
         raid = model["raids"][0]
-        self.assertEqual(set(raid), {"name", "lead", "members"})
+        self.assertEqual(set(raid), {"name", "lead", "members", "paused"})
         self.assertEqual(raid["name"], "ci")
         self.assertEqual(raid["lead"], "alpha")
         self.assertEqual(set(raid["members"]), {"alpha", "beta"})

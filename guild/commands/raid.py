@@ -106,6 +106,21 @@ def raid_names_led_by_for_member(conn, now, lead_party, member_party):
     return result
 
 
+def pause_row(conn, raid_name):
+    return conn.execute("SELECT * FROM raid_pauses WHERE raid = ?", (raid_name,)).fetchone()
+
+
+def is_paused(conn, raid_name):
+    return pause_row(conn, raid_name) is not None
+
+
+def paused_member_raids(conn, now, party):
+    if party is None:
+        return []
+    rows = [pause_row(conn, name) for name in sorted(member_raid_names(conn, now, party))]
+    return [row for row in rows if row is not None]
+
+
 def membership_label(now, row):
     time_label = timeutil.membership_left_label(now, row["expires_at"])
     if row["lead"]:
@@ -127,7 +142,8 @@ def list_raids(ctx):
     by_raid = active_raids_grouped(ctx.conn, ctx.now)
     lines = []
     for raid_name in sorted(by_raid):
-        lines.append("{}:".format(raid_name))
+        suffix = " (paused)" if is_paused(ctx.conn, raid_name) else ""
+        lines.append("{}{}:".format(raid_name, suffix))
         for row in by_raid[raid_name]:
             lines.append("  {} ({})".format(row["party"], membership_label(ctx.now, row)))
     return lines
