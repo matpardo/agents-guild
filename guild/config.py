@@ -38,6 +38,14 @@ def _validate_shared_areas_config(data):
     timeutil.parse_duration(ttl)
 
 
+def _validate_migration_paths_config(data):
+    migration_paths = data.get("migration_paths")
+    if migration_paths is None:
+        return
+    if not isinstance(migration_paths, list) or not all(isinstance(item, str) for item in migration_paths):
+        raise GuildError("project config 'migration_paths' must be a list of strings", 1)
+
+
 def validate_project_config(data):
     for key in _REQUIRED_KEYS:
         if key not in data:
@@ -52,6 +60,7 @@ def validate_project_config(data):
     if tracker_config is not None:
         _validate_tracker_config(tracker_config)
     _validate_shared_areas_config(data)
+    _validate_migration_paths_config(data)
 
 
 def load_project_file(config_file):
