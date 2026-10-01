@@ -1,6 +1,6 @@
 # Guild (multi-session coordination)
 `guild` is a CLI on PATH, not a skill — run it with Bash. `guild --help` for syntax. It coordinates parallel sessions: parties, quests, tasks, PRs, asks, notices, claims, raids.
-- **Bind first.** When a hook reports the session is not bound: continuing a party's work → `guild party resume <party>`; new stream of work → `guild party start <name>` then `guild quest add`. When a quest is finished, `guild quest done <slug>`; when the party's work is over, `guild party close` (a raid lead is refused while the raid has other active members; `--force` overrides).
+- **Bind first.** When a hook reports the session is not bound: continuing a party's work → `guild party resume <party>`; new stream of work → `guild party start <name>` then `guild quest add`. When a quest is finished, `guild quest done <slug>` (epic quests run a drift gate and refuse on findings; `--accept-drift` overrides and records them); when the party's work is over, `guild party close` (a raid lead is refused while the raid has other active members; `--force` overrides).
 - **Track every PR you open**: `guild pr track <owner/repo>#<n> --task <quest>/<tid> --what "<one sentence>" --waits "<what it waits on>"`. Keep lifecycle and waits current with `guild pr set`.
 - **Keep task state current**: `guild task start|block|done`.
 - **When unsure what to do next, run `guild next`.** It picks one item (your own PRs needing attention first, then the next unblocked task of your quest) with a reason; `guild next --all` shows the full queue and never changes state.
