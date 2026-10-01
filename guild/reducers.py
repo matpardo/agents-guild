@@ -64,6 +64,10 @@ def _quest_done(conn, event):
     conn.execute("UPDATE quests SET state = 'done' WHERE slug = ?", (event["payload"]["slug"],))
 
 
+def _quest_marked_incomplete(conn, event):
+    return
+
+
 def _quest_added(conn, event):
     payload = event["payload"]
     conn.execute(
@@ -417,6 +421,7 @@ _REDUCERS = {
     "party.handed_off": _party_handed_off,
     "quest.added": _quest_added,
     "quest.done": _quest_done,
+    "quest.marked_incomplete": _quest_marked_incomplete,
     "task.added": _task_added,
     "task.started": _task_started,
     "task.blocked": _task_blocked,

@@ -51,7 +51,7 @@ class DriftGateTests(QuestDoneTestCase):
         self._set_pr_lifecycle(1, "merged")
 
     def test_drift_refuses_done_and_lists_findings(self):
-        code, out, err = self.run_cli(["quest", "done", "wave1-q"], "sess-1", self.repo_dir)
+        code, out, err = self.run_cli(["quest", "done", "wave1-q", "--force"], "sess-1", self.repo_dir)
         self.assertEqual(code, 1)
         self.assertIn("pr:acme/app#1: merged, task:wave1-q/T01 state=queued", err)
         self.assertIn("--accept-drift", err)
@@ -59,7 +59,7 @@ class DriftGateTests(QuestDoneTestCase):
 
     def test_accept_drift_records_findings_in_snapshot(self):
         code, out, err = self.run_cli(
-            ["quest", "done", "wave1-q", "--accept-drift"], "sess-1", self.repo_dir
+            ["quest", "done", "wave1-q", "--accept-drift", "--force"], "sess-1", self.repo_dir
         )
         self.assertEqual(code, 0, err)
         self.assertEqual(self._quest_state("wave1-q"), "done")
@@ -70,7 +70,7 @@ class DriftGateTests(QuestDoneTestCase):
         self._write_epic("wave2", "status: active\n", _DRIFT_EPIC)
         self._sync_sdd()
         self._add_quest("wave2-q", "wave2", "T01")
-        code, out, err = self.run_cli(["quest", "done", "wave2-q"], "sess-1", self.repo_dir)
+        code, out, err = self.run_cli(["quest", "done", "wave2-q", "--force"], "sess-1", self.repo_dir)
         self.assertEqual(code, 0, err)
 
     def test_party_without_running_leader_does_not_block(self):
@@ -78,7 +78,7 @@ class DriftGateTests(QuestDoneTestCase):
         self._sync_sdd()
         self._add_quest("wave3-q", "wave3", "T01")
         (self.sessions_dir / "1.json").unlink()
-        code, out, err = self.run_cli(["quest", "done", "wave3-q"], "sess-1", self.repo_dir)
+        code, out, err = self.run_cli(["quest", "done", "wave3-q", "--force"], "sess-1", self.repo_dir)
         self.assertEqual(code, 0, err)
 
 
@@ -124,7 +124,7 @@ class SnapshotShapeTests(QuestDoneTestCase):
         self.run_cli(["task", "block", "blk-q/a", "--reason", "x"], "sess-1", self.repo_dir)
         self.run_cli(["task", "start", "blk-q/a", "--summary", "s"], "sess-1", self.repo_dir)
         self.run_cli(["task", "block", "blk-q/a", "--reason", "y"], "sess-1", self.repo_dir)
-        self.run_cli(["quest", "done", "blk-q"], "sess-1", self.repo_dir)
+        self.run_cli(["quest", "done", "blk-q", "--force"], "sess-1", self.repo_dir)
         self.assertEqual(self._done_payload("blk-q")["achievement"]["tasks_blocked_events"], 2)
 
     def test_no_epic_quest_skips_gate_and_has_no_epic_fields(self):
@@ -133,7 +133,7 @@ class SnapshotShapeTests(QuestDoneTestCase):
             "sess-1", self.repo_dir,
         )
         self.run_cli(["task", "done", "free-q/a"], "sess-1", self.repo_dir)
-        code, out, err = self.run_cli(["quest", "done", "free-q"], "sess-1", self.repo_dir)
+        code, out, err = self.run_cli(["quest", "done", "free-q", "--force"], "sess-1", self.repo_dir)
         self.assertEqual(code, 0, err)
         snapshot = self._done_payload("free-q")["achievement"]
         self.assertIsNone(snapshot["epic"])
@@ -147,7 +147,7 @@ class SnapshotShapeTests(QuestDoneTestCase):
         self._write_epic("wave5", "status: active\n", _DRIFT_EPIC)
         self._sync_sdd()
         self._add_quest("wave5-q", "wave5", "T01")
-        code, out, err = self.run_cli(["quest", "done", "wave5-q"], "sess-1", self.repo_dir)
+        code, out, err = self.run_cli(["quest", "done", "wave5-q", "--force"], "sess-1", self.repo_dir)
         self.assertEqual(code, 0, err)
         snapshot = self._done_payload("wave5-q")["achievement"]
         self.assertEqual(snapshot["jira_cards_done"], [])

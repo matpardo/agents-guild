@@ -6,6 +6,8 @@ from guild import timeutil
 _KINDS = (
     "quest.added",
     "quest.done",
+    "quest.marked_incomplete",
+    "task.added",
     "task.done",
     "task.blocked",
     "pr.tracked",
@@ -193,6 +195,127 @@ def _all_quests(by_kind, merged_prs):
     return sorted(quests.values(), key=lambda quest: timeutil.from_iso(quest["done_at"]), reverse=True)
 
 
+def _percent(done, total):
+    if total == 0:
+        return 0
+    return done * 100 // total
+
+
+def _task_counts(conn, slug):
+    rows = conn.execute("SELECT state FROM quest_tasks WHERE quest = ?", (slug,)).fetchall()
+    states = [row["state"] for row in rows]
+    return {
+        "done": states.count("done"),
+        "active": states.count("active"),
+        "blocked": states.count("blocked"),
+        "queued": states.count("queued"),
+        "total": len(states),
+    }
+
+
+def _active_quest_entry(conn, now, started_at, row):
+    tasks = _task_counts(conn, row["slug"])
+    return {
+        "slug": row["slug"],
+        "party": row["party"],
+        "project": row["project"],
+        "epic": row["epic"],
+        "title": row["title"],
+        "started_at": started_at,
+        "age_seconds": _seconds_between(started_at, timeutil.to_iso(now)),
+        "tasks": tasks,
+        "percent_done": _percent(tasks["done"], tasks["total"]),
+    }
+
+
+def _active_quests(conn, by_kind, now, scope):
+    started_by_slug = {}
+    for event in by_kind["quest.added"]:
+        started_by_slug.setdefault(event["payload"]["slug"], event["ts"])
+    rows = conn.execute(
+        "SELECT slug, party, project, epic, title FROM quests WHERE state = 'active'"
+    ).fetchall()
+    entries = [
+        _active_quest_entry(conn, now, started_by_slug.get(row["slug"]), row)
+        for row in rows
+        if scope.admits(row["party"], row["project"])
+    ]
+    return sorted(entries, key=lambda entry: entry["started_at"] or "", reverse=True)
+
+
+def _first_marks(by_kind):
+    marks = {}
+    for event in by_kind["quest.marked_incomplete"]:
+        marks.setdefault(event["payload"]["slug"], event)
+    return marks
+
+
+def _quest_tids(by_kind, slug):
+    tids = set()
+    for event in by_kind["quest.added"]:
+        if event["payload"]["slug"] == slug:
+            tids.update(task["tid"] for task in event["payload"]["tasks"])
+    for event in by_kind["task.added"]:
+        if event["payload"]["quest"] == slug:
+            tids.add(event["payload"]["tid"])
+    return tids
+
+
+def _done_tids_before(by_kind, slug, seq):
+    return {
+        event["payload"]["tid"]
+        for event in by_kind["task.done"]
+        if event["payload"]["quest"] == slug and event["seq"] < seq
+    }
+
+
+def _incomplete_entry(by_kind, quests_by_slug, added_by_slug, mark):
+    slug = mark["payload"]["slug"]
+    quest = quests_by_slug.get(slug)
+    added = added_by_slug.get(slug)
+    all_tids = _quest_tids(by_kind, slug)
+    not_done = all_tids - _done_tids_before(by_kind, slug, mark["seq"])
+    if quest is not None:
+        base = {key: quest[key] for key in ("party", "project", "title", "started_at", "done_at")}
+    elif added is not None:
+        base = {
+            "party": added["payload"]["party"],
+            "project": added["payload"]["project"],
+            "title": added["payload"]["title"],
+            "started_at": added["ts"],
+            "done_at": None,
+        }
+    else:
+        base = {
+            "party": mark["party"],
+            "project": mark["project"],
+            "title": slug,
+            "started_at": None,
+            "done_at": None,
+        }
+    return dict(
+        base,
+        slug=slug,
+        marked_at=mark["ts"],
+        reason=mark["payload"]["reason"],
+        tasks_not_done=len(not_done),
+        tasks_total=len(all_tids),
+    )
+
+
+def _incomplete_quests(by_kind, scope, every_quest):
+    quests_by_slug = {quest["slug"]: quest for quest in every_quest}
+    added_by_slug = {}
+    for event in by_kind["quest.added"]:
+        added_by_slug.setdefault(event["payload"]["slug"], event)
+    entries = [
+        _incomplete_entry(by_kind, quests_by_slug, added_by_slug, mark)
+        for mark in _first_marks(by_kind).values()
+    ]
+    admitted = [entry for entry in entries if scope.admits(entry["party"], entry["project"])]
+    return sorted(admitted, key=lambda entry: timeutil.from_iso(entry["marked_at"]), reverse=True)
+
+
 def _end_span(span, ts):
     ended_at = ts
     if span["expires_at"] is not None and timeutil.from_iso(span["expires_at"]) < timeutil.from_iso(ts):
@@ -342,10 +465,14 @@ def build_model(conn, now, party, raid, project):
     by_kind = _load_events(conn)
     scope = _Scope(party, project, _raid_parties(by_kind, raid))
     merged_prs = _merged_pr_records(by_kind)
-    every_quest = _all_quests(by_kind, merged_prs)
+    finished_quests = _all_quests(by_kind, merged_prs)
+    marked_slugs = set(_first_marks(by_kind))
+    every_quest = [quest for quest in finished_quests if quest["slug"] not in marked_slugs]
     quests = [quest for quest in every_quest if scope.admits(quest["party"], quest["project"])]
     return {
         "quests": quests,
+        "active_quests": _active_quests(conn, by_kind, now, scope),
+        "incomplete_quests": _incomplete_quests(by_kind, scope, finished_quests),
         "raids": _finished_raids(by_kind, now, scope, raid, every_quest, merged_prs),
         "totals": _totals(by_kind, scope, quests, merged_prs),
     }
@@ -414,6 +541,30 @@ def _quest_lines(quest):
     return lines
 
 
+def _active_quest_lines(quest):
+    tasks = quest["tasks"]
+    return [
+        "  {} - {}".format(quest["slug"], quest["title"]),
+        "    party {} | project {} | {}".format(quest["party"], quest["project"], _epic_label(quest["epic"], None)),
+        "    started {} ({} ago)".format(_date(quest["started_at"]), format_duration(quest["age_seconds"])),
+        "    {}% ({}/{} done) | active {} | blocked {} | queued {}".format(
+            quest["percent_done"], tasks["done"], tasks["total"], tasks["active"], tasks["blocked"], tasks["queued"]
+        ),
+    ]
+
+
+def _incomplete_quest_lines(quest):
+    return [
+        "  {} - {}".format(quest["slug"], quest["title"]),
+        "    party {} | project {}".format(quest["party"], quest["project"]),
+        "    {} -> {} | marked {}".format(
+            _date(quest["started_at"]), _date(quest["done_at"]), _date(quest["marked_at"])
+        ),
+        "    {} of {} tasks not done when marked".format(quest["tasks_not_done"], quest["tasks_total"]),
+        "    reason: {}".format(quest["reason"]),
+    ]
+
+
 def _party_label(entry):
     if entry["lead"]:
         return "{} (lead)".format(entry["party"])
@@ -447,9 +598,15 @@ def _totals_line(totals):
 
 
 def render_lines(model):
-    lines = ["Completed quests ({})".format(len(model["quests"]))]
+    lines = ["In progress ({})".format(len(model["active_quests"]))]
+    for quest in model["active_quests"]:
+        lines.extend(_active_quest_lines(quest))
+    lines.extend(["", "Completed quests ({})".format(len(model["quests"]))])
     for quest in model["quests"]:
         lines.extend(_quest_lines(quest))
+    lines.extend(["", "Closed without completing ({})".format(len(model["incomplete_quests"]))])
+    for quest in model["incomplete_quests"]:
+        lines.extend(_incomplete_quest_lines(quest))
     lines.extend(["", "Finished raids ({})".format(len(model["raids"]))])
     for raid in model["raids"]:
         lines.extend(_raid_lines(raid))

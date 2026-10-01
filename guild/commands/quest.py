@@ -1,3 +1,5 @@
+import json
+
 from guild import config, db, events, identity, names, timeutil
 from guild.commands import achievement, drift
 from guild.errors import GuildError
@@ -94,7 +96,19 @@ def _gate_drift(conn, project, epic, accept_drift):
     return findings
 
 
-def done(ctx, slug, accept_drift):
+def _gate_unfinished_tasks(conn, slug, force):
+    rows = conn.execute(
+        "SELECT tid, state FROM quest_tasks WHERE quest = ? AND state != 'done' ORDER BY tid", (slug,)
+    ).fetchall()
+    if not rows or force:
+        return
+    listing = "\n".join("{} ({})".format(row["tid"], row["state"]) for row in rows)
+    raise GuildError(
+        "quest '{}' has tasks not done, finish them or pass --force:\n{}".format(slug, listing), 1
+    )
+
+
+def done(ctx, slug, accept_drift, force):
     binding = identity.require_binding(ctx.conn, ctx.session_id)
     row = ctx.conn.execute(
         "SELECT party, project, epic, state FROM quests WHERE slug = ?", (slug,)
@@ -107,6 +121,7 @@ def done(ctx, slug, accept_drift):
         )
     if row["state"] != "active":
         raise GuildError("quest '{}' is already {}".format(slug, row["state"]), 1)
+    _gate_unfinished_tasks(ctx.conn, slug, force)
     findings = _gate_drift(ctx.conn, row["project"], row["epic"], accept_drift)
     snapshot = achievement.build(ctx.conn, slug, ctx.now, findings)
     with db.writing(ctx.conn):
@@ -122,6 +137,41 @@ def done(ctx, slug, accept_drift):
             {"slug": slug, "achievement": snapshot},
         )
     return "quest '{}' done".format(slug)
+
+
+def _already_marked_incomplete(conn, slug):
+    rows = conn.execute("SELECT payload FROM events WHERE kind = 'quest.marked_incomplete'").fetchall()
+    return any(json.loads(row["payload"])["slug"] == slug for row in rows)
+
+
+def incomplete(ctx, slug, reason):
+    binding = identity.require_binding(ctx.conn, ctx.session_id)
+    row = ctx.conn.execute("SELECT party, project, state FROM quests WHERE slug = ?", (slug,)).fetchone()
+    if row is None:
+        raise GuildError("unknown quest '{}'".format(slug), 1)
+    if row["party"] != binding["party"]:
+        raise GuildError(
+            "quest '{}' is not owned by party '{}'".format(slug, binding["party"]), 1
+        )
+    if row["state"] != "done":
+        raise GuildError("quest '{}' is not done: only done quests can be marked incomplete".format(slug), 1)
+    if not reason.strip():
+        raise GuildError("--reason must not be blank", 1)
+    if _already_marked_incomplete(ctx.conn, slug):
+        raise GuildError("quest '{}' is already marked incomplete".format(slug), 1)
+    with db.writing(ctx.conn):
+        events.record(
+            ctx.conn,
+            ctx.now,
+            ctx.origin,
+            binding["party"],
+            ctx.session_id,
+            row["project"],
+            "quest.marked_incomplete",
+            "local",
+            {"slug": slug, "reason": reason.strip()},
+        )
+    return "quest '{}' marked incomplete".format(slug)
 
 
 def _split_csv(csv):

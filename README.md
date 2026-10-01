@@ -82,7 +82,8 @@ guild party close [<party>] [--force]  # <party>: from a terminal, or your own p
 guild quest add <slug> --title "..." --epic <slug> --tasks T09,T07b
 guild quest add <slug> --title "..." --no-epic [--tasks A,B [--titles "First,Second"]]
 guild quest add <slug> --title "..." --followups-of <quest> [--tasks A,B [--titles ...]]
-guild quest done <slug> [--accept-drift]
+guild quest done <slug> [--accept-drift] [--force]   # refuses while tasks are not done; --force overrides
+guild quest incomplete <slug> --reason "..."          # a done quest that was not really finished
 
 guild task add <quest>/<tid> --title "..."          # no-epic quests only
 guild task start <quest>/<tid> [--summary "..."]
@@ -123,7 +124,7 @@ guild merge-queue [--raid <name> | --party <name>]   # read-only: PRs in the ord
 guild merge-queue pin   <owner/repo>#<a> --before <owner/repo>#<b>
 guild merge-queue unpin <owner/repo>#<a> --before <owner/repo>#<b>
 
-guild history [--party <name>] [--raid <name>] [--project <name>]   # read-only: completed quests, finished raids, totals
+guild history [--party <name>] [--raid <name>] [--project <name>]   # read-only: in-progress quests, completed quests, quests closed without completing, finished raids, totals
 guild board [--party <name> | --raid <name>]
 guild web --port <n>
 guild sync --source gh|sdd|tracker
@@ -209,7 +210,10 @@ fails naming the raid and the members, and `guild party close --force` closes an
 Closing cascades in the same event: the party's active quests become `done`,
 its open asks are dismissed and its claims are released. Tracked PRs stay
 tracked for history and are listed if still open. `guild quest done <slug>`
-finishes one quest without closing its party. For an epic quest it first runs the
+finishes one quest without closing its party. It refuses while the quest has tasks
+that are not `done` (queued, active or blocked), listing them; `--force` finishes anyway,
+and the achievement snapshot still records reality (`tasks_done` counts only done tasks).
+Quests without tasks are allowed. For an epic quest it then runs the
 drift check (the `guild drift` rules, scoped to that epic) and refuses with the
 findings listed; `--accept-drift` finishes anyway and records the findings. No-epic
 quests skip the gate. The `quest.done` event freezes an `achievement` snapshot
@@ -218,6 +222,18 @@ sdd_tids, epic_progress, jira_cards_done, prs_merged, handoffs, sessions, asks_r
 asks_answered, median_answer_seconds, drift) because the epic, card and task
 projections are replaced on every sync. Closed parties leave the board
 and quests that are `done` leave `guild drift`'s default scope.
+
+### Marking a done quest as incomplete
+
+`guild quest incomplete <slug> --reason "<text>"` records that a quest marked `done`
+was closed without being completed. Only the owning party can run it, only on a quest
+that is currently `done`, the reason is required and a quest can be marked once. It
+appends a local `quest.marked_incomplete` event `{slug, reason}`; events are never edited,
+and the quests projection is left untouched. `guild history` derives the flag from the
+event: the quest leaves "Completed quests" and totals, and appears under "Closed without
+completing" with title, party, dates, reason and how many tasks were not done when it was
+marked. The event is local, so `guild export` skips it; `guild rebuild` replays it as a
+no-op on the projections.
 
 ### Task done resolver
 
@@ -303,18 +319,25 @@ sync --source gh` from a session that supports it.
 
 ### `guild history`
 
-Read-only record of what the guild has achieved. Three sections:
+Read-only record of what the guild has achieved. Five sections:
 
-1. Completed quests, newest first. Each shows party, project, epic progress,
+1. In progress: quests whose projection state is `active`, newest started first, with
+   party, project, epic, start, age, task counts (done, active, blocked, queued) and
+   percent done. Read from the `quests`/`quest_tasks` projections plus the `quest.added`
+   timestamp. Quests finished by `guild party close` leave this list.
+2. Completed quests, newest first. Each shows party, project, epic progress,
    start/end and duration, tasks done, JIRA cards done, PRs merged, handoffs and
    ask metrics, read from the `achievement` snapshot frozen in the `quest.done`
    event. Quests closed before snapshots existed are derived from events
    (dates, party, tasks, PRs, handoffs) and marked `no snapshot`.
-2. Finished raids: raids with no active member, derived from
+3. Closed without completing: quests flagged with `guild quest incomplete`, newest
+   marked first, with title, party, dates, reason and how many tasks were not done at
+   marking time. They do not count in totals or in finished raids.
+4. Finished raids: raids with no active member, derived from
    `raid.joined`/`raid.left`/`party.closed` events and membership expiry. Each
    shows start (first join), end, parties (lead marked), quests completed and
    PRs merged by member parties inside that window, and the pause count.
-3. Totals: quests done, PRs merged, tasks done, asks answered, median ask answer
+5. Totals: quests done, PRs merged, tasks done, asks answered, median ask answer
    time, handoffs.
 
 `--party`, `--raid` and `--project` narrow every section; they combine.
@@ -588,9 +611,10 @@ access noise to stderr (server errors still do). Ctrl-C exits cleanly.
 `guild/web/history.js`, same CSS tokens and light/dark support as the board),
 linked from the board header as `history` and back as `board`. It shows a
 totals strip (quests, PRs merged, tasks, asks answered with median, handoffs),
-then completed-quest cards (dates, duration, epic progress bar, SDD tasks, JIRA
+then in-progress cards (`<progress>` bar and task counts; "nothing in progress" when empty),
+completed-quest cards (dates, duration, epic progress bar, SDD tasks, JIRA
 cards, PRs, handoffs, asks, accepted drift; legacy quests show a `no snapshot`
-badge and `—` for unknown fields) and finished-raid cards (duration, parties
+badge and `—` for unknown fields) closed-without-completing cards (reason, tasks not done at marking time) and finished-raid cards (duration, parties
 with the lead marked, quests, PRs, pauses). The data comes from `GET
 /api/history`, the same model as `guild history`; it accepts optional `party`,
 `raid` and `project` query parameters. It is read-only and renders text with

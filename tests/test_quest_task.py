@@ -344,7 +344,7 @@ class QuestAddConflictTests(GuildTestCase):
             "sess-1",
             self.repo_dir,
         )
-        self.run_cli(["quest", "done", "alpha-q"], "sess-1", self.repo_dir)
+        self.run_cli(["quest", "done", "alpha-q", "--force"], "sess-1", self.repo_dir)
         code, out, err = self.run_cli(
             ["quest", "add", "beta-q", "--title", "B", "--epic", "compliance", "--tasks", "T01"],
             "sess-2",
