@@ -8,7 +8,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-from guild import config, db, identity, names, timeutil
+from guild import config, db, identity, localbase, names, timeutil
 from guild.adapters import github
 from guild.commands import brief as brief_commands
 from guild.commands import claim as claim_commands
@@ -333,20 +333,6 @@ def _resolve_push_branch(push_args, target_dir):
     return _current_branch(target_dir)
 
 
-def _push_base_ref(target_dir):
-    try:
-        result = subprocess.run(
-            ["git", "-C", str(target_dir), "symbolic-ref", "--short", "refs/remotes/origin/HEAD"],
-            capture_output=True,
-            text=True,
-        )
-    except OSError:
-        return None
-    if result.returncode != 0:
-        return None
-    return result.stdout.strip() or None
-
-
 def _push_diff_paths(target_dir, base_ref):
     try:
         result = subprocess.run(
@@ -362,7 +348,7 @@ def _push_diff_paths(target_dir, base_ref):
 
 
 def _shared_areas_push_result(ctx, target_dir):
-    base_ref = _push_base_ref(target_dir)
+    base_ref = localbase.origin_head_ref(target_dir)
     if base_ref is None:
         return {
             "blocked": False,

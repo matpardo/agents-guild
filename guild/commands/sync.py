@@ -3,7 +3,7 @@ import json
 import re
 from pathlib import Path
 
-from guild import config, db, events, timeutil
+from guild import config, db, events, localbase, timeutil
 from guild.adapters import github, jira_acli, sdd
 from guild.commands import claim as claim_commands
 from guild.commands import notice as notice_commands
@@ -24,6 +24,9 @@ _MERGE_NOTICE_TEMPLATE = "{}#{} merged in main ({}/{}: {}). Parties with open br
 _MERGE_NOTICE_SHARED_AREAS_SUFFIX = " Shared areas touched: {}"
 _MERGE_NOTICE_RELEASED_SUFFIX = " Released: {}."
 _AREA_PREFIX = "area:"
+
+_FAST_FORWARD_NOTICE_TTL = "12h"
+_FAST_FORWARD_NOTICE_TEMPLATE = "local {} of {} {} commits behind origin, not updated: {}"
 
 _MIGRATION_NOTICE_TTL = "12h"
 _MIGRATION_NOTICE_TEMPLATE = (
@@ -210,6 +213,38 @@ def _handle_merge(ctx, projects, row, failures):
     _post_merge_notice(ctx, row, raids, text)
 
 
+def _post_fast_forward_notice(ctx, project, clone, base, outcome):
+    tip = localbase.origin_tip(clone["path"], base)
+    announces = "ffbase:{}:{}:{}".format(project["name"], clone["repo"], tip)
+    if notice_commands.announced(ctx.conn, announces):
+        return
+    text = _FAST_FORWARD_NOTICE_TEMPLATE.format(
+        base, clone["repo"], outcome["behind"], outcome["reason"]
+    )
+    notice_commands.create_announcing(
+        ctx, None, text, "project:{}".format(project["name"]), _FAST_FORWARD_NOTICE_TTL, announces
+    )
+
+
+def _fast_forward_clone_mutating_git(ctx, project, clone):
+    base = localbase.base_branch(clone["path"])
+    if base is None:
+        return
+    outcome = localbase.fast_forward_base_mutating_git(clone["path"], base)
+    if outcome["reason"] is None:
+        return
+    _post_fast_forward_notice(ctx, project, clone, base, outcome)
+
+
+def _fast_forward_merged_bases_mutating_git(ctx, projects, merged_repos):
+    for project in projects:
+        if not project.get("fast_forward_base"):
+            continue
+        for clone in localbase.locate_clones(project):
+            if clone["repo"] in merged_repos:
+                _fast_forward_clone_mutating_git(ctx, project, clone)
+
+
 def _migration_versions(migration_paths, changed_files):
     versions = set()
     for path in changed_files:
@@ -306,6 +341,7 @@ def _sync_gh(ctx):
     ).fetchall()
     failures = []
     projects = config.load_all_projects(ctx.projects_dir)
+    merged_repos = set()
     for row in rows:
         try:
             lifecycle = _sync_pr(ctx, projects, row, failures)
@@ -314,6 +350,8 @@ def _sync_gh(ctx):
             continue
         if _became_merged(row, lifecycle):
             _handle_merge(ctx, projects, row, failures)
+            merged_repos.add(row["repo"])
+    _fast_forward_merged_bases_mutating_git(ctx, projects, merged_repos)
     _check_migration_clashes(ctx, projects, failures)
     _close_met_notices(ctx)
     return failures
