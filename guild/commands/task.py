@@ -31,7 +31,9 @@ def add(ctx, quest, tid, title):
     quest_row = _load_quest(ctx, quest)
     if quest_row["epic"] is not None:
         raise GuildError(
-            "quest '{}' is an epic quest; tasks come from `quest add --tasks`".format(quest), 1
+            "quest '{}' is an epic quest; tasks come from `quest add --tasks`;"
+            " for extra work use `quest add <slug> --followups-of {}`".format(quest, quest),
+            1,
         )
     binding = identity.require_binding(ctx.conn, ctx.session_id)
     _require_owner(binding, quest_row)
