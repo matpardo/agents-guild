@@ -111,7 +111,7 @@ class AskTests(GuildTestCase):
         code, out, err = self.run_cli(["asks"], None, None)
         self.assertIn("NEEDS YOU · nothing", out)
 
-    def test_asks_sorted_by_blocked_count_desc_then_created_then_id(self):
+    def test_asks_listed_in_ascending_id_regardless_of_blocked_count(self):
         self.run_cli(["task", "add", "demo/T02", "--title", "Second"], "sess-1", self.repo_dir)
         self.run_cli(
             ["ask", "single ref?", "--context", "x", "--ref", "task:demo/T01"], "sess-1", self.repo_dir
@@ -124,17 +124,28 @@ class AskTests(GuildTestCase):
             "sess-1", self.repo_dir,
         )
         code, out, err = self.run_cli(["asks"], None, None)
-        self.assertLess(out.index("two refs?"), out.index("single ref?"))
+        self.assertLess(out.index("single ref?"), out.index("two refs?"))
 
-    def test_ordering_uses_blocked_count_not_raw_ref_count(self):
-        self.run_cli(["task", "add", "demo/T02", "--title", "Second"], "sess-1", self.repo_dir)
-        self.run_cli(["task", "done", "demo/T02"], "sess-1", self.repo_dir)
-        self._create_ask_event("alpha", "one blocked ref?", ["task:demo/T01"], 0)
-        self._create_ask_event(
-            "alpha", "two refs but one done?", ["task:demo/T01", "task:demo/T02"], 1
-        )
+    def test_asks_listed_in_ascending_id_regardless_of_created_at(self):
+        self._create_ask_event("alpha", "created later?", ["task:demo/T01"], 10)
+        self._create_ask_event("alpha", "created earlier?", ["task:demo/T01"], 0)
         code, out, err = self.run_cli(["asks"], None, None)
-        self.assertLess(out.index("one blocked ref?"), out.index("two refs but one done?"))
+        self.assertLess(out.index("created later?"), out.index("created earlier?"))
+
+    def test_board_summary_lists_asks_in_ascending_id(self):
+        self.run_cli(["task", "add", "demo/T02", "--title", "Second"], "sess-1", self.repo_dir)
+        self.run_cli(
+            ["ask", "single ref?", "--context", "x", "--ref", "task:demo/T01"], "sess-1", self.repo_dir
+        )
+        self.run_cli(
+            [
+                "ask", "two refs?", "--context", "x",
+                "--ref", "task:demo/T01", "--ref", "task:demo/T02",
+            ],
+            "sess-1", self.repo_dir,
+        )
+        code, out, err = self.run_cli(["board"], None, None)
+        self.assertLess(out.index("single ref?"), out.index("two refs?"))
 
     def test_merged_pr_ref_no_longer_counts_as_blocked(self):
         self._track_pr(1, "demo", "T01")

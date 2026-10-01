@@ -34,6 +34,7 @@ def new_lines(ctx, binding):
     active_notice_ids = {row["id"] for row in notice.active_notices(ctx.conn, ctx.now)}
     raid_member_of = raid_commands.member_raid_names(ctx.conn, ctx.now, caller_party)
     lines = []
+    ask_lines = []
     for event in new_events:
         payload = event["payload"]
         if event["kind"] == "notice.created":
@@ -50,11 +51,12 @@ def new_lines(ctx, binding):
             for raid_name in raid_commands.raid_names_led_by_for_member(
                 ctx.conn, ctx.now, caller_party, payload["party"]
             ):
-                lines.append(
+                ask_lines.append((
+                    payload["id"],
                     '- ask #{} from {} (raid {}): "{}"'.format(
                         payload["id"], payload["party"], raid_name, question
-                    )
-                )
+                    ),
+                ))
         elif event["kind"] in ("ask.answered", "ask.dismissed") and caller_party is not None:
             ask_row = ctx.conn.execute(
                 "SELECT party FROM asks WHERE id = ?", (payload["id"],)
@@ -63,8 +65,11 @@ def new_lines(ctx, binding):
                 continue
             if event["kind"] == "ask.answered":
                 answer = sanitize.collapse_to_single_line(payload["answer"])
-                lines.append('- ask #{} answered by human: "{}"'.format(payload["id"], answer))
+                ask_lines.append(
+                    (payload["id"], '- ask #{} answered by human: "{}"'.format(payload["id"], answer))
+                )
             else:
-                lines.append("- ask #{} dismissed".format(payload["id"]))
+                ask_lines.append((payload["id"], "- ask #{} dismissed".format(payload["id"])))
+    lines.extend(line for _, line in sorted(ask_lines, key=lambda entry: entry[0]))
     highest_seq = new_events[-1]["seq"] if new_events else last_seq
     return lines, highest_seq

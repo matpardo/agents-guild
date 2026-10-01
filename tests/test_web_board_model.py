@@ -95,6 +95,16 @@ class BoardModelShapeTests(BoardModelTestCase):
         self.assertEqual(ask["total_refs"], 1)
         self.assertEqual(ask["blocked"], 1)
 
+    def test_asks_listed_in_ascending_id(self):
+        self.run_cli(
+            ["ask", "two refs?", "--context", "x", "--ref", "task:demo/T01", "--ref", "task:demo/T02"],
+            "sess-1", self.repo_dir,
+        )
+        model = board_commands.board_model(self._ctx())
+        ids = [ask["id"] for ask in model["asks"]]
+        self.assertEqual(ids, sorted(ids))
+        self.assertEqual(len(ids), 2)
+
     def test_notice_shape(self):
         ctx = self._ctx()
         model = board_commands.board_model(ctx)
