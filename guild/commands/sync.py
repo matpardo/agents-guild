@@ -1,5 +1,6 @@
 import fnmatch
 import json
+import re
 from pathlib import Path
 
 from guild import config, db, events, timeutil
@@ -23,6 +24,12 @@ _MERGE_NOTICE_TEMPLATE = "{}#{} merged in main ({}/{}: {}). Parties with open br
 _MERGE_NOTICE_SHARED_AREAS_SUFFIX = " Shared areas touched: {}"
 _MERGE_NOTICE_RELEASED_SUFFIX = " Released: {}."
 _AREA_PREFIX = "area:"
+
+_MIGRATION_NOTICE_TTL = "12h"
+_MIGRATION_NOTICE_TEMPLATE = (
+    "Migration version {} is claimed by more than one open PR: {}. Renumber before merging."
+)
+_MIGRATION_VERSION_PATTERN = re.compile(r"^(\d+)")
 
 
 def _count_checks(rollup):
@@ -203,6 +210,70 @@ def _handle_merge(ctx, projects, row, failures):
     _post_merge_notice(ctx, row, raids, text)
 
 
+def _migration_versions(migration_paths, changed_files):
+    versions = set()
+    for path in changed_files:
+        if not any(fnmatch.fnmatch(path, pattern) for pattern in migration_paths):
+            continue
+        match = _MIGRATION_VERSION_PATTERN.match(path.rsplit("/", 1)[-1])
+        if match:
+            versions.add(match.group(1))
+    return versions
+
+
+def _versions_by_pr(ctx, project, rows, failures):
+    by_pr = {}
+    for row in rows:
+        if row["repo"] not in project["github"]["repos"]:
+            continue
+        try:
+            paths = github.pr_diff(ctx.cwd, row["repo"], row["number"])["paths"]
+        except github.GhCommandError as error:
+            failures.append(
+                "{}#{}: migration clash check failed: {}".format(row["repo"], row["number"], error)
+            )
+            continue
+        by_pr[(row["repo"], row["number"])] = (row, _migration_versions(project["migration_paths"], paths))
+    return by_pr
+
+
+def _post_migration_notices(ctx, project, version, clashing):
+    refs = ", ".join("{}#{}".format(row["repo"], row["number"]) for row in clashing)
+    text = _MIGRATION_NOTICE_TEMPLATE.format(version, refs)
+    for row in clashing:
+        announces = "migration:{}:{}:{}#{}".format(project["name"], version, row["repo"], row["number"])
+        if notice_commands.announced(ctx.conn, announces):
+            continue
+        for raid_row in raid_commands.member_raids(ctx.conn, ctx.now, row["party"]):
+            notice_commands.create_announcing(
+                ctx,
+                row["party"],
+                text,
+                "raid:{}".format(raid_row["raid"]),
+                _MIGRATION_NOTICE_TTL,
+                announces,
+            )
+
+
+def _check_migration_clashes(ctx, projects, failures):
+    open_rows = ctx.conn.execute(
+        "SELECT * FROM prs WHERE lifecycle NOT IN ('merged', 'closed') ORDER BY repo, number"
+    ).fetchall()
+    for project in projects:
+        if not project.get("migration_paths"):
+            continue
+        by_pr = _versions_by_pr(ctx, project, open_rows, failures)
+        owners_by_version = {}
+        for row, versions in by_pr.values():
+            for version in versions:
+                owners_by_version.setdefault(version, []).append(row)
+        for version in sorted(owners_by_version):
+            clashing = owners_by_version[version]
+            if len(clashing) < 2:
+                continue
+            _post_migration_notices(ctx, project, version, clashing)
+
+
 def _close_met_notices(ctx):
     rows = notice_commands.active_notices(ctx.conn, ctx.now)
     for row in rows:
@@ -243,6 +314,7 @@ def _sync_gh(ctx):
             continue
         if _became_merged(row, lifecycle):
             _handle_merge(ctx, projects, row, failures)
+    _check_migration_clashes(ctx, projects, failures)
     _close_met_notices(ctx)
     return failures
 

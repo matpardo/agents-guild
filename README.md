@@ -237,6 +237,17 @@ notice payload carries `announces: pr:<repo>#<n>`, and `sync` skips posting
 if a notice (active or not) with that `announces` value already exists —
 safe across a re-sync or a `rebuild` followed by a `sync`.
 
+Migration version clash: when the project sets `migration_paths`, every
+`sync --source gh` also lists the changed files (one `gh pr view --json files`
+call per open tracked PR of the project's repos), keeps those matching a
+`migration_paths` glob, and takes the leading digits of each filename as its
+version. When two or more distinct open PRs carry the same version, a notice
+naming the version and the PRs is posted to every raid of each involved
+party. Each (project, version, PR) is announced at most once, ever, through
+an `announces: migration:<project>:<version>:<repo>#<n>` value, so re-syncs
+do not repost. A failed files call is reported as a sync failure. Parties in
+no raid get no notice.
+
 The same sync also releases shared-area claims: when the project has
 `shared_areas` and the owning party is in a raid or holds an active `area:`
 claim in that project, the changed files are fetched once (shared with the
@@ -777,6 +788,10 @@ against path traversal, not an identity boundary.
   fails to load.
 - `shared_area_claim_ttl` (required together with `shared_areas`): the TTL
   (`30m`/`8h`/`3d`) the pre-edit guard claims a matched area for.
+- `migration_paths` (optional): list of glob strings relative to the repo root
+  (e.g. `db/migrate/*`), matched with `fnmatch` against changed file paths.
+  Unset → the migration clash check is skipped and no extra `gh` call is made.
+  Set → see "Migration version clash" under `sync`.
 - Unknown top-level keys are allowed.
 
 ### SDD parsing rules

@@ -101,6 +101,27 @@ class ValidateProjectConfigTests(unittest.TestCase):
                 }
             )
 
+    def test_accepts_migration_paths(self):
+        config.validate_project_config(
+            {
+                "name": "acme",
+                "paths": ["/tmp/*"],
+                "github": {"repos": []},
+                "migration_paths": ["db/migrate/*.rb"],
+            }
+        )
+
+    def test_rejects_migration_paths_that_is_not_a_list_of_strings(self):
+        with self.assertRaises(GuildError):
+            config.validate_project_config(
+                {
+                    "name": "acme",
+                    "paths": ["/tmp/*"],
+                    "github": {"repos": []},
+                    "migration_paths": "db/migrate/*",
+                }
+            )
+
     def test_rejects_shared_area_claim_ttl_with_bad_format(self):
         with self.assertRaises(GuildError):
             config.validate_project_config(
