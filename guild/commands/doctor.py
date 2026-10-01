@@ -1,7 +1,9 @@
 import json
+import re
 from pathlib import Path
 
 from guild import config, localbase
+from guild.adapters import github
 from guild.errors import GuildError
 
 _EXPECTED_HOOKS = (
@@ -11,6 +13,10 @@ _EXPECTED_HOOKS = (
     ("PreToolUse", "guild hook pre-push"),
     ("PreToolUse", "guild hook pre-edit"),
 )
+
+
+_TRACE_RE = re.compile(r"guild|ask #[0-9]|notice #[0-9]", re.IGNORECASE)
+_PR_SCAN_FIELDS = ("number", "title", "body", "comments", "commits")
 
 
 def _claude_dir():
@@ -65,10 +71,48 @@ def _project_lines(projects_dir):
     return lines
 
 
-def run(ctx):
+def _has_trace(text):
+    return text is not None and _TRACE_RE.search(text) is not None
+
+
+def _pr_trace_places(pr):
+    places = []
+    if _has_trace(pr["title"]):
+        places.append("title")
+    if _has_trace(pr["body"]):
+        places.append("body")
+    if any(_has_trace(comment["body"]) for comment in pr["comments"]):
+        places.append("comment")
+    if any(
+        _has_trace(commit["messageHeadline"]) or _has_trace(commit["messageBody"])
+        for commit in pr["commits"]
+    ):
+        places.append("commit")
+    return places
+
+
+def _scan_lines(ctx):
+    lines = []
+    for project in config.load_all_projects(ctx.projects_dir):
+        for repo in project["github"]["repos"]:
+            try:
+                open_prs = github.pr_list_open(ctx.cwd, repo, _PR_SCAN_FIELDS)
+            except github.GhCommandError as error:
+                return [(True, "warn    PR scan skipped: {}".format(error))]
+            for pr in open_prs:
+                for place in _pr_trace_places(pr):
+                    lines.append(
+                        (True, "warn    {}#{} {} mentions guild-internal terms".format(repo, pr["number"], place))
+                    )
+    return lines
+
+
+def run(ctx, scan_prs):
     checks = _hook_lines(_claude_dir() / "settings.json")
     checks.append(_rules_line())
     checks.extend(_project_lines(ctx.projects_dir))
+    if scan_prs:
+        checks.extend(_scan_lines(ctx))
     healthy = all(passed for passed, _ in checks)
     lines = [line for _, line in checks]
     if not healthy:

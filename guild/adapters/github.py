@@ -49,3 +49,15 @@ def pr_list_for_branch(cwd, branch, fields):
     if result.returncode != 0:
         raise GhCommandError(result.stderr.strip() or "gh pr list failed")
     return json.loads(result.stdout)
+
+
+def pr_list_open(cwd, repo, fields):
+    result = subprocess.run(
+        ["gh", "pr", "list", "--repo", repo, "--state", "open", "--json", ",".join(fields)],
+        cwd=str(cwd),
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode != 0:
+        raise GhCommandError(result.stderr.strip() or "gh pr list failed")
+    return json.loads(result.stdout)

@@ -55,7 +55,9 @@ def create(ctx, question, context_text, ref_list, option_list):
                 "options": option_list,
             },
         )
-    return "ask #{} created\n{}".format(ask_id, pii.BROADCAST_REMINDER)
+    return "ask #{} created\n{}\n{}".format(
+        ask_id, pii.BROADCAST_REMINDER, pii.LOCAL_ONLY_REMINDER
+    )
 
 
 def answer(ctx, ask_id, text):

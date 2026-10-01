@@ -33,6 +33,10 @@ def main():
         prefix = "view_files" if "files" in fields.split(",") else "view"
         _respond("{}_{}_{}".format(prefix, repo.replace("/", "-"), number))
         return
+    if args[:2] == ["pr", "list"] and "--repo" in args:
+        repo = args[args.index("--repo") + 1]
+        _respond("open_{}".format(repo.replace("/", "-")))
+        return
     if args[:2] == ["pr", "list"]:
         head_index = args.index("--head") + 1
         branch = args[head_index]

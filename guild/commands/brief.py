@@ -1,4 +1,4 @@
-from guild import config, identity, localbase, render
+from guild import config, identity, localbase, pii, render
 from guild.commands import claim as claim_commands
 from guild.commands import inbox as inbox_commands
 from guild.commands import notice as notice_commands
@@ -35,6 +35,7 @@ def render_brief(ctx):
         lines = [UNBOUND_HINT]
         lines.extend(_targeting_lines(active, project, set()))
         lines.extend(_base_warning_lines(ctx, project))
+        lines.append(pii.LOCAL_ONLY_REMINDER)
         return lines
 
     lines = ["party: {} (generation {})".format(binding["party"], binding["generation"])]
@@ -74,4 +75,5 @@ def render_brief(ctx):
     for claim_row in claims:
         lines.append("claim: {} until {}".format(claim_row["area"], claim_row["expires_at"]))
 
+    lines.append(pii.LOCAL_ONLY_REMINDER)
     return lines
