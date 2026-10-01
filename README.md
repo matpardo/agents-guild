@@ -123,6 +123,7 @@ guild merge-queue [--raid <name> | --party <name>]   # read-only: PRs in the ord
 guild merge-queue pin   <owner/repo>#<a> --before <owner/repo>#<b>
 guild merge-queue unpin <owner/repo>#<a> --before <owner/repo>#<b>
 
+guild history [--party <name>] [--raid <name>] [--project <name>]   # read-only: completed quests, finished raids, totals
 guild board [--party <name> | --raid <name>]
 guild web --port <n>
 guild sync --source gh|sdd|tracker
@@ -299,6 +300,24 @@ the comparison uses the last fetched state).
 lead should keep a watcher running for the duration of the raid, e.g.
 `watch -n 300 guild sync --source gh` from a terminal, or `/loop 5m guild
 sync --source gh` from a session that supports it.
+
+### `guild history`
+
+Read-only record of what the guild has achieved. Three sections:
+
+1. Completed quests, newest first. Each shows party, project, epic progress,
+   start/end and duration, tasks done, JIRA cards done, PRs merged, handoffs and
+   ask metrics, read from the `achievement` snapshot frozen in the `quest.done`
+   event. Quests closed before snapshots existed are derived from events
+   (dates, party, tasks, PRs, handoffs) and marked `no snapshot`.
+2. Finished raids: raids with no active member, derived from
+   `raid.joined`/`raid.left`/`party.closed` events and membership expiry. Each
+   shows start (first join), end, parties (lead marked), quests completed and
+   PRs merged by member parties inside that window, and the pause count.
+3. Totals: quests done, PRs merged, tasks done, asks answered, median ask answer
+   time, handoffs.
+
+`--party`, `--raid` and `--project` narrow every section; they combine.
 
 ### `guild sync-timer`
 

@@ -1,0 +1,461 @@
+import json
+import statistics
+
+from guild import timeutil
+
+_KINDS = (
+    "quest.added",
+    "quest.done",
+    "task.done",
+    "task.blocked",
+    "pr.tracked",
+    "pr.set",
+    "pr.synced",
+    "ask.created",
+    "ask.answered",
+    "party.handed_off",
+    "party.closed",
+    "raid.joined",
+    "raid.left",
+    "raid.paused",
+)
+_SNAPSHOT_KEYS = (
+    "started_at",
+    "done_at",
+    "party",
+    "project",
+    "epic",
+    "title",
+    "tasks_done",
+    "tasks_blocked_events",
+    "sdd_tids",
+    "epic_progress",
+    "jira_cards_done",
+    "prs_merged",
+    "handoffs",
+    "sessions",
+    "asks_raised",
+    "asks_answered",
+    "median_answer_seconds",
+    "drift",
+)
+
+
+class _Scope:
+    def __init__(self, party, project, raid_parties):
+        self._party = party
+        self._project = project
+        self._raid_parties = raid_parties
+
+    def admits(self, party, project):
+        if self._party is not None and party != self._party:
+            return False
+        if self._project is not None and project != self._project:
+            return False
+        if self._raid_parties is not None and party not in self._raid_parties:
+            return False
+        return True
+
+
+def _load_events(conn):
+    marks = ", ".join("?" for _ in _KINDS)
+    rows = conn.execute(
+        "SELECT seq, ts, party, project, kind, payload FROM events"
+        " WHERE kind IN ({}) ORDER BY seq ASC".format(marks),
+        _KINDS,
+    ).fetchall()
+    by_kind = {kind: [] for kind in _KINDS}
+    for row in rows:
+        by_kind[row["kind"]].append(
+            {
+                "seq": row["seq"],
+                "ts": row["ts"],
+                "party": row["party"],
+                "project": row["project"],
+                "payload": json.loads(row["payload"]),
+            }
+        )
+    return by_kind
+
+
+def _raid_parties(by_kind, raid):
+    if raid is None:
+        return None
+    return {
+        event["payload"]["party"] for event in by_kind["raid.joined"] if event["payload"]["raid"] == raid
+    }
+
+
+def _ref(repo, number):
+    return "{}#{}".format(repo, number)
+
+
+def _seconds_between(start_iso, end_iso):
+    if start_iso is None or end_iso is None:
+        return None
+    return int((timeutil.from_iso(end_iso) - timeutil.from_iso(start_iso)).total_seconds())
+
+
+def _merged_pr_records(by_kind):
+    tracked = {}
+    for event in by_kind["pr.tracked"]:
+        payload = event["payload"]
+        tracked[(payload["repo"], payload["number"])] = {
+            "ref": _ref(payload["repo"], payload["number"]),
+            "party": event["party"],
+            "project": event["project"],
+            "quest": payload["task_quest"],
+            "merged_at": None,
+        }
+    lifecycle_events = by_kind["pr.tracked"] + by_kind["pr.set"] + by_kind["pr.synced"]
+    for event in sorted(lifecycle_events, key=lambda item: timeutil.from_iso(item["ts"])):
+        payload = event["payload"]
+        record = tracked.get((payload["repo"], payload["number"]))
+        if record is None or record["merged_at"] is not None or payload["lifecycle"] != "merged":
+            continue
+        record["merged_at"] = event["ts"]
+    merged = [record for record in tracked.values() if record["merged_at"] is not None]
+    return sorted(merged, key=lambda record: record["ref"])
+
+
+def _in_window(ts, started_at, ended_at):
+    moment = timeutil.from_iso(ts)
+    if started_at is not None and moment < timeutil.from_iso(started_at):
+        return False
+    return moment <= timeutil.from_iso(ended_at)
+
+
+def _snapshot_quest(slug, snapshot):
+    quest = {key: snapshot[key] for key in _SNAPSHOT_KEYS}
+    quest["slug"] = slug
+    quest["snapshot"] = True
+    quest["duration_seconds"] = _seconds_between(snapshot["started_at"], snapshot["done_at"])
+    return quest
+
+
+def _distinct_done_tids(by_kind, slug):
+    return sorted(
+        {event["payload"]["tid"] for event in by_kind["task.done"] if event["payload"]["quest"] == slug}
+    )
+
+
+def _legacy_quest(by_kind, merged_prs, added_by_slug, done_event):
+    slug = done_event["payload"]["slug"]
+    added = added_by_slug.get(slug)
+    started_at = None if added is None else added["ts"]
+    party = done_event["party"] if added is None else added["payload"]["party"]
+    project = done_event["project"] if added is None else added["payload"]["project"]
+    done_at = done_event["ts"]
+    tids = _distinct_done_tids(by_kind, slug)
+    blocked = sum(1 for event in by_kind["task.blocked"] if event["payload"]["quest"] == slug)
+    handoffs = sum(
+        1
+        for event in by_kind["party.handed_off"]
+        if event["party"] == party and _in_window(event["ts"], started_at, done_at)
+    )
+    return {
+        "slug": slug,
+        "snapshot": False,
+        "started_at": started_at,
+        "done_at": done_at,
+        "duration_seconds": _seconds_between(started_at, done_at),
+        "party": party,
+        "project": project,
+        "epic": None if added is None else added["payload"]["epic"],
+        "title": slug if added is None else added["payload"]["title"],
+        "tasks_done": len(tids),
+        "tasks_blocked_events": blocked,
+        "sdd_tids": tids,
+        "epic_progress": None,
+        "jira_cards_done": [],
+        "prs_merged": [record["ref"] for record in merged_prs if record["quest"] == slug],
+        "handoffs": handoffs,
+        "sessions": None,
+        "asks_raised": None,
+        "asks_answered": None,
+        "median_answer_seconds": None,
+        "drift": [],
+    }
+
+
+def _all_quests(by_kind, merged_prs):
+    added_by_slug = {event["payload"]["slug"]: event for event in by_kind["quest.added"]}
+    quests = {}
+    for event in by_kind["quest.done"]:
+        slug = event["payload"]["slug"]
+        if slug in quests:
+            continue
+        snapshot = event["payload"].get("achievement")
+        if snapshot is None:
+            quests[slug] = _legacy_quest(by_kind, merged_prs, added_by_slug, event)
+            continue
+        quests[slug] = _snapshot_quest(slug, snapshot)
+    return sorted(quests.values(), key=lambda quest: timeutil.from_iso(quest["done_at"]), reverse=True)
+
+
+def _end_span(span, ts):
+    ended_at = ts
+    if span["expires_at"] is not None and timeutil.from_iso(span["expires_at"]) < timeutil.from_iso(ts):
+        ended_at = span["expires_at"]
+    span["ended_at"] = ended_at
+
+
+def _open_spans(spans, party):
+    return [span for span in spans if span["party"] == party and span["ended_at"] is None]
+
+
+def _apply_join(spans, event):
+    payload = event["payload"]
+    open_spans = _open_spans(spans, payload["party"])
+    if open_spans:
+        open_spans[0]["expires_at"] = payload["expires_at"]
+        open_spans[0]["lead"] = bool(payload.get("lead"))
+        return
+    spans.append(
+        {
+            "party": payload["party"],
+            "project": event["project"],
+            "lead": bool(payload.get("lead")),
+            "started_at": event["ts"],
+            "expires_at": payload["expires_at"],
+            "ended_at": None,
+        }
+    )
+
+
+def _apply_end(spans, party, ts):
+    for span in _open_spans(spans, party):
+        _end_span(span, ts)
+
+
+def _membership_spans(by_kind):
+    membership_events = [("joined", event) for event in by_kind["raid.joined"]]
+    membership_events += [("left", event) for event in by_kind["raid.left"]]
+    membership_events += [("closed", event) for event in by_kind["party.closed"]]
+    membership_events.sort(key=lambda item: item[1]["seq"])
+    spans_by_raid = {}
+    for action, event in membership_events:
+        payload = event["payload"]
+        if action == "closed":
+            for spans in spans_by_raid.values():
+                _apply_end(spans, payload["party"], event["ts"])
+        elif action == "left":
+            _apply_end(spans_by_raid.get(payload["raid"], []), payload["party"], event["ts"])
+        else:
+            _apply_join(spans_by_raid.setdefault(payload["raid"], []), event)
+    return spans_by_raid
+
+
+def _is_active(now, spans):
+    return any(
+        span["ended_at"] is None and not timeutil.is_expired(now, span["expires_at"]) for span in spans
+    )
+
+
+def _span_end(span):
+    if span["ended_at"] is not None:
+        return span["ended_at"]
+    return span["expires_at"]
+
+
+def _raid_parties_summary(spans):
+    leads = {}
+    for span in spans:
+        leads[span["party"]] = leads.get(span["party"], False) or span["lead"]
+    return [{"party": party, "lead": leads[party]} for party in sorted(leads)]
+
+
+def _raid_entry(by_kind, quests, merged_prs, name, spans):
+    started_at = min((span["started_at"] for span in spans), key=timeutil.from_iso)
+    ended_at = max((_span_end(span) for span in spans), key=timeutil.from_iso)
+    parties = _raid_parties_summary(spans)
+    member_names = {entry["party"] for entry in parties}
+    return {
+        "name": name,
+        "started_at": started_at,
+        "ended_at": ended_at,
+        "duration_seconds": _seconds_between(started_at, ended_at),
+        "parties": parties,
+        "quests": [
+            {"slug": quest["slug"], "party": quest["party"], "title": quest["title"]}
+            for quest in quests
+            if quest["party"] in member_names and _in_window(quest["done_at"], started_at, ended_at)
+        ],
+        "prs_merged": [
+            record["ref"]
+            for record in merged_prs
+            if record["party"] in member_names and _in_window(record["merged_at"], started_at, ended_at)
+        ],
+        "pauses": sum(1 for event in by_kind["raid.paused"] if event["payload"]["raid"] == name),
+    }
+
+
+def _finished_raids(by_kind, now, scope, raid, quests, merged_prs):
+    raids = []
+    for name, spans in _membership_spans(by_kind).items():
+        if raid is not None and name != raid:
+            continue
+        if _is_active(now, spans):
+            continue
+        if not any(scope.admits(span["party"], span["project"]) for span in spans):
+            continue
+        raids.append(_raid_entry(by_kind, quests, merged_prs, name, spans))
+    return sorted(raids, key=lambda entry: timeutil.from_iso(entry["ended_at"]), reverse=True)
+
+
+def _answer_seconds(by_kind, scope):
+    answered_at = {}
+    for event in by_kind["ask.answered"]:
+        answered_at.setdefault(event["payload"]["id"], event["ts"])
+    durations = []
+    for event in by_kind["ask.created"]:
+        if not scope.admits(event["party"], event["project"]):
+            continue
+        answer_ts = answered_at.get(event["payload"]["id"])
+        if answer_ts is None:
+            continue
+        durations.append(_seconds_between(event["ts"], answer_ts))
+    return durations
+
+
+def _totals(by_kind, scope, quests, merged_prs):
+    durations = _answer_seconds(by_kind, scope)
+    done_tasks = {
+        (event["payload"]["quest"], event["payload"]["tid"])
+        for event in by_kind["task.done"]
+        if scope.admits(event["party"], event["project"])
+    }
+    handoffs = sum(
+        1 for event in by_kind["party.handed_off"] if scope.admits(event["party"], event["project"])
+    )
+    return {
+        "quests_done": len(quests),
+        "prs_merged": sum(1 for record in merged_prs if scope.admits(record["party"], record["project"])),
+        "tasks_done": len(done_tasks),
+        "asks_answered": len(durations),
+        "median_answer_seconds": float(statistics.median(durations)) if durations else None,
+        "handoffs": handoffs,
+    }
+
+
+def build_model(conn, now, party, raid, project):
+    by_kind = _load_events(conn)
+    scope = _Scope(party, project, _raid_parties(by_kind, raid))
+    merged_prs = _merged_pr_records(by_kind)
+    every_quest = _all_quests(by_kind, merged_prs)
+    quests = [quest for quest in every_quest if scope.admits(quest["party"], quest["project"])]
+    return {
+        "quests": quests,
+        "raids": _finished_raids(by_kind, now, scope, raid, every_quest, merged_prs),
+        "totals": _totals(by_kind, scope, quests, merged_prs),
+    }
+
+
+def format_duration(seconds):
+    if seconds is None:
+        return "unknown"
+    days, remainder = divmod(int(seconds), 86400)
+    hours, remainder = divmod(remainder, 3600)
+    minutes = remainder // 60
+    if days:
+        return "{}d {}h".format(days, hours)
+    if hours:
+        return "{}h {}m".format(hours, minutes)
+    if minutes:
+        return "{}m".format(minutes)
+    return "<1m"
+
+
+def _date(iso):
+    if iso is None:
+        return "?"
+    return timeutil.from_iso(iso).strftime("%Y-%m-%d %H:%M")
+
+
+def _epic_label(epic, progress):
+    if epic is None:
+        return "no epic"
+    if progress is None:
+        return "epic {}".format(epic)
+    return "epic {} {}% ({}/{})".format(epic, progress["percent"], progress["done"], progress["total"])
+
+
+def _asks_label(quest):
+    if quest["asks_raised"] is None:
+        return "asks n/a"
+    label = "asks {} raised, {} answered".format(quest["asks_raised"], quest["asks_answered"])
+    if quest["median_answer_seconds"] is None:
+        return label
+    return "{}, median {}".format(label, format_duration(quest["median_answer_seconds"]))
+
+
+def _quest_lines(quest):
+    lines = [
+        "  {} - {}".format(quest["slug"], quest["title"]),
+        "    party {} | project {} | {}".format(
+            quest["party"], quest["project"], _epic_label(quest["epic"], quest["epic_progress"])
+        ),
+        "    {} -> {} ({})".format(
+            _date(quest["started_at"]), _date(quest["done_at"]), format_duration(quest["duration_seconds"])
+        ),
+        "    tasks {} done, {} blocked events | cards {} | PRs {} | handoffs {}".format(
+            quest["tasks_done"],
+            quest["tasks_blocked_events"],
+            len(quest["jira_cards_done"]),
+            len(quest["prs_merged"]),
+            quest["handoffs"],
+        ),
+        "    {}".format(_asks_label(quest)),
+    ]
+    if quest["drift"]:
+        lines.append("    accepted drift: {}".format(len(quest["drift"])))
+    if not quest["snapshot"]:
+        lines.append("    no snapshot (derived from events)")
+    return lines
+
+
+def _party_label(entry):
+    if entry["lead"]:
+        return "{} (lead)".format(entry["party"])
+    return entry["party"]
+
+
+def _raid_lines(raid):
+    return [
+        "  {}".format(raid["name"]),
+        "    {} -> {} ({})".format(
+            _date(raid["started_at"]), _date(raid["ended_at"]), format_duration(raid["duration_seconds"])
+        ),
+        "    parties {}".format(", ".join(_party_label(entry) for entry in raid["parties"])),
+        "    quests {} | PRs merged {} | pauses {}".format(
+            ", ".join(quest["slug"] for quest in raid["quests"]) or "none",
+            len(raid["prs_merged"]),
+            raid["pauses"],
+        ),
+    ]
+
+
+def _totals_line(totals):
+    return "  quests {} | PRs merged {} | tasks {} | asks answered {} (median {}) | handoffs {}".format(
+        totals["quests_done"],
+        totals["prs_merged"],
+        totals["tasks_done"],
+        totals["asks_answered"],
+        format_duration(totals["median_answer_seconds"]),
+        totals["handoffs"],
+    )
+
+
+def render_lines(model):
+    lines = ["Completed quests ({})".format(len(model["quests"]))]
+    for quest in model["quests"]:
+        lines.extend(_quest_lines(quest))
+    lines.extend(["", "Finished raids ({})".format(len(model["raids"]))])
+    for raid in model["raids"]:
+        lines.extend(_raid_lines(raid))
+    lines.extend(["", "Totals", _totals_line(model["totals"])])
+    return lines
+
+
+def run(ctx, party, raid, project):
+    return render_lines(build_model(ctx.conn, ctx.now, party, raid, project))
