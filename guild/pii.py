@@ -14,6 +14,11 @@ BROADCAST_REMINDER = (
     " — never include names or identifiers of real people"
 )
 
+LOCAL_ONLY_REMINDER = (
+    "guild is local and optional: never mention guild, ask #N, notice #N, party, raid or quest"
+    " in PRs, comments, commits, sdd-docs or cards; cite a decision as \"decisión del dev\" with its date"
+)
+
 _EMAIL_RE = re.compile(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}")
 
 

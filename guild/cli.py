@@ -32,7 +32,7 @@ def _print_lines(lines):
 def _handle_doctor(ctx, args):
     from guild.commands import doctor as doctor_commands
 
-    message, exit_code = doctor_commands.run(ctx)
+    message, exit_code = doctor_commands.run(ctx, args.scan_prs)
     _print(message)
     return exit_code
 
@@ -600,6 +600,7 @@ def build_parser():
     whoami.set_defaults(handler=_handle_whoami)
 
     doctor = subparsers.add_parser("doctor")
+    doctor.add_argument("--scan-prs", action="store_true")
     doctor.set_defaults(handler=_handle_doctor)
 
     init_project = subparsers.add_parser("init-project")

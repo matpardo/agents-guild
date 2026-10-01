@@ -13,6 +13,12 @@ prose. Local first. Python 3.10 stdlib only, no runtime dependencies.
 - A PR registry reconciled against `gh`, not memory.
 - Area claims so two sessions don't step on the same file.
 
+Guild is local and optional per dev: nothing of it is visible outside the
+local CLI. Never put guild, `ask #N`, `notice #N`, party, raid or quest in PR
+bodies, PR comments, commits, sdd-docs files or tracker cards; cite a decision
+as "decisión del dev" with its date. A dev who does not use guild must find no
+trace of it in any repo, PR, commit or card.
+
 Specs, plans and decisions for guild itself live in [`sdd/`](sdd/README.md) and
 are updated in the same PR as the code.
 
@@ -68,6 +74,14 @@ It refuses if the installed worktree has local changes, moves it to
 `guild doctor` checks, read-only, that every guild hook is wired in
 `~/.claude/settings.json`, that `~/.claude/GUILD.md` exists and that every
 project config loads; it exits 1 and names what is missing.
+
+`guild doctor --scan-prs` additionally lists the open PRs of every project's
+`github.repos` through `gh` and scans title, body, comments and commit
+messages with the case-insensitive regex `guild|ask #[0-9]|notice #[0-9]`.
+Each match is a `warn` line naming `repo#n` and where it matched
+(title/body/comment/commit), never the text. Warnings never change the exit
+code; if `gh` fails the scan prints a single `warn` and is skipped. Off by
+default so `guild doctor` stays fast and offline.
 
 ## Commands
 
@@ -1127,6 +1141,8 @@ command).
 ```
 
 The rules ship with the CLI, so they change in the same commit as the commands they describe.
+
+They also state the visibility rule: guild is optional and invisible outside the local CLI. `guild brief` (and so the session-start hook) and `guild ask` repeat it in one line.
 
 ## Hooks
 
