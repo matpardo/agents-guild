@@ -304,17 +304,66 @@ def _resolve_push_branch(push_args, target_dir):
     return _current_branch(target_dir)
 
 
+def _push_base_ref(target_dir):
+    try:
+        result = subprocess.run(
+            ["git", "-C", str(target_dir), "symbolic-ref", "--short", "refs/remotes/origin/HEAD"],
+            capture_output=True,
+            text=True,
+        )
+    except OSError:
+        return None
+    if result.returncode != 0:
+        return None
+    return result.stdout.strip() or None
+
+
+def _push_diff_paths(target_dir, base_ref):
+    try:
+        result = subprocess.run(
+            ["git", "-C", str(target_dir), "diff", "--name-only", "{}...HEAD".format(base_ref)],
+            capture_output=True,
+            text=True,
+        )
+    except OSError:
+        return None
+    if result.returncode != 0:
+        return None
+    return [line for line in result.stdout.splitlines() if line]
+
+
+def _shared_areas_push_result(ctx, target_dir):
+    base_ref = _push_base_ref(target_dir)
+    if base_ref is None:
+        return {
+            "blocked": False,
+            "message": None,
+            "system_message": "guild: could not determine base branch; shared_areas not checked",
+        }
+    paths = _push_diff_paths(target_dir, base_ref)
+    if paths is None:
+        return {
+            "blocked": False,
+            "message": None,
+            "system_message": "guild: could not diff against {}; shared_areas not checked".format(base_ref),
+        }
+    reasons = _claim_shared_areas_or_reasons(ctx.with_cwd(Path(target_dir)), paths)
+    if not reasons:
+        return None
+    return {"blocked": True, "message": "\n".join(reasons), "system_message": None}
+
+
 def _unresolved_branch_result():
     return {"blocked": False, "message": None, "system_message": _UNRESOLVED_BRANCH_MESSAGE}
 
 
-def pre_push(command, cwd):
+def pre_push(ctx, command):
     try:
         segments = _push_segments(command)
     except ValueError:
         return _unresolved_branch_result()
     for tokens in segments:
-        invocation = _push_invocation(tokens, cwd)
+        invocation = _push_invocation(tokens, ctx.cwd)
         if invocation is None:
             continue
         target_dir, push_args = invocation
@@ -342,6 +391,9 @@ def pre_push(command, cwd):
                 ),
                 "system_message": None,
             }
+        shared_areas_result = _shared_areas_push_result(ctx, target_dir)
+        if shared_areas_result is not None:
+            return shared_areas_result
     return {"blocked": False, "message": None, "system_message": None}
 
 
@@ -462,7 +514,7 @@ def staged_paths(cwd):
     return [line for line in result.stdout.splitlines() if line]
 
 
-def pre_commit(ctx, paths_in_commit):
+def _claim_shared_areas_or_reasons(ctx, paths):
     binding = identity.resolve_binding(ctx.conn, ctx.session_id)
     if binding is None:
         return []
@@ -473,9 +525,7 @@ def pre_commit(ctx, paths_in_commit):
     shared_areas = project_data.get("shared_areas")
     if not shared_areas:
         return []
-    matched_globs = sorted(
-        {glob for glob in (_matching_shared_area(path, shared_areas) for path in paths_in_commit) if glob}
-    )
+    matched_globs = sorted({glob for glob in (_matching_shared_area(path, shared_areas) for path in paths) if glob})
     reasons = [
         reason
         for reason in (_foreign_holder_reason(ctx, binding, project, glob) for glob in matched_globs)
@@ -486,3 +536,7 @@ def pre_commit(ctx, paths_in_commit):
     for glob in matched_globs:
         claim_commands.claim(ctx, "area:{}".format(glob), project_data["shared_area_claim_ttl"], None)
     return []
+
+
+def pre_commit(ctx, paths_in_commit):
+    return _claim_shared_areas_or_reasons(ctx, paths_in_commit)

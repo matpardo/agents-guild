@@ -1046,7 +1046,12 @@ Without a hooks manager, add the same call to the repository's
   only PRs are merged/closed. When a push is detected but its branch or
   directory cannot be determined (bad `-C` dir, detached HEAD, unparseable
   command), it warns via `systemMessage` instead of allowing the push
-  unverified.
+  unverified. For a bound session in a project with `shared_areas`, it also
+  lists the files in the push diff (`git diff --name-only <origin/HEAD>...HEAD`)
+  and applies the same rule as `pre-commit`: every matching glob is claimed
+  (`area:<glob>`), or the push is denied naming the holder when another party
+  holds one. If the base branch (`origin/HEAD`) or the diff cannot be
+  resolved, it warns via `systemMessage` and does not check `shared_areas`.
 - `pre-edit`: guards a project's `shared_areas` (see "Project config") on
   `Edit`/`Write`/`MultiEdit`/`NotebookEdit` calls (`tool_input.file_path`, or
   `notebook_path` for `NotebookEdit`). Any other tool, no path, an unbound
