@@ -120,7 +120,8 @@ main {
 @media (min-width: 1000px) {
   main {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) 20rem;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    max-width: none;
     align-items: start;
     gap: 1.5rem;
   }
