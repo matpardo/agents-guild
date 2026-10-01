@@ -124,6 +124,7 @@ guild merge-queue unpin <owner/repo>#<a> --before <owner/repo>#<b>
 guild board [--party <name> | --raid <name>]
 guild web --port <n>
 guild sync --source gh|sdd|tracker
+guild sync-timer install --every <dur> | uninstall | print
 guild drift [--epic <slug> | --all]
 guild brief
 guild inbox --since-last
@@ -255,6 +256,24 @@ was released and the owner is in a raid, the notice ends with
 lead should keep a watcher running for the duration of the raid, e.g.
 `watch -n 300 guild sync --source gh` from a terminal, or `/loop 5m guild
 sync --source gh` from a session that supports it.
+
+### `guild sync-timer`
+
+`guild` has no daemon. To keep `sync --source gh` fresh without running it by
+hand, `guild sync-timer install --every <dur>` (same duration format as
+`--ttl`, e.g. `10m`) writes two systemd user units,
+`guild-sync-gh.service` (runs `guild sync --source gh`) and
+`guild-sync-gh.timer`, into `$XDG_CONFIG_HOME/systemd/user` (default
+`~/.config/systemd/user`), then runs `systemctl --user daemon-reload` and
+`systemctl --user enable --now guild-sync-gh.timer`. `guild` must be on
+`PATH`; the unit records its absolute path.
+
+`guild sync-timer uninstall` disables the timer, removes both units and
+reloads systemd. `guild sync-timer print --every <dur>` only prints the units
+and writes nothing, for installing them by hand. `install` and `uninstall`
+fail with a clear error when the platform is not Linux or `systemctl` is not
+available; use `print` there. Nothing is pushed to running sessions: the timer
+only refreshes the synced state that sessions read.
 
 ### `guild merge-queue`
 
