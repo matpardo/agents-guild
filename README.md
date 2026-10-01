@@ -584,6 +584,18 @@ asks and marking notices seen or unseen, `guild web` never writes to the
 database, and it logs no per-request
 access noise to stderr (server errors still do). Ctrl-C exits cleanly.
 
+**History page**: `GET /history` serves `guild/web/history.html` (script
+`guild/web/history.js`, same CSS tokens and light/dark support as the board),
+linked from the board header as `history` and back as `board`. It shows a
+totals strip (quests, PRs merged, tasks, asks answered with median, handoffs),
+then completed-quest cards (dates, duration, epic progress bar, SDD tasks, JIRA
+cards, PRs, handoffs, asks, accepted drift; legacy quests show a `no snapshot`
+badge and `—` for unknown fields) and finished-raid cards (duration, parties
+with the lead marked, quests, PRs, pauses). The data comes from `GET
+/api/history`, the same model as `guild history`; it accepts optional `party`,
+`raid` and `project` query parameters. It is read-only and renders text with
+`textContent` only, like the board.
+
 ### `guild handoff` and resuming a party
 
 `guild handoff --in-flight "..." --learned "..."` (both required, non-empty)

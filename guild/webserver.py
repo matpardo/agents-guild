@@ -5,11 +5,12 @@ import secrets
 import sys
 from http import server as http_server
 from pathlib import Path
-from urllib.parse import urlsplit
+from urllib.parse import parse_qs, urlsplit
 
 from guild import context, db, origin, paths, timeutil
 from guild.commands import ask as ask_commands
 from guild.commands import board as board_commands
+from guild.commands import history as history_commands
 from guild.commands import notice as notice_commands
 from guild.errors import GuildError
 
@@ -18,6 +19,7 @@ _WEB_DIR = Path(__file__).resolve().parent / "web"
 _STATIC_FILES = {
     "/app.js": ("app.js", "application/javascript; charset=utf-8"),
     "/app.css": ("app.css", "text/css; charset=utf-8"),
+    "/history.js": ("history.js", "application/javascript; charset=utf-8"),
 }
 
 _MAX_BODY_BYTES = 16384
@@ -52,6 +54,28 @@ def _action_context():
         conn, None, Path.cwd(), timeutil.utcnow(), origin.current_origin(),
         paths.claude_sessions_dir(), paths.projects_config_dir(), paths.state_dir(),
     )
+
+
+def _history_model(query):
+    params = parse_qs(query)
+
+    def build(ctx):
+        return history_commands.build_model(
+            ctx.conn,
+            ctx.now,
+            _first_param(params, "party"),
+            _first_param(params, "raid"),
+            _first_param(params, "project"),
+        )
+
+    return build
+
+
+def _first_param(params, name):
+    values = params.get(name)
+    if not values:
+        return None
+    return values[0]
 
 
 def _run_ask_action(action, ask_id, payload):
@@ -227,11 +251,16 @@ class BoardRequestHandler(http_server.BaseHTTPRequestHandler):
         self._write(200, body, "application/json; charset=utf-8", "no-store")
 
     def _route_get(self):
-        path = urlsplit(self.path).path
+        parts = urlsplit(self.path)
+        path = parts.path
         if path == "/":
             return self._serve_file("index.html", "text/html; charset=utf-8")
         if path == "/api/board":
             return self._serve_model(board_commands.board_model)
+        if path == "/history":
+            return self._serve_file("history.html", "text/html; charset=utf-8")
+        if path == "/api/history":
+            return self._serve_model(_history_model(parts.query))
         if path == "/api/session":
             return self._serve_session()
         if path in _STATIC_FILES:
