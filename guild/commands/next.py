@@ -313,8 +313,15 @@ def _render_single(ctx, tier1, tier2, tier3, next_task, disagreements, blocked, 
     return lines
 
 
+def _paused_lines(paused_rows):
+    return ["nothing actionable", "raid paused: {}".format(", ".join(row["raid"] for row in paused_rows))]
+
+
 def run(ctx, binding, show_all, acknowledge):
     party, project = binding["party"], binding["project"]
+    paused_rows = raid_commands.paused_member_raids(ctx.conn, ctx.now, party)
+    if paused_rows:
+        return _paused_lines(paused_rows)
     stale_hours = _stale_hours(ctx.projects_dir, project)
 
     tier1 = _tier1_candidates(ctx.conn, party)

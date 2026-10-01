@@ -114,6 +114,25 @@ def _membership_warning_lines(ctx, binding):
     return lines
 
 
+def _pause_marker_path(ctx, raid_name, paused_at):
+    digest = hashlib.sha256("{}|{}".format(raid_name, paused_at).encode()).hexdigest()[:16]
+    return ctx.state_dir / "hints" / "raid-pause-{}-{}".format(identity.cursor_key(ctx.session_id), digest)
+
+
+def _pause_lines(ctx, binding):
+    if binding is None:
+        return []
+    lines = []
+    for row in raid_commands.paused_member_raids(ctx.conn, ctx.now, binding["party"]):
+        marker = _pause_marker_path(ctx, row["raid"], row["paused_at"])
+        if marker.exists():
+            continue
+        marker.parent.mkdir(parents=True, exist_ok=True)
+        marker.touch()
+        lines.append("raid {} paused: finish current step and leave guild handoff".format(row["raid"]))
+    return lines
+
+
 def session_start(ctx, resume_party):
     lines = _auto_resume_lines(ctx, resume_party)
     binding = identity.resolve_binding(ctx.conn, ctx.session_id)
@@ -162,7 +181,12 @@ def prompt_submit(ctx):
             marker.touch()
             lines = [UNBOUND_HINT] + lines
     project = binding["project"] if binding is not None else None
-    lines = lines + _ctx_nudge_lines(ctx, project) + _membership_warning_lines(ctx, binding)
+    lines = (
+        lines
+        + _ctx_nudge_lines(ctx, project)
+        + _membership_warning_lines(ctx, binding)
+        + _pause_lines(ctx, binding)
+    )
     with db.writing(ctx.conn):
         inbox_commands.advance_cursor(ctx.conn, identity.cursor_key(ctx.session_id), seq)
     return "\n".join(lines)
@@ -173,7 +197,12 @@ def post_tool_use(ctx):
     message_lines, seq = inbox_commands.new_lines(ctx, binding)
     lines = inbox_commands.framed(message_lines)
     project = binding["project"] if binding is not None else None
-    lines = lines + _ctx_nudge_lines(ctx, project) + _membership_warning_lines(ctx, binding)
+    lines = (
+        lines
+        + _ctx_nudge_lines(ctx, project)
+        + _membership_warning_lines(ctx, binding)
+        + _pause_lines(ctx, binding)
+    )
     with db.writing(ctx.conn):
         inbox_commands.advance_cursor(ctx.conn, identity.cursor_key(ctx.session_id), seq)
     if not lines:

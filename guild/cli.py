@@ -250,6 +250,20 @@ def _handle_raid_leave(ctx, args):
     return 0
 
 
+def _handle_raid_pause(ctx, args):
+    from guild.commands import raid_pause as raid_pause_commands
+
+    _print(raid_pause_commands.pause(ctx, args.name))
+    return 0
+
+
+def _handle_raid_resume(ctx, args):
+    from guild.commands import raid_pause as raid_pause_commands
+
+    _print(raid_pause_commands.resume(ctx, args.name))
+    return 0
+
+
 def _handle_raids(ctx, args):
     from guild.commands import raid as raid_commands
 
@@ -528,6 +542,14 @@ def _add_raid_parser(subparsers):
     leave = actions.add_parser("leave")
     leave.add_argument("name")
     leave.set_defaults(handler=_handle_raid_leave)
+
+    pause = actions.add_parser("pause")
+    pause.add_argument("name")
+    pause.set_defaults(handler=_handle_raid_pause)
+
+    resume = actions.add_parser("resume")
+    resume.add_argument("name")
+    resume.set_defaults(handler=_handle_raid_resume)
 
 
 def _add_merge_queue_parser(subparsers):
