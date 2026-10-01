@@ -451,7 +451,12 @@ the real, resolved URL before serving:
 guild web: http://127.0.0.1:<port>/
 ```
 
-**What it shows**, in this order: open asks (question, party, options,
+**Layout**: on screens at least 1000px wide the page has two columns: the
+right one is sticky and always visible, holding the open asks and the merge
+queue; the left one holds notices, drift and the parties. On narrower
+screens it is a single column with asks and the merge queue first.
+
+**What it shows**: open asks (question, party, options,
 refs, how many refs still block it, a collapsible context), active notices,
 the merge queue (one card per raid, plus one per party outside raids that has
 open PRs: numbered PR links with their lifecycle badge, checks, party, task
