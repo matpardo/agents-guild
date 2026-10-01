@@ -8,8 +8,9 @@ _EVENT_HANDLER_ATTR_RE = re.compile(r"<[^>]+\son[a-z]+\s*=", re.IGNORECASE)
 _SCRIPT_TAG_RE = re.compile(r"<script\b([^>]*)>(.*?)</script>", re.IGNORECASE | re.DOTALL)
 
 
-_SCRIPTS = ("app.js",)
-_PAGES = ("index.html",)
+_SCRIPTS = ("app.js", "history.js")
+_WRITING_SCRIPTS = ("app.js",)
+_PAGES = ("index.html", "history.html")
 
 
 class PageScriptSafeRenderingTests(unittest.TestCase):
@@ -42,7 +43,7 @@ class PageScriptSafeRenderingTests(unittest.TestCase):
 
 class PageScriptWriteTests(unittest.TestCase):
     def test_sends_the_session_token_header(self):
-        for name in _SCRIPTS:
+        for name in _WRITING_SCRIPTS:
             with self.subTest(script=name):
                 self.assertIn("X-Guild-Token", (_WEB_DIR / name).read_text())
 
