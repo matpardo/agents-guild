@@ -82,7 +82,9 @@ def _handle_quest_done(ctx, args):
 def _handle_quest_add(ctx, args):
     from guild.commands import quest as quest_commands
 
-    _print(quest_commands.add(ctx, args.slug, args.title, args.epic, args.tasks, args.titles, args.no_epic))
+    _print(quest_commands.add(
+        ctx, args.slug, args.title, args.epic, args.tasks, args.titles, args.no_epic, args.followups_of
+    ))
     return 0
 
 
@@ -405,6 +407,7 @@ def _add_quest_parser(subparsers):
     add.add_argument("--tasks")
     add.add_argument("--titles")
     add.add_argument("--no-epic", action="store_true")
+    add.add_argument("--followups-of")
     add.set_defaults(handler=_handle_quest_add)
 
     done = actions.add_parser("done")

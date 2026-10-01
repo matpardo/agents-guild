@@ -122,23 +122,38 @@ def _free_tasks(tasks_csv, titles_csv):
     return [{"tid": tid, "title": task_title} for tid, task_title in zip(tids, titles)]
 
 
-def add(ctx, slug, title, epic, tasks_csv, titles_csv, no_epic):
+def _require_followup_source(ctx, binding, source):
+    row = ctx.conn.execute("SELECT slug, party FROM quests WHERE slug = ?", (source,)).fetchone()
+    if row is None:
+        raise GuildError("unknown quest '{}'".format(source), 1)
+    if row["party"] != binding["party"]:
+        raise GuildError(
+            "quest '{}' is not owned by party '{}'".format(source, binding["party"]), 1
+        )
+
+
+def add(ctx, slug, title, epic, tasks_csv, titles_csv, no_epic, followups_of):
     names.validate_name(slug, "quest slug")
+    if followups_of is not None and (no_epic or epic is not None):
+        raise GuildError("--followups-of cannot be combined with --epic or --no-epic", 1)
+    free = no_epic or followups_of is not None
     if no_epic and epic is not None:
         raise GuildError("--no-epic cannot be combined with --epic", 1)
-    if titles_csv is not None and (not no_epic or tasks_csv is None):
-        raise GuildError("--titles requires --no-epic and --tasks", 1)
-    if not no_epic and (epic is None or tasks_csv is None):
+    if titles_csv is not None and (not free or tasks_csv is None):
+        raise GuildError("--titles requires --no-epic (or --followups-of) and --tasks", 1)
+    if not free and (epic is None or tasks_csv is None):
         raise GuildError("epic quests require --epic and --tasks, or pass --no-epic", 1)
     existing = ctx.conn.execute("SELECT slug FROM quests WHERE slug = ?", (slug,)).fetchone()
     if existing is not None:
         raise GuildError("quest '{}' already exists".format(slug), 1)
     binding = identity.require_binding(ctx.conn, ctx.session_id)
     project = config.require_project(ctx.cwd, ctx.projects_dir)
+    if followups_of is not None:
+        _require_followup_source(ctx, binding, followups_of)
     tasks = []
-    if no_epic and tasks_csv is not None:
+    if free and tasks_csv is not None:
         tasks = _free_tasks(tasks_csv, titles_csv)
-    if not no_epic:
+    if not free:
         tasks = _resolve_epic_tasks(ctx.conn, project, epic, tasks_csv)
         _reject_taken_tasks(ctx.conn, ctx.now, project, epic, tasks, binding["party"])
     with db.writing(ctx.conn):
@@ -158,6 +173,7 @@ def add(ctx, slug, title, epic, tasks_csv, titles_csv, no_epic):
                 "epic": epic,
                 "title": title,
                 "tasks": tasks,
+                "followups_of": followups_of,
             },
         )
     return "quest '{}' added".format(slug)

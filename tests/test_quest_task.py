@@ -180,6 +180,90 @@ class QuestAddValidationTests(GuildTestCase):
         self.assertIn("already exists", err)
 
 
+class QuestFollowupsTests(GuildTestCase):
+    def setUp(self):
+        super().setUp()
+        self.repo_dir = self.register_project("acme", ["acme/app"])
+        self.run_cli(["party", "start", "alpha"], "sess-1", self.repo_dir)
+        self.run_cli(["quest", "add", "src", "--title", "Source", "--no-epic"], "sess-1", self.repo_dir)
+
+    def test_followups_creates_no_epic_quest_with_tasks(self):
+        code, out, err = self.run_cli(
+            [
+                "quest", "add", "next", "--followups-of", "src", "--title", "Next",
+                "--tasks", "A,B", "--titles", "First,Second",
+            ],
+            "sess-1",
+            self.repo_dir,
+        )
+        self.assertEqual(code, 0, err)
+        code, out, err = self.run_cli(["task", "start", "next/A"], "sess-1", self.repo_dir)
+        self.assertEqual(code, 0, err)
+        code, out, err = self.run_cli(["board"], "sess-1", self.repo_dir)
+        self.assertIn("next", out)
+        self.assertIn("First", out)
+
+    def test_followups_without_tasks_allows_task_add(self):
+        code, out, err = self.run_cli(
+            ["quest", "add", "next", "--followups-of", "src", "--title", "Next"],
+            "sess-1",
+            self.repo_dir,
+        )
+        self.assertEqual(code, 0, err)
+        code, out, err = self.run_cli(
+            ["task", "add", "next/T01", "--title", "One"], "sess-1", self.repo_dir
+        )
+        self.assertEqual(code, 0, err)
+
+    def test_followups_rejects_unknown_source(self):
+        code, out, err = self.run_cli(
+            ["quest", "add", "next", "--followups-of", "ghost", "--title", "Next"],
+            "sess-1",
+            self.repo_dir,
+        )
+        self.assertEqual(code, 1)
+        self.assertIn("unknown quest 'ghost'", err)
+
+    def test_followups_rejects_source_of_other_party(self):
+        self.run_cli(["party", "start", "beta"], "sess-2", self.repo_dir)
+        code, out, err = self.run_cli(
+            ["quest", "add", "next", "--followups-of", "src", "--title", "Next"],
+            "sess-2",
+            self.repo_dir,
+        )
+        self.assertEqual(code, 1)
+        self.assertIn("not owned by party 'beta'", err)
+
+    def test_followups_rejects_epic(self):
+        code, out, err = self.run_cli(
+            ["quest", "add", "next", "--followups-of", "src", "--title", "N", "--epic", "x"],
+            "sess-1",
+            self.repo_dir,
+        )
+        self.assertEqual(code, 1)
+        self.assertIn("--followups-of cannot be combined", err)
+
+    def test_followups_rejects_no_epic(self):
+        code, out, err = self.run_cli(
+            ["quest", "add", "next", "--followups-of", "src", "--title", "N", "--no-epic"],
+            "sess-1",
+            self.repo_dir,
+        )
+        self.assertEqual(code, 1)
+        self.assertIn("--followups-of cannot be combined", err)
+
+    def test_followups_nothing_written_on_rejection(self):
+        self.run_cli(
+            ["quest", "add", "next", "--followups-of", "ghost", "--title", "N"],
+            "sess-1",
+            self.repo_dir,
+        )
+        code, out, err = self.run_cli(
+            ["quest", "add", "next", "--title", "N", "--no-epic"], "sess-1", self.repo_dir
+        )
+        self.assertEqual(code, 0, err)
+
+
 class QuestAddConflictTests(GuildTestCase):
     def setUp(self):
         super().setUp()
@@ -348,6 +432,7 @@ class TaskLifecycleTests(GuildTestCase):
         )
         self.assertEqual(code, 1)
         self.assertIn("epic quest", err)
+        self.assertIn("--followups-of epicq", err)
 
     def test_start_block_done_cycle(self):
         self.run_cli(["task", "add", "demo/T01", "--title", "First"], "sess-1", self.repo_dir)

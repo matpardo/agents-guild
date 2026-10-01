@@ -80,7 +80,8 @@ guild party resume <party> [--session <name>]   # --session: from a human termin
 guild party close [<party>]     # <party>: from a terminal, or your own party
 
 guild quest add <slug> --title "..." --epic <slug> --tasks T09,T07b
-guild quest add <slug> --title "..." --no-epic
+guild quest add <slug> --title "..." --no-epic [--tasks A,B [--titles "First,Second"]]
+guild quest add <slug> --title "..." --followups-of <quest> [--tasks A,B [--titles ...]]
 guild quest done <slug>
 
 guild task add <quest>/<tid> --title "..."          # no-epic quests only
@@ -608,6 +609,15 @@ and any other project-name lookup — lists the known project names, e.g.
 `unknown project 'x': known projects are acme, zeta` (or `known projects
 are none` when none are registered yet). A single helper in `guild/config.py`
 builds this list and is reused everywhere a project lookup can fail.
+
+### Follow-up quests
+
+`guild quest add <slug> --followups-of <quest> --title "..."` creates a
+no-epic quest for your party, for extra work that does not fit an epic quest
+(whose tasks cannot be added to). `<quest>` must exist and be owned by your
+party; the link is recorded in the `quest.added` event payload
+(`followups_of`). `--tasks` and `--titles` work as with `--no-epic`. Combining
+it with `--epic` or `--no-epic` is rejected.
 
 ### No overlapping task lists
 
