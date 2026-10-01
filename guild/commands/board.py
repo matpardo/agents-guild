@@ -168,14 +168,8 @@ def _ask_summary_lines(painter, conn, row):
     return [first] + wrapped[1:]
 
 
-def _ask_sort_key(conn, row):
-    ref_list = json.loads(row["refs"])
-    return (-_blocked_ref_count(conn, ref_list), row["created_at"], row["id"])
-
-
 def _sorted_open_asks(conn, party_names):
-    rows = conn.execute("SELECT * FROM asks WHERE state = 'open'").fetchall()
-    rows = sorted(rows, key=lambda row: _ask_sort_key(conn, row))
+    rows = conn.execute("SELECT * FROM asks WHERE state = 'open' ORDER BY id ASC").fetchall()
     if party_names is not None:
         rows = [row for row in rows if row["party"] in party_names]
     return rows

@@ -74,6 +74,20 @@ class InboxTests(GuildTestCase):
         code, out, err = self.run_cli(["inbox", "--since-last"], "sess-1", repo_dir)
         self.assertIn('- ask #1 answered by human: "yes go"', out)
 
+    def test_answers_listed_in_ascending_ask_id(self):
+        repo_dir = self.register_project("acme", ["acme/app"])
+        self.run_cli(["party", "start", "alpha"], "sess-1", repo_dir)
+        self.run_cli(["quest", "add", "demo", "--title", "Demo", "--no-epic"], "sess-1", repo_dir)
+        self.run_cli(["task", "add", "demo/T01", "--title", "First"], "sess-1", repo_dir)
+        self.run_cli(["ask", "one?", "--context", "x", "--ref", "task:demo/T01"], "sess-1", repo_dir)
+        self.run_cli(["ask", "two?", "--context", "x", "--ref", "task:demo/T01"], "sess-1", repo_dir)
+        self.run_cli(["inbox", "--since-last"], "sess-1", repo_dir)
+        self.run_cli(["answer", "2", "b"], None, None)
+        self.run_cli(["answer", "1", "a"], None, None)
+
+        code, out, err = self.run_cli(["inbox", "--since-last"], "sess-1", repo_dir)
+        self.assertLess(out.index("ask #1 answered"), out.index("ask #2 answered"))
+
     def test_notice_with_embedded_newline_cannot_forge_extra_line(self):
         repo_dir = self.register_project("acme", ["acme/app"])
         self.run_cli(["party", "start", "alpha"], "sess-1", repo_dir)

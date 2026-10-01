@@ -34,7 +34,7 @@ def _ask_answered_ts(conn, ask_id):
 
 
 def _latest_answered_ask_for_ref(conn, ref):
-    rows = conn.execute("SELECT * FROM asks WHERE state = 'answered'").fetchall()
+    rows = conn.execute("SELECT * FROM asks WHERE state = 'answered' ORDER BY id ASC").fetchall()
     best = None
     for row in rows:
         if ref not in json.loads(row["refs"]):
@@ -48,7 +48,7 @@ def _latest_answered_ask_for_ref(conn, ref):
 
 
 def _open_ask_id_for_ref(conn, ref):
-    rows = conn.execute("SELECT id, refs FROM asks WHERE state = 'open'").fetchall()
+    rows = conn.execute("SELECT id, refs FROM asks WHERE state = 'open' ORDER BY id ASC").fetchall()
     for row in rows:
         if ref in json.loads(row["refs"]):
             return row["id"]
