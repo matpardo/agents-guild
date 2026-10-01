@@ -1,8 +1,10 @@
 import json
 from datetime import timedelta
 
-from guild import config, events, resolve, timeutil
+from guild import config, events, resolve, sanitize, timeutil
+from guild.commands import merge_queue as merge_queue_commands
 from guild.commands import pr as pr_commands
+from guild.commands import raid as raid_commands
 
 
 def _own_open_prs(conn, party):
@@ -199,6 +201,58 @@ def _evaluate_next_task(conn, now, project, party):
     return None, disagreements, blocked
 
 
+def _led_raid_members(conn, now, party):
+    led = {}
+    for membership in raid_commands.member_raids(conn, now, party):
+        lead = raid_commands.active_lead(conn, now, membership["raid"])
+        if lead is None or lead["party"] != party:
+            continue
+        led[membership["raid"]] = {
+            row["party"] for row in raid_commands.active_members(conn, now, membership["raid"])
+        } - {party}
+    return led
+
+
+def _raid_ask_lines(conn, raid_name, members):
+    rows = conn.execute("SELECT * FROM asks WHERE state = 'open' ORDER BY id ASC").fetchall()
+    return [
+        'raid {}: ask #{} from {}: "{}"'.format(
+            raid_name, row["id"], row["party"], sanitize.collapse_to_single_line(row["question"])
+        )
+        for row in rows
+        if row["party"] in members
+    ]
+
+
+def _raid_queue_lines(conn, raid_name, members):
+    scoped = merge_queue_commands.scoped_queue(
+        merge_queue_commands.open_pr_records(conn), merge_queue_commands.load_pins(conn), members
+    )
+    lines = [
+        "raid {}: merge queue {}. {} {} \u2014 {}".format(
+            raid_name, position, entry["ref"], entry["party"], entry["reason"]
+        )
+        for position, entry in enumerate(scoped["queue"], start=1)
+    ]
+    lines.extend(
+        "raid {}: blocked {} {} \u2014 {}".format(
+            raid_name, entry["ref"], entry["party"], "; ".join(entry["reasons"])
+        )
+        for entry in scoped["blocked"]
+    )
+    return lines
+
+
+def _lead_raid_lines(conn, now, party):
+    led = _led_raid_members(conn, now, party)
+    lines = []
+    for raid_name in sorted(led):
+        lines.extend(_raid_ask_lines(conn, raid_name, led[raid_name]))
+    for raid_name in sorted(led):
+        lines.extend(_raid_queue_lines(conn, raid_name, led[raid_name]))
+    return [sanitize.strip_control_sequences(line) for line in lines]
+
+
 def _pr_label(row):
     return "{}#{}".format(row["repo"], row["number"])
 
@@ -209,7 +263,7 @@ def _task_title_display(next_task):
     return next_task["title"]
 
 
-def _render_all(tier1, tier2, tier3, next_task, disagreements):
+def _render_all(tier1, tier2, tier3, next_task, disagreements, raid_lines):
     lines = []
     for row, reason, _ in tier1 + tier2 + tier3:
         lines.append("PR {}: {}".format(_pr_label(row), reason))
@@ -221,12 +275,13 @@ def _render_all(tier1, tier2, tier3, next_task, disagreements):
         )
     for line in disagreements:
         lines.append("disagreement: {}".format(line))
+    lines.extend(raid_lines)
     if not lines:
         lines.append("nothing actionable")
     return lines
 
 
-def _render_single(ctx, tier1, tier2, tier3, next_task, disagreements, blocked, acknowledge):
+def _render_single(ctx, tier1, tier2, tier3, next_task, disagreements, blocked, raid_lines, acknowledge):
     for candidates in (tier1, tier2, tier3):
         if not candidates:
             continue
@@ -243,6 +298,11 @@ def _render_single(ctx, tier1, tier2, tier3, next_task, disagreements, blocked, 
                 next_task["quest"], next_task["tid"], _task_title_display(next_task)
             )
         ]
+        for line in disagreements:
+            lines.append("disagreement: {}".format(line))
+        return lines
+    if raid_lines:
+        lines = [raid_lines[0]]
         for line in disagreements:
             lines.append("disagreement: {}".format(line))
         return lines
@@ -265,6 +325,8 @@ def run(ctx, binding, show_all, acknowledge):
     else:
         next_task, disagreements, blocked = _evaluate_next_task(ctx.conn, ctx.now, project, party)
 
+    raid_lines = _lead_raid_lines(ctx.conn, ctx.now, party)
+
     if show_all:
-        return _render_all(tier1, tier2, tier3, next_task, disagreements)
-    return _render_single(ctx, tier1, tier2, tier3, next_task, disagreements, blocked, acknowledge)
+        return _render_all(tier1, tier2, tier3, next_task, disagreements, raid_lines)
+    return _render_single(ctx, tier1, tier2, tier3, next_task, disagreements, blocked, raid_lines, acknowledge)

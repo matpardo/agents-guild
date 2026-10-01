@@ -302,6 +302,111 @@ class NextAllTests(NextTestCase):
         self.assertIn('task wave1/T01: "First task" — ready', out)
 
 
+class LeadRaidWorkTests(NextTestCase):
+    def setUp(self):
+        super().setUp()
+        self.run_cli(["raid", "join", "ci", "--until-leave", "--lead"], "sess-1", self.repo_dir)
+        self.run_cli(["party", "start", "beta"], "sess-2", self.repo_dir)
+        self.run_cli(["raid", "join", "ci", "--until-leave"], "sess-2", self.repo_dir)
+        self.run_cli(["quest", "add", "bq", "--title", "B", "--no-epic"], "sess-2", self.repo_dir)
+        self.run_cli(["task", "add", "bq/T01", "--title", "First"], "sess-2", self.repo_dir)
+
+    def _beta_asks(self):
+        self.run_cli(["ask", "ready?", "--context", "x", "--ref", "task:bq/T01"], "sess-2", self.repo_dir)
+
+    def _view(self, conclusion):
+        return {
+            "state": "OPEN", "isDraft": False, "headRefName": "feature/y", "title": "t",
+            "statusCheckRollup": [{"conclusion": conclusion}], "mergeable": "MERGEABLE",
+        }
+
+    def _beta_tracks_pr(self):
+        self.write_gh_fixture("view_acme-app_7", self._view("SUCCESS"))
+        self.write_gh_fixture(
+            "view_files_acme-app_7",
+            {"files": [{"path": "a.py"}], "additions": 1, "deletions": 1, "createdAt": "2026-09-03T10:00:00Z"},
+        )
+        self.run_cli(
+            ["pr", "track", "acme/app#7", "--task", "bq/T01", "--what", "x", "--waits", "y"],
+            "sess-2", self.repo_dir,
+        )
+        self.run_cli(["pr", "set", "acme/app#7", "--lifecycle", "ready"], "sess-2", self.repo_dir)
+        self.run_cli(["sync", "--source", "gh"], "sess-1", self.repo_dir)
+
+    def _event_count(self):
+        conn = sqlite3.connect(str(self.data_home / "guild" / "guild.db"))
+        count = conn.execute("SELECT COUNT(*) FROM events").fetchone()[0]
+        conn.close()
+        return count
+
+    def test_open_member_ask_listed_instead_of_nothing_actionable(self):
+        self._beta_asks()
+        code, out, err = self.run_cli(["next"], "sess-1", self.repo_dir)
+        self.assertEqual(code, 0, err)
+        self.assertIn('raid ci: ask #1 from beta: "ready?"', out)
+        self.assertNotIn("nothing actionable", out)
+
+    def test_answered_member_ask_not_listed(self):
+        self._beta_asks()
+        self.run_cli(["answer", "1", "go"], None, None)
+        code, out, err = self.run_cli(["next"], "sess-1", self.repo_dir)
+        self.assertIn("nothing actionable", out)
+
+    def test_own_ask_not_listed(self):
+        self.run_cli(["ask", "mine?", "--context", "x", "--ref", "task:bq/T01"], "sess-1", self.repo_dir)
+        code, out, err = self.run_cli(["next"], "sess-1", self.repo_dir)
+        self.assertNotIn("raid ci: ask", out)
+
+    def test_non_lead_member_sees_nothing_of_it(self):
+        self._beta_asks()
+        code, out, err = self.run_cli(["next"], "sess-2", self.repo_dir)
+        self.assertNotIn("raid ci", out)
+
+    def test_merge_queue_entry_listed_with_reason(self):
+        self._beta_tracks_pr()
+        code, out, err = self.run_cli(["next"], "sess-1", self.repo_dir)
+        self.assertEqual(code, 0, err)
+        self.assertIn("raid ci: merge queue 1. acme/app#7 beta", out)
+        self.assertNotIn("nothing actionable", out)
+
+    def test_blocked_merge_queue_entry_listed_with_reasons(self):
+        self._beta_tracks_pr()
+        self.write_gh_fixture("view_acme-app_7", self._view("FAILURE"))
+        self.run_cli(["sync", "--source", "gh"], "sess-1", self.repo_dir)
+        code, out, err = self.run_cli(["next"], "sess-1", self.repo_dir)
+        self.assertIn("raid ci: blocked acme/app#7 beta", out)
+
+    def test_all_lists_asks_and_queue_entries(self):
+        self._beta_asks()
+        self._beta_tracks_pr()
+        code, out, err = self.run_cli(["next", "--all"], "sess-1", self.repo_dir)
+        self.assertIn('raid ci: ask #1 from beta: "ready?"', out)
+        self.assertIn("raid ci: merge queue 1. acme/app#7 beta", out)
+
+    def test_ask_listed_before_merge_queue_in_single_mode(self):
+        self._beta_asks()
+        self._beta_tracks_pr()
+        code, out, err = self.run_cli(["next"], "sess-1", self.repo_dir)
+        self.assertIn("raid ci: ask #1", out)
+        self.assertNotIn("merge queue", out)
+
+    def test_next_never_changes_state(self):
+        self._beta_asks()
+        self._beta_tracks_pr()
+        before = self._event_count()
+        self.run_cli(["next"], "sess-1", self.repo_dir)
+        self.run_cli(["next", "--all"], "sess-1", self.repo_dir)
+        self.assertEqual(self._event_count(), before)
+
+    def test_own_task_ranks_before_raid_work(self):
+        self._beta_asks()
+        self.run_cli(["quest", "add", "demo", "--title", "Demo", "--no-epic"], "sess-1", self.repo_dir)
+        self.run_cli(["task", "add", "demo/T01", "--title", "First"], "sess-1", self.repo_dir)
+        code, out, err = self.run_cli(["next"], "sess-1", self.repo_dir)
+        self.assertIn("task demo/T01", out)
+        self.assertNotIn("raid ci", out)
+
+
 if __name__ == "__main__":
     import unittest
 
