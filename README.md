@@ -77,7 +77,7 @@ guild init-project <name> --config <file.json>
 
 guild party start <name>
 guild party resume <party> [--session <name>]   # --session: from a human terminal only
-guild party close [<party>]     # <party>: from a terminal, or your own party
+guild party close [<party>] [--force]  # <party>: from a terminal, or your own party; --force overrides the raid-lead guard
 
 guild quest add <slug> --title "..." --epic <slug> --tasks T09,T07b
 guild quest add <slug> --title "..." --no-epic [--tasks A,B [--titles "First,Second"]]
@@ -191,6 +191,9 @@ read-only: it never fires that event.
 
 `guild party close` closes the caller's party; `guild party close <party>`
 closes any party from a terminal (a session may only name its own party).
+A party that leads a raid cannot be closed while that raid has other active
+members (a member's open asks live and die with its membership): the command
+fails naming the raid and the members, and `guild party close --force` closes anyway.
 Closing cascades in the same event: the party's active quests become `done`,
 its open asks are dismissed and its claims are released. Tracked PRs stay
 tracked for history and are listed if still open. `guild quest done <slug>`
@@ -502,7 +505,9 @@ renders `$XDG_DATA_HOME/guild/handoffs/<party>-g<N>.md` from the DB (active
 quests, the full `guild next --all` queue, PRs, open asks, active notices and
 claims, plus the two free-text fields), records `party.handed_off` (party →
 `awaiting-leader`, `leaders.handoff_path` set for this generation) and prints
-one command for the human to run:
+one command for the human to run. A party that leads a raid gets a `Role`
+section in the handoff (`you lead raid <name>`), so the resumed session
+knows it is the lead:
 
 ```
 GUILD_RESUME=<party> claude -n <party>-g<N+1> 'Continue the work described in the guild handoff.'
