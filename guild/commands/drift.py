@@ -222,7 +222,7 @@ def _rule_epic_done_with_open_work(conn, project, epics):
     return findings
 
 
-def _collect(conn, project, epics, party_states, sessions_dir):
+def _collect_epic_scoped(conn, project, epics, party_states):
     return [
         ("merged PR, task not done", _rule_merged_pr_task_not_done(conn, project, epics, party_states)),
         ("tracker and SDD disagree", _rule_tracker_sdd_disagree(conn, project, epics)),
@@ -230,9 +230,19 @@ def _collect(conn, project, epics, party_states, sessions_dir):
         ("card not under its epic", _rule_card_not_under_epic(conn, project, epics)),
         ("PR open, card not started", _rule_pr_open_card_not_started(conn, project, epics, party_states)),
         ("PR closed unmerged", _rule_pr_closed_unmerged(conn, project, epics, party_states)),
-        ("party has no running leader", _rule_party_without_leader(conn, project, sessions_dir)),
         ("epic done with open work", _rule_epic_done_with_open_work(conn, project, epics)),
     ]
+
+
+def _collect(conn, project, epics, party_states, sessions_dir):
+    groups = _collect_epic_scoped(conn, project, epics, party_states)
+    groups.insert(6, ("party has no running leader", _rule_party_without_leader(conn, project, sessions_dir)))
+    return groups
+
+
+def epic_findings(conn, project, epic):
+    groups = _collect_epic_scoped(conn, project, (epic,), None)
+    return [finding for _, rule_findings in groups for finding in rule_findings]
 
 
 def _render(groups):

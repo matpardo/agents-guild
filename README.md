@@ -82,7 +82,7 @@ guild party close [<party>] [--force]  # <party>: from a terminal, or your own p
 guild quest add <slug> --title "..." --epic <slug> --tasks T09,T07b
 guild quest add <slug> --title "..." --no-epic [--tasks A,B [--titles "First,Second"]]
 guild quest add <slug> --title "..." --followups-of <quest> [--tasks A,B [--titles ...]]
-guild quest done <slug>
+guild quest done <slug> [--accept-drift]
 
 guild task add <quest>/<tid> --title "..."          # no-epic quests only
 guild task start <quest>/<tid> [--summary "..."]
@@ -208,7 +208,14 @@ fails naming the raid and the members, and `guild party close --force` closes an
 Closing cascades in the same event: the party's active quests become `done`,
 its open asks are dismissed and its claims are released. Tracked PRs stay
 tracked for history and are listed if still open. `guild quest done <slug>`
-finishes one quest without closing its party. Closed parties leave the board
+finishes one quest without closing its party. For an epic quest it first runs the
+drift check (the `guild drift` rules, scoped to that epic) and refuses with the
+findings listed; `--accept-drift` finishes anyway and records the findings. No-epic
+quests skip the gate. The `quest.done` event freezes an `achievement` snapshot
+(started_at, done_at, party, project, epic, title, tasks_done, tasks_blocked_events,
+sdd_tids, epic_progress, jira_cards_done, prs_merged, handoffs, sessions, asks_raised,
+asks_answered, median_answer_seconds, drift) because the epic, card and task
+projections are replaced on every sync. Closed parties leave the board
 and quests that are `done` leave `guild drift`'s default scope.
 
 ### Task done resolver

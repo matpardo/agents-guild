@@ -75,7 +75,7 @@ def _handle_party_close(ctx, args):
 def _handle_quest_done(ctx, args):
     from guild.commands import quest as quest_commands
 
-    _print(quest_commands.done(ctx, args.slug))
+    _print(quest_commands.done(ctx, args.slug, args.accept_drift))
     return 0
 
 
@@ -455,6 +455,7 @@ def _add_quest_parser(subparsers):
 
     done = actions.add_parser("done")
     done.add_argument("slug")
+    done.add_argument("--accept-drift", action="store_true")
     done.set_defaults(handler=_handle_quest_done)
 
 

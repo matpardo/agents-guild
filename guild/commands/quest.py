@@ -1,4 +1,5 @@
 from guild import config, db, events, identity, names, timeutil
+from guild.commands import achievement, drift
 from guild.errors import GuildError
 
 _TASK_CLAIM_PREFIX = "task:{}/"
@@ -82,9 +83,22 @@ def _reject_taken_tasks(conn, now, project, epic, tasks, party):
         raise GuildError("; ".join(conflicts), 1)
 
 
-def done(ctx, slug):
+def _gate_drift(conn, project, epic, accept_drift):
+    if epic is None:
+        return []
+    findings = drift.epic_findings(conn, project, epic)
+    if findings and not accept_drift:
+        raise GuildError(
+            "drift in epic '{}', fix it or pass --accept-drift:\n{}".format(epic, "\n".join(findings)), 1
+        )
+    return findings
+
+
+def done(ctx, slug, accept_drift):
     binding = identity.require_binding(ctx.conn, ctx.session_id)
-    row = ctx.conn.execute("SELECT party, project, state FROM quests WHERE slug = ?", (slug,)).fetchone()
+    row = ctx.conn.execute(
+        "SELECT party, project, epic, state FROM quests WHERE slug = ?", (slug,)
+    ).fetchone()
     if row is None:
         raise GuildError("unknown quest '{}'".format(slug), 1)
     if row["party"] != binding["party"]:
@@ -93,6 +107,8 @@ def done(ctx, slug):
         )
     if row["state"] != "active":
         raise GuildError("quest '{}' is already {}".format(slug, row["state"]), 1)
+    findings = _gate_drift(ctx.conn, row["project"], row["epic"], accept_drift)
+    snapshot = achievement.build(ctx.conn, slug, ctx.now, findings)
     with db.writing(ctx.conn):
         events.record(
             ctx.conn,
@@ -103,7 +119,7 @@ def done(ctx, slug):
             row["project"],
             "quest.done",
             "local",
-            {"slug": slug},
+            {"slug": slug, "achievement": snapshot},
         )
     return "quest '{}' done".format(slug)
 
