@@ -1,4 +1,4 @@
-from guild import config, identity, render
+from guild import config, identity, localbase, render
 from guild.commands import claim as claim_commands
 from guild.commands import inbox as inbox_commands
 from guild.commands import notice as notice_commands
@@ -9,6 +9,14 @@ from guild.identity import UNBOUND_HINT
 def _resolve_project(ctx):
     projects = config.load_all_projects(ctx.projects_dir)
     return config.resolve_project(ctx.cwd, projects)
+
+
+def _base_warning_lines(ctx, project_name):
+    lines = []
+    for project in config.load_all_projects(ctx.projects_dir):
+        if project["name"] == project_name:
+            lines.extend(localbase.behind_warning_lines(project))
+    return lines
 
 
 def _targeting_lines(rows, project, raid_member_of):
@@ -26,6 +34,7 @@ def render_brief(ctx):
         project = _resolve_project(ctx)
         lines = [UNBOUND_HINT]
         lines.extend(_targeting_lines(active, project, set()))
+        lines.extend(_base_warning_lines(ctx, project))
         return lines
 
     lines = ["party: {} (generation {})".format(binding["party"], binding["generation"])]
@@ -58,6 +67,8 @@ def render_brief(ctx):
         lead_row = raid_commands.active_lead(ctx.conn, ctx.now, raid_row["raid"])
         if lead_row is not None:
             lines.append("raid {} — lead: {}".format(raid_row["raid"], lead_row["party"]))
+
+    lines.extend(_base_warning_lines(ctx, binding["project"]))
 
     claims = [row for row in claim_commands.list_claims(ctx.conn, ctx.now) if row["party"] == binding["party"]]
     for claim_row in claims:

@@ -1,7 +1,7 @@
 import json
 from pathlib import Path
 
-from guild import config
+from guild import config, localbase
 from guild.errors import GuildError
 
 _EXPECTED_HOOKS = (
@@ -60,6 +60,8 @@ def _project_lines(projects_dir):
             lines.append((False, "invalid project {}: {}".format(config_file.name, error.message)))
             continue
         lines.append((True, "ok      project {}".format(data["name"])))
+        for warning in localbase.behind_warning_lines(data):
+            lines.append((True, "warn    {}".format(warning)))
     return lines
 
 

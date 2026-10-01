@@ -46,6 +46,14 @@ def _validate_migration_paths_config(data):
         raise GuildError("project config 'migration_paths' must be a list of strings", 1)
 
 
+def _validate_fast_forward_base_config(data):
+    fast_forward_base = data.get("fast_forward_base")
+    if fast_forward_base is None:
+        return
+    if not isinstance(fast_forward_base, bool):
+        raise GuildError("project config 'fast_forward_base' must be a boolean", 1)
+
+
 def validate_project_config(data):
     for key in _REQUIRED_KEYS:
         if key not in data:
@@ -61,6 +69,7 @@ def validate_project_config(data):
         _validate_tracker_config(tracker_config)
     _validate_shared_areas_config(data)
     _validate_migration_paths_config(data)
+    _validate_fast_forward_base_config(data)
 
 
 def load_project_file(config_file):

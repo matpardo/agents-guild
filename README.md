@@ -273,6 +273,21 @@ fails nothing is released and the failure is a sync failure. When something
 was released and the owner is in a raid, the notice ends with
 ` Released: <glob1>, <glob2>.`
 
+Base branch fast-forward: when the project sets `"fast_forward_base": true`,
+a `sync --source gh` run that detects a merge updates the local base branch of
+each merged repo once per run. Local clones are the git main checkouts (not
+linked worktrees) matched by the project's `paths` globs whose `origin` URL
+(https, ssh or path form) ends in a `github.repos` entry; the base branch is
+read from `origin/HEAD`. Steps: `git fetch origin`; if the base is not checked
+out in any worktree, `git fetch origin <base>:<base>`; if it is checked out
+and that worktree is clean, `git merge --ff-only origin/<base>`. A dirty
+worktree or a diverged base is left untouched and a `project:<name>` notice
+`local <base> of <repo> N commits behind origin, not updated: <reason>` is
+posted, at most once per origin tip. Absent or `false` → guild never mutates
+a clone. `guild doctor` and `guild brief` warn when a located local base is
+behind its `origin/<base>` ref regardless of the flag (they never fetch, so
+the comparison uses the last fetched state).
+
 `guild` has no daemon, so this only fires when someone runs the sync. A raid
 lead should keep a watcher running for the duration of the raid, e.g.
 `watch -n 300 guild sync --source gh` from a terminal, or `/loop 5m guild
@@ -864,6 +879,10 @@ against path traversal, not an identity boundary.
   (e.g. `db/migrate/*`), matched with `fnmatch` against changed file paths.
   Unset → the migration clash check is skipped and no extra `gh` call is made.
   Set → see "Migration version clash" under `sync`.
+- `fast_forward_base` (optional): boolean. `true` → `sync --source gh`
+  fast-forwards the local base branch of merged repos (see "Base branch
+  fast-forward" under `sync`). Must be a boolean or the config fails to load.
+  Absent → no clone is ever modified.
 - Unknown top-level keys are allowed.
 
 ### SDD parsing rules
