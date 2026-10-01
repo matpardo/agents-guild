@@ -89,3 +89,27 @@ class HistoryRouteTests(WebServerTestCase):
         self._seed_done_quest("q1", "alpha", "acme")
         response, model = self._get_history("?bogus=1")
         self.assertEqual(len(model["quests"]), 1)
+
+    def test_page_has_in_progress_and_incomplete_sections(self):
+        response, body = self._get("/history", self._host())
+        self.assertIn(b'id="active-quests"', body)
+        self.assertIn(b'id="incomplete-quests"', body)
+        self.assertLess(body.index(b'id="active-quests"'), body.index(b'id="quests"'))
+        self.assertLess(body.index(b'id="quests"'), body.index(b'id="incomplete-quests"'))
+
+    def test_js_renders_new_sections(self):
+        response, body = self._get("/history.js", self._host())
+        self.assertIn(b"nothing in progress", body)
+        self.assertIn(b"Closed without completing", body)
+
+    def test_api_exposes_new_lists_when_empty(self):
+        response, model = self._get_history("")
+        self.assertEqual(model["active_quests"], [])
+        self.assertEqual(model["incomplete_quests"], [])
+
+    def test_api_lists_incomplete_quest(self):
+        self._seed_done_quest("q1", "alpha", "acme")
+        self._seed_event("mark-q1", 6, "alpha", "acme", "quest.marked_incomplete", {"slug": "q1", "reason": "r"})
+        response, model = self._get_history("")
+        self.assertEqual(model["quests"], [])
+        self.assertEqual([quest["slug"] for quest in model["incomplete_quests"]], ["q1"])

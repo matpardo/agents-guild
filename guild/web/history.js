@@ -209,6 +209,100 @@
     node.appendChild(grid);
   }
 
+  function activeQuestCard(quest) {
+    var tasks = quest.tasks;
+    var card = el("article");
+    card.className = "card quest-card";
+    var head = el("div");
+    head.className = "card-head";
+    appendAll(head, [textEl("h3", quest.title), classedText("span", quest.party, "muted")]);
+    if (quest.project) {
+      head.appendChild(classedText("span", quest.project, "muted"));
+    }
+    card.appendChild(head);
+    card.appendChild(
+      classedText("p", "started " + formatDate(quest.started_at) + " · " + formatDuration(quest.age_seconds) + " ago", "muted")
+    );
+    var wrap = el("div");
+    wrap.className = "epic-progress";
+    var bar = el("progress");
+    bar.max = tasks.total;
+    bar.value = tasks.done;
+    appendAll(wrap, [
+      classedText("span", quest.percent_done + "% (" + tasks.done + "/" + tasks.total + " done)", "muted"),
+      bar,
+    ]);
+    card.appendChild(wrap);
+    card.appendChild(
+      fieldList([
+        field("epic", orUnknown(quest.epic)),
+        field("active", String(tasks.active)),
+        field("blocked", String(tasks.blocked)),
+        field("queued", String(tasks.queued)),
+      ])
+    );
+    return card;
+  }
+
+  function renderActiveQuests(quests) {
+    var node = document.getElementById("active-quests");
+    clear(node);
+    node.appendChild(textEl("h2", "In progress"));
+    if (quests.length === 0) {
+      node.appendChild(classedText("p", "nothing in progress", "muted empty"));
+      return;
+    }
+    var grid = el("div");
+    grid.className = "card-grid";
+    quests.forEach(function (quest) {
+      grid.appendChild(activeQuestCard(quest));
+    });
+    node.appendChild(grid);
+  }
+
+  function incompleteQuestCard(quest) {
+    var card = el("article");
+    card.className = "card quest-card";
+    var head = el("div");
+    head.className = "card-head";
+    appendAll(head, [textEl("h3", quest.title), classedText("span", quest.party, "muted")]);
+    if (quest.project) {
+      head.appendChild(classedText("span", quest.project, "muted"));
+    }
+    head.appendChild(classedText("span", "incomplete", "badge badge-warn"));
+    card.appendChild(head);
+    card.appendChild(
+      classedText(
+        "p",
+        formatDate(quest.started_at) + " → " + formatDate(quest.done_at) + " · marked " + formatDate(quest.marked_at),
+        "muted"
+      )
+    );
+    card.appendChild(
+      fieldList([
+        field("reason", quest.reason),
+        field("tasks not done", quest.tasks_not_done + " of " + quest.tasks_total),
+      ])
+    );
+    return card;
+  }
+
+  function renderIncompleteQuests(quests) {
+    var node = document.getElementById("incomplete-quests");
+    clear(node);
+    node.appendChild(textEl("h2", "Closed without completing"));
+    if (quests.length === 0) {
+      node.appendChild(classedText("p", "nothing closed without completing", "muted empty"));
+      return;
+    }
+    var grid = el("div");
+    grid.className = "card-grid";
+    quests.forEach(function (quest) {
+      grid.appendChild(incompleteQuestCard(quest));
+    });
+    node.appendChild(grid);
+  }
+
   function partyLabel(entry) {
     if (entry.lead) {
       return entry.party + " (lead)";
@@ -263,7 +357,9 @@
 
   function render(model) {
     renderTotals(model.totals);
+    renderActiveQuests(model.active_quests);
     renderQuests(model.quests);
+    renderIncompleteQuests(model.incomplete_quests);
     renderRaids(model.raids);
   }
 

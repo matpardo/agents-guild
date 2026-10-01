@@ -1,7 +1,7 @@
 import json
 from datetime import datetime, timedelta, timezone
 
-from guild import db, paths
+from guild import db, paths, reducers
 from guild.commands import history
 from tests.testutil import GuildTestCase
 
@@ -122,6 +122,153 @@ class CompletedQuestTests(HistoryTestCase):
         self.assertEqual(quest["title"], "ghost")
 
 
+class LiveHistoryTestCase(HistoryTestCase):
+    def _live(self, hours, party, project, kind, payload):
+        self._event(hours, party, project, kind, payload)
+        reducers.apply(self.conn, {
+            "kind": kind, "payload": payload, "ts": _at(hours), "project": project, "session_id": None,
+        })
+        self.conn.commit()
+
+    def _live_quest(self, hours, slug, party, project, epic, tids):
+        self._live(hours, party, project, "quest.added", {
+            "slug": slug, "project": project, "party": party, "epic": epic, "title": "Quest " + slug,
+            "tasks": [{"tid": tid, "title": tid} for tid in tids],
+        })
+
+    def _live_task(self, hours, kind, slug, tid, party, project):
+        self._live(hours, party, project, kind, {"quest": slug, "tid": tid, "summary": "s", "reason": "r"})
+
+    def _live_done(self, hours, slug, party, project):
+        self._live(hours, party, project, "quest.done", {"slug": slug})
+
+
+class ActiveQuestTests(LiveHistoryTestCase):
+    def test_active_quest_exposes_progress(self):
+        self._live_quest(10, "q1", "alpha", "acme", "wave4", ["T01", "T02", "T03", "T04", "T05"])
+        self._live_task(11, "task.done", "q1", "T01", "alpha", "acme")
+        self._live_task(12, "task.done", "q1", "T02", "alpha", "acme")
+        self._live_task(13, "task.started", "q1", "T03", "alpha", "acme")
+        self._live_task(14, "task.blocked", "q1", "T04", "alpha", "acme")
+        quest = self._model()["active_quests"][0]
+        self.assertEqual(quest["slug"], "q1")
+        self.assertEqual(quest["party"], "alpha")
+        self.assertEqual(quest["project"], "acme")
+        self.assertEqual(quest["epic"], "wave4")
+        self.assertEqual(quest["title"], "Quest q1")
+        self.assertEqual(quest["started_at"], _at(10))
+        self.assertEqual(quest["age_seconds"], int((_NOW - (_T0 + timedelta(hours=10))).total_seconds()))
+        self.assertEqual(quest["tasks"], {"done": 2, "active": 1, "blocked": 1, "queued": 1, "total": 5})
+        self.assertEqual(quest["percent_done"], 40)
+
+    def test_quest_without_tasks_is_zero_percent(self):
+        self._live_quest(10, "q1", "alpha", "acme", None, [])
+        quest = self._model()["active_quests"][0]
+        self.assertEqual(quest["tasks"]["total"], 0)
+        self.assertEqual(quest["percent_done"], 0)
+
+    def test_newest_started_first(self):
+        for slug, started in (("old", 10), ("new", 90), ("mid", 40)):
+            self._live_quest(started, slug, "alpha", "acme", None, ["T01"])
+        self.assertEqual([q["slug"] for q in self._model()["active_quests"]], ["new", "mid", "old"])
+
+    def test_done_quest_is_not_active(self):
+        self._live_quest(10, "q1", "alpha", "acme", None, ["T01"])
+        self._live_done(20, "q1", "alpha", "acme")
+        model = self._model()
+        self.assertEqual(model["active_quests"], [])
+        self.assertEqual(model["totals"]["quests_done"], 1)
+
+    def test_party_close_cascade_is_not_active(self):
+        self._live_quest(10, "q1", "alpha", "acme", None, ["T01"])
+        self._live(20, "alpha", "acme", "party.closed", {"party": "alpha", "generation": 1})
+        self.assertEqual(self._model()["active_quests"], [])
+
+    def test_filters(self):
+        self._live_quest(10, "a", "alpha", "acme", None, ["T01"])
+        self._live_quest(11, "b", "beta", "other", None, ["T01"])
+        self._event(1, "beta", "other", "raid.joined", {
+            "raid": "docs", "party": "beta", "expires_at": _at(3), "lead": False,
+        })
+        self.assertEqual([q["slug"] for q in self._model(party="alpha")["active_quests"]], ["a"])
+        self.assertEqual([q["slug"] for q in self._model(project="other")["active_quests"]], ["b"])
+        self.assertEqual([q["slug"] for q in self._model(raid="docs")["active_quests"]], ["b"])
+        self.assertEqual(self._model(party="alpha", project="other")["active_quests"], [])
+
+    def test_totals_unchanged_by_active_quests(self):
+        self._live_quest(10, "q1", "alpha", "acme", None, ["T01"])
+        self.assertEqual(self._model()["totals"]["quests_done"], 0)
+
+
+class IncompleteQuestTests(HistoryTestCase):
+    def _marked(self, hours, slug, party, project, reason):
+        self._event(hours, party, project, "quest.marked_incomplete", {"slug": slug, "reason": reason})
+
+    def _seed_marked_quest(self):
+        self._quest_added(0, "q1", "alpha", "acme", "wave4", ["T01", "T02", "T03"])
+        self._task_done(1, "q1", "T01", "alpha", "acme")
+        self._event(2, "alpha", "acme", "task.added", {"quest": "q1", "tid": "T04", "title": "T04"})
+        self._quest_done(5, "q1", "alpha", "acme", self._snapshot("q1", "alpha", "acme", 0, 5))
+        self._marked(6, "q1", "alpha", "acme", "dropped scope")
+        self._task_done(7, "q1", "T02", "alpha", "acme")
+
+    def test_marked_quest_moves_out_of_completed(self):
+        self._seed_marked_quest()
+        model = self._model()
+        self.assertEqual(model["quests"], [])
+        self.assertEqual(model["totals"]["quests_done"], 0)
+        self.assertEqual([q["slug"] for q in model["incomplete_quests"]], ["q1"])
+
+    def test_incomplete_entry_fields(self):
+        self._seed_marked_quest()
+        entry = self._model()["incomplete_quests"][0]
+        self.assertEqual(entry["title"], "Quest q1")
+        self.assertEqual(entry["party"], "alpha")
+        self.assertEqual(entry["project"], "acme")
+        self.assertEqual(entry["started_at"], _at(0))
+        self.assertEqual(entry["done_at"], _at(5))
+        self.assertEqual(entry["marked_at"], _at(6))
+        self.assertEqual(entry["reason"], "dropped scope")
+        self.assertEqual(entry["tasks_not_done"], 3)
+        self.assertEqual(entry["tasks_total"], 4)
+
+    def test_quest_marked_without_done_event_still_listed(self):
+        self._quest_added(0, "q1", "alpha", "acme", None, ["T01"])
+        self._marked(6, "q1", "alpha", "acme", "closed with party")
+        entry = self._model()["incomplete_quests"][0]
+        self.assertIsNone(entry["done_at"])
+        self.assertEqual(entry["tasks_not_done"], 1)
+
+    def test_unmarked_quests_stay_completed(self):
+        self._seed_marked_quest()
+        self._quest_done(9, "q2", "alpha", "acme", self._snapshot("q2", "alpha", "acme", 0, 9))
+        model = self._model()
+        self.assertEqual([q["slug"] for q in model["quests"]], ["q2"])
+        self.assertEqual(model["totals"]["quests_done"], 1)
+
+    def test_marked_quest_is_not_listed_in_raid(self):
+        self._event(1, "alpha", "acme", "raid.joined", {
+            "raid": "ci", "party": "alpha", "expires_at": _at(100), "lead": True,
+        })
+        self._quest_done(10, "q1", "alpha", "acme", self._snapshot("q1", "alpha", "acme", 0, 10))
+        self._marked(11, "q1", "alpha", "acme", "x")
+        self.assertEqual(self._model()["raids"][0]["quests"], [])
+
+    def test_filters_apply_to_incomplete(self):
+        self._quest_done(10, "a", "alpha", "acme", self._snapshot("a", "alpha", "acme", 0, 10))
+        self._quest_done(11, "b", "beta", "other", self._snapshot("b", "beta", "other", 0, 11))
+        self._marked(12, "a", "alpha", "acme", "x")
+        self._marked(13, "b", "beta", "other", "y")
+        self.assertEqual([q["slug"] for q in self._model(party="beta")["incomplete_quests"]], ["b"])
+        self.assertEqual([q["slug"] for q in self._model(project="acme")["incomplete_quests"]], ["a"])
+
+    def test_newest_marked_first(self):
+        for slug, marked in (("old", 10), ("new", 90), ("mid", 40)):
+            self._quest_done(1, slug, "alpha", "acme", self._snapshot(slug, "alpha", "acme", 0, 1))
+            self._marked(marked, slug, "alpha", "acme", "x")
+        self.assertEqual([q["slug"] for q in self._model()["incomplete_quests"]], ["new", "mid", "old"])
+
+
 class FinishedRaidTests(HistoryTestCase):
     def _join(self, hours, party, raid, expires_at, lead):
         self._event(hours, party, "acme", "raid.joined", {
@@ -220,7 +367,7 @@ class TotalsTests(HistoryTestCase):
 
     def test_empty_model(self):
         self.assertEqual(self._model(), {
-            "quests": [], "raids": [],
+            "quests": [], "active_quests": [], "incomplete_quests": [], "raids": [],
             "totals": {
                 "quests_done": 0, "prs_merged": 0, "tasks_done": 0, "asks_answered": 0,
                 "median_answer_seconds": None, "handoffs": 0,
@@ -275,7 +422,7 @@ class FormatDurationTests(GuildTestCase):
         self.assertEqual(history.format_duration(None), "unknown")
 
 
-class HistoryCliTests(HistoryTestCase):
+class HistoryCliTests(LiveHistoryTestCase):
     def test_cli_renders_all_sections(self):
         self._quest_added(0, "q1", "alpha", "acme", "wave4", ["T01"])
         self._quest_done(50, "q1", "alpha", "acme", self._snapshot("q1", "alpha", "acme", 0, 50))
@@ -302,6 +449,29 @@ class HistoryCliTests(HistoryTestCase):
         self.assertEqual(code, 0, err)
         self.assertIn("q2", out)
         self.assertNotIn("q1", out)
+
+    def test_cli_renders_in_progress_before_completed(self):
+        self._live_quest(0, "wip", "alpha", "acme", None, ["T01", "T02"])
+        code, out, err = self.run_cli(["history"], None, self.root)
+        self.assertEqual(code, 0, err)
+        self.assertIn("In progress (1)", out)
+        self.assertIn("wip - Quest wip", out)
+        self.assertIn("0% (0/2 done)", out)
+        self.assertLess(out.index("In progress"), out.index("Completed quests"))
+
+    def test_cli_in_progress_empty(self):
+        code, out, err = self.run_cli(["history"], None, self.root)
+        self.assertIn("In progress (0)", out)
+
+    def test_cli_renders_closed_without_completing(self):
+        self._quest_done(50, "q1", "alpha", "acme", self._snapshot("q1", "alpha", "acme", 0, 50))
+        self._event(60, "alpha", "acme", "quest.marked_incomplete", {"slug": "q1", "reason": "dropped scope"})
+        code, out, err = self.run_cli(["history"], None, self.root)
+        self.assertEqual(code, 0, err)
+        self.assertIn("Completed quests (0)", out)
+        self.assertIn("Closed without completing (1)", out)
+        self.assertIn("reason: dropped scope", out)
+        self.assertLess(out.index("Completed quests"), out.index("Closed without completing"))
 
     def test_cli_empty(self):
         code, out, err = self.run_cli(["history"], None, self.root)
