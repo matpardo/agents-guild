@@ -1,13 +1,18 @@
 import json
 import statistics
+from datetime import timedelta
 
-from guild import timeutil
+from guild import config, timeutil
+
+_WEEK = timedelta(days=7)
+_DEFAULT_STALE_HOURS = 48
 
 _KINDS = (
     "quest.added",
     "quest.done",
     "quest.marked_incomplete",
     "task.added",
+    "task.started",
     "task.done",
     "task.blocked",
     "pr.tracked",
@@ -226,7 +231,64 @@ def _task_counts(conn, slug):
     }
 
 
-def _active_quest_entry(conn, now, started_at, row):
+def _stale_hours(projects_dir, project):
+    if project is None:
+        return _DEFAULT_STALE_HOURS
+    config_file = projects_dir / "{}.json".format(project)
+    if not config_file.is_file():
+        return _DEFAULT_STALE_HOURS
+    next_config = config.load_project_file(config_file).get("next")
+    if next_config is None:
+        return _DEFAULT_STALE_HOURS
+    return next_config.get("stale_hours", _DEFAULT_STALE_HOURS)
+
+
+def _latest(timestamps):
+    if not timestamps:
+        return None
+    return max(timestamps, key=timeutil.from_iso)
+
+
+def _quest_pr_keys(by_kind, slug):
+    return {
+        (event["payload"]["repo"], event["payload"]["number"])
+        for event in by_kind["pr.tracked"]
+        if event["payload"]["task_quest"] == slug
+    }
+
+
+def _quest_activity_timestamps(by_kind, slug):
+    timestamps = [
+        event["ts"]
+        for kind in ("task.added", "task.started", "task.done", "task.blocked")
+        for event in by_kind[kind]
+        if event["payload"]["quest"] == slug
+    ]
+    pr_keys = _quest_pr_keys(by_kind, slug)
+    timestamps.extend(
+        event["ts"]
+        for kind in ("pr.tracked", "pr.set", "pr.synced")
+        for event in by_kind[kind]
+        if (event["payload"]["repo"], event["payload"]["number"]) in pr_keys
+    )
+    return timestamps
+
+
+def _party_activity_timestamps(by_kind, party):
+    return [event["ts"] for events in by_kind.values() for event in events if event["party"] == party]
+
+
+def _last_activity_at(by_kind, slug, party, started_at):
+    quest_latest = _latest(_quest_activity_timestamps(by_kind, slug))
+    if quest_latest is not None:
+        return quest_latest
+    party_latest = _latest(_party_activity_timestamps(by_kind, party))
+    if party_latest is not None:
+        return party_latest
+    return started_at
+
+
+def _active_quest_entry(conn, by_kind, now, projects_dir, started_at, row):
     tasks = _task_counts(conn, row["slug"])
     return {
         "slug": row["slug"],
@@ -236,12 +298,14 @@ def _active_quest_entry(conn, now, started_at, row):
         "title": row["title"],
         "started_at": started_at,
         "age_seconds": _seconds_between(started_at, timeutil.to_iso(now)),
+        "last_activity_at": _last_activity_at(by_kind, row["slug"], row["party"], started_at),
+        "stale_hours": _stale_hours(projects_dir, row["project"]),
         "tasks": tasks,
         "percent_done": _percent(tasks["done"], tasks["total"]),
     }
 
 
-def _active_quests(conn, by_kind, now, scope):
+def _active_quests(conn, by_kind, now, projects_dir, scope):
     started_by_slug = {}
     for event in by_kind["quest.added"]:
         started_by_slug.setdefault(event["payload"]["slug"], event["ts"])
@@ -249,7 +313,7 @@ def _active_quests(conn, by_kind, now, scope):
         "SELECT slug, party, project, epic, title FROM quests WHERE state = 'active'"
     ).fetchall()
     entries = [
-        _active_quest_entry(conn, now, started_by_slug.get(row["slug"]), row)
+        _active_quest_entry(conn, by_kind, now, projects_dir, started_by_slug.get(row["slug"]), row)
         for row in rows
         if scope.admits(row["party"], row["project"])
     ]
@@ -439,7 +503,13 @@ def _finished_raids(by_kind, now, scope, raid, quests, merged_prs):
     return _newest_created_first(raids, "name")
 
 
-def _answer_seconds(by_kind, scope):
+def _since_cutoff(ts, cutoff):
+    if cutoff is None:
+        return True
+    return timeutil.from_iso(ts) >= cutoff
+
+
+def _answer_seconds(by_kind, scope, cutoff):
     answered_at = {}
     for event in by_kind["ask.answered"]:
         answered_at.setdefault(event["payload"]["id"], event["ts"])
@@ -448,25 +518,31 @@ def _answer_seconds(by_kind, scope):
         if not scope.admits(event["party"], event["project"]):
             continue
         answer_ts = answered_at.get(event["payload"]["id"])
-        if answer_ts is None:
+        if answer_ts is None or not _since_cutoff(answer_ts, cutoff):
             continue
         durations.append(_seconds_between(event["ts"], answer_ts))
     return durations
 
 
-def _totals(by_kind, scope, quests, merged_prs):
-    durations = _answer_seconds(by_kind, scope)
+def _totals(by_kind, scope, quests, merged_prs, cutoff):
+    durations = _answer_seconds(by_kind, scope, cutoff)
     done_tasks = {
         (event["payload"]["quest"], event["payload"]["tid"])
         for event in by_kind["task.done"]
-        if scope.admits(event["party"], event["project"])
+        if scope.admits(event["party"], event["project"]) and _since_cutoff(event["ts"], cutoff)
     }
     handoffs = sum(
-        1 for event in by_kind["party.handed_off"] if scope.admits(event["party"], event["project"])
+        1
+        for event in by_kind["party.handed_off"]
+        if scope.admits(event["party"], event["project"]) and _since_cutoff(event["ts"], cutoff)
     )
     return {
-        "quests_done": len(quests),
-        "prs_merged": sum(1 for record in merged_prs if scope.admits(record["party"], record["project"])),
+        "quests_done": sum(1 for quest in quests if _since_cutoff(quest["done_at"], cutoff)),
+        "prs_merged": sum(
+            1
+            for record in merged_prs
+            if scope.admits(record["party"], record["project"]) and _since_cutoff(record["merged_at"], cutoff)
+        ),
         "tasks_done": len(done_tasks),
         "asks_answered": len(durations),
         "median_answer_seconds": float(statistics.median(durations)) if durations else None,
@@ -474,7 +550,19 @@ def _totals(by_kind, scope, quests, merged_prs):
     }
 
 
-def build_model(conn, now, party, raid, project):
+def _first_event_ts(by_kind):
+    return _earliest(
+        [event["ts"] for events in by_kind.values() for event in events]
+    )
+
+
+def _earliest(timestamps):
+    if not timestamps:
+        return None
+    return min(timestamps, key=timeutil.from_iso)
+
+
+def build_model(conn, now, party, raid, project, projects_dir):
     by_kind = _load_events(conn)
     scope = _Scope(party, project, _raid_parties(by_kind, raid))
     merged_prs = _merged_pr_records(by_kind)
@@ -484,10 +572,12 @@ def build_model(conn, now, party, raid, project):
     quests = [quest for quest in every_quest if scope.admits(quest["party"], quest["project"])]
     return {
         "quests": quests,
-        "active_quests": _active_quests(conn, by_kind, now, scope),
+        "active_quests": _active_quests(conn, by_kind, now, projects_dir, scope),
         "incomplete_quests": _incomplete_quests(by_kind, scope, finished_quests),
         "raids": _finished_raids(by_kind, now, scope, raid, every_quest, merged_prs),
-        "totals": _totals(by_kind, scope, quests, merged_prs),
+        "totals": _totals(by_kind, scope, quests, merged_prs, None),
+        "week_totals": _totals(by_kind, scope, quests, merged_prs, now - _WEEK),
+        "since": _first_event_ts(by_kind),
     }
 
 
@@ -628,4 +718,4 @@ def render_lines(model):
 
 
 def run(ctx, party, raid, project):
-    return render_lines(build_model(ctx.conn, ctx.now, party, raid, project))
+    return render_lines(build_model(ctx.conn, ctx.now, party, raid, project, ctx.projects_dir))

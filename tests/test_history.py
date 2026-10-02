@@ -65,7 +65,7 @@ class HistoryTestCase(GuildTestCase):
         self._event(hours, party, project, "quest.done", payload)
 
     def _model(self, party=None, raid=None, project=None):
-        return history.build_model(self.conn, _NOW, party, raid, project)
+        return history.build_model(self.conn, _NOW, party, raid, project, paths.projects_config_dir())
 
 
 class CompletedQuestTests(HistoryTestCase):
@@ -225,6 +225,70 @@ class ActiveQuestTests(LiveHistoryTestCase):
     def test_totals_unchanged_by_active_quests(self):
         self._live_quest(10, "q1", "alpha", "acme", None, ["T01"])
         self.assertEqual(self._model()["totals"]["quests_done"], 0)
+
+
+class LastActivityTests(LiveHistoryTestCase):
+    def test_latest_task_event_of_the_quest_wins(self):
+        self._live_quest(10, "q1", "alpha", "acme", None, ["T01", "T02"])
+        self._live_task(20, "task.started", "q1", "T01", "alpha", "acme")
+        self._live_task(30, "task.done", "q1", "T01", "alpha", "acme")
+        self._event(90, "alpha", "acme", "ask.created", {"id": 1, "party": "alpha"})
+        self.assertEqual(self._model()["active_quests"][0]["last_activity_at"], _at(30))
+
+    def test_pr_events_of_the_quest_count(self):
+        self._live_quest(10, "q1", "alpha", "acme", None, ["T01"])
+        self._live_task(20, "task.started", "q1", "T01", "alpha", "acme")
+        self._pr_tracked(40, "acme/app", 1, "alpha", "acme", "q1", "T01")
+        self._pr_merged(50, "acme/app", 1)
+        self.assertEqual(self._model()["active_quests"][0]["last_activity_at"], _at(50))
+
+    def test_other_quest_events_are_ignored(self):
+        self._live_quest(10, "q1", "alpha", "acme", None, ["T01"])
+        self._live_quest(11, "q2", "alpha", "acme", None, ["T01"])
+        self._live_task(20, "task.started", "q1", "T01", "alpha", "acme")
+        self._live_task(60, "task.started", "q2", "T01", "alpha", "acme")
+        quests = {quest["slug"]: quest for quest in self._model()["active_quests"]}
+        self.assertEqual(quests["q1"]["last_activity_at"], _at(20))
+
+    def test_falls_back_to_party_events(self):
+        self._live_quest(10, "q1", "alpha", "acme", None, ["T01"])
+        self._event(70, "alpha", "acme", "party.handed_off", {"party": "alpha"})
+        self._event(80, "beta", "acme", "party.handed_off", {"party": "beta"})
+        self.assertEqual(self._model()["active_quests"][0]["last_activity_at"], _at(70))
+
+    def test_falls_back_to_none_without_any_event(self):
+        self.conn.execute(
+            "INSERT INTO quests (slug, party, project, epic, title, state) VALUES ('x', 'alpha', 'acme', NULL, 't', 'active')"
+        )
+        self.conn.commit()
+        self.assertIsNone(self._model()["active_quests"][0]["last_activity_at"])
+
+
+class StaleHoursTests(LiveHistoryTestCase):
+    def _write_project(self, data):
+        projects_dir = paths.projects_config_dir()
+        projects_dir.mkdir(parents=True, exist_ok=True)
+        (projects_dir / "acme.json").write_text(json.dumps(dict(
+            {"name": "acme", "paths": [str(self.root) + "/*"], "github": {"repos": ["acme/app"]}}, **data
+        )))
+
+    def test_defaults_to_48_without_project_config(self):
+        self._live_quest(10, "q1", "alpha", "acme", None, ["T01"])
+        self.assertEqual(self._model()["active_quests"][0]["stale_hours"], 48)
+
+    def test_defaults_to_48_when_config_has_no_next_section(self):
+        self._write_project({})
+        self._live_quest(10, "q1", "alpha", "acme", None, ["T01"])
+        self.assertEqual(self._model()["active_quests"][0]["stale_hours"], 48)
+
+    def test_uses_project_next_stale_hours(self):
+        self._write_project({"next": {"stale_hours": 12}})
+        self._live_quest(10, "q1", "alpha", "acme", None, ["T01"])
+        self.assertEqual(self._model()["active_quests"][0]["stale_hours"], 12)
+
+    def test_defaults_to_48_without_project(self):
+        self._live_quest(10, "q1", "alpha", None, None, ["T01"])
+        self.assertEqual(self._model()["active_quests"][0]["stale_hours"], 48)
 
 
 class IncompleteQuestTests(HistoryTestCase):
@@ -411,13 +475,50 @@ class TotalsTests(HistoryTestCase):
         })
 
     def test_empty_model(self):
+        empty_totals = {
+            "quests_done": 0, "prs_merged": 0, "tasks_done": 0, "asks_answered": 0,
+            "median_answer_seconds": None, "handoffs": 0,
+        }
         self.assertEqual(self._model(), {
             "quests": [], "active_quests": [], "incomplete_quests": [], "raids": [],
-            "totals": {
-                "quests_done": 0, "prs_merged": 0, "tasks_done": 0, "asks_answered": 0,
-                "median_answer_seconds": None, "handoffs": 0,
-            },
+            "totals": empty_totals, "week_totals": empty_totals, "since": None,
         })
+
+    def test_since_is_first_event_timestamp(self):
+        self._task_done(7, "a", "T01", "alpha", "acme")
+        self._event(3, "alpha", "acme", "ask.created", {"id": 1, "party": "alpha"})
+        self.assertEqual(self._model()["since"], _at(3))
+
+
+class WeekTotalsTests(HistoryTestCase):
+    def test_week_totals_count_only_last_seven_days(self):
+        recent = 24 * 25
+        old = 24 * 5
+        self._quest_done(recent, "a", "alpha", "acme", self._snapshot("a", "alpha", "acme", 0, recent))
+        self._quest_done(old, "b", "alpha", "acme", self._snapshot("b", "alpha", "acme", 0, old))
+        self._task_done(recent, "a", "T01", "alpha", "acme")
+        self._task_done(old, "b", "T01", "alpha", "acme")
+        self._pr_tracked(old, "acme/app", 1, "alpha", "acme", "a", "T01")
+        self._pr_tracked(old, "acme/app", 2, "alpha", "acme", "a", "T02")
+        self._pr_merged(old + 1, "acme/app", 1)
+        self._pr_merged(recent + 1, "acme/app", 2)
+        self._event(old, "alpha", "acme", "ask.created", {"id": 1, "party": "alpha"})
+        self._event(old + 1, "alpha", "acme", "ask.answered", {"id": 1, "answer": "x"})
+        self._event(recent, "alpha", "acme", "ask.created", {"id": 2, "party": "alpha"})
+        self._event(recent + 2, "alpha", "acme", "ask.answered", {"id": 2, "answer": "x"})
+        self._event(old, "alpha", "acme", "party.handed_off", {"party": "alpha"})
+        self._event(recent, "alpha", "acme", "party.handed_off", {"party": "alpha"})
+        model = self._model()
+        self.assertEqual(model["week_totals"], {
+            "quests_done": 1,
+            "prs_merged": 1,
+            "tasks_done": 1,
+            "asks_answered": 1,
+            "median_answer_seconds": 7200.0,
+            "handoffs": 1,
+        })
+        self.assertEqual(model["totals"]["quests_done"], 2)
+        self.assertEqual(model["totals"]["prs_merged"], 2)
 
 
 class FilterTests(HistoryTestCase):

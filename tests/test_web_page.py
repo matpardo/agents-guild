@@ -8,9 +8,9 @@ _EVENT_HANDLER_ATTR_RE = re.compile(r"<[^>]+\son[a-z]+\s*=", re.IGNORECASE)
 _SCRIPT_TAG_RE = re.compile(r"<script\b([^>]*)>(.*?)</script>", re.IGNORECASE | re.DOTALL)
 
 
-_SCRIPTS = ("app.js", "history.js")
+_SCRIPTS = ("app.js", "history.js", "progress.js")
 _WRITING_SCRIPTS = ("app.js",)
-_PAGES = ("index.html", "history.html")
+_PAGES = ("index.html", "history.html", "progress.html")
 
 
 class PageScriptSafeRenderingTests(unittest.TestCase):

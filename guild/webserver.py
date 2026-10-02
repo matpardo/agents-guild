@@ -20,6 +20,7 @@ _STATIC_FILES = {
     "/app.js": ("app.js", "application/javascript; charset=utf-8"),
     "/app.css": ("app.css", "text/css; charset=utf-8"),
     "/history.js": ("history.js", "application/javascript; charset=utf-8"),
+    "/progress.js": ("progress.js", "application/javascript; charset=utf-8"),
 }
 
 _MAX_BODY_BYTES = 16384
@@ -66,6 +67,7 @@ def _history_model(query):
             _first_param(params, "party"),
             _first_param(params, "raid"),
             _first_param(params, "project"),
+            ctx.projects_dir,
         )
 
     return build
@@ -259,6 +261,8 @@ class BoardRequestHandler(http_server.BaseHTTPRequestHandler):
             return self._serve_model(board_commands.board_model)
         if path == "/history":
             return self._serve_file("history.html", "text/html; charset=utf-8")
+        if path == "/progress":
+            return self._serve_file("progress.html", "text/html; charset=utf-8")
         if path == "/api/history":
             return self._serve_model(_history_model(parts.query))
         if path == "/api/session":

@@ -496,3 +496,116 @@ main.history-main {
   background: var(--lifecycle-converging-bg);
   color: var(--lifecycle-converging-fg);
 }
+
+.page-nav a[aria-current="page"] {
+  font-weight: 600;
+  color: var(--fg);
+  text-decoration: none;
+}
+
+.totals-row {
+  margin-top: 0.5rem;
+}
+
+.totals-label {
+  margin: 0 0 0.25rem 0;
+  font-size: 0.9rem;
+  color: var(--muted);
+}
+
+.week {
+  margin-top: 1rem;
+}
+
+.week > h3 {
+  margin: 0 0 0.5rem 0;
+  color: var(--muted);
+  font-size: 0.95rem;
+}
+
+.achievement-card .card-title {
+  margin: 0;
+  font-size: 1.15rem;
+}
+
+.tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin-top: 0.4rem;
+}
+
+.tag {
+  background: var(--lifecycle-draft-bg);
+  color: var(--lifecycle-draft-fg);
+  border-radius: 999px;
+  padding: 0.05rem 0.6rem;
+  font-size: 0.78rem;
+}
+
+.summary-line {
+  margin: 0.5rem 0 0 0;
+  font-size: 0.95rem;
+}
+
+.reason {
+  margin: 0.5rem 0 0 0;
+  overflow-wrap: anywhere;
+}
+
+.more {
+  margin-top: 0.5rem;
+  font-size: 0.9rem;
+}
+
+.more > summary,
+.closed-section > summary {
+  cursor: pointer;
+  color: var(--accent);
+}
+
+.closed-section > summary {
+  font-size: 1.2rem;
+  font-weight: 600;
+  color: var(--fg);
+  margin-bottom: 0.75rem;
+}
+
+.table-scroll {
+  overflow-x: auto;
+  max-width: 100%;
+}
+
+.progress-table {
+  border-collapse: collapse;
+  width: 100%;
+  min-width: 40rem;
+}
+
+.progress-table th,
+.progress-table td {
+  text-align: left;
+  padding: 0.5rem 0.75rem;
+  border-bottom: 1px solid var(--border);
+  vertical-align: middle;
+}
+
+.progress-table th {
+  color: var(--muted);
+  font-size: 0.8rem;
+  font-weight: 500;
+}
+
+.progress-table progress {
+  width: 8rem;
+  height: 0.6rem;
+  accent-color: var(--green);
+}
+
+.quest-title {
+  font-weight: 600;
+}
+
+.stale-marker {
+  margin-left: 0.5rem;
+}
