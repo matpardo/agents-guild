@@ -67,7 +67,9 @@ class MergeQueueTestCase(GuildTestCase):
         self.assertEqual(code, 0, err)
 
     def track(self, session_id, number, task, lifecycle):
-        self.write_gh_fixture("view_acme-app_{}".format(number), OPEN_VIEW)
+        self.write_gh_fixture(
+            "view_acme-app_{}".format(number), dict(OPEN_VIEW, isDraft=lifecycle != "ready")
+        )
         code, out, err = self.run_cli(
             ["pr", "track", "acme/app#{}".format(number), "--task", task, "--what", "pr {}".format(number),
              "--waits", "review"],

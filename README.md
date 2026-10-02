@@ -389,6 +389,15 @@ flag, a bound session uses its raid when its party is in exactly one, errors
 listing them when it is in several, and uses its own party when it is in
 none; a human terminal (or an unbound session) must pass a flag.
 
+**Lifecycle from GitHub.** Readiness is owned by `guild sync --source gh`, not
+by sessions. An open PR that is Ready for review on GitHub becomes `ready`
+whatever its guild lifecycle was; an open draft PR keeps `converging` or
+`needs-human` and otherwise (including a stale `ready`) becomes `draft`.
+Merged and closed PRs become `merged` and `closed`. Agents mark a PR ready
+with `gh pr ready <n>`; `guild pr set --lifecycle` remains for the
+`converging` / `needs-human` nuance. `pr set --lifecycle ready` on a PR that
+is still draft on GitHub prints a hint, and the next sync reverts it.
+
 **Ready or blocked.** A PR is ready when its lifecycle is `ready`, no check
 is failing, `mergeable` is not `CONFLICTING`, and every task its own task
 depends on (SDD `Depends on`, through the quest's epic) is done by the same
