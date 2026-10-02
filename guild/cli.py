@@ -61,7 +61,7 @@ def _handle_party_start(ctx, args):
 def _handle_party_resume(ctx, args):
     from guild.commands import party as party_commands
 
-    _print(party_commands.resume(ctx, args.party, args.session))
+    _print(party_commands.resume(ctx, args.party, args.session, None))
     return 0
 
 
@@ -793,7 +793,9 @@ def _run_stateful_hook(hook_name, stdin_data):
         cwd = Path(stdin_data.get("cwd", str(Path.cwd())))
         ctx = _build_context(session_id, cwd)
         if hook_name == "session-start":
-            text = hook_commands.session_start(ctx, os.environ.get("GUILD_RESUME") or None)
+            text = hook_commands.session_start(
+                ctx, os.environ.get("GUILD_RESUME") or None, stdin_data.get("permission_mode")
+            )
         elif hook_name == "post-tool-use":
             text = hook_commands.post_tool_use(ctx)
         else:

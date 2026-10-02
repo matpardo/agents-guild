@@ -66,7 +66,7 @@ def _resume_lines(ctx, binding):
     return [handoff_content, ""] + next_commands.run(ctx, binding, False, False)
 
 
-def _auto_resume_lines(ctx, resume_party):
+def _auto_resume_lines(ctx, resume_party, permission_mode):
     if resume_party is None:
         return []
     binding = identity.resolve_binding(ctx.conn, ctx.session_id)
@@ -82,7 +82,7 @@ def _auto_resume_lines(ctx, resume_party):
         return ["{}: unknown party".format(label)]
     if row["state"] != "awaiting-leader":
         return ["{}: party is {}".format(label, row["state"])]
-    return [party_commands.resume(ctx, resume_party, None).splitlines()[0]]
+    return [party_commands.resume(ctx, resume_party, None, permission_mode).splitlines()[0]]
 
 
 def _membership_warning_marker_path(ctx, raid_name, expires_at):
@@ -133,10 +133,11 @@ def _pause_lines(ctx, binding):
     return lines
 
 
-def session_start(ctx, resume_party):
-    lines = _auto_resume_lines(ctx, resume_party)
+def session_start(ctx, resume_party, permission_mode):
+    lines = _auto_resume_lines(ctx, resume_party, permission_mode)
     binding = identity.resolve_binding(ctx.conn, ctx.session_id)
     if binding is not None:
+        party_commands.locate_if_changed(ctx, binding, permission_mode)
         lines.extend(_resume_lines(ctx, binding))
     lines.extend(brief_commands.render_brief(ctx))
     lines.extend(_membership_warning_lines(ctx, binding))
