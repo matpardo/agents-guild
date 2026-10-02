@@ -18,6 +18,8 @@ _SDD_OPTIONAL_PATTERN_KEYS = ("order_list", "key_line")
 _FAILING_CONCLUSIONS = ("FAILURE", "CANCELLED", "TIMED_OUT", "ACTION_REQUIRED")
 _SUCCESS_CONCLUSION = "SUCCESS"
 
+_DRAFT_SUB_LIFECYCLES = ("converging", "needs-human")
+
 _MERGED_GH_STATE = "MERGED"
 _MERGE_NOTICE_TTL = "12h"
 _MERGE_NOTICE_TEMPLATE = "{}#{} merged in main ({}/{}: {}). Parties with open branches: rebase."
@@ -52,7 +54,14 @@ def _lifecycle_from_gh(current_lifecycle, gh_data):
         return "merged"
     if gh_data.get("state") == "CLOSED":
         return "closed"
-    return current_lifecycle
+    is_draft = gh_data.get("isDraft")
+    if is_draft is None:
+        return current_lifecycle
+    if not is_draft:
+        return "ready"
+    if current_lifecycle in _DRAFT_SUB_LIFECYCLES:
+        return current_lifecycle
+    return "draft"
 
 
 def _sync_pr(ctx, projects, row, failures):

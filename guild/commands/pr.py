@@ -3,6 +3,9 @@ from guild.adapters import github
 from guild.errors import GuildError
 
 _TRACK_INITIAL_LIFECYCLE = "draft"
+_DRAFT_READY_HINT = (
+    "PR is draft on GitHub; mark it ready there (gh pr ready {}) or the next sync reverts it"
+)
 
 
 def _load_pr(ctx, repo, number):
@@ -104,4 +107,7 @@ def set_(ctx, ref, lifecycle, waits):
             "guild",
             {"repo": repo, "number": number, "lifecycle": new_lifecycle, "waits": new_waits},
         )
-    return "PR '{}#{}' updated".format(repo, number)
+    message = "PR '{}#{}' updated".format(repo, number)
+    if new_lifecycle == "ready" and row["gh_draft"]:
+        return message + "\n" + _DRAFT_READY_HINT.format(number)
+    return message
