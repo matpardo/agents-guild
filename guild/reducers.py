@@ -60,6 +60,14 @@ def _party_handed_off(conn, event):
     )
 
 
+def _leader_located(conn, event):
+    payload = event["payload"]
+    conn.execute(
+        "UPDATE leaders SET cwd = ?, permission_mode = ? WHERE party = ? AND generation = ?",
+        (payload["cwd"], payload["permission_mode"], payload["party"], payload["generation"]),
+    )
+
+
 def _quest_done(conn, event):
     conn.execute("UPDATE quests SET state = 'done' WHERE slug = ?", (event["payload"]["slug"],))
 
@@ -419,6 +427,7 @@ _REDUCERS = {
     "party.resumed": _party_resumed,
     "party.closed": _party_closed,
     "party.handed_off": _party_handed_off,
+    "leader.located": _leader_located,
     "quest.added": _quest_added,
     "quest.done": _quest_done,
     "quest.marked_incomplete": _quest_marked_incomplete,

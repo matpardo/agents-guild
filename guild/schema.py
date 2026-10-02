@@ -209,6 +209,8 @@ _CREATE_STATEMENTS = (
 
 _COLUMN_MIGRATIONS = (
     ("leaders", "handoff_path", "TEXT"),
+    ("leaders", "cwd", "TEXT"),
+    ("leaders", "permission_mode", "TEXT"),
     ("prs", "mergeable", "TEXT"),
     ("prs", "review_comment_count", "INTEGER"),
     ("prs", "last_notified_comment_count", "INTEGER"),

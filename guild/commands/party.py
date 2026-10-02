@@ -20,6 +20,42 @@ def previous_handoff_content(conn, party, generation):
     return path.read_text().rstrip()
 
 
+def record_location(ctx, party, project, generation, session_id, permission_mode):
+    events.record(
+        ctx.conn,
+        ctx.now,
+        ctx.origin,
+        party,
+        session_id,
+        project,
+        "leader.located",
+        "local",
+        {
+            "party": party,
+            "generation": generation,
+            "session_id": session_id,
+            "cwd": str(ctx.cwd),
+            "permission_mode": permission_mode,
+        },
+    )
+
+
+def locate_if_changed(ctx, binding, permission_mode):
+    row = ctx.conn.execute(
+        "SELECT cwd, permission_mode FROM leaders WHERE party = ? AND generation = ?",
+        (binding["party"], binding["generation"]),
+    ).fetchone()
+    if row is None:
+        return
+    effective_mode = permission_mode or row["permission_mode"]
+    if row["cwd"] == str(ctx.cwd) and row["permission_mode"] == effective_mode:
+        return
+    with db.writing(ctx.conn):
+        record_location(
+            ctx, binding["party"], binding["project"], binding["generation"], ctx.session_id, effective_mode
+        )
+
+
 def start(ctx, name):
     names.validate_name(name, "party name")
     if ctx.session_id is None:
@@ -44,6 +80,7 @@ def start(ctx, name):
             "local",
             {"party": name, "session_name": session_name},
         )
+        record_location(ctx, name, project, 1, ctx.session_id, None)
     return "party '{}' started, generation 1".format(name)
 
 
@@ -60,7 +97,7 @@ def _resolve_resume_session_id(ctx, session_name):
     return ctx.session_id
 
 
-def resume(ctx, name, session_name):
+def resume(ctx, name, session_name, permission_mode):
     names.validate_name(name, "party name")
     session_id = _resolve_resume_session_id(ctx, session_name)
     row = ctx.conn.execute(
@@ -84,6 +121,8 @@ def resume(ctx, name, session_name):
             "local",
             {"party": name, "generation": generation, "session_name": resolved_session_name},
         )
+        if ctx.session_id is not None:
+            record_location(ctx, name, row["project"], generation, session_id, permission_mode)
     lines = ["party '{}' resumed, generation {}".format(name, generation)]
     handoff_content = previous_handoff_content(ctx.conn, name, generation)
     if handoff_content is not None:
