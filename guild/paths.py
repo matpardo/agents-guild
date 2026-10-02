@@ -44,6 +44,13 @@ def claude_sessions_dir():
     return Path.home() / ".claude" / "sessions"
 
 
+def claude_projects_dir():
+    value = os.environ.get("GUILD_CLAUDE_PROJECTS_DIR")
+    if value:
+        return Path(value).expanduser()
+    return Path.home() / ".claude" / "projects"
+
+
 def ensure_private_dir(path):
     path.mkdir(parents=True, exist_ok=True)
     path.chmod(0o700)

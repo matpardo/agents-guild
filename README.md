@@ -670,6 +670,42 @@ via `~/.claude/sessions` by its `/rename` name). It is refused from inside a
 Claude Code session (use the plain form there) and fails clearly when the
 name is not found.
 
+### `guild revive`
+
+After a reboot, `guild revive` relaunches the active parties. It lists them
+numbered (party, project, quest progress, last activity, leader session
+name, cwd, permission mode, and `resume` or `fresh`) and starts the ones you
+pick, one tmux window per party, in a tmux session called `guild`.
+
+```
+guild revive                   # TTY: prompts "numbers to revive (e.g. 1,3)"; no TTY: lists and exits
+guild revive --party alpha --party beta
+guild revive --all
+guild revive --list            # no tmux needed: one copy-paste command per party
+```
+
+- `resume` (the leader transcript exists under `~/.claude/projects`) runs
+  `claude --resume <session-id> --name <party> [--permission-mode <mode>]`
+  in the recorded cwd. `fresh` runs the handoff resume command
+  (`GUILD_RESUME=<party> claude -n <party>-g<N+1> ...`) from the same cwd.
+- cwd and permission mode come from the leader row (recorded by the
+  `SessionStart` hook); when missing, the first lines of the transcript are
+  read. A mode that is not known is never invented.
+- A party whose cwd no longer exists, or that already has a window in the
+  `guild` session, is skipped with the reason printed.
+- Names: the tmux window is named after the party, with `automatic-rename`
+  and `allow-rename` off, and the `guild` session sets `set-titles on` /
+  `set-titles-string "#W"` so the outer terminal title shows the party.
+  Only session and window options are set; your `~/.tmux.conf` is untouched.
+  `claude --name <party>` makes the prompt box and `/resume` picker show it.
+- `--list` prints, per party, a one-liner for terminals without tmux: it sets
+  the tab title with `printf '\033]0;<party>\007'`, then `cd <cwd> && claude
+  --resume <id> --name <party> ...`.
+- The last line is `tmux attach -t guild`. `/goal` and other in-session state
+  are not restored: re-issue `/goal` where you used it.
+- Without tmux installed, launching fails with an install hint; `--list`
+  still works.
+
 ### `guild raid`
 
 A raid is a named channel parties join so a shared concern (CI, a shared
