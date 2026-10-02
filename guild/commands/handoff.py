@@ -1,6 +1,4 @@
-import shlex
-
-from guild import db, events, identity, names, paths, pii, render
+from guild import db, events, identity, names, paths, pii, render, resume
 from guild.commands import claim as claim_commands
 from guild.commands import next as next_commands
 from guild.commands import notice as notice_commands
@@ -67,16 +65,6 @@ def _render_handoff(ctx, binding, in_flight, learned):
     return "\n".join(lines) + "\n"
 
 
-_RESUME_PROMPT = "Continue the work described in the guild handoff."
-
-
-def _resume_command(party, next_generation, model):
-    model_flag = "" if model is None else " --model {}".format(shlex.quote(model))
-    return "GUILD_RESUME={} claude -n {}-g{}{} {}".format(
-        party, party, next_generation, model_flag, shlex.quote(_RESUME_PROMPT)
-    )
-
-
 def run(ctx, in_flight, learned, model):
     if not in_flight.strip():
         raise GuildError("--in-flight must not be empty", 1)
@@ -105,4 +93,4 @@ def run(ctx, in_flight, learned, model):
             "local",
             {"party": party, "generation": generation, "handoff_path": str(handoff_path)},
         )
-    return "{}\n{}".format(_resume_command(party, generation + 1, model), pii.BROADCAST_REMINDER)
+    return "{}\n{}".format(resume.fresh_command(party, generation + 1, model, None), pii.BROADCAST_REMINDER)

@@ -37,6 +37,24 @@ def _handle_doctor(ctx, args):
     return exit_code
 
 
+def _handle_revive(ctx, args):
+    from guild.commands import revive as revive_commands
+
+    ask_numbers = input if sys.stdin.isatty() else None
+    _print(
+        revive_commands.run(
+            ctx,
+            args.party,
+            args.all,
+            args.list,
+            paths.claude_projects_dir(),
+            revive_commands.Tmux(),
+            ask_numbers,
+        )
+    )
+    return 0
+
+
 def _handle_whoami(ctx, args):
     from guild.commands import whoami as whoami_commands
 
@@ -697,6 +715,12 @@ def build_parser():
     drift_scope.add_argument("--epic")
     drift_scope.add_argument("--all", action="store_true")
     drift.set_defaults(handler=_handle_drift)
+
+    revive = subparsers.add_parser("revive")
+    revive.add_argument("--party", action="append", default=[])
+    revive.add_argument("--all", action="store_true")
+    revive.add_argument("--list", action="store_true")
+    revive.set_defaults(handler=_handle_revive)
 
     brief = subparsers.add_parser("brief")
     brief.set_defaults(handler=_handle_brief)
