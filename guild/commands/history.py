@@ -127,6 +127,19 @@ def _in_window(ts, started_at, ended_at):
     return moment <= timeutil.from_iso(ended_at)
 
 
+def _newest_created_first(entries, name_key):
+    dated = sorted(
+        (entry for entry in entries if entry["started_at"] is not None),
+        key=lambda entry: entry[name_key],
+    )
+    dated.sort(key=lambda entry: timeutil.from_iso(entry["started_at"]), reverse=True)
+    undated = sorted(
+        (entry for entry in entries if entry["started_at"] is None),
+        key=lambda entry: entry[name_key],
+    )
+    return dated + undated
+
+
 def _snapshot_quest(slug, snapshot):
     quest = {key: snapshot[key] for key in _SNAPSHOT_KEYS}
     quest["slug"] = slug
@@ -192,7 +205,7 @@ def _all_quests(by_kind, merged_prs):
             quests[slug] = _legacy_quest(by_kind, merged_prs, added_by_slug, event)
             continue
         quests[slug] = _snapshot_quest(slug, snapshot)
-    return sorted(quests.values(), key=lambda quest: timeutil.from_iso(quest["done_at"]), reverse=True)
+    return _newest_created_first(list(quests.values()), "slug")
 
 
 def _percent(done, total):
@@ -240,7 +253,7 @@ def _active_quests(conn, by_kind, now, scope):
         for row in rows
         if scope.admits(row["party"], row["project"])
     ]
-    return sorted(entries, key=lambda entry: entry["started_at"] or "", reverse=True)
+    return _newest_created_first(entries, "slug")
 
 
 def _first_marks(by_kind):
@@ -313,7 +326,7 @@ def _incomplete_quests(by_kind, scope, every_quest):
         for mark in _first_marks(by_kind).values()
     ]
     admitted = [entry for entry in entries if scope.admits(entry["party"], entry["project"])]
-    return sorted(admitted, key=lambda entry: timeutil.from_iso(entry["marked_at"]), reverse=True)
+    return _newest_created_first(admitted, "slug")
 
 
 def _end_span(span, ts):
@@ -423,7 +436,7 @@ def _finished_raids(by_kind, now, scope, raid, quests, merged_prs):
         if not any(scope.admits(span["party"], span["project"]) for span in spans):
             continue
         raids.append(_raid_entry(by_kind, quests, merged_prs, name, spans))
-    return sorted(raids, key=lambda entry: timeutil.from_iso(entry["ended_at"]), reverse=True)
+    return _newest_created_first(raids, "name")
 
 
 def _answer_seconds(by_kind, scope):

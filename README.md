@@ -335,19 +335,19 @@ sync --source gh` from a session that supports it.
 
 Read-only record of what the guild has achieved. Five sections:
 
-1. In progress: quests whose projection state is `active`, newest started first, with
+1. In progress: quests whose projection state is `active`, ordered by creation date (newest first, undated last), with
    party, project, epic, start, age, task counts (done, active, blocked, queued) and
    percent done. Read from the `quests`/`quest_tasks` projections plus the `quest.added`
    timestamp. Quests finished by `guild party close` leave this list.
-2. Completed quests, newest first. Each shows party, project, epic progress,
+2. Completed quests, ordered by creation date (newest first, undated last). Each shows party, project, epic progress,
    start/end and duration, tasks done, JIRA cards done, PRs merged, handoffs and
    ask metrics, read from the `achievement` snapshot frozen in the `quest.done`
    event. Quests closed before snapshots existed are derived from events
    (dates, party, tasks, PRs, handoffs) and marked `no snapshot`.
-3. Closed without completing: quests flagged with `guild quest incomplete`, newest
-   marked first, with title, party, dates, reason and how many tasks were not done at
+3. Closed without completing: quests flagged with `guild quest incomplete`, ordered by
+   creation date (newest first, undated last), with title, party, dates, reason and how many tasks were not done at
    marking time. They do not count in totals or in finished raids.
-4. Finished raids: raids with no active member, derived from
+4. Finished raids, ordered by creation date (newest first, undated last): raids with no active member, derived from
    `raid.joined`/`raid.left`/`party.closed` events and membership expiry. Each
    shows start (first join), end, parties (lead marked), quests completed and
    PRs merged by member parties inside that window, and the pause count.

@@ -81,10 +81,22 @@ class CompletedQuestTests(HistoryTestCase):
         self.assertEqual(quest["duration_seconds"], 50 * 3600)
         self.assertEqual(quest["median_answer_seconds"], 600.0)
 
-    def test_quests_are_newest_first(self):
-        for slug, done in (("old", 10), ("new", 90), ("mid", 40)):
-            self._quest_done(done, slug, "alpha", "acme", self._snapshot(slug, "alpha", "acme", 0, done))
+    def test_quests_are_newest_created_first(self):
+        for slug, started, done in (("old", 1, 90), ("new", 50, 60), ("mid", 20, 30)):
+            self._quest_done(done, slug, "alpha", "acme", self._snapshot(slug, "alpha", "acme", started, done))
         self.assertEqual([q["slug"] for q in self._model()["quests"]], ["new", "mid", "old"])
+
+    def test_quests_with_same_creation_are_alphabetical(self):
+        for slug, done in (("zeta", 90), ("alpha-q", 10), ("mid", 40)):
+            self._quest_done(done, slug, "alpha", "acme", self._snapshot(slug, "alpha", "acme", 5, done))
+        self.assertEqual([q["slug"] for q in self._model()["quests"]], ["alpha-q", "mid", "zeta"])
+
+    def test_undated_quests_go_last_alphabetically(self):
+        self._quest_done(10, "zed", "alpha", "acme", None)
+        self._quest_done(20, "abe", "alpha", "acme", None)
+        self._quest_added(3, "dated", "alpha", "acme", None, ["T01"])
+        self._quest_done(30, "dated", "alpha", "acme", None)
+        self.assertEqual([q["slug"] for q in self._model()["quests"]], ["dated", "abe", "zed"])
 
     def test_legacy_quest_is_derived_from_events(self):
         self._quest_added(1, "legacy", "alpha", "acme", "wave4", ["T01", "T02", "T03"])
@@ -171,6 +183,21 @@ class ActiveQuestTests(LiveHistoryTestCase):
         for slug, started in (("old", 10), ("new", 90), ("mid", 40)):
             self._live_quest(started, slug, "alpha", "acme", None, ["T01"])
         self.assertEqual([q["slug"] for q in self._model()["active_quests"]], ["new", "mid", "old"])
+
+    def test_same_start_is_alphabetical(self):
+        for slug in ("zeta", "alpha-q", "mid"):
+            self._live_quest(10, slug, "alpha", "acme", None, ["T01"])
+        self.assertEqual([q["slug"] for q in self._model()["active_quests"]], ["alpha-q", "mid", "zeta"])
+
+    def test_undated_active_quests_go_last_alphabetically(self):
+        for slug in ("zed", "abe"):
+            self.conn.execute(
+                "INSERT INTO quests (slug, party, project, epic, title, state) VALUES (?, 'alpha', 'acme', NULL, 't', 'active')",
+                (slug,),
+            )
+        self.conn.commit()
+        self._live_quest(5, "dated", "alpha", "acme", None, ["T01"])
+        self.assertEqual([q["slug"] for q in self._model()["active_quests"]], ["dated", "abe", "zed"])
 
     def test_done_quest_is_not_active(self):
         self._live_quest(10, "q1", "alpha", "acme", None, ["T01"])
@@ -262,11 +289,24 @@ class IncompleteQuestTests(HistoryTestCase):
         self.assertEqual([q["slug"] for q in self._model(party="beta")["incomplete_quests"]], ["b"])
         self.assertEqual([q["slug"] for q in self._model(project="acme")["incomplete_quests"]], ["a"])
 
-    def test_newest_marked_first(self):
-        for slug, marked in (("old", 10), ("new", 90), ("mid", 40)):
-            self._quest_done(1, slug, "alpha", "acme", self._snapshot(slug, "alpha", "acme", 0, 1))
+    def test_newest_created_first(self):
+        for slug, started, marked in (("old", 1, 90), ("new", 50, 60), ("mid", 20, 70)):
+            self._quest_done(51, slug, "alpha", "acme", self._snapshot(slug, "alpha", "acme", started, 51))
             self._marked(marked, slug, "alpha", "acme", "x")
         self.assertEqual([q["slug"] for q in self._model()["incomplete_quests"]], ["new", "mid", "old"])
+
+    def test_same_creation_is_alphabetical(self):
+        for slug in ("zeta", "alpha-q", "mid"):
+            self._quest_done(51, slug, "alpha", "acme", self._snapshot(slug, "alpha", "acme", 5, 51))
+            self._marked(60, slug, "alpha", "acme", "x")
+        self.assertEqual([q["slug"] for q in self._model()["incomplete_quests"]], ["alpha-q", "mid", "zeta"])
+
+    def test_undated_go_last_alphabetically(self):
+        for slug in ("zed", "abe"):
+            self._marked(60, slug, "alpha", "acme", "x")
+        self._quest_added(3, "dated", "alpha", "acme", None, ["T01"])
+        self._marked(10, "dated", "alpha", "acme", "x")
+        self.assertEqual([q["slug"] for q in self._model()["incomplete_quests"]], ["dated", "abe", "zed"])
 
 
 class FinishedRaidTests(HistoryTestCase):
@@ -333,10 +373,15 @@ class FinishedRaidTests(HistoryTestCase):
         self.assertEqual(raid["ended_at"], _at(50))
         self.assertEqual(raid["parties"], [{"party": "alpha", "lead": True}])
 
-    def test_raids_are_newest_ended_first(self):
-        self._join(1, "alpha", "first", _at(5), False)
-        self._join(1, "alpha", "second", _at(9), False)
+    def test_raids_are_newest_created_first(self):
+        self._join(1, "alpha", "first", _at(50), False)
+        self._join(3, "alpha", "second", _at(9), False)
         self.assertEqual([raid["name"] for raid in self._model()["raids"]], ["second", "first"])
+
+    def test_raids_with_same_creation_are_alphabetical(self):
+        for name in ("zeta", "alpha-r", "mid"):
+            self._join(1, "alpha", name, _at(5), False)
+        self.assertEqual([raid["name"] for raid in self._model()["raids"]], ["alpha-r", "mid", "zeta"])
 
 
 class TotalsTests(HistoryTestCase):
