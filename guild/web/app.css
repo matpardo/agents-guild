@@ -9,6 +9,7 @@
   --red: #b3261e;
   --green: #1e7a3a;
   --blue: #2b5fb8;
+  --amber: #8a5a00;
   --lifecycle-needs-human-fg: #8c1d18;
   --lifecycle-needs-human-bg: #fbe3e1;
   --lifecycle-converging-fg: #7a4b00;
@@ -35,6 +36,7 @@
     --red: #ff8f8f;
     --green: #7fd99a;
     --blue: #7aa6ff;
+    --amber: #ffd479;
     --lifecycle-needs-human-fg: #ffb3ad;
     --lifecycle-needs-human-bg: #4a1c1a;
     --lifecycle-converging-fg: #ffd479;
@@ -227,6 +229,10 @@ li.queue-blocked > .queue-reason {
   color: var(--red);
 }
 
+li.queue-waiting > .queue-reason {
+  color: var(--amber);
+}
+
 .queue-reason {
   margin: 0;
   color: var(--muted);
@@ -366,6 +372,10 @@ a {
 
 .checks-passing {
   color: var(--green);
+}
+
+.checks-pending {
+  color: var(--amber);
 }
 
 .checks-none {

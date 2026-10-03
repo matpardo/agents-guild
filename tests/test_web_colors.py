@@ -5,7 +5,7 @@ from pathlib import Path
 _WEB_DIR = Path(__file__).resolve().parent.parent / "guild" / "web"
 _LIFECYCLES = ("needs-human", "converging", "ready", "draft", "merged", "closed")
 _TASK_STATES = ("active", "blocked", "queued")
-_CHECK_CLASSES = ("checks-failing", "checks-clear", "checks-passing", "checks-none")
+_CHECK_CLASSES = ("checks-failing", "checks-clear", "checks-passing", "checks-pending", "checks-none")
 
 
 def _dark_block(css):

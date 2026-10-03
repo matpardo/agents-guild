@@ -211,7 +211,7 @@ def _pr_set(conn, event):
     )
 
 
-_PR_SYNCED_CARRY_FORWARD_FIELDS = ("mergeable", "review_comment_count")
+_PR_SYNCED_CARRY_FORWARD_FIELDS = ("mergeable", "review_comment_count", "checks_pending")
 
 
 def _pr_synced_field(current, payload, field):
@@ -234,13 +234,13 @@ def _pr_synced(conn, event):
     payload = event["payload"]
     current = conn.execute(
         "SELECT lifecycle, gh_state, gh_draft, branch, title, checks_failing, checks_passing,"
-        " mergeable, review_comment_count, last_activity_at FROM prs WHERE repo = ? AND number = ?",
+        " checks_pending, mergeable, review_comment_count, last_activity_at FROM prs WHERE repo = ? AND number = ?",
         (payload["repo"], payload["number"]),
     ).fetchone()
     last_activity_at = event["ts"] if _pr_synced_changed(current, payload) else current["last_activity_at"]
     conn.execute(
         "UPDATE prs SET lifecycle = ?, gh_state = ?, gh_draft = ?, branch = ?, title = ?,"
-        " checks_failing = ?, checks_passing = ?, mergeable = ?, review_comment_count = ?,"
+        " checks_failing = ?, checks_passing = ?, checks_pending = ?, mergeable = ?, review_comment_count = ?,"
         " synced_at = ?, last_activity_at = ? WHERE repo = ? AND number = ?",
         (
             payload["lifecycle"],
@@ -250,6 +250,7 @@ def _pr_synced(conn, event):
             payload["title"],
             payload["checks_failing"],
             payload["checks_passing"],
+            _pr_synced_field(current, payload, "checks_pending"),
             _pr_synced_field(current, payload, "mergeable"),
             _pr_synced_field(current, payload, "review_comment_count"),
             payload["synced_at"],

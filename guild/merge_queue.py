@@ -5,9 +5,12 @@ _CLOSED_LIFECYCLES = ("merged", "closed")
 _READY_LIFECYCLE = "ready"
 _CONFLICTING = "CONFLICTING"
 _HUMAN_AUTHOR = "human"
+_DRAFT_LIFECYCLES = ("draft", "converging")
 _READY_STATE = "ready"
+_WAITING_STATE = "waiting"
 _BLOCKED_STATE = "blocked"
 _MERGE_ACTION = "merge"
+_PROMOTE_ACTION = "promote"
 
 
 def _is_open(pr):
@@ -16,7 +19,7 @@ def _is_open(pr):
 
 def _blocked_reasons(pr):
     reasons = []
-    if pr["lifecycle"] != _READY_LIFECYCLE:
+    if pr["lifecycle"] not in _DRAFT_LIFECYCLES and pr["lifecycle"] != _READY_LIFECYCLE:
         reasons.append(pr["lifecycle"])
     if pr["checks_failing"] > 0:
         reasons.append("checks failing ({})".format(pr["checks_failing"]))
@@ -25,6 +28,18 @@ def _blocked_reasons(pr):
     for tid in pr["unmet_deps"]:
         reasons.append("waits on task {}".format(tid))
     return reasons
+
+
+def _wait_reasons(pr):
+    if pr["checks_pending"] > 0:
+        return ["checks pending ({})".format(pr["checks_pending"])]
+    return []
+
+
+def _labels(pr):
+    if pr["lifecycle"] in _DRAFT_LIFECYCLES:
+        return [pr["lifecycle"]]
+    return []
 
 
 def _entry(pr):
@@ -40,6 +55,8 @@ def _entry(pr):
         "lifecycle": pr["lifecycle"],
         "checks_failing": pr["checks_failing"],
         "checks_passing": pr["checks_passing"],
+        "checks_pending": pr["checks_pending"],
+        "labels": _labels(pr),
     }
 
 
@@ -204,21 +221,33 @@ def _why(pr, state, position, edges):
     return "; ".join(clauses)
 
 
-def _action(pr, reasons):
-    if not reasons:
-        return _MERGE_ACTION
-    return "fix: {} \u2192 {}".format("; ".join(reasons), pr["party"])
+def _state(reasons, waits):
+    if reasons:
+        return _BLOCKED_STATE
+    if waits:
+        return _WAITING_STATE
+    return _READY_STATE
 
 
-def _queue_entry(pr, unblocks, reasons, why):
-    state = _BLOCKED_STATE if reasons else _READY_STATE
+def _action(pr, state, reasons, waits):
+    if state == _BLOCKED_STATE:
+        return "fix: {} \u2192 {}".format("; ".join(reasons), pr["party"])
+    if state == _WAITING_STATE:
+        return "wait: {}".format("; ".join(waits))
+    if pr["lifecycle"] in _DRAFT_LIFECYCLES:
+        return "{}: gh pr ready \u2192 {}".format(_PROMOTE_ACTION, pr["party"])
+    return _MERGE_ACTION
+
+
+def _queue_entry(pr, unblocks, reasons, waits, why):
+    state = _state(reasons, waits)
     return dict(
         _entry(pr),
         unblocks=unblocks,
         state=state,
-        reasons=reasons,
+        reasons=reasons if state == _BLOCKED_STATE else waits,
         why=why,
-        action=_action(pr, reasons),
+        action=_action(pr, state, reasons, waits),
         next_action=False,
     )
 
@@ -228,24 +257,29 @@ def _ordered_entries(by_ref, order, edges, unblocks):
     ordered_edges = [edge for edge in edges if edge["first"] in position and edge["second"] in position]
     predecessors = _predecessors(ordered_edges)
     blocked_refs = set()
+    pending_refs = set()
     entries = []
     for ref in order:
         pr = by_ref[ref]
+        before = sorted(predecessors.get(ref, ()))
         reasons = _blocked_reasons(pr)
-        reasons.extend(
-            "waits on {}".format(first) for first in sorted(predecessors.get(ref, ())) if first in blocked_refs
-        )
-        if reasons:
+        reasons.extend("waits on {}".format(first) for first in before if first in blocked_refs)
+        waits = _wait_reasons(pr)
+        waits.extend("waits on {}".format(first) for first in before if first in pending_refs)
+        state = _state(reasons, waits)
+        if state == _BLOCKED_STATE:
             blocked_refs.add(ref)
-        state = _BLOCKED_STATE if reasons else _READY_STATE
-        entries.append(_queue_entry(pr, unblocks[ref], reasons, _why(pr, state, position, ordered_edges)))
+        if state == _WAITING_STATE or (state == _READY_STATE and _labels(pr)):
+            pending_refs.add(ref)
+        entries.append(_queue_entry(pr, unblocks[ref], reasons, waits, _why(pr, state, position, ordered_edges)))
     return entries
 
 
 def _stuck_entries(by_ref, stuck, unblocks):
     cycle = "ordering cycle between pins and task dependencies: {}".format(", ".join(stuck))
     return [
-        _queue_entry(by_ref[ref], unblocks[ref], _blocked_reasons(by_ref[ref]) + [cycle], "") for ref in stuck
+        _queue_entry(by_ref[ref], unblocks[ref], _blocked_reasons(by_ref[ref]) + [cycle], [], "")
+        for ref in stuck
     ]
 
 
@@ -253,7 +287,7 @@ def _flag_next_action(entries):
     for index, entry in enumerate(entries):
         if entry["state"] != _BLOCKED_STATE:
             continue
-        if any(later["state"] == _READY_STATE for later in entries[index + 1:]):
+        if any(later["action"] == _MERGE_ACTION for later in entries[index + 1:]):
             entry["next_action"] = True
         return
 

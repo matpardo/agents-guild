@@ -66,6 +66,7 @@ def _pr_record(conn, row):
         "lifecycle": row["lifecycle"],
         "checks_failing": row["checks_failing"] or 0,
         "checks_passing": row["checks_passing"] or 0,
+        "checks_pending": row["checks_pending"] or 0,
         "mergeable": row["mergeable"],
         "additions": row["additions"] or 0,
         "deletions": row["deletions"] or 0,
@@ -318,15 +319,22 @@ def _main_line(row):
 
 
 def _action_text(entry):
-    if entry["state"] == "ready":
-        return "{} ({})".format(entry["action"], entry["why"])
-    return entry["action"]
+    if entry["state"] == "blocked" or not entry["why"]:
+        return entry["action"]
+    return "{} ({})".format(entry["action"], entry["why"])
+
+
+def _task_text(entry):
+    task = entry["task"] or "-"
+    if not entry["labels"]:
+        return task
+    return "{} {}".format(task, " ".join("[{}]".format(label) for label in entry["labels"]))
 
 
 def _queue_line(position, entry):
     prefix = "\u25b6 next action: " if entry["next_action"] else ""
     return "{}{}. {}  {}  {}  unblocks {} \u2014 {}".format(
-        prefix, position, entry["ref"], entry["party"], entry["task"] or "-", entry["unblocks"], _action_text(entry)
+        prefix, position, entry["ref"], entry["party"], _task_text(entry), entry["unblocks"], _action_text(entry)
     )
 
 
@@ -349,7 +357,7 @@ def run(ctx, raid, party):
 def next_to_merge(conn, party_names):
     scoped = load_scoped_queue(conn, party_names)
     for entry in scoped["queue"]:
-        if entry["state"] == "ready":
+        if entry["action"] == "merge":
             return entry["ref"]
     return None
 
@@ -368,6 +376,8 @@ def _entry_model(entry):
         "lifecycle": entry["lifecycle"],
         "checks_failing": entry["checks_failing"],
         "checks_passing": entry["checks_passing"],
+        "checks_pending": entry["checks_pending"],
+        "labels": entry["labels"],
         "url": "https://github.com/{}/pull/{}".format(entry["repo"], entry["number"]),
     }
 

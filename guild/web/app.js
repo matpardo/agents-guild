@@ -398,9 +398,11 @@
     var head = el("div");
     head.className = "queue-entry-head";
     head.appendChild(link(entry.url, entry.ref));
-    var lifecycle = textEl("span", entry.lifecycle);
-    lifecycle.className = "pill lifecycle-" + entry.lifecycle;
-    head.appendChild(lifecycle);
+    entry.labels.forEach(function (label) {
+      var pill = textEl("span", label);
+      pill.className = "pill lifecycle-" + label;
+      head.appendChild(pill);
+    });
     head.appendChild(renderChecks(entry));
     head.appendChild(textEl("span", entry.party));
     head.appendChild(textEl("span", entry.task || "-"));
@@ -462,7 +464,7 @@
 
   function renderChecks(pr) {
     var checks = el("span");
-    if (pr.checks_failing === 0 && pr.checks_passing === 0) {
+    if (pr.checks_failing === 0 && pr.checks_passing === 0 && pr.checks_pending === 0) {
       var none = textEl("span", "no checks");
       none.className = "checks-none";
       checks.appendChild(none);
@@ -475,6 +477,12 @@
     checks.appendChild(failing);
     checks.appendChild(document.createTextNode(" "));
     checks.appendChild(passing);
+    if (pr.checks_pending > 0) {
+      var pending = textEl("span", "⏳" + pr.checks_pending);
+      pending.className = "checks-pending";
+      checks.appendChild(document.createTextNode(" "));
+      checks.appendChild(pending);
+    }
     return checks;
   }
 

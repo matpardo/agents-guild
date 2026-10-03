@@ -53,16 +53,20 @@ class _Painter:
 def _checks_parts(pr_row):
     failing = pr_row["checks_failing"] or 0
     passing = pr_row["checks_passing"] or 0
-    if failing == 0 and passing == 0:
+    pending = pr_row["checks_pending"] or 0
+    if failing == 0 and passing == 0 and pending == 0:
         return None
-    return failing, passing
+    return failing, passing, pending
 
 
 def _checks_plain(pr_row):
     parts = _checks_parts(pr_row)
     if parts is None:
         return "no checks"
-    return "✗{} ✓{}".format(parts[0], parts[1])
+    text = "✗{} ✓{}".format(parts[0], parts[1])
+    if parts[2] > 0:
+        return "{} ⏳{}".format(text, parts[2])
+    return text
 
 
 def _checks_painted(painter, pr_row):
@@ -70,10 +74,13 @@ def _checks_painted(painter, pr_row):
     if parts is None:
         return painter.paint("no checks", "dim")
     failing_style = "red" if parts[0] > 0 else "dim"
-    return "{} {}".format(
+    text = "{} {}".format(
         painter.paint("✗{}".format(parts[0]), failing_style),
         painter.paint("✓{}".format(parts[1]), "green"),
     )
+    if parts[2] > 0:
+        return "{} {}".format(text, painter.paint("⏳{}".format(parts[2]), "yellow"))
+    return text
 
 
 def _pr_lines(painter, pr_row, indent):
@@ -443,6 +450,7 @@ def _pr_model(pr_row):
         "lifecycle": pr_row["lifecycle"],
         "checks_failing": pr_row["checks_failing"] or 0,
         "checks_passing": pr_row["checks_passing"] or 0,
+        "checks_pending": pr_row["checks_pending"] or 0,
         "what": sanitize.strip_control_sequences(pr_row["what"]),
         "waits": _optional_text(pr_row["waits"]),
         "url": "https://github.com/{}/pull/{}".format(pr_row["repo"], pr_row["number"]),

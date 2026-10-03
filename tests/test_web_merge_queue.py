@@ -71,7 +71,7 @@ class MergeQueueModelTests(MergeQueueModelTestCase):
             set(first),
             {
                 "position", "ref", "repo", "number", "party", "task", "lifecycle",
-                "checks_failing", "checks_passing", "unblocks", "state", "next_action",
+                "checks_failing", "checks_passing", "checks_pending", "labels", "unblocks", "state", "next_action",
                 "action", "why", "reasons", "url",
             },
         )
@@ -83,12 +83,22 @@ class MergeQueueModelTests(MergeQueueModelTestCase):
         self.assertEqual((first["state"], first["action"], first["reasons"]), ("ready", "merge", []))
         self.assertEqual(first["unblocks"], 1)
 
+    def test_draft_entry_is_ready_with_a_label_and_a_promote_action(self):
+        queue = self.queues_by_scope()["raid:ci"]["queue"]
+        draft = [entry for entry in queue if entry["ref"] == "acme/app#3"][0]
+        self.assertEqual(
+            (draft["state"], draft["labels"], draft["reasons"], draft["checks_pending"]),
+            ("ready", ["draft"], [], 0),
+        )
+        self.assertEqual(draft["action"], "promote: gh pr ready \u2192 beta")
+
     def test_blocked_entry_stays_in_the_queue_with_its_action(self):
+        self.run_cli(["pr", "set", "acme/app#3", "--lifecycle", "needs-human"], "sess-2", self.repo_dir)
         queue = self.queues_by_scope()["raid:ci"]["queue"]
         blocked = [entry for entry in queue if entry["state"] == "blocked"]
         self.assertEqual([entry["ref"] for entry in blocked], ["acme/app#3"])
-        self.assertEqual(blocked[0]["reasons"], ["draft"])
-        self.assertEqual(blocked[0]["action"], "fix: draft \u2192 beta")
+        self.assertEqual(blocked[0]["reasons"], ["needs-human"])
+        self.assertEqual(blocked[0]["action"], "fix: needs-human \u2192 beta")
         self.assertFalse(blocked[0]["next_action"])
 
     def test_raid_without_open_prs_has_an_empty_queue(self):
@@ -156,7 +166,8 @@ class MergeQueuePageTests(MergeQueueTestCase):
 
     def test_page_renders_the_queue_with_lifecycle_pills_and_links(self):
         self.assertIn("function renderMergeQueues", self.js)
-        self.assertIn('"pill lifecycle-" + entry.lifecycle', self.js)
+        self.assertIn('"pill lifecycle-" + label', self.js)
+        self.assertIn("entry.labels.forEach", self.js)
         self.assertIn("merge_queues", self.js)
 
     def test_page_filters_queues_by_raid_and_party(self):
@@ -169,6 +180,11 @@ class MergeQueuePageTests(MergeQueueTestCase):
         self.assertIn("next action", self.js)
         self.assertIn("queue.main.map(renderMainRow)", self.js)
         self.assertNotIn("queue.blocked", self.js)
+
+    def test_page_styles_waiting_entries_and_pending_checks(self):
+        self.assertIn("checks-pending", self.js)
+        self.assertRegex(self.css, r"(?m)^li\.queue-waiting > \.queue-reason\s*\{")
+        self.assertRegex(self.css, r"(?m)^\.checks-pending\s*\{")
 
     def test_page_says_guild_never_merges(self):
         self.assertIn("guild never merges", self.js)

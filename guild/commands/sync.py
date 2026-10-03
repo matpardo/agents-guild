@@ -17,6 +17,11 @@ _SDD_OPTIONAL_PATTERN_KEYS = ("order_list", "key_line")
 
 _FAILING_CONCLUSIONS = ("FAILURE", "CANCELLED", "TIMED_OUT", "ACTION_REQUIRED")
 _SUCCESS_CONCLUSION = "SUCCESS"
+_CHECK_RUN_COMPLETED_STATUS = "COMPLETED"
+_STATUS_CONTEXT_TYPENAME = "StatusContext"
+_STATUS_CONTEXT_PENDING_STATES = ("PENDING", "EXPECTED")
+_STATUS_CONTEXT_FAILING_STATES = ("FAILURE", "ERROR")
+_STATUS_CONTEXT_SUCCESS_STATE = "SUCCESS"
 
 _DRAFT_SUB_LIFECYCLES = ("converging", "needs-human")
 
@@ -37,16 +42,42 @@ _MIGRATION_NOTICE_TEMPLATE = (
 _MIGRATION_VERSION_PATTERN = re.compile(r"^(\d+)")
 
 
+def _classify_status_context(entry):
+    state = entry.get("state")
+    if state in _STATUS_CONTEXT_PENDING_STATES:
+        return "pending"
+    if state == _STATUS_CONTEXT_SUCCESS_STATE:
+        return "passing"
+    if state in _STATUS_CONTEXT_FAILING_STATES:
+        return "failing"
+    return None
+
+
+def _classify_check_run(entry):
+    status = entry.get("status")
+    if status is not None and status != _CHECK_RUN_COMPLETED_STATUS:
+        return "pending"
+    conclusion = entry.get("conclusion")
+    if conclusion == _SUCCESS_CONCLUSION:
+        return "passing"
+    if conclusion in _FAILING_CONCLUSIONS:
+        return "failing"
+    return None
+
+
+def _classify_check(entry):
+    if entry.get("__typename") == _STATUS_CONTEXT_TYPENAME:
+        return _classify_status_context(entry)
+    return _classify_check_run(entry)
+
+
 def _count_checks(rollup):
-    failing = 0
-    passing = 0
+    counts = {"failing": 0, "passing": 0, "pending": 0}
     for entry in rollup or []:
-        conclusion = entry.get("conclusion")
-        if conclusion == _SUCCESS_CONCLUSION:
-            passing += 1
-        elif conclusion in _FAILING_CONCLUSIONS:
-            failing += 1
-    return failing, passing
+        kind = _classify_check(entry)
+        if kind is not None:
+            counts[kind] += 1
+    return counts["failing"], counts["passing"], counts["pending"]
 
 
 def _lifecycle_from_gh(current_lifecycle, gh_data):
@@ -74,7 +105,7 @@ def _sync_pr(ctx, projects, row, failures):
             "reviewDecision", "mergeable", "comments", "reviews",
         ],
     )
-    failing, passing = _count_checks(gh_data.get("statusCheckRollup"))
+    failing, passing, pending = _count_checks(gh_data.get("statusCheckRollup"))
     lifecycle = _lifecycle_from_gh(row["lifecycle"], gh_data)
     review_comment_count = len(gh_data.get("comments") or []) + len(gh_data.get("reviews") or [])
     payload = {
@@ -86,6 +117,7 @@ def _sync_pr(ctx, projects, row, failures):
         "title": gh_data.get("title"),
         "checks_failing": failing,
         "checks_passing": passing,
+        "checks_pending": pending,
         "lifecycle": lifecycle,
         "mergeable": gh_data.get("mergeable"),
         "review_comment_count": review_comment_count,

@@ -232,6 +232,7 @@ _COLUMN_MIGRATIONS = (
     ("prs", "additions", "INTEGER"),
     ("prs", "deletions", "INTEGER"),
     ("prs", "created_at", "TEXT"),
+    ("prs", "checks_pending", "INTEGER"),
 )
 
 
