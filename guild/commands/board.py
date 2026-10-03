@@ -345,6 +345,8 @@ def _party_section(ctx, painter, party_row):
         )
     ]
     next_ref = merge_queue_commands.next_to_merge(ctx.conn, {party_row["name"]})
+    for label in merge_queue_commands.main_red_labels(ctx.conn, {party_row["name"]}):
+        lines.append(painter.paint("  MAIN RED: {}".format(label), "red"))
     if next_ref is not None:
         lines.append(painter.paint("  next to merge: {}".format(next_ref), "green"))
     pr_rows = _party_pr_rows(ctx.conn, party_row["name"])
@@ -388,9 +390,15 @@ def _party_rows_for_names(conn, party_names):
 
 def _raid_next_to_merge_lines(ctx, painter, party_names):
     next_ref = merge_queue_commands.next_to_merge(ctx.conn, party_names)
-    if next_ref is None:
+    lines = [
+        painter.paint("MAIN RED: {}".format(label), "red")
+        for label in merge_queue_commands.main_red_labels(ctx.conn, party_names)
+    ]
+    if next_ref is not None:
+        lines.append(painter.paint("next to merge: {}".format(next_ref), "green"))
+    if not lines:
         return []
-    return [painter.paint("next to merge: {}".format(next_ref), "green"), ""]
+    return lines + [""]
 
 
 def render_board(ctx, party_filter, raid_filter, color, width):

@@ -5,6 +5,9 @@ _CLOSED_LIFECYCLES = ("merged", "closed")
 _READY_LIFECYCLE = "ready"
 _CONFLICTING = "CONFLICTING"
 _HUMAN_AUTHOR = "human"
+_READY_STATE = "ready"
+_BLOCKED_STATE = "blocked"
+_MERGE_ACTION = "merge"
 
 
 def _is_open(pr):
@@ -81,10 +84,10 @@ def dependency_pairs(prs):
     return pairs
 
 
-def _task_edges(eligible):
-    by_ref = {pr["ref"]: pr for pr in eligible}
+def _task_edges(open_prs):
+    by_ref = {pr["ref"]: pr for pr in open_prs}
     edges = []
-    for first, second in dependency_pairs(eligible):
+    for first, second in dependency_pairs(open_prs):
         edges.append(
             {
                 "first": first,
@@ -98,10 +101,10 @@ def _task_edges(eligible):
     return edges
 
 
-def _pin_edges(eligible_refs, pins):
+def _pin_edges(open_refs, pins):
     edges = []
     for pin in pins:
-        if pin["first"] not in eligible_refs or pin["second"] not in eligible_refs:
+        if pin["first"] not in open_refs or pin["second"] not in open_refs:
             continue
         author = pin["author"] or _HUMAN_AUTHOR
         edges.append(
@@ -115,80 +118,70 @@ def _pin_edges(eligible_refs, pins):
     return edges
 
 
-def _diff_size(pr):
-    return pr["additions"] + pr["deletions"]
-
-
-def _overlap_key(pr):
-    return (_diff_size(pr), pr["created_at"], pr["number"])
-
-
-def _overlap_reason(first, second):
-    if _diff_size(first) != _diff_size(second):
-        return "smaller diff"
-    if first["created_at"] != second["created_at"]:
-        return "created earlier"
-    return "lower number"
-
-
 def _shared_globs(first, second):
     if first["repo"] != second["repo"]:
         return []
     return sorted(set(first["globs"]) & set(second["globs"]))
 
 
-def _oriented_overlaps(eligible):
-    oriented = []
-    for index, left in enumerate(eligible):
-        for right in eligible[index + 1:]:
-            globs = _shared_globs(left, right)
-            if not globs:
-                continue
-            first, second = sorted((left, right), key=_overlap_key)
-            oriented.append((first, second, globs))
-    oriented.sort(key=lambda item: (_overlap_key(item[0]), _overlap_key(item[1])))
-    return oriented
+def _successors(edges):
+    successors = {}
+    for edge in edges:
+        successors.setdefault(edge["first"], set()).add(edge["second"])
+    return successors
 
 
-def _overlap_edges(eligible, hard_pairs):
-    pairs = list(hard_pairs)
-    edges = []
-    for first, second, globs in _oriented_overlaps(eligible):
-        if find_path(pairs, second["ref"], first["ref"]):
+def _predecessors(edges):
+    predecessors = {}
+    for edge in edges:
+        predecessors.setdefault(edge["second"], set()).add(edge["first"])
+    return predecessors
+
+
+def _dependents(successors, ref):
+    seen = set()
+    pending = list(successors.get(ref, ()))
+    while pending:
+        node = pending.pop()
+        if node in seen:
             continue
-        pairs.append((first["ref"], second["ref"]))
-        shared = ", ".join(globs)
-        edges.append(
-            {
-                "first": first["ref"],
-                "second": second["ref"],
-                "before": "before {} (shares {}, {})".format(
-                    second["ref"], shared, _overlap_reason(first, second)
-                ),
-                "after": "after {} (shares {})".format(first["ref"], shared),
-            }
-        )
-    return edges
+        seen.add(node)
+        pending.extend(successors.get(node, ()))
+    seen.discard(ref)
+    return seen
 
 
-def _topological_order(eligible, edges):
-    sort_keys = {pr["ref"]: (pr["number"], pr["repo"]) for pr in eligible}
-    blockers = {pr["ref"]: 0 for pr in eligible}
-    successors = {pr["ref"]: set() for pr in eligible}
-    for first, second in {(edge["first"], edge["second"]) for edge in edges}:
-        successors[first].add(second)
-        blockers[second] += 1
+def _glob_sharers(pr, open_prs):
+    return {other["ref"] for other in open_prs if other["ref"] != pr["ref"] and _shared_globs(pr, other)}
+
+
+def _unblock_counts(open_prs, edges):
+    successors = _successors(edges)
+    return {
+        pr["ref"]: len(_dependents(successors, pr["ref"]) | _glob_sharers(pr, open_prs)) for pr in open_prs
+    }
+
+
+def _topological_order(open_prs, edges, unblocks):
+    sort_keys = {pr["ref"]: (-unblocks[pr["ref"]], pr["number"], pr["repo"]) for pr in open_prs}
+    blockers = {pr["ref"]: 0 for pr in open_prs}
+    successors = _successors(edges)
+    for first in successors:
+        for second in successors[first]:
+            blockers[second] += 1
     heap = [(sort_keys[ref], ref) for ref, count in blockers.items() if count == 0]
     heapq.heapify(heap)
     order = []
     while heap:
         _, ref = heapq.heappop(heap)
         order.append(ref)
-        for following in successors[ref]:
+        for following in successors.get(ref, ()):
             blockers[following] -= 1
             if blockers[following] == 0:
                 heapq.heappush(heap, (sort_keys[following], following))
-    stuck = sorted((ref for ref in blockers if ref not in order), key=lambda ref: sort_keys[ref])
+    stuck = sorted(
+        (ref for ref in blockers if ref not in order), key=lambda ref: (sort_keys[ref][1], sort_keys[ref][2])
+    )
     return order, stuck
 
 
@@ -198,8 +191,10 @@ def _base_reason(pr):
     return "ready, checks ✓{}".format(pr["checks_passing"])
 
 
-def _reason(pr, position, edges):
-    clauses = [_base_reason(pr)]
+def _why(pr, state, position, edges):
+    clauses = []
+    if state == _READY_STATE:
+        clauses.append(_base_reason(pr))
     before = [edge for edge in edges if edge["first"] == pr["ref"]]
     after = [edge for edge in edges if edge["second"] == pr["ref"]]
     before.sort(key=lambda edge: position[edge["second"]])
@@ -209,46 +204,73 @@ def _reason(pr, position, edges):
     return "; ".join(clauses)
 
 
-def _block_behind_blocked_pins(eligible, blocked, pins):
-    blocked_refs = {entry["ref"] for entry in blocked}
-    remaining = list(eligible)
-    moved = True
-    while moved:
-        moved = False
-        for pin in pins:
-            held = next((pr for pr in remaining if pr["ref"] == pin["second"]), None)
-            if held is None or pin["first"] not in blocked_refs:
-                continue
-            reason = "pinned after {} (blocked) by {}".format(pin["first"], pin["author"] or _HUMAN_AUTHOR)
-            blocked.append(dict(_entry(held), reasons=[reason]))
-            blocked_refs.add(held["ref"])
-            remaining.remove(held)
-            moved = True
-    return remaining
+def _action(pr, reasons):
+    if not reasons:
+        return _MERGE_ACTION
+    return "fix: {} \u2192 {}".format("; ".join(reasons), pr["party"])
 
 
-def compute(prs, pins):
-    open_prs = [pr for pr in prs if _is_open(pr)]
-    blocked = []
-    eligible = []
-    for pr in open_prs:
-        reasons = _blocked_reasons(pr)
-        if reasons:
-            blocked.append(dict(_entry(pr), reasons=reasons))
-            continue
-        eligible.append(pr)
-    eligible = _block_behind_blocked_pins(eligible, blocked, pins)
-    eligible_refs = {pr["ref"] for pr in eligible}
-    hard_edges = _task_edges(eligible) + _pin_edges(eligible_refs, pins)
-    hard_pairs = [(edge["first"], edge["second"]) for edge in hard_edges]
-    edges = hard_edges + _overlap_edges(eligible, hard_pairs)
-    order, stuck = _topological_order(eligible, edges)
-    by_ref = {pr["ref"]: pr for pr in eligible}
-    for ref in stuck:
-        reason = "ordering cycle between pins and task dependencies: {}".format(", ".join(stuck))
-        blocked.append(dict(_entry(by_ref[ref]), reasons=[reason]))
+def _queue_entry(pr, unblocks, reasons, why):
+    state = _BLOCKED_STATE if reasons else _READY_STATE
+    return dict(
+        _entry(pr),
+        unblocks=unblocks,
+        state=state,
+        reasons=reasons,
+        why=why,
+        action=_action(pr, reasons),
+        next_action=False,
+    )
+
+
+def _ordered_entries(by_ref, order, edges, unblocks):
     position = {ref: index for index, ref in enumerate(order)}
-    edges = [edge for edge in edges if edge["first"] in position and edge["second"] in position]
-    queue = [dict(_entry(by_ref[ref]), reason=_reason(by_ref[ref], position, edges)) for ref in order]
-    blocked.sort(key=lambda entry: (entry["number"], entry["repo"]))
-    return {"queue": queue, "blocked": blocked}
+    ordered_edges = [edge for edge in edges if edge["first"] in position and edge["second"] in position]
+    predecessors = _predecessors(ordered_edges)
+    blocked_refs = set()
+    entries = []
+    for ref in order:
+        pr = by_ref[ref]
+        reasons = _blocked_reasons(pr)
+        reasons.extend(
+            "waits on {}".format(first) for first in sorted(predecessors.get(ref, ())) if first in blocked_refs
+        )
+        if reasons:
+            blocked_refs.add(ref)
+        state = _BLOCKED_STATE if reasons else _READY_STATE
+        entries.append(_queue_entry(pr, unblocks[ref], reasons, _why(pr, state, position, ordered_edges)))
+    return entries
+
+
+def _stuck_entries(by_ref, stuck, unblocks):
+    cycle = "ordering cycle between pins and task dependencies: {}".format(", ".join(stuck))
+    return [
+        _queue_entry(by_ref[ref], unblocks[ref], _blocked_reasons(by_ref[ref]) + [cycle], "") for ref in stuck
+    ]
+
+
+def _flag_next_action(entries):
+    for index, entry in enumerate(entries):
+        if entry["state"] != _BLOCKED_STATE:
+            continue
+        if any(later["state"] == _READY_STATE for later in entries[index + 1:]):
+            entry["next_action"] = True
+        return
+
+
+def _main_entries(main_status):
+    return sorted(
+        (dict(row) for row in main_status), key=lambda row: (row["repo"], row["source"])
+    )
+
+
+def compute(prs, pins, main_status):
+    open_prs = [pr for pr in prs if _is_open(pr)]
+    open_refs = {pr["ref"] for pr in open_prs}
+    edges = _task_edges(open_prs) + _pin_edges(open_refs, pins)
+    unblocks = _unblock_counts(open_prs, edges)
+    order, stuck = _topological_order(open_prs, edges, unblocks)
+    by_ref = {pr["ref"]: pr for pr in open_prs}
+    entries = _ordered_entries(by_ref, order, edges, unblocks) + _stuck_entries(by_ref, stuck, unblocks)
+    _flag_next_action(entries)
+    return {"main": _main_entries(main_status), "queue": entries}

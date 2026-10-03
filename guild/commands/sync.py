@@ -344,6 +344,58 @@ def _close_met_notices(ctx):
             )
 
 
+def _branch_red_reason(checks):
+    failing = [check["name"] for check in checks if check["conclusion"] in _FAILING_CONCLUSIONS]
+    if not failing:
+        return None
+    return "checks failing: {}".format(", ".join(sorted(failing)))
+
+
+def _recorded_gh_status(ctx, repo):
+    row = ctx.conn.execute(
+        "SELECT red, reason FROM main_status WHERE repo = ? AND source = 'gh'", (repo,)
+    ).fetchone()
+    if row is None:
+        return False, None
+    return bool(row["red"]), row["reason"]
+
+
+def _record_main_status(ctx, project, repo, reason):
+    with db.writing(ctx.conn):
+        events.record(
+            ctx.conn,
+            ctx.now,
+            ctx.origin,
+            None,
+            ctx.session_id,
+            project["name"],
+            "main.status_synced",
+            "guild",
+            {"repo": repo, "red": reason is not None, "reason": reason},
+        )
+
+
+def _sync_repo_main_status(ctx, project, repo, base, failures):
+    try:
+        checks = github.branch_checks(ctx.cwd, repo, base)
+    except github.GhCommandError as error:
+        failures.append("{}: main status check failed: {}".format(repo, error))
+        return
+    reason = _branch_red_reason(checks)
+    if _recorded_gh_status(ctx, repo) == (reason is not None, reason):
+        return
+    _record_main_status(ctx, project, repo, reason)
+
+
+def _sync_main_status(ctx, projects, failures):
+    for project in projects:
+        for clone in localbase.locate_clones(project):
+            base = localbase.base_branch(clone["path"])
+            if base is None:
+                continue
+            _sync_repo_main_status(ctx, project, clone["repo"], base, failures)
+
+
 def _sync_gh(ctx):
     rows = ctx.conn.execute(
         "SELECT * FROM prs WHERE lifecycle NOT IN ('merged', 'closed')"
@@ -362,6 +414,7 @@ def _sync_gh(ctx):
             merged_repos.add(row["repo"])
     _fast_forward_merged_bases_mutating_git(ctx, projects, merged_repos)
     _check_migration_clashes(ctx, projects, failures)
+    _sync_main_status(ctx, projects, failures)
     _close_met_notices(ctx)
     return failures
 

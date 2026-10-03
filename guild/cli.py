@@ -317,6 +317,20 @@ def _handle_merge_queue_unpin(ctx, args):
     return 0
 
 
+def _handle_main_red(ctx, args):
+    from guild.commands import main_status as main_status_commands
+
+    _print(main_status_commands.red(ctx, args.repo, args.reason))
+    return 0
+
+
+def _handle_main_green(ctx, args):
+    from guild.commands import main_status as main_status_commands
+
+    _print(main_status_commands.green(ctx, args.repo))
+    return 0
+
+
 def _handle_history(ctx, args):
     from guild.commands import history as history_commands
 
@@ -610,6 +624,20 @@ def _add_merge_queue_parser(subparsers):
     unpin.set_defaults(handler=_handle_merge_queue_unpin)
 
 
+def _add_main_parser(subparsers):
+    parser = subparsers.add_parser("main")
+    actions = parser.add_subparsers(dest="main_action", required=True)
+
+    red = actions.add_parser("red")
+    red.add_argument("repo")
+    red.add_argument("--reason", required=True)
+    red.set_defaults(handler=_handle_main_red)
+
+    green = actions.add_parser("green")
+    green.add_argument("repo")
+    green.set_defaults(handler=_handle_main_green)
+
+
 def build_parser():
     parser = argparse.ArgumentParser(prog="guild")
     subparsers = parser.add_subparsers(dest="command", required=True)
@@ -674,6 +702,7 @@ def build_parser():
     raids.set_defaults(handler=_handle_raids)
 
     _add_merge_queue_parser(subparsers)
+    _add_main_parser(subparsers)
 
     board = subparsers.add_parser("board")
     board_filter = board.add_mutually_exclusive_group()

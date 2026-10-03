@@ -137,6 +137,8 @@ guild handoff --in-flight "..." --learned "..."
 guild merge-queue [--raid <name> | --party <name>]   # read-only: PRs in the order to merge by hand
 guild merge-queue pin   <owner/repo>#<a> --before <owner/repo>#<b>
 guild merge-queue unpin <owner/repo>#<a> --before <owner/repo>#<b>
+guild main red <owner/repo> --reason "<text>"   # mark a repo's main branch red by hand
+guild main green <owner/repo>                   # clear the manual red mark
 
 guild history [--party <name>] [--raid <name>] [--project <name>]   # read-only: in-progress quests, completed quests, quests closed without completing, finished raids, totals
 guild board [--party <name> | --raid <name>]
@@ -195,9 +197,11 @@ Deterministic, per-party ranking, evaluated in order:
 5. Raid lead work, only for a party that is the active lead of a raid: open
    asks from the raid's other member parties (`raid <name>: ask #<id> from
    <party>: "<question>"`), then the raid's merge queue entries for the other
-   members' PRs, ready ones with their position and reason and blocked ones
-   with their reasons (`raid <name>: merge queue <n>. <ref> <party> — <reason>`
-   / `raid <name>: blocked <ref> <party> — <reasons>`). Without `--all` only
+   members' PRs, one line per PR in queue order with its action
+   (`raid <name>: merge queue <n>. <ref> <party> — merge` / `— fix: <reasons> →
+   <party>`, `next action:` before the number on the first blocked PR above a
+   ready one), preceded by `raid <name>: MAIN RED <repo> — <reason> (<source>)
+   → fix before anything` for each red main. Without `--all` only
    the first item is printed. Read-only: guild never merges and nothing is
    acknowledged.
 6. Nothing actionable: the exact blockers (pending deps and who says so, open
@@ -376,9 +380,9 @@ only refreshes the synced state that sessions read.
 
 ### `guild merge-queue`
 
-`guild merge-queue [--raid <name> | --party <name>]` prints the open tracked
-PRs that are ready to merge in the order to merge them, with the reason for
-every position, plus the PRs that are not ready and why. It is read-only: no
+`guild merge-queue [--raid <name> | --party <name>]` prints every open tracked
+PR in priority order, blocked ones included and kept in place, with the next
+action for each: `merge`, or `fix: <reasons> → <party>`. It is read-only: no
 network call, no event. **Guild never merges**: the output is advice for a
 human, who merges by hand and re-runs the command after each merge (the
 last line of the output says so).
@@ -401,41 +405,55 @@ is still draft on GitHub prints a hint, and the next sync reverts it.
 **Ready or blocked.** A PR is ready when its lifecycle is `ready`, no check
 is failing, `mergeable` is not `CONFLICTING`, and every task its own task
 depends on (SDD `Depends on`, through the quest's epic) is done by the same
-resolver `guild next` uses. Otherwise it goes to the `blocked:` section with
-every reason that applies: `needs-human`, `draft` or `converging` (its
-lifecycle), `checks failing (N)`, `merge conflict`, `waits on task Txx`.
-Merged and closed PRs never appear.
+resolver `guild next` uses. Otherwise it is blocked, with every reason that
+applies: `needs-human`, `draft` or `converging` (its lifecycle), `checks
+failing (N)`, `merge conflict`, `waits on task Txx`. A PR that must come after
+a blocked PR (by task dependency or pin, transitively) is blocked too, with
+`waits on <ref>`. Merged and closed PRs never appear.
 
-**Hybrid order.** The ready PRs are put in a topological order over three
-kinds of constraint, ties broken by PR number:
+**Order.** All open PRs are put in a topological order over hard
+constraints, and ties between PRs that are free to go first are broken by
+value:
 
 1. SDD task dependencies between the PRs' tasks.
-2. Pins: explicit `X before Y` agreements (below). Pins and task dependencies
-   are hard constraints; a pin that involves a merged or closed PR is
-   ignored, so stale pins drop out by themselves. A PR pinned after a blocked
-   PR is blocked too (`pinned after X (blocked)`), transitively; a pin whose
-   second PR is blocked is ignored.
-3. Shared-area overlap: two ready PRs of the same repo that touch the same
-   project `shared_areas` glob are sequential. By default the one with the
-   smaller diff (additions plus deletions) goes first, then the one created
-   earlier, then the lower number. This is a heuristic (a smaller change
-   rebases less), never a rule: pin the pair to overrule it.
+2. Pins: explicit `X before Y` agreements (below). A pin that involves a
+   merged or closed PR is ignored, so stale pins drop out by themselves. A
+   pin whose first PR is blocked keeps that PR in place and the second one
+   waits on it.
+3. Among the PRs that are free, the one that unblocks the most goes first
+   (`unblocks N`: the distinct open PRs that depend on it, directly or
+   transitively, plus the open PRs of the same repo that touch the same
+   project `shared_areas` glob), then the lower PR number, then the repo.
 
-Every position carries its reason, for example:
+A blocked PR is not moved to the bottom: if the top PR is blocked, fixing it
+is the first thing to do. `▶ next action:` marks the first blocked PR that
+sits above at least one ready PR.
 
 ```
 merge queue · raid ci · synced 4 min ago
-1. acme/app#1044  alpha  T01 — ready, checks ✓17; before acme/app#1047 (shares config/locales/es.yml, smaller diff)
-2. acme/app#1047  beta   T02 — ready, checks ✓9; after acme/app#1044 (shares config/locales/es.yml)
-blocked:
-  acme/app#1049  beta  T03 — checks failing (2)
+0. MAIN RED acme/app — checks failing: lint (gh) → fix before anything
+1. acme/app#1044  alpha  T01  unblocks 2 — merge (ready, checks ✓17; before acme/app#1047 (task T02 depends on T01))
+▶ next action: 2. acme/app#1049  beta  T03  unblocks 1 — fix: checks failing (2) → beta
+3. acme/app#1047  beta  T02  unblocks 0 — fix: waits on acme/app#1049 → beta
+4. acme/app#1052  gamma  T07  unblocks 0 — merge (ready, checks ✓9)
 guild never merges: merge in this order by hand; re-run after each merge
 ```
 
-A ready PR that must wait for an earlier one still sits in the list, with
-`after <ref> (...)`. If pins and task dependencies contradict each other, the
-PRs involved are listed as blocked with the cycle named rather than ordered
-arbitrarily.
+If pins and task dependencies contradict each other, the PRs involved are
+listed at the end as blocked with the cycle named (`fix: ordering cycle ...`)
+rather than ordered arbitrarily.
+
+**Main red.** A red base branch comes first, as row `0.`, for every repo
+among the shown PRs. Two sources feed it: `guild sync --source gh` reads the
+check runs of the base branch (`gh api repos/<repo>/commits/<branch>/check-runs`)
+for each project repo that has a local clone with a known base branch, and
+it is red when any run failed, was cancelled, timed out or needs action
+(event `main.status_synced`, one event per change, source `gh`); and
+`guild main red <repo> --reason "<text>"` / `guild main green <repo>` mark it
+by hand (event `main.marked`, source `manual`). A repo is red when any source
+says so; `green` clears only the manual mark, the `gh` mark clears on the next
+sync that sees the base branch green. Projection `main_status`, rebuilt like
+everything else.
 
 **Data and freshness.** The order is computed from stored data, so it is only
 as fresh as the last `guild sync --source gh` (the header says `synced N min
@@ -463,9 +481,10 @@ naming the cycle (`pin would create a cycle: a -> b -> a`), a duplicate pin
 and an `unpin` of a missing pin are errors. `unpin` still works after a PR
 merges.
 
-`guild board --raid <name>` starts with `next to merge: <ref>` and each party
-block of `guild board` shows the same line for that party's own queue, when
-one exists. `guild web` shows the same queues, see below.
+`guild board --raid <name>` starts with `MAIN RED: <repo> — <reason> (<source>)`
+for each red main and `next to merge: <ref>` (the first ready PR of the
+queue), and each party block of `guild board` shows the same lines for that
+party's own queue, when they exist. `guild web` shows the same queues, see below.
 
 ### `guild drift`
 
@@ -548,9 +567,10 @@ screens it is a single column with asks and the merge queue first.
 **What it shows**: open asks (question, party, options,
 refs, how many refs still block it, a collapsible context), active notices,
 the merge queue (one card per raid, plus one per party outside raids that has
-open PRs: numbered PR links with their lifecycle badge, checks, party, task
-and the reason of each position, then a `blocked` list; read-only, the same
-order as `guild merge-queue`, with `synced N min ago`; the party filter keeps
+open PRs: a `MAIN RED` row per red main, then numbered PR links with their
+lifecycle badge, checks, party, task, state, `unblocks N`, the action and the
+`next action` marker, blocked PRs in place; read-only, the same order as
+`guild merge-queue`, with `synced N min ago`; the party filter keeps
 only that party's PRs and the raid filter only that raid's card; the model
 key is `merge_queues`), drift findings for the default scope (grouped by rule, one block per
 project resolved from the parties shown, skipping parties without a

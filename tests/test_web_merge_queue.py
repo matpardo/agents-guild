@@ -59,41 +59,50 @@ class MergeQueueModelTests(MergeQueueModelTestCase):
 
     def test_queue_shape(self):
         queue = self.queues_by_scope()["raid:ci"]
-        self.assertEqual(set(queue), {"scope", "synced_at", "synced_label", "queue", "blocked"})
+        self.assertEqual(set(queue), {"scope", "synced_at", "synced_label", "main", "queue"})
         timeutil.from_iso(queue["synced_at"])
         self.assertEqual(queue["synced_label"], "synced 0 min ago")
 
     def test_queue_entry_shape_and_order(self):
         queue = self.queues_by_scope()["raid:ci"]["queue"]
-        self.assertEqual([entry["ref"] for entry in queue], ["acme/app#2", "acme/app#1"])
+        self.assertEqual([entry["ref"] for entry in queue], ["acme/app#1", "acme/app#2", "acme/app#3"])
         first = queue[0]
         self.assertEqual(
             set(first),
             {
                 "position", "ref", "repo", "number", "party", "task", "lifecycle",
-                "checks_failing", "checks_passing", "reason", "url",
+                "checks_failing", "checks_passing", "unblocks", "state", "next_action",
+                "action", "why", "reasons", "url",
             },
         )
-        self.assertEqual([entry["position"] for entry in queue], [1, 2])
-        self.assertEqual(first["url"], "https://github.com/acme/app/pull/2")
-        self.assertEqual(first["party"], "beta")
-        self.assertEqual(first["task"], "qb/T02")
+        self.assertEqual([entry["position"] for entry in queue], [1, 2, 3])
+        self.assertEqual(first["url"], "https://github.com/acme/app/pull/1")
+        self.assertEqual(first["party"], "alpha")
+        self.assertEqual(first["task"], "qa/T03")
         self.assertEqual(first["lifecycle"], "ready")
-        self.assertIn("before acme/app#1 (shares config/locales/es.yml, smaller diff)", first["reason"])
+        self.assertEqual((first["state"], first["action"], first["reasons"]), ("ready", "merge", []))
+        self.assertEqual(first["unblocks"], 1)
 
-    def test_blocked_entry_shape(self):
-        blocked = self.queues_by_scope()["raid:ci"]["blocked"]
+    def test_blocked_entry_stays_in_the_queue_with_its_action(self):
+        queue = self.queues_by_scope()["raid:ci"]["queue"]
+        blocked = [entry for entry in queue if entry["state"] == "blocked"]
         self.assertEqual([entry["ref"] for entry in blocked], ["acme/app#3"])
-        self.assertEqual(
-            set(blocked[0]),
-            {"ref", "repo", "number", "party", "task", "lifecycle", "checks_failing", "checks_passing", "reasons", "url"},
-        )
         self.assertEqual(blocked[0]["reasons"], ["draft"])
+        self.assertEqual(blocked[0]["action"], "fix: draft \u2192 beta")
+        self.assertFalse(blocked[0]["next_action"])
 
     def test_raid_without_open_prs_has_an_empty_queue(self):
         queue = self.queues_by_scope()["raid:empty"]
-        self.assertEqual((queue["queue"], queue["blocked"], queue["synced_at"]), ([], [], None))
+        self.assertEqual((queue["queue"], queue["main"], queue["synced_at"]), ([], [], None))
         self.assertEqual(queue["synced_label"], "never synced")
+
+    def test_red_main_is_listed_for_scopes_with_prs_in_that_repo(self):
+        self.run_cli(["main", "red", "acme/app", "--reason", "ci down"], None, self.repo_dir)
+        queues = self.queues_by_scope()
+        self.assertEqual(
+            queues["raid:ci"]["main"], [{"repo": "acme/app", "source": "manual", "reason": "ci down"}]
+        )
+        self.assertEqual(queues["raid:empty"]["main"], [])
 
     def test_party_outside_raids_gets_its_own_queue(self):
         queue = self.queues_by_scope()["party:gamma"]
@@ -105,12 +114,12 @@ class MergeQueueModelTests(MergeQueueModelTestCase):
 
     def test_pin_changes_the_model_order(self):
         code, out, err = self.run_cli(
-            ["merge-queue", "pin", "acme/app#1", "--before", "acme/app#2"], None, self.repo_dir
+            ["merge-queue", "pin", "acme/app#2", "--before", "acme/app#1"], None, self.repo_dir
         )
         self.assertEqual(code, 0, err)
         queue = self.queues_by_scope()["raid:ci"]["queue"]
-        self.assertEqual([entry["ref"] for entry in queue], ["acme/app#1", "acme/app#2"])
-        self.assertIn("pinned before acme/app#2 by human", queue[0]["reason"])
+        self.assertEqual([entry["ref"] for entry in queue], ["acme/app#2", "acme/app#1", "acme/app#3"])
+        self.assertIn("pinned before acme/app#1 by human", queue[0]["why"])
 
     def test_model_is_json_serializable(self):
         json.dumps(self.model())
@@ -153,6 +162,13 @@ class MergeQueuePageTests(MergeQueueTestCase):
     def test_page_filters_queues_by_raid_and_party(self):
         self.assertIn('"raid:" + state.raidFilter', self.js)
         self.assertIn("filterMergeQueuesByParty", self.js)
+
+    def test_page_renders_one_list_with_state_unblocks_action_and_main_row(self):
+        self.assertIn("entry.unblocks", self.js)
+        self.assertIn("entry.action", self.js)
+        self.assertIn("next action", self.js)
+        self.assertIn("queue.main.map(renderMainRow)", self.js)
+        self.assertNotIn("queue.blocked", self.js)
 
     def test_page_says_guild_never_merges(self):
         self.assertIn("guild never merges", self.js)

@@ -42,6 +42,12 @@ def main():
         branch = args[head_index]
         _respond("list_{}".format(branch.replace("/", "-")))
         return
+    if args[:1] == ["api"]:
+        parts = args[1].split("/")
+        repo = "-".join(parts[1:3])
+        branch = "-".join(parts[4:-1])
+        _respond("branch_checks_{}_{}".format(repo, branch))
+        return
     sys.stderr.write("fake gh: unhandled args {}".format(args))
     sys.exit(1)
 

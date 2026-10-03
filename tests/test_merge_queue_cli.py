@@ -49,23 +49,38 @@ class QueueCliTestCase(MergeQueueTestCase):
 
 
 class OutputTests(QueueCliTestCase):
-    def test_raid_queue_orders_overlapping_prs_with_reasons(self):
-        self.run_cli(["task", "done", "qb/T02"], "sess-2", self.repo_dir)
+    def test_raid_queue_lists_every_open_pr_in_order_with_its_action(self):
         code, out, err = self.queue(["--raid", "ci"], None)
         self.assertEqual(code, 0, err)
         lines = out.splitlines()
-        self.assertEqual(lines[0], "merge queue · raid ci · synced 0 min ago")
-        self.assertTrue(lines[1].startswith("1. acme/app#2  beta  qb/T02 — ready, checks ✓1;"))
-        self.assertIn("before acme/app#1 (shares config/locales/es.yml, smaller diff)", lines[1])
-        self.assertTrue(lines[2].startswith("2. acme/app#1  alpha  qa/T01 — ready, checks ✓17;"))
-        self.assertIn("after acme/app#2 (shares config/locales/es.yml)", lines[2])
-        self.assertIn("after acme/app#2 (needs task T02)", lines[2])
+        self.assertEqual(lines[0], "merge queue \u00b7 raid ci \u00b7 synced 0 min ago")
+        self.assertEqual(
+            lines[1],
+            "1. acme/app#2  beta  qb/T02  unblocks 1 \u2014 merge"
+            " (ready, checks \u27131; before acme/app#1 (task T01 depends on T02))",
+        )
+        self.assertEqual(
+            lines[2], "\u25b6 next action: 2. acme/app#4  beta  qb/T02  unblocks 1 \u2014 fix: checks failing (2) \u2192 beta"
+        )
+        self.assertEqual(
+            lines[3],
+            "3. acme/app#1  alpha  qa/T01  unblocks 1 \u2014 fix: waits on task T02; waits on acme/app#4 \u2192 alpha",
+        )
+        self.assertTrue(lines[4].startswith("4. acme/app#3  alpha  qa/T03  unblocks 0 \u2014 merge"))
+        self.assertTrue(lines[5].startswith("5. acme/app#7  delta  qd/T01  unblocks 0 \u2014 merge"))
 
-    def test_blocked_section_lists_exact_reasons(self):
+    def test_there_is_no_separate_blocked_section(self):
         code, out, err = self.queue(["--raid", "ci"], None)
-        lines = out.splitlines()
-        self.assertEqual(lines[lines.index("blocked:") + 1], "  acme/app#1  alpha  qa/T01 — waits on task T02")
-        self.assertIn("  acme/app#4  beta  qb/T02 — checks failing (2)", lines)
+        self.assertNotIn("blocked:", out)
+
+    def test_red_main_shows_as_row_zero(self):
+        code, out, err = self.run_cli(["main", "red", "acme/app", "--reason", "ci down"], None, self.repo_dir)
+        self.assertEqual(code, 0, err)
+        code, out, err = self.queue(["--raid", "ci"], None)
+        self.assertEqual(
+            out.splitlines()[1], "0. MAIN RED acme/app \u2014 ci down (manual) \u2192 fix before anything"
+        )
+        self.assertTrue(out.splitlines()[2].startswith("1. acme/app#2"))
 
     def test_footer_reminds_that_guild_never_merges(self):
         code, out, err = self.queue(["--raid", "ci"], None)
@@ -75,8 +90,8 @@ class OutputTests(QueueCliTestCase):
         code, out, err = self.queue(["--party", "gamma"], None)
         self.assertEqual(code, 0, err)
         self.assertIn("merge queue · party gamma", out)
-        self.assertIn("1. acme/app#5  gamma  qc/T01 — ready, checks ✓1", out)
-        self.assertIn("  acme/app#6  gamma  qc/T01 — draft", out)
+        self.assertIn("1. acme/app#5  gamma  qc/T01  unblocks 0 \u2014 merge (ready, checks \u27131)", out)
+        self.assertIn("2. acme/app#6  gamma  qc/T01  unblocks 0 \u2014 fix: draft \u2192 gamma", out)
         self.assertNotIn("acme/app#1 ", out)
 
     def test_party_without_synced_data_says_never_synced(self):
@@ -87,11 +102,11 @@ class OutputTests(QueueCliTestCase):
         code, out, err = self.queue(["--party", "zeta"], None)
         self.assertEqual(out.splitlines()[0], "merge queue \u00b7 party zeta \u00b7 never synced")
 
-    def test_empty_queue_says_nothing_is_ready(self):
+    def test_blocked_only_queue_keeps_every_row_with_a_fix_action(self):
         self.run_cli(["pr", "set", "acme/app#5", "--lifecycle", "converging"], "sess-3", self.repo_dir)
         code, out, err = self.queue(["--party", "gamma"], None)
-        self.assertIn("nothing ready to merge", out)
-        self.assertNotIn("1. ", out)
+        self.assertIn("1. acme/app#5  gamma  qc/T01  unblocks 0 \u2014 fix: converging \u2192 gamma", out)
+        self.assertNotIn("next action", out)
 
     def test_party_with_no_open_prs_says_so(self):
         self.run_cli(["party", "start", "epsilon"], "sess-5", self.repo_dir)
@@ -99,17 +114,25 @@ class OutputTests(QueueCliTestCase):
         self.assertEqual(code, 0, err)
         self.assertIn("no open tracked PRs", out)
 
-    def test_pins_show_in_the_reasons(self):
-        self.run_cli(["task", "done", "qb/T02"], "sess-2", self.repo_dir)
-        self.run_cli(["pr", "set", "acme/app#4", "--lifecycle", "converging"], "sess-2", self.repo_dir)
+    def test_pin_to_a_draft_pr_keeps_it_first_with_a_fix_action(self):
+        self.run_cli(["pr", "set", "acme/app#3", "--lifecycle", "draft"], "sess-1", self.repo_dir)
         code, out, err = self.run_cli(
-            ["merge-queue", "pin", "acme/app#3", "--before", "acme/app#2"], None, self.repo_dir
+            ["merge-queue", "pin", "acme/app#3", "--before", "acme/app#7"], None, self.repo_dir
         )
         self.assertEqual(code, 0, err)
         code, out, err = self.queue(["--raid", "ci"], None)
-        lines = out.splitlines()
-        self.assertTrue(lines[1].startswith("1. acme/app#3"))
-        self.assertIn("pinned before acme/app#2 by human", lines[1])
+        self.assertIn("acme/app#3  alpha  qa/T03  unblocks 1 \u2014 fix: draft \u2192 alpha", out)
+        self.assertIn("acme/app#7  delta  qd/T01  unblocks 0 \u2014 fix: waits on acme/app#3 \u2192 delta", out)
+        self.assertLess(out.index("acme/app#3  alpha"), out.index("acme/app#7  delta"))
+
+    def test_pins_show_in_the_ready_entry_text(self):
+        code, out, err = self.run_cli(
+            ["merge-queue", "pin", "acme/app#3", "--before", "acme/app#7"], None, self.repo_dir
+        )
+        self.assertEqual(code, 0, err)
+        code, out, err = self.queue(["--raid", "ci"], None)
+        self.assertIn("pinned before acme/app#7 by human", out)
+        self.assertIn("pinned after acme/app#3 by human", out)
 
     def test_merged_pr_drops_out(self):
         self.write_gh_fixture(
@@ -189,8 +212,7 @@ class DefaultScopeTests(QueueCliTestCase):
 
 
 class BoardLineTests(QueueCliTestCase):
-    def test_raid_board_starts_with_the_next_pr_to_merge(self):
-        self.run_cli(["task", "done", "qb/T02"], "sess-2", self.repo_dir)
+    def test_raid_board_starts_with_the_first_ready_pr_to_merge(self):
         code, out, err = self.run_cli(["board", "--raid", "ci"], None, self.repo_dir)
         self.assertEqual(code, 0, err)
         self.assertEqual(out.splitlines()[0], "next to merge: acme/app#2")
@@ -199,7 +221,7 @@ class BoardLineTests(QueueCliTestCase):
         code, out, err = self.run_cli(["board", "--party", "gamma"], None, self.repo_dir)
         self.assertIn("  next to merge: acme/app#5", out)
 
-    def test_no_line_when_the_queue_is_empty(self):
+    def test_no_line_when_nothing_is_ready(self):
         self.run_cli(["pr", "set", "acme/app#5", "--lifecycle", "converging"], "sess-3", self.repo_dir)
         code, out, err = self.run_cli(["board", "--party", "gamma"], None, self.repo_dir)
         self.assertNotIn("next to merge", out)
@@ -209,11 +231,23 @@ class BoardLineTests(QueueCliTestCase):
         self.assertFalse(out.splitlines()[0].startswith("next to merge"))
         self.assertIn("next to merge: acme/app#5", out)
 
-    def test_raid_board_without_a_queue_has_no_line(self):
+    def test_raid_board_without_a_ready_pr_has_no_line(self):
         self.run_cli(["pr", "set", "acme/app#7", "--lifecycle", "converging"], "sess-4", self.repo_dir)
         code, out, err = self.run_cli(["board", "--raid", "other"], None, self.repo_dir)
         self.assertEqual(code, 0, err)
         self.assertNotIn("next to merge", out)
+
+    def test_raid_board_shows_red_main_above_the_next_pr(self):
+        self.run_cli(["main", "red", "acme/app", "--reason", "ci down"], None, self.repo_dir)
+        code, out, err = self.run_cli(["board", "--raid", "ci"], None, self.repo_dir)
+        lines = out.splitlines()
+        self.assertEqual(lines[0], "MAIN RED: acme/app \u2014 ci down (manual)")
+        self.assertEqual(lines[1], "next to merge: acme/app#2")
+
+    def test_party_block_shows_red_main(self):
+        self.run_cli(["main", "red", "acme/app", "--reason", "ci down"], None, self.repo_dir)
+        code, out, err = self.run_cli(["board", "--party", "gamma"], None, self.repo_dir)
+        self.assertIn("  MAIN RED: acme/app \u2014 ci down (manual)", out)
 
 
 class SyncedLabelTests(QueueCliTestCase):
