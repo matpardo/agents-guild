@@ -149,7 +149,10 @@ class BoardModelShapeTests(BoardModelTestCase):
         pr = t01["prs"][0]
         self.assertEqual(
             set(pr),
-            {"repo", "number", "lifecycle", "checks_failing", "checks_passing", "what", "waits", "url"},
+            {
+                "repo", "number", "lifecycle", "checks_failing", "checks_passing", "checks_pending",
+                "what", "waits", "url",
+            },
         )
         self.assertEqual(pr["repo"], "acme/app")
         self.assertEqual(pr["number"], 1)

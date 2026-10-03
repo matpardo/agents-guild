@@ -198,9 +198,10 @@ Deterministic, per-party ranking, evaluated in order:
    asks from the raid's other member parties (`raid <name>: ask #<id> from
    <party>: "<question>"`), then the raid's merge queue entries for the other
    members' PRs, one line per PR in queue order with its action
-   (`raid <name>: merge queue <n>. <ref> <party> — merge` / `— fix: <reasons> →
-   <party>`, `next action:` before the number on the first blocked PR above a
-   ready one), preceded by `raid <name>: MAIN RED <repo> — <reason> (<source>)
+   (`raid <name>: merge queue <n>. <ref> <party> — merge` / `— promote: gh pr
+   ready → <party>` / `— wait: <reasons>` / `— fix: <reasons> → <party>`,
+   `next action:` before the number on the first blocked PR above one whose
+   action is `merge`), preceded by `raid <name>: MAIN RED <repo> — <reason> (<source>)
    → fix before anything` for each red main. Without `--all` only
    the first item is printed. Read-only: guild never merges and nothing is
    acknowledged.
@@ -382,7 +383,8 @@ only refreshes the synced state that sessions read.
 
 `guild merge-queue [--raid <name> | --party <name>]` prints every open tracked
 PR in priority order, blocked ones included and kept in place, with the next
-action for each: `merge`, or `fix: <reasons> → <party>`. It is read-only: no
+action for each: `merge`, `promote: gh pr ready → <party>`, `wait: <reasons>`
+or `fix: <reasons> → <party>`. It is read-only: no
 network call, no event. **Guild never merges**: the output is advice for a
 human, who merges by hand and re-runs the command after each merge (the
 last line of the output says so).
@@ -402,14 +404,44 @@ with `gh pr ready <n>`; `guild pr set --lifecycle` remains for the
 `converging` / `needs-human` nuance. `pr set --lifecycle ready` on a PR that
 is still draft on GitHub prints a hint, and the next sync reverts it.
 
-**Ready or blocked.** A PR is ready when its lifecycle is `ready`, no check
-is failing, `mergeable` is not `CONFLICTING`, and every task its own task
-depends on (SDD `Depends on`, through the quest's epic) is done by the same
-resolver `guild next` uses. Otherwise it is blocked, with every reason that
-applies: `needs-human`, `draft` or `converging` (its lifecycle), `checks
-failing (N)`, `merge conflict`, `waits on task Txx`. A PR that must come after
-a blocked PR (by task dependency or pin, transitively) is blocked too, with
-`waits on <ref>`. Merged and closed PRs never appear.
+**State.** Only merge blockers decide the state, in this precedence:
+
+- `blocked`: a check is failing, `mergeable` is `CONFLICTING`, a task its own
+  task depends on (SDD `Depends on`, through the quest's epic) is not done by
+  the same resolver `guild next` uses, its lifecycle is `needs-human`, or a PR
+  that must come before it (by task dependency or pin, transitively) is
+  blocked (`waits on <ref>`). Every reason that applies is listed: `needs-human`,
+  `checks failing (N)`, `merge conflict`, `waits on task Txx`, `waits on <ref>`.
+- `waiting`: not blocked, but checks are still running (`checks pending (N)`)
+  or a PR that must come before it is itself waiting or ready but still draft
+  (`waits on <ref>`).
+- `ready`: neither of the above.
+
+Check counts come from the `statusCheckRollup` of `gh pr view` (check runs
+and legacy commit statuses): a check run that has not completed and a status
+that is `PENDING` or `EXPECTED` count as pending, `FAILURE` and `ERROR`
+statuses count as failing, skipped and neutral runs are not counted. The
+pending count is stored in `prs.checks_pending` (column migration, rebuilt
+from the `pr.synced` event; events from before it replay as unknown).
+Failing checks beat pending ones: a PR with both is blocked. Merged and
+closed PRs never appear.
+
+**Labels.** `draft` and `converging` (the lifecycle from GitHub) are labels
+shown in brackets after the task, `[draft]`; they do not block. A draft that
+is otherwise `ready` is worth promoting, and one that is blocked or waiting
+is not.
+
+**Action.**
+
+| State | Label | Action |
+|---|---|---|
+| blocked | any | `fix: <reasons> → <party>` |
+| waiting | any | `wait: <reasons>` |
+| ready | `draft` / `converging` | `promote: gh pr ready → <party>` |
+| ready | none | `merge` |
+
+Waiting and ready actions are followed by the order notes in parentheses
+(`ready, checks ✓N`, `before ...`, `after ...`, `pinned ...`).
 
 **Order.** All open PRs are put in a topological order over hard
 constraints, and ties between PRs that are free to go first are broken by
@@ -427,7 +459,7 @@ value:
 
 A blocked PR is not moved to the bottom: if the top PR is blocked, fixing it
 is the first thing to do. `▶ next action:` marks the first blocked PR that
-sits above at least one ready PR.
+sits above at least one PR whose action is `merge`.
 
 ```
 merge queue · raid ci · synced 4 min ago
@@ -435,7 +467,9 @@ merge queue · raid ci · synced 4 min ago
 1. acme/app#1044  alpha  T01  unblocks 2 — merge (ready, checks ✓17; before acme/app#1047 (task T02 depends on T01))
 ▶ next action: 2. acme/app#1049  beta  T03  unblocks 1 — fix: checks failing (2) → beta
 3. acme/app#1047  beta  T02  unblocks 0 — fix: waits on acme/app#1049 → beta
-4. acme/app#1052  gamma  T07  unblocks 0 — merge (ready, checks ✓9)
+4. acme/app#1052  gamma  T07  unblocks 0 — wait: checks pending (3)
+5. acme/app#1055  gamma  T08 [draft]  unblocks 0 — promote: gh pr ready → gamma (ready, checks ✓9)
+6. acme/app#1058  gamma  T09  unblocks 0 — merge (ready, checks ✓9)
 guild never merges: merge in this order by hand; re-run after each merge
 ```
 
@@ -482,8 +516,8 @@ and an `unpin` of a missing pin are errors. `unpin` still works after a PR
 merges.
 
 `guild board --raid <name>` starts with `MAIN RED: <repo> — <reason> (<source>)`
-for each red main and `next to merge: <ref>` (the first ready PR of the
-queue), and each party block of `guild board` shows the same lines for that
+for each red main and `next to merge: <ref>` (the first PR of the
+queue whose action is `merge`), and each party block of `guild board` shows the same lines for that
 party's own queue, when they exist. `guild web` shows the same queues, see below.
 
 ### `guild drift`
@@ -568,7 +602,7 @@ screens it is a single column with asks and the merge queue first.
 refs, how many refs still block it, a collapsible context), active notices,
 the merge queue (one card per raid, plus one per party outside raids that has
 open PRs: a `MAIN RED` row per red main, then numbered PR links with their
-lifecycle badge, checks, party, task, state, `unblocks N`, the action and the
+label pills (`draft`, `converging`), checks, party, task, state, `unblocks N`, the action and the
 `next action` marker, blocked PRs in place; read-only, the same order as
 `guild merge-queue`, with `synced N min ago`; the party filter keeps
 only that party's PRs and the raid filter only that raid's card; the model
@@ -591,7 +625,9 @@ only (no inline style) and light and dark variants through
 `prefers-color-scheme`. A PR's lifecycle is a badge (`needs-human` red,
 `converging` amber, `ready` green, `draft` gray, `merged` purple, `closed`
 muted gray). Checks show `✗N` in red when N > 0 and muted otherwise, `✓N` in
-green, and `no checks` muted when there are none. A task's state is colored
+green, `⏳N` in amber when N checks are still running, and `no checks` muted
+when there are none. Merge queue entries in `waiting` state show their reason
+in amber. A task's state is colored
 too (`active` blue, `blocked` red, `queued` muted). The text labels stay, so
 color is never the only signal.
 

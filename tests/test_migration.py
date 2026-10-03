@@ -83,7 +83,7 @@ class MigrationTests(GuildTestCase):
         self.assertIn("handoff_path", {row["name"] for row in leaders_columns})
 
         prs_columns = {row["name"] for row in conn.execute("PRAGMA table_info(prs)").fetchall()}
-        for column in ("mergeable", "review_comment_count", "last_notified_comment_count", "last_activity_at"):
+        for column in ("mergeable", "review_comment_count", "last_notified_comment_count", "last_activity_at", "checks_pending"):
             self.assertIn(column, prs_columns)
 
         leader_row = conn.execute("SELECT * FROM leaders WHERE party = 'alpha'").fetchone()
@@ -93,6 +93,7 @@ class MigrationTests(GuildTestCase):
         pr_row = conn.execute("SELECT * FROM prs WHERE repo = 'acme/app' AND number = 1").fetchone()
         self.assertEqual(pr_row["what"], "x")
         self.assertIsNone(pr_row["mergeable"])
+        self.assertIsNone(pr_row["checks_pending"])
 
         for table in ("epics", "tasks"):
             self.assertEqual(conn.execute("SELECT COUNT(*) AS n FROM {}".format(table)).fetchone()["n"], 0)

@@ -18,6 +18,7 @@ def _pr(number, **overrides):
         "lifecycle": "ready",
         "checks_failing": 0,
         "checks_passing": 3,
+        "checks_pending": 0,
         "mergeable": "MERGEABLE",
         "additions": 10,
         "deletions": 0,
@@ -140,11 +141,11 @@ class StateTests(unittest.TestCase):
     def test_needs_human(self):
         self.assertEqual(self._blocked_reasons(lifecycle="needs-human"), ["needs-human"])
 
-    def test_draft(self):
-        self.assertEqual(self._blocked_reasons(lifecycle="draft"), ["draft"])
-
-    def test_converging(self):
-        self.assertEqual(self._blocked_reasons(lifecycle="converging"), ["converging"])
+    def test_draft_and_converging_are_labels_not_blocked_reasons(self):
+        for lifecycle in ("draft", "converging"):
+            with self.subTest(lifecycle=lifecycle):
+                entry = self._entry(lifecycle=lifecycle)
+                self.assertEqual((entry["state"], entry["labels"]), ("ready", [lifecycle]))
 
     def test_failing_checks(self):
         self.assertEqual(self._blocked_reasons(checks_failing=2), ["checks failing (2)"])
@@ -164,15 +165,43 @@ class StateTests(unittest.TestCase):
 
     def test_reasons_accumulate_in_a_fixed_order(self):
         reasons = self._blocked_reasons(
-            lifecycle="converging", checks_failing=1, mergeable="CONFLICTING", unmet_deps=["T09"]
+            lifecycle="needs-human", checks_failing=1, mergeable="CONFLICTING", unmet_deps=["T09"]
         )
         self.assertEqual(
-            reasons, ["converging", "checks failing (1)", "merge conflict", "waits on task T09"]
+            reasons, ["needs-human", "checks failing (1)", "merge conflict", "waits on task T09"]
         )
 
     def test_blocked_action_names_the_reasons_and_the_party(self):
-        entry = self._entry(lifecycle="draft", checks_failing=1, party="beta")
-        self.assertEqual(entry["action"], "fix: draft; checks failing (1) \u2192 beta")
+        entry = self._entry(checks_failing=1, mergeable="CONFLICTING", party="beta")
+        self.assertEqual(entry["action"], "fix: checks failing (1); merge conflict \u2192 beta")
+
+    def test_pending_checks_make_the_pr_wait(self):
+        entry = self._entry(checks_pending=2)
+        self.assertEqual(
+            (entry["state"], entry["reasons"], entry["action"], entry["why"]),
+            ("waiting", ["checks pending (2)"], "wait: checks pending (2)", ""),
+        )
+
+    def test_failing_and_pending_checks_block(self):
+        entry = self._entry(checks_failing=1, checks_pending=2)
+        self.assertEqual((entry["state"], entry["reasons"]), ("blocked", ["checks failing (1)"]))
+
+    def test_ready_draft_is_promoted(self):
+        entry = self._entry(lifecycle="draft", party="beta")
+        self.assertEqual(
+            (entry["state"], entry["action"], entry["why"]),
+            ("ready", "promote: gh pr ready \u2192 beta", "ready, checks \u27133"),
+        )
+
+    def test_draft_with_a_conflict_is_blocked(self):
+        entry = self._entry(lifecycle="draft", mergeable="CONFLICTING", party="beta")
+        self.assertEqual(
+            (entry["state"], entry["action"]), ("blocked", "fix: merge conflict \u2192 beta")
+        )
+
+    def test_converging_with_pending_checks_waits(self):
+        entry = self._entry(lifecycle="converging", checks_pending=1)
+        self.assertEqual((entry["state"], entry["labels"]), ("waiting", ["converging"]))
 
     def test_entry_carries_the_pr_identity(self):
         entry = _compute([_pr(4, lifecycle="draft", party="beta")], [])["queue"][0]
@@ -195,24 +224,24 @@ class StateTests(unittest.TestCase):
 
 class BlockedPlacementTests(unittest.TestCase):
     def test_blocked_pr_pinned_first_stays_first(self):
-        result = _compute([_pr(1, lifecycle="draft"), _pr(2), _pr(3)], [_pin(1, 3, "a")])
+        result = _compute([_pr(1, lifecycle="needs-human"), _pr(2), _pr(3)], [_pin(1, 3, "a")])
         self.assertEqual(_refs(result["queue"]), [_ref(1), _ref(2), _ref(3)])
         self.assertEqual([entry["state"] for entry in result["queue"]], ["blocked", "ready", "blocked"])
 
     def test_pin_to_a_blocked_pr_makes_the_pinned_pr_wait_on_it(self):
-        result = _compute([_pr(1, lifecycle="draft"), _pr(2), _pr(3)], [_pin(1, 3, "a")])
+        result = _compute([_pr(1, lifecycle="needs-human"), _pr(2), _pr(3)], [_pin(1, 3, "a")])
         entry = _by_ref(result)[_ref(3)]
         self.assertEqual(entry["reasons"], ["waits on acme/app#1"])
         self.assertEqual(entry["action"], "fix: waits on acme/app#1 \u2192 alpha")
 
     def test_waiting_propagates_through_chained_pins(self):
-        prs = [_pr(1, lifecycle="draft"), _pr(3), _pr(5)]
+        prs = [_pr(1, lifecycle="needs-human"), _pr(3), _pr(5)]
         result = _compute(prs, [_pin(1, 3, "a"), _pin(3, 5, "a")])
         self.assertEqual(_refs(result["queue"]), [_ref(1), _ref(3), _ref(5)])
         self.assertEqual(_by_ref(result)[_ref(5)]["reasons"], ["waits on acme/app#3"])
 
     def test_dependent_of_a_blocked_pr_waits_on_it(self):
-        prs = [_pr(1, dep_keys=[("acme", "epic", "T02")]), _pr(2, lifecycle="draft")]
+        prs = [_pr(1, dep_keys=[("acme", "epic", "T02")]), _pr(2, lifecycle="needs-human")]
         result = _compute(prs, [])
         self.assertEqual(_refs(result["queue"]), [_ref(2), _ref(1)])
         self.assertEqual(_by_ref(result)[_ref(1)]["reasons"], ["waits on acme/app#2"])
@@ -222,7 +251,7 @@ class BlockedPlacementTests(unittest.TestCase):
         self.assertEqual([entry["state"] for entry in _compute(prs, [])["queue"]], ["ready", "ready"])
 
     def test_blocked_pr_keeps_its_place_by_unblock_value(self):
-        prs = [_pr(1), _pr(2, lifecycle="draft", globs=["a"]), _pr(3, globs=["a"])]
+        prs = [_pr(1), _pr(2, lifecycle="needs-human", globs=["a"]), _pr(3, globs=["a"])]
         result = _compute(prs, [])
         self.assertEqual(_refs(result["queue"]), [_ref(2), _ref(3), _ref(1)])
 
@@ -231,16 +260,59 @@ class BlockedPlacementTests(unittest.TestCase):
         self.assertEqual([entry["unblocks"] for entry in _compute(prs, [])["queue"]], [1, 1])
 
     def test_next_action_flags_the_first_blocked_entry_above_a_ready_one(self):
-        prs = [_pr(1, lifecycle="draft"), _pr(2, lifecycle="draft"), _pr(3)]
+        prs = [_pr(1, lifecycle="needs-human"), _pr(2, lifecycle="needs-human"), _pr(3)]
         result = _compute(prs, [])
         self.assertEqual([entry["next_action"] for entry in result["queue"]], [True, False, False])
 
     def test_next_action_is_absent_when_no_ready_entry_follows(self):
-        result = _compute([_pr(1), _pr(2, lifecycle="draft")], [])
+        result = _compute([_pr(1), _pr(2, lifecycle="needs-human")], [])
+        self.assertEqual([entry["next_action"] for entry in result["queue"]], [False, False])
+
+    def test_next_action_ignores_a_promote_after_the_blocked_entry(self):
+        prs = [_pr(1, lifecycle="needs-human"), _pr(2, lifecycle="draft")]
+        result = _compute(prs, [])
         self.assertEqual([entry["next_action"] for entry in result["queue"]], [False, False])
 
     def test_next_action_is_absent_when_everything_is_ready(self):
         result = _compute([_pr(1), _pr(2)], [])
+        self.assertEqual([entry["next_action"] for entry in result["queue"]], [False, False])
+
+
+class WaitingPropagationTests(unittest.TestCase):
+    def _successor_entry(self, predecessor):
+        prs = [_pr(1, dep_keys=[("acme", "epic", "T02")]), _pr(2, **predecessor)]
+        return _by_ref(_compute(prs, []))[_ref(1)]
+
+    def test_successor_of_a_draft_ready_pr_waits(self):
+        entry = self._successor_entry({"lifecycle": "draft"})
+        self.assertEqual(
+            (entry["state"], entry["reasons"], entry["action"]),
+            ("waiting", ["waits on acme/app#2"], "wait: waits on acme/app#2"),
+        )
+
+    def test_successor_of_a_waiting_pr_waits(self):
+        entry = self._successor_entry({"checks_pending": 1})
+        self.assertEqual((entry["state"], entry["reasons"]), ("waiting", ["waits on acme/app#2"]))
+
+    def test_successor_of_a_blocked_pr_is_blocked(self):
+        entry = self._successor_entry({"checks_failing": 1})
+        self.assertEqual((entry["state"], entry["reasons"]), ("blocked", ["waits on acme/app#2"]))
+
+    def test_waiting_propagates_through_a_chain(self):
+        prs = [_pr(1, checks_pending=1), _pr(3), _pr(5)]
+        result = _compute(prs, [_pin(1, 3, "a"), _pin(3, 5, "a")])
+        self.assertEqual(
+            [entry["state"] for entry in result["queue"]], ["waiting", "waiting", "waiting"]
+        )
+
+    def test_blocked_beats_waiting(self):
+        prs = [_pr(1, checks_failing=1), _pr(2, checks_pending=1), _pr(3)]
+        result = _compute(prs, [_pin(1, 3, "a"), _pin(2, 3, "a")])
+        entry = _by_ref(result)[_ref(3)]
+        self.assertEqual((entry["state"], entry["reasons"]), ("blocked", ["waits on acme/app#1"]))
+
+    def test_waiting_entry_does_not_flag_next_action(self):
+        result = _compute([_pr(1, checks_pending=1), _pr(2)], [])
         self.assertEqual([entry["next_action"] for entry in result["queue"]], [False, False])
 
 

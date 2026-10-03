@@ -91,7 +91,11 @@ class OutputTests(QueueCliTestCase):
         self.assertEqual(code, 0, err)
         self.assertIn("merge queue · party gamma", out)
         self.assertIn("1. acme/app#5  gamma  qc/T01  unblocks 0 \u2014 merge (ready, checks \u27131)", out)
-        self.assertIn("2. acme/app#6  gamma  qc/T01  unblocks 0 \u2014 fix: draft \u2192 gamma", out)
+        self.assertIn(
+            "2. acme/app#6  gamma  qc/T01 [draft]  unblocks 0"
+            " \u2014 promote: gh pr ready \u2192 gamma (ready, checks \u27131)",
+            out,
+        )
         self.assertNotIn("acme/app#1 ", out)
 
     def test_party_without_synced_data_says_never_synced(self):
@@ -103,9 +107,20 @@ class OutputTests(QueueCliTestCase):
         self.assertEqual(out.splitlines()[0], "merge queue \u00b7 party zeta \u00b7 never synced")
 
     def test_blocked_only_queue_keeps_every_row_with_a_fix_action(self):
-        self.run_cli(["pr", "set", "acme/app#5", "--lifecycle", "converging"], "sess-3", self.repo_dir)
+        self.run_cli(["pr", "set", "acme/app#5", "--lifecycle", "needs-human"], "sess-3", self.repo_dir)
         code, out, err = self.queue(["--party", "gamma"], None)
-        self.assertIn("1. acme/app#5  gamma  qc/T01  unblocks 0 \u2014 fix: converging \u2192 gamma", out)
+        self.assertIn("1. acme/app#5  gamma  qc/T01  unblocks 0 \u2014 fix: needs-human \u2192 gamma", out)
+        self.assertNotIn("next action", out)
+
+    def test_pending_checks_show_a_wait_action(self):
+        rollup = [{"__typename": "CheckRun", "status": "IN_PROGRESS", "conclusion": ""}]
+        self.write_gh_fixture("view_acme-app_5", dict(OPEN_VIEW, statusCheckRollup=rollup))
+        self.write_gh_fixture("view_files_acme-app_5", diff_fixture(["src/d.py"], 1, 1, "2026-09-03T10:00:00Z"))
+        code, out, err = self.sync_gh("sess-1")
+        self.assertEqual(code, 0, err)
+        code, out, err = self.queue(["--party", "gamma"], None)
+        self.assertIn("1. acme/app#5  gamma  qc/T01  unblocks 0 \u2014 wait: checks pending (1)", out)
+        self.assertIn("2. acme/app#6  gamma  qc/T01 [draft]", out)
         self.assertNotIn("next action", out)
 
     def test_party_with_no_open_prs_says_so(self):
@@ -114,14 +129,26 @@ class OutputTests(QueueCliTestCase):
         self.assertEqual(code, 0, err)
         self.assertIn("no open tracked PRs", out)
 
-    def test_pin_to_a_draft_pr_keeps_it_first_with_a_fix_action(self):
+    def test_pin_after_a_ready_draft_pr_makes_the_pinned_pr_wait(self):
         self.run_cli(["pr", "set", "acme/app#3", "--lifecycle", "draft"], "sess-1", self.repo_dir)
         code, out, err = self.run_cli(
             ["merge-queue", "pin", "acme/app#3", "--before", "acme/app#7"], None, self.repo_dir
         )
         self.assertEqual(code, 0, err)
         code, out, err = self.queue(["--raid", "ci"], None)
-        self.assertIn("acme/app#3  alpha  qa/T03  unblocks 1 \u2014 fix: draft \u2192 alpha", out)
+        self.assertIn(
+            "acme/app#3  alpha  qa/T03 [draft]  unblocks 1 \u2014 promote: gh pr ready \u2192 alpha", out
+        )
+        self.assertIn("acme/app#7  delta  qd/T01  unblocks 0 \u2014 wait: waits on acme/app#3", out)
+
+    def test_pin_to_a_blocked_pr_keeps_it_first_with_a_fix_action(self):
+        self.run_cli(["pr", "set", "acme/app#3", "--lifecycle", "needs-human"], "sess-1", self.repo_dir)
+        code, out, err = self.run_cli(
+            ["merge-queue", "pin", "acme/app#3", "--before", "acme/app#7"], None, self.repo_dir
+        )
+        self.assertEqual(code, 0, err)
+        code, out, err = self.queue(["--raid", "ci"], None)
+        self.assertIn("acme/app#3  alpha  qa/T03  unblocks 1 \u2014 fix: needs-human \u2192 alpha", out)
         self.assertIn("acme/app#7  delta  qd/T01  unblocks 0 \u2014 fix: waits on acme/app#3 \u2192 delta", out)
         self.assertLess(out.index("acme/app#3  alpha"), out.index("acme/app#7  delta"))
 

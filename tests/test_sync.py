@@ -41,6 +41,66 @@ class SyncTests(GuildTestCase):
         code, out, err = self.run_cli(["board"], "sess-1", self.repo_dir)
         self.assertIn("app#1  merged  ✗1 ✓1", out)
 
+    def _sync_rollup(self, rollup):
+        self.write_gh_fixture(
+            "view_acme-app_1",
+            {
+                "state": "OPEN", "isDraft": False, "headRefName": "feature/x", "title": "t",
+                "statusCheckRollup": rollup,
+            },
+        )
+        code, out, err = self.run_cli(["sync", "--source", "gh"], "sess-1", self.repo_dir)
+        self.assertEqual(code, 0)
+        conn = db.connect(paths.db_path())
+        conn.row_factory = sqlite3.Row
+        row = conn.execute(
+            "SELECT checks_failing, checks_passing, checks_pending FROM prs WHERE number = 1"
+        ).fetchone()
+        conn.close()
+        return (row["checks_failing"], row["checks_passing"], row["checks_pending"])
+
+    def test_status_context_failure_counts_as_failing(self):
+        rollup = [
+            {"__typename": "StatusContext", "state": "FAILURE"},
+            {"__typename": "StatusContext", "state": "ERROR"},
+            {"__typename": "StatusContext", "state": "SUCCESS"},
+        ]
+        self.assertEqual(self._sync_rollup(rollup), (2, 1, 0))
+
+    def test_pending_checks_are_counted(self):
+        rollup = [
+            {"__typename": "CheckRun", "status": "QUEUED", "conclusion": ""},
+            {"__typename": "CheckRun", "status": "IN_PROGRESS", "conclusion": ""},
+            {"__typename": "CheckRun", "status": "COMPLETED", "conclusion": "SUCCESS"},
+            {"__typename": "CheckRun", "status": "COMPLETED", "conclusion": "SKIPPED"},
+            {"__typename": "StatusContext", "state": "PENDING"},
+            {"__typename": "StatusContext", "state": "EXPECTED"},
+        ]
+        self.assertEqual(self._sync_rollup(rollup), (0, 1, 4))
+
+    def test_board_shows_pending_checks_glyph(self):
+        self._sync_rollup([{"__typename": "StatusContext", "state": "PENDING"}])
+        code, out, err = self.run_cli(["board"], "sess-1", self.repo_dir)
+        self.assertIn("app#1  ready  ✗0 ✓0 ⏳1", out)
+
+    def test_board_says_no_checks_only_when_every_count_is_zero(self):
+        self._sync_rollup([])
+        code, out, err = self.run_cli(["board"], "sess-1", self.repo_dir)
+        self.assertIn("app#1  ready  no checks", out)
+
+    def test_old_pr_synced_event_without_checks_pending_replays(self):
+        self._sync_rollup([{"conclusion": "FAILURE"}])
+        conn = db.connect(paths.db_path())
+        conn.execute("UPDATE events SET payload = json_remove(payload, '$.checks_pending') WHERE kind = 'pr.synced'")
+        conn.commit()
+        conn.close()
+        code, out, err = self.run_cli(["rebuild"], None, None)
+        self.assertEqual(code, 0)
+        conn = db.connect(paths.db_path())
+        row = conn.execute("SELECT checks_failing, checks_pending FROM prs WHERE number = 1").fetchone()
+        conn.close()
+        self.assertEqual((row[0], row[1]), (1, None))
+
     def test_sync_closes_notice_when_until_met(self):
         self.run_cli(
             [
