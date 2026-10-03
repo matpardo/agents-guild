@@ -1,7 +1,9 @@
 from guild.errors import GuildError
 
 UNBOUND_HINT = (
-    "session not bound: run `guild party start <name>` or `guild party resume <party>`"
+    "session not bound: continuing a party's work \u2192 `guild party resume <party>`;"
+    " otherwise ask the human before `guild party start` or `guild quest add`"
+    " (one-off changes stay unbound)"
 )
 
 

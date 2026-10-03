@@ -14,6 +14,8 @@ _EXPECTED_HOOKS = (
     ("PreToolUse", "guild hook pre-edit"),
 )
 
+_EXPECTED_ASK_RULES = ("Bash(guild party start:*)", "Bash(guild quest add:*)")
+
 
 _TRACE_RE = re.compile(r"guild|ask #[0-9]|notice #[0-9]", re.IGNORECASE)
 _PR_SCAN_FIELDS = ("number", "title", "body", "comments", "commits")
@@ -23,28 +25,41 @@ def _claude_dir():
     return Path.home() / ".claude"
 
 
-def _configured_commands(settings_path):
+def _load_settings(settings_path):
     if not settings_path.is_file():
         return {}
     try:
-        hooks = json.loads(settings_path.read_text()).get("hooks", {})
+        return json.loads(settings_path.read_text())
     except json.JSONDecodeError as error:
         raise GuildError("invalid JSON in {}: {}".format(settings_path, error), 1)
+
+
+def _configured_commands(settings):
     commands = {}
-    for event, entries in hooks.items():
+    for event, entries in settings.get("hooks", {}).items():
         for entry in entries:
             for hook in entry.get("hooks", []):
                 commands.setdefault(event, []).append(hook.get("command", ""))
     return commands
 
 
-def _hook_lines(settings_path):
-    commands = _configured_commands(settings_path)
+def _hook_lines(settings):
+    commands = _configured_commands(settings)
     lines = []
     for event, expected in _EXPECTED_HOOKS:
         wired = any(command.endswith(expected) for command in commands.get(event, []))
         status = "ok     " if wired else "missing"
         lines.append((wired, "{} hook {}: {}".format(status, event, expected)))
+    return lines
+
+
+def _ask_rule_lines(settings):
+    configured = settings.get("permissions", {}).get("ask", [])
+    lines = []
+    for rule in _EXPECTED_ASK_RULES:
+        present = rule in configured
+        status = "ok     " if present else "missing"
+        lines.append((present, "{} ask rule {}".format(status, rule)))
     return lines
 
 
@@ -108,7 +123,9 @@ def _scan_lines(ctx):
 
 
 def run(ctx, scan_prs):
-    checks = _hook_lines(_claude_dir() / "settings.json")
+    settings = _load_settings(_claude_dir() / "settings.json")
+    checks = _hook_lines(settings)
+    checks.extend(_ask_rule_lines(settings))
     checks.append(_rules_line())
     checks.extend(_project_lines(ctx.projects_dir))
     if scan_prs:

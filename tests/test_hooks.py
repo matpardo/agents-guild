@@ -15,6 +15,7 @@ class SessionStartHookTests(GuildTestCase):
         code, out, err = self.run_hook("session-start", {"session_id": "sess-1", "cwd": str(self.root)})
         self.assertEqual(code, 0)
         self.assertIn("session not bound", out)
+        self.assertIn("ask the human before `guild party start` or `guild quest add`", out)
 
     def test_bound_prints_brief_and_spawns_sync(self):
         repo_dir = self.register_project("acme", ["acme/app"])
