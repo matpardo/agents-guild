@@ -209,6 +209,24 @@ def _reason(pr, position, edges):
     return "; ".join(clauses)
 
 
+def _block_behind_blocked_pins(eligible, blocked, pins):
+    blocked_refs = {entry["ref"] for entry in blocked}
+    remaining = list(eligible)
+    moved = True
+    while moved:
+        moved = False
+        for pin in pins:
+            held = next((pr for pr in remaining if pr["ref"] == pin["second"]), None)
+            if held is None or pin["first"] not in blocked_refs:
+                continue
+            reason = "pinned after {} (blocked) by {}".format(pin["first"], pin["author"] or _HUMAN_AUTHOR)
+            blocked.append(dict(_entry(held), reasons=[reason]))
+            blocked_refs.add(held["ref"])
+            remaining.remove(held)
+            moved = True
+    return remaining
+
+
 def compute(prs, pins):
     open_prs = [pr for pr in prs if _is_open(pr)]
     blocked = []
@@ -219,6 +237,7 @@ def compute(prs, pins):
             blocked.append(dict(_entry(pr), reasons=reasons))
             continue
         eligible.append(pr)
+    eligible = _block_behind_blocked_pins(eligible, blocked, pins)
     eligible_refs = {pr["ref"] for pr in eligible}
     hard_edges = _task_edges(eligible) + _pin_edges(eligible_refs, pins)
     hard_pairs = [(edge["first"], edge["second"]) for edge in hard_edges]
