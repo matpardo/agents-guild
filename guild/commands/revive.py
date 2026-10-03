@@ -43,7 +43,7 @@ class _Entry:
 
     def command(self):
         if self.resumable():
-            return resume.resume_command(self.session_id, self.party, self.mode)
+            return resume.resume_command(self.session_id, self.party, self.generation, self.mode)
         return resume.fresh_command(self.party, self.generation + 1, None, self.mode)
 
 

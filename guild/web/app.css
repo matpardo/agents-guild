@@ -24,6 +24,12 @@
   --lifecycle-merged-bg: #ece0fa;
   --lifecycle-closed-fg: #6b6b73;
   --lifecycle-closed-bg: #f0f0f2;
+  --role-lead-fg: #5b2a9e;
+  --role-lead-bg: #ece0fa;
+  --role-member-fg: #1d4f9a;
+  --role-member-bg: #dce8fb;
+  --role-solo-fg: #4a4a52;
+  --role-solo-bg: #e6e6ea;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -53,6 +59,12 @@
     --lifecycle-merged-bg: #3a2660;
     --lifecycle-closed-fg: #9a9aa4;
     --lifecycle-closed-bg: #26272e;
+    --role-lead-fg: #d3b5ff;
+    --role-lead-bg: #3a2660;
+    --role-member-fg: #a9c8ff;
+    --role-member-bg: #1c2f52;
+    --role-solo-fg: #c4c4cc;
+    --role-solo-bg: #33343c;
   }
 }
 
@@ -519,6 +531,27 @@ main.history-main {
   width: 100%;
   height: 0.6rem;
   accent-color: var(--green);
+}
+
+.role-badge {
+  border-radius: 3px;
+  padding: 0 0.35rem;
+  font-size: 0.75rem;
+}
+
+.role-lead {
+  background: var(--role-lead-bg);
+  color: var(--role-lead-fg);
+}
+
+.role-member {
+  background: var(--role-member-bg);
+  color: var(--role-member-fg);
+}
+
+.role-solo {
+  background: var(--role-solo-bg);
+  color: var(--role-solo-fg);
 }
 
 .badge-warn {

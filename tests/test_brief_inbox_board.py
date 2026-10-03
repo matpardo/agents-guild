@@ -189,6 +189,19 @@ class BoardTests(GuildTestCase):
         self.assertIn("DemoRED", out)
         self.assertNotIn("\x1b", out)
 
+    def test_board_header_shows_solo_role(self):
+        repo_dir = self.register_project("acme", ["acme/app"])
+        self.run_cli(["party", "start", "alpha"], "sess-1", repo_dir)
+        code, out, err = self.run_cli(["board"], None, None)
+        self.assertIn("(gen 1, active, solo)", out)
+
+    def test_board_header_shows_raid_lead_role(self):
+        repo_dir = self.register_project("acme", ["acme/app"])
+        self.run_cli(["party", "start", "alpha"], "sess-1", repo_dir)
+        self.run_cli(["raid", "join", "infra", "--ttl", "2h", "--lead"], "sess-1", repo_dir)
+        code, out, err = self.run_cli(["board"], None, None)
+        self.assertIn("(gen 1, active, RL infra)", out)
+
 
 if __name__ == "__main__":
     import unittest

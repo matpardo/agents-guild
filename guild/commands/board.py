@@ -324,7 +324,12 @@ def _leader_session_name(conn, party_name):
 
 def _leader_label(ctx, party_row):
     session_name = _leader_session_name(ctx.conn, party_row["name"]) or "no leader"
-    return "{} (gen {}, {})".format(session_name, party_row["generation"], party_row["state"])
+    role = raid_commands.raid_role_label(
+        raid_commands.member_raids(ctx.conn, ctx.now, party_row["name"])
+    )
+    return "{} (gen {}, {}, {})".format(
+        session_name, party_row["generation"], party_row["state"], role
+    )
 
 
 def _party_pr_rows(conn, party_name):

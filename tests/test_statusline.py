@@ -43,6 +43,46 @@ class StatuslineTests(GuildTestCase):
         self.assertIn("1 notice", out)
 
 
+class StatuslineIdentityTests(GuildTestCase):
+    def setUp(self):
+        super().setUp()
+        self.repo_dir = self.register_project("acme", ["acme/app"])
+        self.run_cli(["party", "start", "alpha"], "sess-1", self.repo_dir)
+
+    def _statusline(self, session):
+        code, out, err = self.run_cli(["statusline", "--session", session], None, None)
+        self.assertEqual(code, 0)
+        return out.strip()
+
+    def test_solo_bound_shows_generation_only(self):
+        self.assertEqual(self._statusline("sess-1"), "g1")
+
+    def test_solo_bound_appends_pending_parts_after_generation(self):
+        self.run_cli(["notice", "create", "pipeline down", "--to", "guild", "--ttl", "2h"], None, None)
+        self.assertEqual(self._statusline("sess-1"), "g1 · 1 notice")
+
+    def test_member_shows_raid_name(self):
+        self.run_cli(["raid", "join", "infra", "--ttl", "2h"], "sess-1", self.repo_dir)
+        self.assertEqual(self._statusline("sess-1"), "⚔ infra · g1")
+
+    def test_lead_shows_lead_marker(self):
+        self.run_cli(["raid", "join", "infra", "--ttl", "2h", "--lead"], "sess-1", self.repo_dir)
+        self.assertEqual(self._statusline("sess-1"), "⚔ infra·RL · g1")
+
+    def test_paused_raid_shows_pause_marker(self):
+        self.run_cli(["raid", "join", "infra", "--ttl", "2h", "--lead"], "sess-1", self.repo_dir)
+        self.run_cli(["raid", "pause", "infra"], "sess-1", self.repo_dir)
+        self.assertEqual(self._statusline("sess-1"), "⚔ infra·RL ⏸ · g1")
+
+    def test_multiple_raids_are_sorted_and_comma_joined(self):
+        self.run_cli(["raid", "join", "zeta", "--ttl", "2h"], "sess-1", self.repo_dir)
+        self.run_cli(["raid", "join", "infra", "--ttl", "2h", "--lead"], "sess-1", self.repo_dir)
+        self.assertEqual(self._statusline("sess-1"), "⚔ infra·RL, zeta · g1")
+
+    def test_unbound_session_is_unchanged(self):
+        self.assertEqual(self._statusline("sess-unbound"), "")
+
+
 if __name__ == "__main__":
     import unittest
 

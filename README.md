@@ -151,7 +151,7 @@ guild sync-timer install --every <dur> | uninstall | print
 guild drift [--epic <slug> | --all]
 guild brief
 guild inbox --since-last
-guild statusline --session <id> [--ctx <pct>]
+guild statusline --session <id> [--ctx <pct>]   # bound: [⚔ <raid>[·RL][ ⏸], ...] · g<N> · ⚑<n> asks · <n> notices
 
 guild hook session-start   # reads Claude Code hook JSON on stdin
 guild hook prompt-submit
@@ -767,7 +767,7 @@ guild revive --list            # no tmux needed: one copy-paste command per part
 ```
 
 - `resume` (the leader transcript exists under `~/.claude/projects`) runs
-  `claude --resume <session-id> --name <party> [--permission-mode <mode>]`
+  `claude --resume <session-id> --name <party>-g<N> [--permission-mode <mode>]`
   in the recorded cwd. `fresh` runs the handoff resume command
   (`GUILD_RESUME=<party> claude -n <party>-g<N+1> ...`) from the same cwd.
 - cwd and permission mode come from the leader row (recorded by the
@@ -779,10 +779,11 @@ guild revive --list            # no tmux needed: one copy-paste command per part
   and `allow-rename` off, and the `guild` session sets `set-titles on` /
   `set-titles-string "#W"` so the outer terminal title shows the party.
   Only session and window options are set; your `~/.tmux.conf` is untouched.
-  `claude --name <party>` makes the prompt box and `/resume` picker show it.
+  Claude sessions are named `<party>-g<N>` on both fresh launch and resume,
+  so the prompt box and `/resume` picker show the party and its generation.
 - `--list` prints, per party, a one-liner for terminals without tmux: it sets
   the tab title with `printf '\033]0;<party>\007'`, then `cd <cwd> && claude
-  --resume <id> --name <party> ...`.
+  --resume <id> --name <party>-g<N> ...`.
 - The last line is `tmux attach -t guild`. `/goal` and other in-session state
   are not restored: re-issue `/goal` where you used it.
 - Without tmux installed, launching fails with an install hint; `--list`

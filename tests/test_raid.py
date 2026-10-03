@@ -1,9 +1,26 @@
 import sqlite3
+import unittest
 from datetime import timedelta
 from unittest import mock
 
 from guild import timeutil
+from guild.commands import raid as raid_commands
 from tests.testutil import GuildTestCase
+
+
+class RaidRoleLabelTests(unittest.TestCase):
+    def test_solo_when_no_raids(self):
+        self.assertEqual(raid_commands.raid_role_label([]), "solo")
+
+    def test_member_shows_raid_name(self):
+        self.assertEqual(raid_commands.raid_role_label([{"raid": "infra", "lead": 0}]), "infra")
+
+    def test_lead_is_prefixed(self):
+        self.assertEqual(raid_commands.raid_role_label([{"raid": "infra", "lead": 1}]), "RL infra")
+
+    def test_multiple_sorted_by_name(self):
+        rows = [{"raid": "zeta", "lead": 0}, {"raid": "infra", "lead": 1}]
+        self.assertEqual(raid_commands.raid_role_label(rows), "RL infra, zeta")
 
 
 class RaidJoinLeaveTests(GuildTestCase):
