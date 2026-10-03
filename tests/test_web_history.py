@@ -49,13 +49,31 @@ class HistoryRouteTests(WebServerTestCase):
         self.assertEqual(response.getheader("Content-Type"), "application/javascript; charset=utf-8")
         self.assertTrue(body)
 
-    def test_board_page_links_to_history(self):
-        response, body = self._get("/", self._host())
-        self.assertIn(b'href="/history"', body)
+    def _assert_nav(self, path):
+        response, body = self._get(path, self._host())
+        self.assertEqual(response.status, 200)
+        for href in (b'href="/"', b'href="/progress"', b'href="/history"'):
+            with self.subTest(path=path, href=href):
+                self.assertIn(href, body)
+        self.assertLess(body.index(b'href="/"'), body.index(b'href="/progress"'))
+        self.assertLess(body.index(b'href="/progress"'), body.index(b'href="/history"'))
 
-    def test_history_page_links_back_to_board(self):
-        response, body = self._get("/history", self._host())
-        self.assertIn(b'href="/"', body)
+    def test_every_page_has_the_three_way_navigation(self):
+        for path in ("/", "/progress", "/history"):
+            self._assert_nav(path)
+
+    def test_progress_page_is_served_as_html(self):
+        response, body = self._get("/progress", self._host())
+        self.assertEqual(response.status, 200)
+        self.assertEqual(response.getheader("Content-Type"), "text/html; charset=utf-8")
+        self.assertIn(b'src="/progress.js"', body)
+        self.assertIn(b'id="progress-table"', body)
+
+    def test_progress_js_is_served_as_javascript(self):
+        response, body = self._get("/progress.js", self._host())
+        self.assertEqual(response.status, 200)
+        self.assertEqual(response.getheader("Content-Type"), "application/javascript; charset=utf-8")
+        self.assertIn(b"/api/history", body)
 
     def test_api_history_returns_model_shape_when_empty(self):
         response, model = self._get_history("")
@@ -90,17 +108,38 @@ class HistoryRouteTests(WebServerTestCase):
         response, model = self._get_history("?bogus=1")
         self.assertEqual(len(model["quests"]), 1)
 
-    def test_page_has_in_progress_and_incomplete_sections(self):
+    def test_history_page_has_achievement_sections_and_no_active_quests(self):
         response, body = self._get("/history", self._host())
-        self.assertIn(b'id="active-quests"', body)
-        self.assertIn(b'id="incomplete-quests"', body)
-        self.assertLess(body.index(b'id="active-quests"'), body.index(b'id="quests"'))
-        self.assertLess(body.index(b'id="quests"'), body.index(b'id="incomplete-quests"'))
+        self.assertNotIn(b'id="active-quests"', body)
+        for section in (b'id="totals"', b'id="quests"', b'id="raids"', b'id="incomplete-quests"'):
+            with self.subTest(section=section):
+                self.assertIn(section, body)
+        self.assertLess(body.index(b'id="quests"'), body.index(b'id="raids"'))
+        self.assertLess(body.index(b'id="raids"'), body.index(b'id="incomplete-quests"'))
 
-    def test_js_renders_new_sections(self):
+    def test_history_js_renders_achievement_views(self):
         response, body = self._get("/history.js", self._host())
-        self.assertIn(b"nothing in progress", body)
         self.assertIn(b"Closed without completing", body)
+        self.assertIn(b"partial data", body)
+        self.assertNotIn(b"nothing in progress", body)
+
+    def test_api_active_quest_exposes_activity_and_stale_hours(self):
+        self._seed_event("added-wip", 0, "alpha", "acme", "quest.added", {
+            "slug": "wip", "project": "acme", "party": "alpha", "epic": None, "title": "Quest wip",
+            "tasks": [{"tid": "T01", "title": "T01"}],
+        })
+        conn = db.connect(paths.db_path())
+        conn.execute(
+            "INSERT INTO quests (slug, party, project, epic, title, state) VALUES ('wip', 'alpha', 'acme', NULL, 'Quest wip', 'active')"
+        )
+        conn.commit()
+        conn.close()
+        response, model = self._get_history("")
+        quest = model["active_quests"][0]
+        self.assertEqual(quest["stale_hours"], 48)
+        self.assertEqual(quest["last_activity_at"], _at(0))
+        self.assertIn("week_totals", model)
+        self.assertIn("since", model)
 
     def test_api_exposes_new_lists_when_empty(self):
         response, model = self._get_history("")

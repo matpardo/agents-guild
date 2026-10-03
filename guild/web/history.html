@@ -3,21 +3,20 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>guild history</title>
+<title>guild achievements</title>
 <link rel="stylesheet" href="/app.css">
 </head>
 <body class="history-page">
 <header>
-  <h1>guild history</h1>
-  <nav class="page-nav"><a href="/">board</a></nav>
+  <h1>guild achievements</h1>
+  <nav class="page-nav"><a href="/">board</a> · <a href="/progress">in progress</a> · <a href="/history" aria-current="page">achievements</a></nav>
   <p id="generated-at" class="muted"></p>
 </header>
 <main class="history-main">
   <section id="totals" aria-label="totals"></section>
-  <section id="active-quests" aria-label="quests in progress"></section>
   <section id="quests" aria-label="completed quests"></section>
-  <section id="incomplete-quests" aria-label="quests closed without completing"></section>
   <section id="raids" aria-label="finished raids"></section>
+  <section id="incomplete-quests" aria-label="quests closed without completing"></section>
 </main>
 <script src="/history.js" defer></script>
 </body>
