@@ -75,7 +75,7 @@ def _tier1_candidates(conn, party):
 def _tier2_candidates(conn, party):
     results = []
     for row in _own_open_prs(conn, party):
-        if row["lifecycle"] != "needs-human":
+        if not row["needs_ask_answer"]:
             continue
         ref = "pr:{}#{}".format(row["repo"], row["number"])
         answered = _latest_answered_ask_for_ref(conn, ref)

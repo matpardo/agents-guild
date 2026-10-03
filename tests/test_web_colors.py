@@ -3,7 +3,15 @@ import unittest
 from pathlib import Path
 
 _WEB_DIR = Path(__file__).resolve().parent.parent / "guild" / "web"
-_LIFECYCLES = ("needs-human", "converging", "ready", "draft", "merged", "closed")
+_LIFECYCLES = (
+    "needs-ask-answer",
+    "needs-human-pr-review",
+    "converging",
+    "ready",
+    "draft",
+    "merged",
+    "closed",
+)
 _TASK_STATES = ("active", "blocked", "queued")
 _CHECK_CLASSES = ("checks-failing", "checks-clear", "checks-passing", "checks-pending", "checks-none")
 
@@ -20,6 +28,18 @@ class LifecycleColorTests(unittest.TestCase):
 
     def test_app_js_assigns_a_lifecycle_class(self):
         self.assertIn('"pill lifecycle-" + pr.lifecycle', self.js)
+
+    def test_app_js_renders_the_flag_badges_and_filters_on_them(self):
+        for token in ("lifecycle-needs-ask-answer", "lifecycle-needs-human-pr-review", "pr.needs_ask_answer",
+                      "pr.needs_human_pr_review"):
+            with self.subTest(token=token):
+                self.assertIn(token, self.js)
+
+    def test_state_filter_offers_both_flags_and_not_the_old_lifecycle(self):
+        html = (_WEB_DIR / "index.html").read_text()
+        self.assertIn('<option value="needs-ask-answer">', html)
+        self.assertIn('<option value="needs-human-pr-review">', html)
+        self.assertNotIn("needs-human\"", html)
 
     def test_app_css_defines_one_rule_per_lifecycle(self):
         for lifecycle in _LIFECYCLES:

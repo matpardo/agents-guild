@@ -67,6 +67,8 @@ def _pr_record(conn, row):
         "checks_failing": row["checks_failing"] or 0,
         "checks_passing": row["checks_passing"] or 0,
         "checks_pending": row["checks_pending"] or 0,
+        "needs_ask_answer": bool(row["needs_ask_answer"]),
+        "needs_human_pr_review": bool(row["needs_human_pr_review"]),
         "mergeable": row["mergeable"],
         "additions": row["additions"] or 0,
         "deletions": row["deletions"] or 0,

@@ -29,7 +29,8 @@ _SEED = {
             "task_tid": "T09",
             "what": "per-school flags",
             "waits": "one more review",
-            "lifecycle": "needs-human",
+            "lifecycle": "draft",
+            "needs_ask_answer": True,
         }
     ],
     "asks": [
@@ -58,7 +59,7 @@ class SeedTests(GuildTestCase):
         self.assertIn("queued: T04", out)
         self.assertIn("blocked: T05 — waiting on ci", out)
         self.assertNotIn("T06", out)
-        self.assertIn("app#894  needs-human", out)
+        self.assertIn("app#894  draft needs-ask-answer", out)
         code, out, err = self.run_cli(["asks"], None, None)
         self.assertIn("one more round?", out)
 

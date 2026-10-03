@@ -80,6 +80,19 @@ class PrActivityTests(GuildTestCase):
         after = self._pr_row()["last_activity_at"]
         self.assertNotEqual(before, after)
 
+    def test_pr_set_bumps_activity_when_a_flag_changes(self):
+        before = self._pr_row()["last_activity_at"]
+        self.run_cli(["pr", "set", "acme/app#1", "--needs-human-pr-review"], "sess-1", self.repo_dir)
+        after = self._pr_row()["last_activity_at"]
+        self.assertNotEqual(before, after)
+
+    def test_pr_set_does_not_bump_activity_when_a_flag_is_set_to_its_current_value(self):
+        self.run_cli(["pr", "set", "acme/app#1", "--needs-ask-answer"], "sess-1", self.repo_dir)
+        before = self._pr_row()["last_activity_at"]
+        self.run_cli(["pr", "set", "acme/app#1", "--needs-ask-answer"], "sess-1", self.repo_dir)
+        after = self._pr_row()["last_activity_at"]
+        self.assertEqual(before, after)
+
     def test_pr_set_does_not_bump_activity_when_nothing_changes(self):
         self.run_cli(["pr", "set", "acme/app#1", "--waits", "y"], "sess-1", self.repo_dir)
         before = self._pr_row()["last_activity_at"]
@@ -110,6 +123,67 @@ class PrActivityTests(GuildTestCase):
         self.assertIsNone(row["mergeable"])
         self.assertEqual(row["review_comment_count"], 0)
         conn.close()
+
+    def _apply_pr_set(self, payload):
+        conn = db.connect(paths.db_path())
+        event = {
+            "ts": timeutil.to_iso(timeutil.utcnow()),
+            "kind": "pr.set",
+            "payload": dict({"repo": "acme/app", "number": 1, "waits": "y"}, **payload),
+        }
+        reducers.apply(conn, event)
+        conn.close()
+        return self._pr_row()
+
+    def test_legacy_pr_set_needs_human_replays_as_draft_with_the_ask_flag(self):
+        row = self._apply_pr_set({"lifecycle": "needs-human"})
+        self.assertEqual(
+            (row["lifecycle"], row["needs_ask_answer"], row["needs_human_pr_review"]), ("draft", 1, 0)
+        )
+
+    def test_legacy_pr_set_without_flag_keys_carries_flags_forward(self):
+        self.run_cli(["pr", "set", "acme/app#1", "--needs-human-pr-review"], "sess-1", self.repo_dir)
+        row = self._apply_pr_set({"lifecycle": "converging"})
+        self.assertEqual(
+            (row["lifecycle"], row["needs_ask_answer"], row["needs_human_pr_review"]), ("converging", 0, 1)
+        )
+
+    def test_legacy_pr_tracked_without_flag_keys_inits_flags_to_zero(self):
+        conn = db.connect(paths.db_path())
+        reducers.apply(
+            conn,
+            {
+                "ts": timeutil.to_iso(timeutil.utcnow()),
+                "kind": "pr.tracked",
+                "payload": {
+                    "repo": "acme/app", "number": 2, "party": "alpha", "task_quest": "demo",
+                    "task_tid": "T01", "what": "x", "waits": "y", "lifecycle": "needs-human",
+                    "branch": None, "title": None, "gh_state": None, "gh_draft": None, "seeded": 1,
+                },
+            },
+        )
+        reducers.apply(
+            conn,
+            {
+                "ts": timeutil.to_iso(timeutil.utcnow()),
+                "kind": "pr.tracked",
+                "payload": {
+                    "repo": "acme/app", "number": 3, "party": "alpha", "task_quest": "demo",
+                    "task_tid": "T01", "what": "x", "waits": "y", "lifecycle": "draft",
+                    "needs_human_pr_review": 1,
+                    "branch": None, "title": None, "gh_state": None, "gh_draft": None, "seeded": 0,
+                },
+            },
+        )
+        flagged = conn.execute("SELECT * FROM prs WHERE number = 3").fetchone()
+        self.assertEqual((flagged["needs_ask_answer"], flagged["needs_human_pr_review"]), (0, 1))
+        legacy = conn.execute("SELECT * FROM prs WHERE number = 2").fetchone()
+        plain = conn.execute("SELECT * FROM prs WHERE number = 1").fetchone()
+        conn.close()
+        self.assertEqual(
+            (legacy["lifecycle"], legacy["needs_ask_answer"], legacy["needs_human_pr_review"]), ("draft", 1, 0)
+        )
+        self.assertEqual((plain["needs_ask_answer"], plain["needs_human_pr_review"]), (0, 0))
 
     def test_acknowledge_comments_syncs_last_notified_count(self):
         self.write_gh_fixture(

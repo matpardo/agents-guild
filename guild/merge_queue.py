@@ -11,6 +11,9 @@ _WAITING_STATE = "waiting"
 _BLOCKED_STATE = "blocked"
 _MERGE_ACTION = "merge"
 _PROMOTE_ACTION = "promote"
+_REVIEW_ACTION = "review: human, then merge"
+_ASK_LABEL = "needs-ask-answer"
+_REVIEW_LABEL = "needs-human-pr-review"
 
 
 def _is_open(pr):
@@ -19,8 +22,8 @@ def _is_open(pr):
 
 def _blocked_reasons(pr):
     reasons = []
-    if pr["lifecycle"] not in _DRAFT_LIFECYCLES and pr["lifecycle"] != _READY_LIFECYCLE:
-        reasons.append(pr["lifecycle"])
+    if pr["needs_ask_answer"]:
+        reasons.append("needs ask answer")
     if pr["checks_failing"] > 0:
         reasons.append("checks failing ({})".format(pr["checks_failing"]))
     if pr["mergeable"] == _CONFLICTING:
@@ -36,10 +39,19 @@ def _wait_reasons(pr):
     return []
 
 
+def _is_draft(pr):
+    return pr["lifecycle"] in _DRAFT_LIFECYCLES
+
+
 def _labels(pr):
-    if pr["lifecycle"] in _DRAFT_LIFECYCLES:
-        return [pr["lifecycle"]]
-    return []
+    labels = []
+    if _is_draft(pr):
+        labels.append(pr["lifecycle"])
+    if pr["needs_ask_answer"]:
+        labels.append(_ASK_LABEL)
+    if pr["needs_human_pr_review"]:
+        labels.append(_REVIEW_LABEL)
+    return labels
 
 
 def _entry(pr):
@@ -234,8 +246,10 @@ def _action(pr, state, reasons, waits):
         return "fix: {} \u2192 {}".format("; ".join(reasons), pr["party"])
     if state == _WAITING_STATE:
         return "wait: {}".format("; ".join(waits))
-    if pr["lifecycle"] in _DRAFT_LIFECYCLES:
+    if _is_draft(pr):
         return "{}: gh pr ready \u2192 {}".format(_PROMOTE_ACTION, pr["party"])
+    if pr["needs_human_pr_review"]:
+        return _REVIEW_ACTION
     return _MERGE_ACTION
 
 
@@ -269,7 +283,7 @@ def _ordered_entries(by_ref, order, edges, unblocks):
         state = _state(reasons, waits)
         if state == _BLOCKED_STATE:
             blocked_refs.add(ref)
-        if state == _WAITING_STATE or (state == _READY_STATE and _labels(pr)):
+        if state == _WAITING_STATE or (state == _READY_STATE and _is_draft(pr)):
             pending_refs.add(ref)
         entries.append(_queue_entry(pr, unblocks[ref], reasons, waits, _why(pr, state, position, ordered_edges)))
     return entries

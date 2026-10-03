@@ -171,13 +171,34 @@ def _tracker_synced(conn, event):
         )
 
 
+_LEGACY_NEEDS_HUMAN_LIFECYCLE = "needs-human"
+_PR_FLAG_FIELDS = ("needs_ask_answer", "needs_human_pr_review")
+
+
+def _payload_flag(payload, field, fallback):
+    if field in payload:
+        return int(payload[field])
+    return fallback
+
+
+def _flags_and_lifecycle(payload, fallbacks):
+    values = {field: _payload_flag(payload, field, fallbacks[field]) for field in _PR_FLAG_FIELDS}
+    values["lifecycle"] = payload["lifecycle"]
+    if payload["lifecycle"] == _LEGACY_NEEDS_HUMAN_LIFECYCLE:
+        values["lifecycle"] = "draft"
+        values["needs_ask_answer"] = 1
+    return values
+
+
 def _pr_tracked(conn, event):
     payload = event["payload"]
+    values = _flags_and_lifecycle(payload, {field: 0 for field in _PR_FLAG_FIELDS})
     conn.execute(
         "INSERT INTO prs (repo, number, party, task_quest, task_tid, what, waits, lifecycle,"
         " branch, title, gh_state, gh_draft, checks_failing, checks_passing, seeded, synced_at,"
-        " mergeable, review_comment_count, last_notified_comment_count, last_activity_at)"
-        " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, ?, NULL, NULL, 0, 0, ?)",
+        " mergeable, review_comment_count, last_notified_comment_count, last_activity_at,"
+        " needs_ask_answer, needs_human_pr_review)"
+        " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, ?, NULL, NULL, 0, 0, ?, ?, ?)",
         (
             payload["repo"],
             payload["number"],
@@ -186,13 +207,15 @@ def _pr_tracked(conn, event):
             payload["task_tid"],
             payload["what"],
             payload["waits"],
-            payload["lifecycle"],
+            values["lifecycle"],
             payload["branch"],
             payload["title"],
             payload["gh_state"],
             payload["gh_draft"],
             payload["seeded"],
             event["ts"],
+            values["needs_ask_answer"],
+            values["needs_human_pr_review"],
         ),
     )
 
@@ -200,14 +223,27 @@ def _pr_tracked(conn, event):
 def _pr_set(conn, event):
     payload = event["payload"]
     current = conn.execute(
-        "SELECT lifecycle, waits, last_activity_at FROM prs WHERE repo = ? AND number = ?",
+        "SELECT lifecycle, waits, needs_ask_answer, needs_human_pr_review, last_activity_at"
+        " FROM prs WHERE repo = ? AND number = ?",
         (payload["repo"], payload["number"]),
     ).fetchone()
-    changed = current["lifecycle"] != payload["lifecycle"] or current["waits"] != payload["waits"]
+    values = _flags_and_lifecycle(payload, current)
+    changed = current["waits"] != payload["waits"] or any(
+        current[field] != values[field] for field in ("lifecycle",) + _PR_FLAG_FIELDS
+    )
     last_activity_at = event["ts"] if changed else current["last_activity_at"]
     conn.execute(
-        "UPDATE prs SET lifecycle = ?, waits = ?, last_activity_at = ? WHERE repo = ? AND number = ?",
-        (payload["lifecycle"], payload["waits"], last_activity_at, payload["repo"], payload["number"]),
+        "UPDATE prs SET lifecycle = ?, waits = ?, needs_ask_answer = ?, needs_human_pr_review = ?,"
+        " last_activity_at = ? WHERE repo = ? AND number = ?",
+        (
+            values["lifecycle"],
+            payload["waits"],
+            values["needs_ask_answer"],
+            values["needs_human_pr_review"],
+            last_activity_at,
+            payload["repo"],
+            payload["number"],
+        ),
     )
 
 

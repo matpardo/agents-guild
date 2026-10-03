@@ -233,6 +233,8 @@ _COLUMN_MIGRATIONS = (
     ("prs", "deletions", "INTEGER"),
     ("prs", "created_at", "TEXT"),
     ("prs", "checks_pending", "INTEGER"),
+    ("prs", "needs_ask_answer", "INTEGER"),
+    ("prs", "needs_human_pr_review", "INTEGER"),
 )
 
 
@@ -275,12 +277,21 @@ def _relax_raid_expiry(conn):
     conn.execute("COMMIT")
 
 
+def _split_needs_human(conn):
+    conn.execute(
+        "UPDATE prs SET lifecycle = 'draft', needs_ask_answer = 1 WHERE lifecycle = 'needs-human'"
+    )
+    conn.execute("UPDATE prs SET needs_ask_answer = 0 WHERE needs_ask_answer IS NULL")
+    conn.execute("UPDATE prs SET needs_human_pr_review = 0 WHERE needs_human_pr_review IS NULL")
+
+
 def create_all(conn):
     for statement in _CREATE_STATEMENTS:
         conn.execute(statement)
     _relax_raid_expiry(conn)
     for table, column, ddl_type in _COLUMN_MIGRATIONS:
         _add_column_if_missing(conn, table, column, ddl_type)
+    _split_needs_human(conn)
 
 
 def drop_projections(conn):

@@ -148,14 +148,20 @@ def _handle_task_done(ctx, args):
 def _handle_pr_track(ctx, args):
     from guild.commands import pr as pr_commands
 
-    _print(pr_commands.track(ctx, args.ref, args.task, args.what, args.waits))
+    _print(
+        pr_commands.track(ctx, args.ref, args.task, args.what, args.waits, args.needs_human_pr_review)
+    )
     return 0
 
 
 def _handle_pr_set(ctx, args):
     from guild.commands import pr as pr_commands
 
-    _print(pr_commands.set_(ctx, args.ref, args.lifecycle, args.waits))
+    _print(
+        pr_commands.set_(
+            ctx, args.ref, args.lifecycle, args.waits, args.needs_ask_answer, args.needs_human_pr_review
+        )
+    )
     return 0
 
 
@@ -536,6 +542,12 @@ def _add_task_parser(subparsers):
     done.set_defaults(handler=_handle_task_done)
 
 
+def _add_flag_pair(parser, name, dest):
+    group = parser.add_mutually_exclusive_group()
+    group.add_argument("--" + name, dest=dest, action="store_const", const=True)
+    group.add_argument("--no-" + name, dest=dest, action="store_const", const=False)
+
+
 def _add_pr_parser(subparsers):
     parser = subparsers.add_parser("pr")
     actions = parser.add_subparsers(dest="pr_action", required=True)
@@ -545,12 +557,15 @@ def _add_pr_parser(subparsers):
     track.add_argument("--task", required=True)
     track.add_argument("--what", required=True)
     track.add_argument("--waits", required=True)
+    track.add_argument("--needs-human-pr-review", action="store_true")
     track.set_defaults(handler=_handle_pr_track)
 
     set_parser = actions.add_parser("set")
     set_parser.add_argument("ref")
-    set_parser.add_argument("--lifecycle", choices=["draft", "converging", "needs-human", "ready"])
+    set_parser.add_argument("--lifecycle", choices=["draft", "converging", "ready"])
     set_parser.add_argument("--waits")
+    _add_flag_pair(set_parser, "needs-ask-answer", "needs_ask_answer")
+    _add_flag_pair(set_parser, "needs-human-pr-review", "needs_human_pr_review")
     set_parser.set_defaults(handler=_handle_pr_set)
 
 

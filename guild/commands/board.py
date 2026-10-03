@@ -18,8 +18,12 @@ _STYLES = {
     "magenta": "35",
 }
 
+_FLAG_STYLES = (
+    ("needs_ask_answer", "needs-ask-answer", "red"),
+    ("needs_human_pr_review", "needs-human-pr-review", "yellow"),
+)
+
 _LIFECYCLE_STYLES = {
-    "needs-human": "red",
     "converging": "yellow",
     "ready": "green",
     "draft": "dim",
@@ -83,11 +87,23 @@ def _checks_painted(painter, pr_row):
     return text
 
 
+def _badges(pr_row):
+    badges = [(pr_row["lifecycle"], _LIFECYCLE_STYLES[pr_row["lifecycle"]])]
+    badges.extend((label, style) for column, label, style in _FLAG_STYLES if pr_row[column])
+    return badges
+
+
+def _visible_waits(pr_row):
+    if pr_row["lifecycle"] in ("merged", "closed"):
+        return None
+    return pr_row["waits"]
+
+
 def _pr_lines(painter, pr_row, indent):
-    lifecycle = pr_row["lifecycle"]
-    status_plain = "{}  {}".format(lifecycle, _checks_plain(pr_row))
+    badges = _badges(pr_row)
+    status_plain = "{}  {}".format(" ".join(label for label, _ in badges), _checks_plain(pr_row))
     status_painted = "{}  {}".format(
-        painter.paint(lifecycle, _LIFECYCLE_STYLES[lifecycle]), _checks_painted(painter, pr_row)
+        " ".join(painter.paint(label, style) for label, style in badges), _checks_painted(painter, pr_row)
     )
     plain_head = "● {}#{}  {}  {}".format(
         pr_row["repo"].split("/")[-1],
@@ -103,9 +119,10 @@ def _pr_lines(painter, pr_row, indent):
         break_on_hyphens=False,
     )
     head_lines[0] = head_lines[0].replace(status_plain, status_painted, 1)
-    if not pr_row["waits"]:
+    waits = _visible_waits(pr_row)
+    if not waits:
         return head_lines
-    return head_lines + painter.wrap("waits: {}".format(pr_row["waits"]), indent + "  ")
+    return head_lines + painter.wrap("waits: {}".format(waits), indent + "  ")
 
 
 def _pr_ref_blocked(conn, ref):
@@ -448,11 +465,13 @@ def _pr_model(pr_row):
         "repo": pr_row["repo"],
         "number": pr_row["number"],
         "lifecycle": pr_row["lifecycle"],
+        "needs_ask_answer": bool(pr_row["needs_ask_answer"]),
+        "needs_human_pr_review": bool(pr_row["needs_human_pr_review"]),
         "checks_failing": pr_row["checks_failing"] or 0,
         "checks_passing": pr_row["checks_passing"] or 0,
         "checks_pending": pr_row["checks_pending"] or 0,
         "what": sanitize.strip_control_sequences(pr_row["what"]),
-        "waits": _optional_text(pr_row["waits"]),
+        "waits": _optional_text(_visible_waits(pr_row)),
         "url": "https://github.com/{}/pull/{}".format(pr_row["repo"], pr_row["number"]),
     }
 
