@@ -79,6 +79,8 @@ def _seed_pr(ctx, pr):
             "what": pr["what"],
             "waits": pr.get("waits"),
             "lifecycle": pr.get("lifecycle", "draft"),
+            "needs_ask_answer": pr.get("needs_ask_answer", False),
+            "needs_human_pr_review": pr.get("needs_human_pr_review", False),
             "branch": pr.get("branch"),
             "title": pr.get("title"),
             "gh_state": pr.get("gh_state"),

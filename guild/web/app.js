@@ -459,7 +459,16 @@
   }
 
   function prMatchesStateFilter(pr) {
-    return state.stateFilter === "all" || pr.lifecycle === state.stateFilter;
+    if (state.stateFilter === "all") {
+      return true;
+    }
+    if (state.stateFilter === "needs-ask-answer") {
+      return pr.needs_ask_answer;
+    }
+    if (state.stateFilter === "needs-human-pr-review") {
+      return pr.needs_human_pr_review;
+    }
+    return pr.lifecycle === state.stateFilter;
   }
 
   function renderChecks(pr) {
@@ -493,6 +502,16 @@
     var lifecycle = textEl("span", pr.lifecycle);
     lifecycle.className = "pill lifecycle-" + pr.lifecycle;
     row.appendChild(lifecycle);
+    if (pr.needs_ask_answer) {
+      var ask = textEl("span", "needs-ask-answer");
+      ask.className = "pill lifecycle-needs-ask-answer";
+      row.appendChild(ask);
+    }
+    if (pr.needs_human_pr_review) {
+      var review = textEl("span", "needs-human-pr-review");
+      review.className = "pill lifecycle-needs-human-pr-review";
+      row.appendChild(review);
+    }
     row.appendChild(renderChecks(pr));
     row.appendChild(textEl("span", pr.what));
     if (pr.waits) {

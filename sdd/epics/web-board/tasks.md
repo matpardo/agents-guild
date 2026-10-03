@@ -48,7 +48,7 @@ updated: 2026-09-29
 **Depends on:** T03
 **Status:** [x] done — #28
 
-**What:** the page uses the terminal board's meanings through CSS classes only, with light and dark variants under `prefers-color-scheme`: a PR's lifecycle is a badge (`needs-human` red, `converging` amber, `ready` green, `draft` gray, `merged` purple, `closed` muted gray), checks show `✗N` red when N > 0 and muted otherwise, `✓N` green and `no checks` muted, and a task's state is colored (`active` blue, `blocked` red, `queued` muted). The text labels stay.
+**What:** the page uses the terminal board's meanings through CSS classes only, with light and dark variants under `prefers-color-scheme`: a PR's lifecycle is a badge (`converging` amber, `ready` green, `draft` gray, `merged` purple, `closed` muted gray) and its human flags are badges too (`needs-ask-answer` red, `needs-human-pr-review` amber), checks show `✗N` red when N > 0 and muted otherwise, `✓N` green and `no checks` muted, and a task's state is colored (`active` blue, `blocked` red, `queued` muted). The text labels stay.
 
 ## T07 — Mark notices seen from the view
 

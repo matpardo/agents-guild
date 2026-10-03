@@ -17,7 +17,7 @@ def _load_pr(ctx, repo, number):
     return row
 
 
-def track(ctx, ref, task_ref, what, waits):
+def track(ctx, ref, task_ref, what, waits, needs_human_pr_review):
     repo, number = refs.parse_pr_ref(ref)
     binding = identity.require_binding(ctx.conn, ctx.session_id)
     project = config.require_project(ctx.cwd, ctx.projects_dir)
@@ -60,6 +60,7 @@ def track(ctx, ref, task_ref, what, waits):
                 "what": what,
                 "waits": waits,
                 "lifecycle": _TRACK_INITIAL_LIFECYCLE,
+                "needs_human_pr_review": int(needs_human_pr_review),
                 "branch": gh_data.get("headRefName"),
                 "title": gh_data.get("title"),
                 "gh_state": gh_data.get("state"),
@@ -86,9 +87,19 @@ def acknowledge_comments(ctx, repo, number):
         )
 
 
-def set_(ctx, ref, lifecycle, waits):
-    if lifecycle is None and waits is None:
-        raise GuildError("pr set needs --lifecycle and/or --waits", 1)
+def _flag_value(requested, current):
+    if requested is None:
+        return int(current or 0)
+    return int(requested)
+
+
+def set_(ctx, ref, lifecycle, waits, needs_ask_answer, needs_human_pr_review):
+    if all(option is None for option in (lifecycle, waits, needs_ask_answer, needs_human_pr_review)):
+        raise GuildError(
+            "pr set needs at least one of --lifecycle, --waits, --needs-ask-answer/--no-needs-ask-answer,"
+            " --needs-human-pr-review/--no-needs-human-pr-review",
+            1,
+        )
     repo, number = refs.parse_pr_ref(ref)
     binding = identity.require_binding(ctx.conn, ctx.session_id)
     row = _load_pr(ctx, repo, number)
@@ -105,7 +116,14 @@ def set_(ctx, ref, lifecycle, waits):
             project,
             "pr.set",
             "guild",
-            {"repo": repo, "number": number, "lifecycle": new_lifecycle, "waits": new_waits},
+            {
+                "repo": repo,
+                "number": number,
+                "lifecycle": new_lifecycle,
+                "waits": new_waits,
+                "needs_ask_answer": _flag_value(needs_ask_answer, row["needs_ask_answer"]),
+                "needs_human_pr_review": _flag_value(needs_human_pr_review, row["needs_human_pr_review"]),
+            },
         )
     message = "PR '{}#{}' updated".format(repo, number)
     if new_lifecycle == "ready" and row["gh_draft"]:

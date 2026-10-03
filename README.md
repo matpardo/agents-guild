@@ -104,8 +104,10 @@ guild task start <quest>/<tid> [--summary "..."]
 guild task block <quest>/<tid> --reason "..."
 guild task done  <quest>/<tid> [--summary "..."]
 
-guild pr track <owner/repo>#<n> --task <quest>/<tid> --what "..." --waits "..."
-guild pr set   <owner/repo>#<n> [--lifecycle draft|converging|needs-human|ready] [--waits "..."]
+guild pr track <owner/repo>#<n> --task <quest>/<tid> --what "..." --waits "..." [--needs-human-pr-review]
+guild pr set   <owner/repo>#<n> [--lifecycle draft|converging|ready] [--waits "..."]
+                               [--needs-ask-answer | --no-needs-ask-answer]
+                               [--needs-human-pr-review | --no-needs-human-pr-review]
 
 guild ask "<question>" --context "..." --ref <ref> [--ref <ref> ...] [--option "..." ...]
 guild answer <id> "<text>"
@@ -185,7 +187,7 @@ Deterministic, per-party ranking, evaluated in order:
 1. Own PR with failing checks, a merge conflict (`mergeable == CONFLICTING`),
    or unseen review comments (`review_comment_count >
    last_notified_comment_count`).
-2. Own PR whose lifecycle is `needs-human` and has an ask, referencing it,
+2. Own PR flagged `needs-ask-answer` that has an ask, referencing it,
    answered after the PR was last `pr set`.
 3. Own PR `converging` with no activity for longer than the project's
    `next.stale_hours` (skipped entirely when that key is absent — no hidden
@@ -397,20 +399,30 @@ none; a human terminal (or an unbound session) must pass a flag.
 
 **Lifecycle from GitHub.** Readiness is owned by `guild sync --source gh`, not
 by sessions. An open PR that is Ready for review on GitHub becomes `ready`
-whatever its guild lifecycle was; an open draft PR keeps `converging` or
-`needs-human` and otherwise (including a stale `ready`) becomes `draft`.
+whatever its guild lifecycle was; an open draft PR keeps `converging` and
+otherwise (including a stale `ready`) becomes `draft`.
 Merged and closed PRs become `merged` and `closed`. Agents mark a PR ready
 with `gh pr ready <n>`; `guild pr set --lifecycle` remains for the
-`converging` / `needs-human` nuance. `pr set --lifecycle ready` on a PR that
+`converging` nuance. `pr set --lifecycle ready` on a PR that
 is still draft on GitHub prints a hint, and the next sync reverts it.
+
+**Human flags.** Two independent booleans set with `guild pr set` and never
+touched by sync: `--needs-ask-answer` (the PR is stopped until the human
+answers an ask; blocks the PR in the merge queue) and
+`--needs-human-pr-review` (the human should review the PR before it is
+merged; does not block). Each has a `--no-...` counterpart to clear it; an
+absent option leaves the flag unchanged. `pr set` needs at least one option.
+A PR that had the old `needs-human` lifecycle becomes `draft` with
+`needs-ask-answer` set, both in the live database and when events replay in
+`guild rebuild`.
 
 **State.** Only merge blockers decide the state, in this precedence:
 
 - `blocked`: a check is failing, `mergeable` is `CONFLICTING`, a task its own
   task depends on (SDD `Depends on`, through the quest's epic) is not done by
-  the same resolver `guild next` uses, its lifecycle is `needs-human`, or a PR
+  the same resolver `guild next` uses, it is flagged `needs-ask-answer`, or a PR
   that must come before it (by task dependency or pin, transitively) is
-  blocked (`waits on <ref>`). Every reason that applies is listed: `needs-human`,
+  blocked (`waits on <ref>`). Every reason that applies is listed: `needs ask answer`,
   `checks failing (N)`, `merge conflict`, `waits on task Txx`, `waits on <ref>`.
 - `waiting`: not blocked, but checks are still running (`checks pending (N)`)
   or a PR that must come before it is itself waiting or ready but still draft
@@ -426,8 +438,9 @@ from the `pr.synced` event; events from before it replay as unknown).
 Failing checks beat pending ones: a PR with both is blocked. Merged and
 closed PRs never appear.
 
-**Labels.** `draft` and `converging` (the lifecycle from GitHub) are labels
-shown in brackets after the task, `[draft]`; they do not block. A draft that
+**Labels.** `draft` and `converging` (the lifecycle from GitHub), then
+`needs-ask-answer` and `needs-human-pr-review` (the human flags), are labels
+shown in brackets after the task, `[draft]`; only `needs-ask-answer` blocks. A draft that
 is otherwise `ready` is worth promoting, and one that is blocked or waiting
 is not.
 
@@ -438,6 +451,7 @@ is not.
 | blocked | any | `fix: <reasons> → <party>` |
 | waiting | any | `wait: <reasons>` |
 | ready | `draft` / `converging` | `promote: gh pr ready → <party>` |
+| ready | `needs-human-pr-review` | `review: human, then merge` |
 | ready | none | `merge` |
 
 Waiting and ready actions are followed by the order notes in parentheses
@@ -611,7 +625,7 @@ project resolved from the parties shown, skipping parties without a
 project), then one collapsible block per party with its quests, tasks and
 PRs, plus PRs outside active tasks, raids (each with a `lead` badge when
 that membership is the raid's lead) and claims. A party filter, a state
-filter (`all`/`needs-human`/`converging`/`ready`/`draft`/`merged`) and a
+filter (`all`/`needs-ask-answer`/`needs-human-pr-review`/`converging`/`ready`/`draft`/`merged`) and a
 raid filter (`all` plus one option per raid, narrowing parties, asks and
 notices the same way `guild board --raid` does) narrow what is shown; the
 page re-fetches `/api/board` every 15 seconds,
@@ -622,9 +636,9 @@ tracker card when the project configures `tracker.browse_url` (see
 
 **Colors**: the page uses the terminal board's meanings, with CSS classes
 only (no inline style) and light and dark variants through
-`prefers-color-scheme`. A PR's lifecycle is a badge (`needs-human` red,
-`converging` amber, `ready` green, `draft` gray, `merged` purple, `closed`
-muted gray). Checks show `✗N` in red when N > 0 and muted otherwise, `✓N` in
+`prefers-color-scheme`. A PR's lifecycle is a badge (`converging` amber, `ready` green,
+`draft` gray, `merged` purple, `closed` muted gray); the human flags add
+badges next to it (`needs-ask-answer` red, `needs-human-pr-review` amber). Checks show `✗N` in red when N > 0 and muted otherwise, `✓N` in
 green, `⏳N` in amber when N checks are still running, and `no checks` muted
 when there are none. Merge queue entries in `waiting` state show their reason
 in amber. A task's state is colored
@@ -1217,7 +1231,8 @@ command).
       "task_tid": "T09",
       "what": "Sequential invoice numbers per tenant",
       "waits": "decide one more review round",
-      "lifecycle": "needs-human"
+      "lifecycle": "draft",
+      "needs_ask_answer": true
     }
   ],
   "asks": [

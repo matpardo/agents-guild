@@ -126,7 +126,7 @@ class Tier2Tests(NextTestCase):
             ["pr", "track", "acme/app#1", "--task", "demo/T01", "--what", "x", "--waits", "y"],
             "sess-1", self.repo_dir,
         )
-        self.run_cli(["pr", "set", "acme/app#1", "--lifecycle", "needs-human"], "sess-1", self.repo_dir)
+        self.run_cli(["pr", "set", "acme/app#1", "--needs-ask-answer"], "sess-1", self.repo_dir)
 
     def test_answered_ask_after_pr_set_is_reported(self):
         self.run_cli(
@@ -136,6 +136,15 @@ class Tier2Tests(NextTestCase):
         self.assertEqual(code, 0)
         code, out, err = self.run_cli(["next"], "sess-1", self.repo_dir)
         self.assertIn("PR acme/app#1: ask #1 answered: ship it", out)
+
+    def test_answered_ask_is_not_reported_when_the_flag_is_off(self):
+        self.run_cli(["pr", "set", "acme/app#1", "--no-needs-ask-answer"], "sess-1", self.repo_dir)
+        self.run_cli(
+            ["ask", "one more round?", "--context", "ctx", "--ref", "pr:acme/app#1"], "sess-1", self.repo_dir
+        )
+        self.run_cli(["answer", "1", "ship it"], None, None)
+        code, out, err = self.run_cli(["next"], "sess-1", self.repo_dir)
+        self.assertNotIn("ask #1 answered", out)
 
     def test_answer_before_pr_set_is_not_reported(self):
         self.run_cli(

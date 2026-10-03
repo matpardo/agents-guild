@@ -98,6 +98,33 @@ class MigrationTests(GuildTestCase):
         for table in ("epics", "tasks"):
             self.assertEqual(conn.execute("SELECT COUNT(*) AS n FROM {}".format(table)).fetchone()["n"], 0)
 
+    def test_old_schema_db_gains_human_flag_columns_initialised_to_zero(self):
+        db_path = self.data_home / "guild.db"
+        _make_old_schema_db(db_path)
+
+        conn = db.connect(db_path)
+
+        pr_row = conn.execute("SELECT * FROM prs WHERE number = 1").fetchone()
+        self.assertEqual((pr_row["needs_ask_answer"], pr_row["needs_human_pr_review"]), (0, 0))
+
+    def test_needs_human_lifecycle_rows_become_draft_with_the_ask_flag(self):
+        db_path = self.data_home / "guild.db"
+        _make_old_schema_db(db_path)
+        raw = sqlite3.connect(str(db_path))
+        raw.execute("UPDATE prs SET lifecycle = 'needs-human'")
+        raw.commit()
+        raw.close()
+
+        conn = db.connect(db_path)
+        pr_row = conn.execute("SELECT * FROM prs WHERE number = 1").fetchone()
+        self.assertEqual((pr_row["lifecycle"], pr_row["needs_ask_answer"]), ("draft", 1))
+        conn.close()
+
+        again = db.connect(db_path)
+        pr_row = again.execute("SELECT * FROM prs WHERE number = 1").fetchone()
+        self.assertEqual((pr_row["lifecycle"], pr_row["needs_ask_answer"]), ("draft", 1))
+        again.close()
+
     def test_old_schema_db_gains_cards_table(self):
         db_path = self.data_home / "guild.db"
         _make_old_schema_db(db_path)

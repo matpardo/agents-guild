@@ -1,10 +1,16 @@
+_CLOSED_LIFECYCLES = ("merged", "closed")
+
+
 def pr_line(row):
     failing = row["checks_failing"] if row["checks_failing"] is not None else 0
     passing = row["checks_passing"] if row["checks_passing"] is not None else 0
     tid = row["task_tid"] or ""
-    return "{}#{} [{}] checks:✗{} ✓{}  {} {} — waits: {}".format(
-        row["repo"], row["number"], row["lifecycle"], failing, passing, tid, row["what"], row["waits"]
+    line = "{}#{} [{}] checks:✗{} ✓{}  {} {}".format(
+        row["repo"], row["number"], row["lifecycle"], failing, passing, tid, row["what"]
     )
+    if row["lifecycle"] in _CLOSED_LIFECYCLES:
+        return line
+    return "{} — waits: {}".format(line, row["waits"])
 
 
 def quest_lanes(conn, quest_slug):

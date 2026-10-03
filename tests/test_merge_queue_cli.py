@@ -107,9 +107,9 @@ class OutputTests(QueueCliTestCase):
         self.assertEqual(out.splitlines()[0], "merge queue \u00b7 party zeta \u00b7 never synced")
 
     def test_blocked_only_queue_keeps_every_row_with_a_fix_action(self):
-        self.run_cli(["pr", "set", "acme/app#5", "--lifecycle", "needs-human"], "sess-3", self.repo_dir)
+        self.run_cli(["pr", "set", "acme/app#5", "--needs-ask-answer"], "sess-3", self.repo_dir)
         code, out, err = self.queue(["--party", "gamma"], None)
-        self.assertIn("1. acme/app#5  gamma  qc/T01  unblocks 0 \u2014 fix: needs-human \u2192 gamma", out)
+        self.assertIn("1. acme/app#5  gamma  qc/T01 [needs-ask-answer]  unblocks 0 \u2014 fix: needs ask answer \u2192 gamma", out)
         self.assertNotIn("next action", out)
 
     def test_pending_checks_show_a_wait_action(self):
@@ -122,6 +122,17 @@ class OutputTests(QueueCliTestCase):
         self.assertIn("1. acme/app#5  gamma  qc/T01  unblocks 0 \u2014 wait: checks pending (1)", out)
         self.assertIn("2. acme/app#6  gamma  qc/T01 [draft]", out)
         self.assertNotIn("next action", out)
+
+    def test_review_flag_shows_a_human_review_action_and_its_label(self):
+        self.run_cli(["pr", "set", "acme/app#5", "--needs-human-pr-review"], "sess-3", self.repo_dir)
+        code, out, err = self.queue(["--party", "gamma"], None)
+        self.assertIn("qc/T01 [needs-human-pr-review]", out)
+        self.assertIn("review: human, then merge", out)
+
+    def test_ask_flag_shows_its_label_after_the_draft_label(self):
+        self.run_cli(["pr", "set", "acme/app#6", "--needs-ask-answer"], "sess-3", self.repo_dir)
+        code, out, err = self.queue(["--party", "gamma"], None)
+        self.assertIn("qc/T01 [draft] [needs-ask-answer]", out)
 
     def test_party_with_no_open_prs_says_so(self):
         self.run_cli(["party", "start", "epsilon"], "sess-5", self.repo_dir)
@@ -142,13 +153,13 @@ class OutputTests(QueueCliTestCase):
         self.assertIn("acme/app#7  delta  qd/T01  unblocks 0 \u2014 wait: waits on acme/app#3", out)
 
     def test_pin_to_a_blocked_pr_keeps_it_first_with_a_fix_action(self):
-        self.run_cli(["pr", "set", "acme/app#3", "--lifecycle", "needs-human"], "sess-1", self.repo_dir)
+        self.run_cli(["pr", "set", "acme/app#3", "--needs-ask-answer"], "sess-1", self.repo_dir)
         code, out, err = self.run_cli(
             ["merge-queue", "pin", "acme/app#3", "--before", "acme/app#7"], None, self.repo_dir
         )
         self.assertEqual(code, 0, err)
         code, out, err = self.queue(["--raid", "ci"], None)
-        self.assertIn("acme/app#3  alpha  qa/T03  unblocks 1 \u2014 fix: needs-human \u2192 alpha", out)
+        self.assertIn("acme/app#3  alpha  qa/T03 [needs-ask-answer]  unblocks 1 \u2014 fix: needs ask answer \u2192 alpha", out)
         self.assertIn("acme/app#7  delta  qd/T01  unblocks 0 \u2014 fix: waits on acme/app#3 \u2192 delta", out)
         self.assertLess(out.index("acme/app#3  alpha"), out.index("acme/app#7  delta"))
 

@@ -93,12 +93,13 @@ class MergeQueueModelTests(MergeQueueModelTestCase):
         self.assertEqual(draft["action"], "promote: gh pr ready \u2192 beta")
 
     def test_blocked_entry_stays_in_the_queue_with_its_action(self):
-        self.run_cli(["pr", "set", "acme/app#3", "--lifecycle", "needs-human"], "sess-2", self.repo_dir)
+        self.run_cli(["pr", "set", "acme/app#3", "--needs-ask-answer"], "sess-2", self.repo_dir)
         queue = self.queues_by_scope()["raid:ci"]["queue"]
         blocked = [entry for entry in queue if entry["state"] == "blocked"]
         self.assertEqual([entry["ref"] for entry in blocked], ["acme/app#3"])
-        self.assertEqual(blocked[0]["reasons"], ["needs-human"])
-        self.assertEqual(blocked[0]["action"], "fix: needs-human \u2192 beta")
+        self.assertEqual(blocked[0]["reasons"], ["needs ask answer"])
+        self.assertEqual(blocked[0]["labels"], ["draft", "needs-ask-answer"])
+        self.assertEqual(blocked[0]["action"], "fix: needs ask answer \u2192 beta")
         self.assertFalse(blocked[0]["next_action"])
 
     def test_raid_without_open_prs_has_an_empty_queue(self):

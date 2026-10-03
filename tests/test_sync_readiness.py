@@ -41,16 +41,24 @@ class SyncReadinessTests(GuildTestCase):
         self.assertIn("app#1", out)
 
     def test_non_draft_open_pr_becomes_ready_from_every_lifecycle(self):
-        for lifecycle in ("draft", "converging", "needs-human", "ready"):
+        for lifecycle in ("draft", "converging", "ready"):
             self.set_lifecycle(lifecycle)
             board = self.sync_board({"state": "OPEN", "isDraft": False})
             self.assertIn("app#1  ready", board, lifecycle)
 
-    def test_draft_pr_keeps_converging_and_needs_human(self):
-        for lifecycle in ("converging", "needs-human"):
-            self.set_lifecycle(lifecycle)
-            board = self.sync_board({"state": "OPEN", "isDraft": True})
-            self.assertIn("app#1  {}".format(lifecycle), board)
+    def test_draft_pr_keeps_converging(self):
+        self.set_lifecycle("converging")
+        board = self.sync_board({"state": "OPEN", "isDraft": True})
+        self.assertIn("app#1  converging", board)
+
+    def test_sync_keeps_both_flags_when_pr_goes_ready_on_github(self):
+        code, out, err = self.run_cli(
+            ["pr", "set", "acme/app#1", "--needs-ask-answer", "--needs-human-pr-review"],
+            "sess-1", self.repo_dir,
+        )
+        self.assertEqual(code, 0, err)
+        board = self.sync_board({"state": "OPEN", "isDraft": False})
+        self.assertIn("app#1  ready needs-ask-answer needs-human-pr-review", board)
 
     def test_draft_pr_demotes_stale_ready_to_draft(self):
         self.set_lifecycle("ready")
