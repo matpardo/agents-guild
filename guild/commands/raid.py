@@ -101,6 +101,15 @@ def member_raids(conn, now, party):
     return [row for row in rows if not timeutil.is_expired(now, row["expires_at"])]
 
 
+def raid_role_label(raids):
+    if not raids:
+        return "solo"
+    entries = sorted(raids, key=lambda row: row["raid"])
+    return ", ".join(
+        "RL {}".format(row["raid"]) if row["lead"] else row["raid"] for row in entries
+    )
+
+
 def member_raid_names(conn, now, party):
     if party is None:
         return set()

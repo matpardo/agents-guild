@@ -19,6 +19,22 @@ def read_ctx(state_dir, session_id):
         return None
 
 
+def _raid_label(ctx, row):
+    label = "{}·RL".format(row["raid"]) if row["lead"] else row["raid"]
+    if raid_commands.is_paused(ctx.conn, row["raid"]):
+        return "{} ⏸".format(label)
+    return label
+
+
+def _identity_parts(ctx, party, generation):
+    raids = sorted(raid_commands.member_raids(ctx.conn, ctx.now, party), key=lambda row: row["raid"])
+    parts = []
+    if raids:
+        parts.append("⚔ " + ", ".join(_raid_label(ctx, row) for row in raids))
+    parts.append("g{}".format(generation))
+    return parts
+
+
 def render(ctx, session_id):
     binding = identity.resolve_binding(ctx.conn, session_id)
     project = binding["project"] if binding is not None else None
@@ -30,6 +46,8 @@ def render(ctx, session_id):
     raid_member_of = raid_commands.member_raid_names(ctx.conn, ctx.now, party)
     targeting = notice_commands.targeting(active, project, True, raid_member_of)
     parts = []
+    if party is not None:
+        parts.extend(_identity_parts(ctx, party, binding["generation"]))
     if total_open_asks:
         parts.append("⚑{} asks".format(total_open_asks))
     if targeting:

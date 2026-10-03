@@ -569,6 +569,28 @@
     return article;
   }
 
+  function renderRoleBadge(raids) {
+    var badge = el("span");
+    var isLead = raids.some(function (raid) {
+      return raid.lead;
+    });
+    var modifier = raids.length === 0 ? "role-solo" : isLead ? "role-lead" : "role-member";
+    badge.className = "role-badge " + modifier;
+    badge.textContent =
+      raids.length === 0
+        ? "solo"
+        : raids
+            .slice()
+            .sort(function (a, b) {
+              return a.raid < b.raid ? -1 : a.raid > b.raid ? 1 : 0;
+            })
+            .map(function (raid) {
+              return raid.lead ? "RL " + raid.raid : raid.raid;
+            })
+            .join(", ");
+    return badge;
+  }
+
   function renderParty(party) {
     var details = el("details");
     details.className = "party";
@@ -579,6 +601,7 @@
 
     var summary = el("summary");
     summary.appendChild(textEl("strong", party.name));
+    summary.appendChild(renderRoleBadge(party.raids));
     summary.appendChild(textEl("span", party.state));
     summary.appendChild(textEl("span", "gen " + party.generation));
     summary.appendChild(textEl("span", party.leader_session_name || "no leader"));

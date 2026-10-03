@@ -50,13 +50,13 @@ def _write_transcript(projects_dir, encoded, session_id, lines):
 class ResumeHelperTests(GuildTestCase):
     def test_resume_command_names_party_and_mode(self):
         self.assertEqual(
-            resume.resume_command("sess-1", "alpha", "acceptEdits"),
-            "claude --resume sess-1 --name alpha --permission-mode acceptEdits",
+            resume.resume_command("sess-1", "alpha", 3, "acceptEdits"),
+            "claude --resume sess-1 --name alpha-g3 --permission-mode acceptEdits",
         )
 
     def test_resume_command_omits_unknown_mode(self):
         self.assertEqual(
-            resume.resume_command("sess-1", "alpha", None), "claude --resume sess-1 --name alpha"
+            resume.resume_command("sess-1", "alpha", 3, None), "claude --resume sess-1 --name alpha-g3"
         )
 
     def test_fresh_command_keeps_generation_name_and_adds_mode(self):
@@ -181,7 +181,7 @@ class ListTests(ReviveBase):
         expected = resume.tab_command(
             "alpha",
             str(self.work_a),
-            resume.resume_command("sess-a", "alpha", "acceptEdits"),
+            resume.resume_command("sess-a", "alpha", 1, "acceptEdits"),
         )
         self.assertIn(expected, out)
 
@@ -300,7 +300,7 @@ class LaunchTests(ReviveBase):
             [
                 "new-session", "-d", "-s", "guild", "-n", "alpha", "-c", str(self.work_a),
                 "-P", "-F", "#{window_id}",
-                "claude --resume sess-a --name alpha --permission-mode acceptEdits",
+                "claude --resume sess-a --name alpha-g1 --permission-mode acceptEdits",
             ],
             tmux.calls,
         )

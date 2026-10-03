@@ -9,9 +9,9 @@ def _mode_flag(permission_mode):
     return " --permission-mode {}".format(shlex.quote(permission_mode))
 
 
-def resume_command(session_id, party, permission_mode):
-    return "claude --resume {} --name {}{}".format(
-        shlex.quote(session_id), shlex.quote(party), _mode_flag(permission_mode)
+def resume_command(session_id, party, generation, permission_mode):
+    return "claude --resume {} --name {}-g{}{}".format(
+        shlex.quote(session_id), shlex.quote(party), generation, _mode_flag(permission_mode)
     )
 
 
