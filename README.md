@@ -411,8 +411,10 @@ kinds of constraint, ties broken by PR number:
 
 1. SDD task dependencies between the PRs' tasks.
 2. Pins: explicit `X before Y` agreements (below). Pins and task dependencies
-   are hard constraints; a pin that involves a merged, closed or blocked PR
-   is ignored, so stale pins drop out by themselves.
+   are hard constraints; a pin that involves a merged or closed PR is
+   ignored, so stale pins drop out by themselves. A PR pinned after a blocked
+   PR is blocked too (`pinned after X (blocked)`), transitively; a pin whose
+   second PR is blocked is ignored.
 3. Shared-area overlap: two ready PRs of the same repo that touch the same
    project `shared_areas` glob are sequential. By default the one with the
    smaller diff (additions plus deletions) goes first, then the one created

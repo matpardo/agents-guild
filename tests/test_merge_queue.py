@@ -230,6 +230,19 @@ class EligibilityTests(unittest.TestCase):
         result = merge_queue.compute([_pr(1, lifecycle="draft"), _pr(2), _pr(3)], [_pin(3, 1, "a")])
         self.assertEqual(_refs(result["queue"]), [_ref(2), _ref(3)])
 
+    def test_pin_after_a_blocked_pr_blocks_the_pinned_pr(self):
+        result = merge_queue.compute([_pr(1, lifecycle="draft"), _pr(2), _pr(3)], [_pin(1, 3, "a")])
+        self.assertEqual(_refs(result["queue"]), [_ref(2)])
+        reasons = {entry["ref"]: entry["reasons"] for entry in result["blocked"]}
+        self.assertEqual(reasons[_ref(3)], ["pinned after {} (blocked) by a".format(_ref(1))])
+
+    def test_pin_block_propagates_through_chained_pins(self):
+        prs = [_pr(1, lifecycle="draft"), _pr(3), _pr(5)]
+        result = merge_queue.compute(prs, [_pin(1, 3, "a"), _pin(3, 5, "a")])
+        self.assertEqual(result["queue"], [])
+        reasons = {entry["ref"]: entry["reasons"] for entry in result["blocked"]}
+        self.assertEqual(reasons[_ref(5)], ["pinned after {} (blocked) by a".format(_ref(3))])
+
     def test_blocked_prs_do_not_take_part_in_overlap(self):
         prs = [_pr(1, globs=["a"], checks_failing=1), _pr(2, globs=["a"])]
         result = merge_queue.compute(prs, [])
