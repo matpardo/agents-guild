@@ -72,8 +72,9 @@ It refuses if the installed worktree has local changes, moves it to
 `guild doctor`. It never edits `~/.claude/settings.json` or project configs.
 
 `guild doctor` checks, read-only, that every guild hook is wired in
-`~/.claude/settings.json`, that `~/.claude/GUILD.md` exists and that every
-project config loads; it exits 1 and names what is missing.
+`~/.claude/settings.json`, that its `permissions.ask` holds the opt-in binding
+rules (see "Hooks"), that `~/.claude/GUILD.md` exists and that every project
+config loads; it exits 1 and names what is missing.
 
 `guild doctor --scan-prs` additionally lists the open PRs of every project's
 `github.repos` through `gh` and scans title, body, comments and commit
@@ -1288,9 +1289,18 @@ Wired from `~/.claude/settings.json` (not part of this repo):
         "hooks": [{"type": "command", "command": "guild hook pre-edit"}]
       }
     ]
+  },
+  "permissions": {
+    "ask": ["Bash(guild party start:*)", "Bash(guild quest add:*)"]
   }
 }
 ```
+
+**Opt-in binding.** A session never needs a party: one-off changes stay
+unbound. The unbound hint only says to resume a party when the work continues
+one, and to ask the human before creating a party or a quest. The
+`permissions.ask` rules make Claude Code ask the human before every
+`guild party start` and `guild quest add`, whatever the model decides.
 
 **Commit guard (git).** `pre-edit` only sees the Edit/Write family of tools.
 Agents that write files through Bash (`cat > file <<EOF`, `python3 -`,
