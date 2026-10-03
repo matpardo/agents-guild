@@ -418,6 +418,22 @@ def _merge_queue_unpinned(conn, event):
     )
 
 
+def _record_main_status(conn, event, source):
+    payload = event["payload"]
+    conn.execute(
+        "INSERT OR REPLACE INTO main_status (repo, source, red, reason, updated_at) VALUES (?, ?, ?, ?, ?)",
+        (payload["repo"], source, 1 if payload["red"] else 0, payload["reason"], event["ts"]),
+    )
+
+
+def _main_status_synced(conn, event):
+    _record_main_status(conn, event, "gh")
+
+
+def _main_marked(conn, event):
+    _record_main_status(conn, event, "manual")
+
+
 def _dump(value):
     return json.dumps(value)
 
@@ -456,6 +472,8 @@ _REDUCERS = {
     "raid.resumed": _raid_resumed,
     "merge_queue.pinned": _merge_queue_pinned,
     "merge_queue.unpinned": _merge_queue_unpinned,
+    "main.status_synced": _main_status_synced,
+    "main.marked": _main_marked,
 }
 
 

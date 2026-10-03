@@ -369,12 +369,18 @@ class LeadRaidWorkTests(NextTestCase):
         self.assertIn("raid ci: merge queue 1. acme/app#7 beta", out)
         self.assertNotIn("nothing actionable", out)
 
-    def test_blocked_merge_queue_entry_listed_with_reasons(self):
+    def test_blocked_merge_queue_entry_listed_with_its_fix_action(self):
         self._beta_tracks_pr()
         self.write_gh_fixture("view_acme-app_7", self._view("FAILURE"))
         self.run_cli(["sync", "--source", "gh"], "sess-1", self.repo_dir)
         code, out, err = self.run_cli(["next"], "sess-1", self.repo_dir)
-        self.assertIn("raid ci: blocked acme/app#7 beta", out)
+        self.assertIn("raid ci: merge queue 1. acme/app#7 beta \u2014 fix: checks failing (1) \u2192 beta", out)
+
+    def test_red_main_listed_before_the_queue(self):
+        self._beta_tracks_pr()
+        self.run_cli(["main", "red", "acme/app", "--reason", "ci down"], None, self.repo_dir)
+        code, out, err = self.run_cli(["next"], "sess-1", self.repo_dir)
+        self.assertIn("raid ci: MAIN RED acme/app \u2014 ci down (manual) \u2192 fix before anything", out)
 
     def test_all_lists_asks_and_queue_entries(self):
         self._beta_asks()

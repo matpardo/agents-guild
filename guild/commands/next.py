@@ -224,21 +224,22 @@ def _raid_ask_lines(conn, raid_name, members):
     ]
 
 
-def _raid_queue_lines(conn, raid_name, members):
-    scoped = merge_queue_commands.scoped_queue(
-        merge_queue_commands.open_pr_records(conn), merge_queue_commands.load_pins(conn), members
+def _raid_queue_entry_line(raid_name, position, entry):
+    prefix = "next action: " if entry["next_action"] else ""
+    return "raid {}: merge queue {}{}. {} {} \u2014 {}".format(
+        raid_name, prefix, position, entry["ref"], entry["party"], entry["action"]
     )
+
+
+def _raid_queue_lines(conn, raid_name, members):
+    scoped = merge_queue_commands.load_scoped_queue(conn, members)
     lines = [
-        "raid {}: merge queue {}. {} {} \u2014 {}".format(
-            raid_name, position, entry["ref"], entry["party"], entry["reason"]
-        )
-        for position, entry in enumerate(scoped["queue"], start=1)
+        "raid {}: MAIN RED {} \u2192 fix before anything".format(raid_name, merge_queue_commands.main_label(row))
+        for row in scoped["main"]
     ]
     lines.extend(
-        "raid {}: blocked {} {} \u2014 {}".format(
-            raid_name, entry["ref"], entry["party"], "; ".join(entry["reasons"])
-        )
-        for entry in scoped["blocked"]
+        _raid_queue_entry_line(raid_name, position, entry)
+        for position, entry in enumerate(scoped["queue"], start=1)
     )
     return lines
 

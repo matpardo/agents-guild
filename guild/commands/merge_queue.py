@@ -1,6 +1,7 @@
 import json
 
 from guild import config, db, events, identity, merge_queue, refs, resolve, sanitize, timeutil
+from guild.commands import main_status as main_status_commands
 from guild.commands import raid as raid_commands
 from guild.errors import GuildError
 
@@ -252,16 +253,24 @@ def unpin(ctx, first_text, second_text):
     return "unpinned '{}' before '{}'".format(first_ref, second_ref)
 
 
-def scoped_queue(records, pins, party_names):
+def scoped_queue(records, pins, main_rows, party_names):
     scoped = [record for record in records if record["party"] in party_names]
     synced = [record["synced_at"] for record in scoped if record["synced_at"] is not None]
-    result = merge_queue.compute(scoped, pins)
+    scoped_repos = {record["repo"] for record in scoped}
+    scoped_main = [row for row in main_rows if row["repo"] in scoped_repos]
+    result = merge_queue.compute(scoped, pins, scoped_main)
     return {
+        "main": result["main"],
         "queue": result["queue"],
-        "blocked": result["blocked"],
         "synced_at": max(synced) if synced else None,
         "has_prs": bool(scoped),
     }
+
+
+def load_scoped_queue(conn, party_names):
+    return scoped_queue(
+        open_pr_records(conn), load_pins(conn), main_status_commands.red_rows(conn), party_names
+    )
 
 
 def _resolve_scope(ctx, raid, party):
@@ -300,45 +309,53 @@ def _synced_label(now, synced_at):
     return "synced {} min ago".format(max(minutes, 0))
 
 
+def main_label(row):
+    return "{} \u2014 {} ({})".format(row["repo"], row["reason"], row["source"])
+
+
+def _main_line(row):
+    return "0. MAIN RED {} \u2192 fix before anything".format(main_label(row))
+
+
+def _action_text(entry):
+    if entry["state"] == "ready":
+        return "{} ({})".format(entry["action"], entry["why"])
+    return entry["action"]
+
+
 def _queue_line(position, entry):
-    return "{}. {}  {}  {} \u2014 {}".format(
-        position, entry["ref"], entry["party"], entry["task"] or "-", entry["reason"]
-    )
-
-
-def _blocked_line(entry):
-    return "  {}  {}  {} \u2014 {}".format(
-        entry["ref"], entry["party"], entry["task"] or "-", "; ".join(entry["reasons"])
+    prefix = "\u25b6 next action: " if entry["next_action"] else ""
+    return "{}{}. {}  {}  {}  unblocks {} \u2014 {}".format(
+        prefix, position, entry["ref"], entry["party"], entry["task"] or "-", entry["unblocks"], _action_text(entry)
     )
 
 
 def _body_lines(scoped):
     if not scoped["has_prs"]:
         return ["no open tracked PRs"]
-    lines = []
-    if scoped["queue"]:
-        lines.extend(_queue_line(index, entry) for index, entry in enumerate(scoped["queue"], start=1))
-    else:
-        lines.append("nothing ready to merge")
-    if scoped["blocked"]:
-        lines.append("blocked:")
-        lines.extend(_blocked_line(entry) for entry in scoped["blocked"])
+    lines = [_main_line(row) for row in scoped["main"]]
+    lines.extend(_queue_line(index, entry) for index, entry in enumerate(scoped["queue"], start=1))
     return lines
 
 
 def run(ctx, raid, party):
     kind, name, party_names = _resolve_scope(ctx, raid, party)
-    scoped = scoped_queue(open_pr_records(ctx.conn), load_pins(ctx.conn), party_names)
+    scoped = load_scoped_queue(ctx.conn, party_names)
     header = "merge queue \u00b7 {} {} \u00b7 {}".format(kind, name, _synced_label(ctx.now, scoped["synced_at"]))
     lines = [header] + _body_lines(scoped) + [NEVER_MERGES_REMINDER]
     return [sanitize.strip_control_sequences(line) for line in lines]
 
 
 def next_to_merge(conn, party_names):
-    scoped = scoped_queue(open_pr_records(conn), load_pins(conn), party_names)
-    if not scoped["queue"]:
-        return None
-    return scoped["queue"][0]["ref"]
+    scoped = load_scoped_queue(conn, party_names)
+    for entry in scoped["queue"]:
+        if entry["state"] == "ready":
+            return entry["ref"]
+    return None
+
+
+def main_red_labels(conn, party_names):
+    return [main_label(row) for row in load_scoped_queue(conn, party_names)["main"]]
 
 
 def _entry_model(entry):
@@ -359,15 +376,21 @@ def _queue_entry_model(position, entry):
     return dict(
         _entry_model(entry),
         position=position,
-        reason=sanitize.strip_control_sequences(entry["reason"]),
-    )
-
-
-def _blocked_entry_model(entry):
-    return dict(
-        _entry_model(entry),
+        unblocks=entry["unblocks"],
+        state=entry["state"],
+        next_action=entry["next_action"],
+        action=sanitize.strip_control_sequences(entry["action"]),
+        why=sanitize.strip_control_sequences(entry["why"]),
         reasons=[sanitize.strip_control_sequences(reason) for reason in entry["reasons"]],
     )
+
+
+def _main_model(row):
+    return {
+        "repo": row["repo"],
+        "source": row["source"],
+        "reason": sanitize.strip_control_sequences(row["reason"]),
+    }
 
 
 def _scope_model(now, scope, scoped):
@@ -375,28 +398,29 @@ def _scope_model(now, scope, scoped):
         "scope": scope,
         "synced_at": scoped["synced_at"],
         "synced_label": _synced_label(now, scoped["synced_at"]),
+        "main": [_main_model(row) for row in scoped["main"]],
         "queue": [
             _queue_entry_model(position, entry)
             for position, entry in enumerate(scoped["queue"], start=1)
         ],
-        "blocked": [_blocked_entry_model(entry) for entry in scoped["blocked"]],
     }
 
 
 def board_models(conn, now, party_names):
     records = open_pr_records(conn)
     pins = load_pins(conn)
+    main_rows = main_status_commands.red_rows(conn)
     grouped = raid_commands.active_raids_grouped(conn, now)
     models = []
     in_raid = set()
     for raid_name in sorted(grouped):
         members = {row["party"] for row in grouped[raid_name]}
         in_raid |= members
-        models.append(_scope_model(now, "raid:{}".format(raid_name), scoped_queue(records, pins, members)))
+        models.append(_scope_model(now, "raid:{}".format(raid_name), scoped_queue(records, pins, main_rows, members)))
     for party in sorted(party_names):
         if party in in_raid:
             continue
-        scoped = scoped_queue(records, pins, {party})
+        scoped = scoped_queue(records, pins, main_rows, {party})
         if scoped["has_prs"]:
             models.append(_scope_model(now, "party:{}".format(party), scoped))
     return models

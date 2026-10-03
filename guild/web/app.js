@@ -409,19 +409,23 @@
 
   function renderQueueEntry(entry) {
     var item = el("li");
-    item.className = "queue-entry";
+    item.className = "queue-entry queue-" + entry.state;
     item.value = entry.position;
     item.appendChild(renderQueueEntryHead(entry));
-    item.appendChild(classedText("p", entry.reason, "queue-reason"));
+    var summary = entry.state + " \u00b7 unblocks " + entry.unblocks + " \u2014 " + entry.action;
+    if (entry.next_action) {
+      summary = "\u25b6 next action: " + summary;
+    }
+    item.appendChild(classedText("p", summary, "queue-reason"));
+    if (entry.why) {
+      item.appendChild(classedText("p", entry.why, "queue-reason"));
+    }
     return item;
   }
 
-  function renderBlockedEntry(entry) {
-    var item = el("li");
-    item.className = "queue-entry";
-    item.appendChild(renderQueueEntryHead(entry));
-    item.appendChild(classedText("p", entry.reasons.join("; "), "queue-reason"));
-    return item;
+  function renderMainRow(row) {
+    var text = "MAIN RED " + row.repo + " \u2014 " + row.reason + " (" + row.source + ") \u2192 fix before anything";
+    return classedText("p", text, "queue-main-red");
   }
 
   function renderMergeQueue(queue) {
@@ -432,21 +436,11 @@
     head.appendChild(textEl("strong", queue.scope));
     head.appendChild(textEl("span", queue.synced_label));
     article.appendChild(head);
-    if (queue.queue.length === 0) {
-      article.appendChild(textEl("p", "nothing ready to merge"));
-    } else {
-      var list = el("ol");
-      list.className = "queue-list";
-      appendAll(list, queue.queue.map(renderQueueEntry));
-      article.appendChild(list);
-    }
-    if (queue.blocked.length > 0) {
-      article.appendChild(textEl("h4", "blocked (" + queue.blocked.length + ")"));
-      var blockedList = el("ul");
-      blockedList.className = "queue-list";
-      appendAll(blockedList, queue.blocked.map(renderBlockedEntry));
-      article.appendChild(blockedList);
-    }
+    appendAll(article, queue.main.map(renderMainRow));
+    var list = el("ol");
+    list.className = "queue-list";
+    appendAll(list, queue.queue.map(renderQueueEntry));
+    article.appendChild(list);
     return article;
   }
 
@@ -671,12 +665,12 @@
           scope: queue.scope,
           synced_at: queue.synced_at,
           synced_label: queue.synced_label,
+          main: queue.main,
           queue: queue.queue.filter(matches),
-          blocked: queue.blocked.filter(matches),
         };
       })
       .filter(function (queue) {
-        return queue.queue.length + queue.blocked.length > 0;
+        return queue.queue.length > 0;
       });
   }
 

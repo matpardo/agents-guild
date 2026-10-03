@@ -61,3 +61,18 @@ def pr_list_open(cwd, repo, fields):
     if result.returncode != 0:
         raise GhCommandError(result.stderr.strip() or "gh pr list failed")
     return json.loads(result.stdout)
+
+
+def branch_checks(cwd, repo, branch):
+    result = subprocess.run(
+        ["gh", "api", "repos/{}/commits/{}/check-runs".format(repo, branch)],
+        cwd=str(cwd),
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode != 0:
+        raise GhCommandError(result.stderr.strip() or "gh api check-runs failed")
+    return [
+        {"name": run["name"], "conclusion": (run.get("conclusion") or "").upper()}
+        for run in json.loads(result.stdout)["check_runs"]
+    ]
