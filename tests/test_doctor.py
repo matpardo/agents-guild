@@ -8,6 +8,8 @@ _ALL_HOOKS = {
     "SessionStart": [{"hooks": [{"type": "command", "command": "guild hook session-start"}]}],
     "UserPromptSubmit": [{"hooks": [{"type": "command", "command": "guild hook prompt-submit"}]}],
     "PostToolUse": [{"hooks": [{"type": "command", "command": "guild hook post-tool-use"}]}],
+    "Notification": [{"hooks": [{"type": "command", "command": "guild hook notification"}]}],
+    "Stop": [{"hooks": [{"type": "command", "command": "guild hook stop"}]}],
     "PreToolUse": [
         {"matcher": "Bash", "hooks": [{"type": "command", "command": "guild hook pre-push"}]},
         {"matcher": "Edit|Write", "hooks": [{"type": "command", "command": "guild hook pre-edit"}]},
@@ -15,6 +17,19 @@ _ALL_HOOKS = {
 }
 
 _ASK_RULES = ["Bash(guild party start:*)", "Bash(guild quest add:*)"]
+
+_ALLOW_RULES = [
+    "Bash(guild task:*)",
+    "Bash(guild pr:*)",
+    "Bash(guild notice:*)",
+    "Bash(guild ask:*)",
+    "Bash(guild next:*)",
+    "Bash(guild claim:*)",
+    "Bash(guild release:*)",
+    "Bash(guild raid:*)",
+    "Bash(guild handoff:*)",
+    "Bash(guild sync:*)",
+]
 
 
 class DoctorTests(GuildTestCase):
@@ -27,10 +42,10 @@ class DoctorTests(GuildTestCase):
         self.addCleanup(self.env.stop)
 
     def _write_settings(self, hooks):
-        self._write_full_settings(hooks, _ASK_RULES)
+        self._write_full_settings(hooks, _ASK_RULES, _ALLOW_RULES)
 
-    def _write_full_settings(self, hooks, ask_rules):
-        settings = {"hooks": hooks, "permissions": {"ask": ask_rules}}
+    def _write_full_settings(self, hooks, ask_rules, allow_rules):
+        settings = {"hooks": hooks, "permissions": {"ask": ask_rules, "allow": allow_rules}}
         (self.home / ".claude" / "settings.json").write_text(json.dumps(settings))
 
     def _link_rules(self):
@@ -48,7 +63,7 @@ class DoctorTests(GuildTestCase):
         self.assertNotIn("missing", out)
 
     def test_missing_ask_rule_fails_and_names_it(self):
-        self._write_full_settings(_ALL_HOOKS, ["Bash(guild quest add:*)"])
+        self._write_full_settings(_ALL_HOOKS, ["Bash(guild quest add:*)"], _ALLOW_RULES)
         self._link_rules()
         code, out, err = self.run_cli(["doctor"], None, None)
         self.assertEqual(code, 1)
@@ -75,8 +90,63 @@ class DoctorTests(GuildTestCase):
         self._link_rules()
         code, out, err = self.run_cli(["doctor"], None, None)
         self.assertEqual(code, 1)
-        self.assertEqual(out.count("missing hook"), 5)
+        self.assertEqual(out.count("missing hook"), 7)
         self.assertEqual(out.count("missing ask rule"), 2)
+
+    def test_missing_notification_and_stop_hooks_fail_and_name_them(self):
+        hooks = dict(_ALL_HOOKS)
+        del hooks["Notification"]
+        del hooks["Stop"]
+        self._write_settings(hooks)
+        self._link_rules()
+        code, out, err = self.run_cli(["doctor"], None, None)
+        self.assertEqual(code, 1)
+        self.assertIn("missing hook Notification: guild hook notification", out)
+        self.assertIn("missing hook Stop: guild hook stop", out)
+
+    def test_wired_notification_and_stop_hooks_pass(self):
+        self._write_settings(_ALL_HOOKS)
+        self._link_rules()
+        code, out, err = self.run_cli(["doctor"], None, None)
+        self.assertIn("ok      hook Notification: guild hook notification", out)
+        self.assertIn("ok      hook Stop: guild hook stop", out)
+
+    def test_allow_rules_present_are_ok(self):
+        self._write_settings(_ALL_HOOKS)
+        self._link_rules()
+        code, out, err = self.run_cli(["doctor"], None, None)
+        self.assertEqual(code, 0, out)
+        self.assertIn("ok      allow rule Bash(guild task:*)", out)
+        self.assertEqual(out.count("ok      allow rule"), len(_ALLOW_RULES))
+
+    def test_missing_allow_rule_warns_without_changing_exit(self):
+        self._write_full_settings(_ALL_HOOKS, _ASK_RULES, ["Bash(guild task:*)"])
+        self._link_rules()
+        code, out, err = self.run_cli(["doctor"], None, None)
+        self.assertEqual(code, 0, out)
+        self.assertIn(
+            "warn    allow rule missing Bash(guild pr:*) (a permission prompt can stall the session)", out
+        )
+        self.assertIn("ok      allow rule Bash(guild task:*)", out)
+
+    def test_settings_without_allow_list_warns_for_every_rule(self):
+        (self.home / ".claude" / "settings.json").write_text(
+            json.dumps({"hooks": _ALL_HOOKS, "permissions": {"ask": _ASK_RULES}})
+        )
+        self._link_rules()
+        code, out, err = self.run_cli(["doctor"], None, None)
+        self.assertEqual(code, 0, out)
+        self.assertEqual(out.count("warn    allow rule missing"), len(_ALLOW_RULES))
+
+    def test_blanket_guild_allow_satisfies_every_rule(self):
+        for blanket in ("Bash(guild:*)", "Bash(guild *)"):
+            with self.subTest(blanket=blanket):
+                self._write_full_settings(_ALL_HOOKS, _ASK_RULES, [blanket])
+                self._link_rules()
+                code, out, err = self.run_cli(["doctor"], None, None)
+                self.assertEqual(code, 0, out)
+                self.assertEqual(out.count("ok      allow rule"), len(_ALLOW_RULES))
+                self.assertNotIn("allow rule missing", out)
 
     def test_missing_rules_link_fails(self):
         self._write_settings(_ALL_HOOKS)

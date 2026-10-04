@@ -72,9 +72,12 @@ It refuses if the installed worktree has local changes, moves it to
 `guild doctor`. It never edits `~/.claude/settings.json` or project configs.
 
 `guild doctor` checks, read-only, that every guild hook is wired in
-`~/.claude/settings.json`, that its `permissions.ask` holds the opt-in binding
-rules (see "Hooks"), that `~/.claude/GUILD.md` exists and that every project
-config loads; it exits 1 and names what is missing.
+`~/.claude/settings.json` (including `Notification` and `Stop`), that its
+`permissions.ask` holds the opt-in binding rules (see "Hooks"), that
+`~/.claude/GUILD.md` exists and that every project config loads; it exits 1
+and names what is missing. It also checks that the guild state commands are in
+`permissions.allow` (see "Hooks"); a missing allow rule is a `warn` line and
+never changes the exit code.
 
 `guild doctor --scan-prs` additionally lists the open PRs of every project's
 `github.repos` through `gh` and scans title, body, comments and commit
@@ -151,7 +154,7 @@ guild sync-timer install --every <dur> | uninstall | print
 guild drift [--epic <slug> | --all]
 guild brief
 guild inbox --since-last
-guild statusline --session <id> [--ctx <pct>]   # bound: [⚔ <raid>[·RL][ ⏸], ...] · g<N> · ⚑<n> asks · <n> notices
+guild statusline --session <id> [--ctx <pct>]   # bound: [⚔ <raid>[·RL][ ⏸], ...] · g<N> · ⚑<n> asks · <n> notices · ⏸<n> blocked
 
 guild hook session-start   # reads Claude Code hook JSON on stdin
 guild hook prompt-submit
@@ -764,7 +767,7 @@ name is not found.
 ### `guild revive`
 
 After a reboot, `guild revive` relaunches the active parties. It lists them
-numbered (party, project, quest progress, last activity, leader session
+numbered (party, project, quest progress, status, last activity, leader session
 name, cwd, permission mode, and `resume` or `fresh`) and starts the ones you
 pick, one tmux window per party, in a tmux session called `guild`.
 
@@ -1087,6 +1090,9 @@ against path traversal, not an identity boundary.
   ask question/context, answer text and handoff `--in-flight`/`--learned` for
   the caller's project. A match rejects the command with an error that names
   the field, never the matched text.
+- `notify` (optional): `{"command": [<argv>...]}`, a non-empty list of
+  non-empty strings run once per blocking wait (see "Session status"). The
+  only allowed key is `command`.
 - `shared_areas` (optional): list of glob strings relative to the repo root
   (e.g. `config/routes.rb`, `db/migrate/*`, `config/locales/*.yml`), matched
   with `fnmatch` against POSIX-style relative paths by `guild hook pre-edit`
@@ -1306,6 +1312,12 @@ Wired from `~/.claude/settings.json` (not part of this repo):
     "PostToolUse": [
       {"hooks": [{"type": "command", "command": "guild hook post-tool-use"}]}
     ],
+    "Notification": [
+      {"hooks": [{"type": "command", "command": "guild hook notification"}]}
+    ],
+    "Stop": [
+      {"hooks": [{"type": "command", "command": "guild hook stop"}]}
+    ],
     "PreToolUse": [
       {
         "matcher": "Bash",
@@ -1318,10 +1330,28 @@ Wired from `~/.claude/settings.json` (not part of this repo):
     ]
   },
   "permissions": {
-    "ask": ["Bash(guild party start:*)", "Bash(guild quest add:*)"]
+    "ask": ["Bash(guild party start:*)", "Bash(guild quest add:*)"],
+    "allow": [
+      "Bash(guild task:*)",
+      "Bash(guild pr:*)",
+      "Bash(guild notice:*)",
+      "Bash(guild ask:*)",
+      "Bash(guild next:*)",
+      "Bash(guild claim:*)",
+      "Bash(guild release:*)",
+      "Bash(guild raid:*)",
+      "Bash(guild handoff:*)",
+      "Bash(guild sync:*)"
+    ]
   }
 }
 ```
+
+The `allow` list keeps guild state commands from raising a Claude Code
+permission prompt, which stalls the session until a human answers it.
+`guild party start` and `guild quest add` stay out of it on purpose: they are
+the opt-in binding commands above. A blanket `Bash(guild:*)` or
+`Bash(guild *)` entry also satisfies `guild doctor`.
 
 **Opt-in binding.** A session never needs a party: one-off changes stay
 unbound. The unbound hint only says to resume a party when the work continues
@@ -1418,6 +1448,70 @@ Without a hooks manager, add the same call to the repository's
   `session_id` (so the guard binds to the parent's party) plus `agent_id`/
   `agent_type` (null on the main thread), and a `permissionDecisionReason`
   reaches the denied subagent verbatim.
+
+- `notification` and `stop`: record the session status (see "Session
+  status"). They print nothing, ignore unbound sessions and exit 0 whatever
+  the stdin carries.
+
+### Session status
+
+Every bound session has a status, kept in the `session_status` projection from
+local `session.waiting`, `session.stopped` and `session.working` events (replayed
+by `guild rebuild`). `Notification` maps `notification_type`
+`permission_prompt` to `waiting-permission`, and `elicitation_dialog` and
+`idle_prompt` to `waiting-input`; any other type is ignored. `Stop` records
+`stopped`. `session-start` (bound leader), `prompt-submit` and `post-tool-use`
+record `working`, and only when the status changes, so a hundred tool calls
+add no event.
+
+Each party then gets one derived status, first match wins:
+
+1. `closed`; `awaiting-leader` (handed off, no session yet).
+2. `waiting-permission`: the leader session is blocked on a permission prompt.
+3. `waiting-ask`: the party has an open ask and the session is not working
+   (age counts from the oldest open ask).
+4. `waiting-input`: the session waits on an idle prompt or an elicitation.
+5. `stopped-with-work` when the session stopped and `guild next` would still
+   return work (never when a raid pause is on), otherwise `done`.
+6. `working` (also when the session has no row yet).
+
+Surfaces, each with the age of the status (`45s`, `12m`, `3h`, `2d`):
+
+- `guild board`: a `status:` line per party, and every session blocked on a
+  permission prompt in NEEDS YOU (`NEEDS YOU · 2 open asks · 1 blocked`) with
+  the sanitized prompt text.
+- `guild web` / `/api/board`: a status badge per party (`status`: name, since,
+  detail, label) and a `blocked` list in the asks area.
+- `guild statusline`: `⏸<n> blocked`, omitted when zero.
+- `guild revive`: a `status:` line per party in the listing.
+- The raid lead's inbox: `- <party> (raid <raid>) waiting on permission` (or
+  `input` for an elicitation) when a member blocks. Idle waits are not
+  forwarded, and the message text never is.
+
+**Push command.** An optional project config key runs a command when a session
+blocks, once per waiting episode (permission prompt or elicitation; not idle):
+
+```json
+{"notify": {"command": ["notify-send", "guild"]}}
+```
+
+It is called as `notify-send guild <party> <wait>` with `<wait>` being
+`permission` or `elicitation`. `command` is an argv list (a non-empty list of
+non-empty strings, never a shell string) and it is the only allowed key. It
+runs detached; if it cannot start, the hook prints
+`guild: notify command failed: <error>` to stderr and still exits 0. A new
+episode starts after the session works again.
+
+**Security.** The notification message is text from Claude Code and may quote a
+command. It is sanitized, collapsed to one line, truncated to 200 characters
+and stored with `local` visibility only: it is never exported, never forwarded
+to the raid lead and never passed to the push command, which receives only the
+party name and the wait type.
+
+**Limitations.** The status stays `waiting-permission` until the next
+`PostToolUse` (or prompt) after you approve, because Claude Code has no
+approval hook. There is no `SessionEnd` hook, so a killed session keeps its last
+status; the age shown is the way to spot it.
 
 Whenever `prompt-submit`, `post-tool-use` or the `session-start` brief inject
 notices or answered asks from other sessions, the block is preceded by one

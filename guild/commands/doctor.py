@@ -12,9 +12,25 @@ _EXPECTED_HOOKS = (
     ("PostToolUse", "guild hook post-tool-use"),
     ("PreToolUse", "guild hook pre-push"),
     ("PreToolUse", "guild hook pre-edit"),
+    ("Notification", "guild hook notification"),
+    ("Stop", "guild hook stop"),
 )
 
 _EXPECTED_ASK_RULES = ("Bash(guild party start:*)", "Bash(guild quest add:*)")
+
+_EXPECTED_ALLOW_RULES = (
+    "Bash(guild task:*)",
+    "Bash(guild pr:*)",
+    "Bash(guild notice:*)",
+    "Bash(guild ask:*)",
+    "Bash(guild next:*)",
+    "Bash(guild claim:*)",
+    "Bash(guild release:*)",
+    "Bash(guild raid:*)",
+    "Bash(guild handoff:*)",
+    "Bash(guild sync:*)",
+)
+_BLANKET_ALLOW_RULES = ("Bash(guild:*)", "Bash(guild *)")
 
 
 _TRACE_RE = re.compile(r"guild|ask #[0-9]|notice #[0-9]", re.IGNORECASE)
@@ -60,6 +76,20 @@ def _ask_rule_lines(settings):
         present = rule in configured
         status = "ok     " if present else "missing"
         lines.append((present, "{} ask rule {}".format(status, rule)))
+    return lines
+
+
+def _allow_rule_lines(settings):
+    configured = settings.get("permissions", {}).get("allow", [])
+    blanket = any(rule in configured for rule in _BLANKET_ALLOW_RULES)
+    lines = []
+    for rule in _EXPECTED_ALLOW_RULES:
+        if blanket or rule in configured:
+            lines.append((True, "ok      allow rule {}".format(rule)))
+            continue
+        lines.append(
+            (True, "warn    allow rule missing {} (a permission prompt can stall the session)".format(rule))
+        )
     return lines
 
 
@@ -126,6 +156,7 @@ def run(ctx, scan_prs):
     settings = _load_settings(_claude_dir() / "settings.json")
     checks = _hook_lines(settings)
     checks.extend(_ask_rule_lines(settings))
+    checks.extend(_allow_rule_lines(settings))
     checks.append(_rules_line())
     checks.extend(_project_lines(ctx.projects_dir))
     if scan_prs:
