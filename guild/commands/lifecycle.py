@@ -1,7 +1,4 @@
-import contextlib
-import fcntl
-
-from guild import config, db, events, localbase, names, paths
+from guild import config, db, events, localbase, locking
 from guild.commands import notice as notice_commands
 from guild.errors import GuildError
 
@@ -43,22 +40,6 @@ def _checkout_for(project, repo):
         if clone["repo"] == repo:
             return clone["path"]
     return None
-
-
-@contextlib.contextmanager
-def _lock(state_dir, project, event_kind):
-    lock_dir = paths.ensure_private_dir(state_dir / _LOCK_DIR_NAME)
-    lock_path = names.ensure_within(lock_dir / "{}-{}.lock".format(project, event_kind), lock_dir)
-    with open(lock_path, "a") as handle:
-        try:
-            fcntl.flock(handle, fcntl.LOCK_EX | fcntl.LOCK_NB)
-        except BlockingIOError:
-            yield False
-            return
-        try:
-            yield True
-        finally:
-            fcntl.flock(handle, fcntl.LOCK_UN)
 
 
 def _record_ran(ctx, payload):
@@ -142,7 +123,8 @@ def run_group(ctx, project, event_kind, repo, trigger_refs, runner):
         payload["status"] = "error"
         payload["reason"] = "no checkout"
         return _finish(ctx, payload)
-    with _lock(ctx.state_dir, project["name"], event_kind) as acquired:
+    lock_file = "{}-{}.lock".format(project["name"], event_kind)
+    with locking.try_lock(ctx.state_dir / _LOCK_DIR_NAME, lock_file) as acquired:
         if not acquired:
             payload["status"] = "skipped"
             payload["reason"] = "locked"

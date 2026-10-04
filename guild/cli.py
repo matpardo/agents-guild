@@ -430,6 +430,13 @@ def _handle_lifecycle_run(ctx, args):
     return 0
 
 
+def _handle_resources(ctx, args):
+    from guild.commands import resources as resources_commands
+
+    _print(resources_commands.run_collect(ctx))
+    return 0
+
+
 def _handle_sync_timer(ctx, args):
     from guild.commands import timer as timer_commands
 
@@ -814,6 +821,11 @@ def build_parser():
     lifecycle_run.add_argument("--repo")
     lifecycle_run.add_argument("--dry-run", action="store_true")
     lifecycle_run.set_defaults(handler=_handle_lifecycle_run)
+
+    resources = subparsers.add_parser("resources")
+    resources_actions = resources.add_subparsers(dest="resources_action", required=True)
+    resources_collect = resources_actions.add_parser("collect")
+    resources_collect.set_defaults(handler=_handle_resources)
 
     sync_timer = subparsers.add_parser("sync-timer")
     sync_timer_actions = sync_timer.add_subparsers(dest="timer_action", required=True)
