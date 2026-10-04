@@ -217,8 +217,23 @@ def run(ctx, in_flight, learned, model, respawn, tmux, tmux_pane, sleep):
     return _with_reminder(command), None
 
 
-def run_prune(ctx, dry_run):
+def _dry_run_text(ctx):
     prune_plan = handoff_prune.plan(ctx, paths.handoffs_dir(), ctx.state_dir)
-    if not dry_run:
-        handoff_prune.apply(ctx, prune_plan.actions)
-    return "\n".join(handoff_prune.report_lines(prune_plan, dry_run))
+    return "\n".join(handoff_prune.report_lines(prune_plan, True))
+
+
+def _real_run_text(ctx):
+    with handoff_prune.lock(ctx) as acquired:
+        if not acquired:
+            return "prune already running"
+        prune_plan = handoff_prune.plan(ctx, paths.handoffs_dir(), ctx.state_dir)
+        result = handoff_prune.apply(ctx, prune_plan.actions)
+    lines = handoff_prune.report_lines(prune_plan, False)
+    lines.extend("skip {}: {}".format(action.label, action.reason) for action in result.skipped)
+    return "\n".join(lines)
+
+
+def run_prune(ctx, dry_run):
+    if dry_run:
+        return _dry_run_text(ctx)
+    return _real_run_text(ctx)

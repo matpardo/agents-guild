@@ -1,5 +1,7 @@
 import json
 import os
+from pathlib import Path
+from unittest import mock
 
 from guild import handoff_prune, paths
 from guild.cli import _build_context
@@ -131,3 +133,49 @@ class StatePruneTests(GuildTestCase):
         self.assertTrue(path.exists())
         real = handoff_prune.report_lines(plan, False)
         self.assertEqual(real[1], "delete marker ctx/{}: session not running".format(_DEAD))
+
+    def test_marker_vanishing_during_lstat_is_skipped_silently(self):
+        self._marker(self.ctx_dir, _DEAD, 2 * _DAY)
+        real_stat = Path.lstat
+
+        def vanishing(path, *args, **kwargs):
+            if path.name == _DEAD:
+                raise FileNotFoundError(str(path))
+            return real_stat(path, *args, **kwargs)
+
+        with mock.patch.object(Path, "lstat", autospec=True, side_effect=vanishing):
+            self.assertEqual(self._plan().actions, [])
+
+    def test_marker_lstat_permission_error_is_reported_and_others_continue(self):
+        self._marker(self.ctx_dir, _DEAD, 2 * _DAY)
+        other = self._marker(self.hints_dir, "nudge-" + _DEAD, 2 * _DAY)
+        real_stat = Path.lstat
+
+        def denied(path, *args, **kwargs):
+            if path.parent.name == "ctx" and path.name == _DEAD:
+                raise PermissionError("denied")
+            return real_stat(path, *args, **kwargs)
+
+        with mock.patch.object(Path, "lstat", autospec=True, side_effect=denied):
+            actions = self._plan().actions
+        self.assertEqual(
+            sorted((a.verb, a.reason) for a in actions), [("delete", "session not running"), ("skip", "denied")]
+        )
+        self.assertIn(other, [a.path for a in actions])
+
+    def test_marker_unlink_failure_is_reported_and_others_continue(self):
+        first = self._marker(self.ctx_dir, _DEAD, 2 * _DAY)
+        second = self._marker(self.hints_dir, _DEAD, 2 * _DAY)
+        actions = self._plan().actions
+        real_unlink = Path.unlink
+
+        def flaky(path, missing_ok):
+            if path == first:
+                raise PermissionError("denied")
+            return real_unlink(path, missing_ok=missing_ok)
+
+        with mock.patch.object(Path, "unlink", autospec=True, side_effect=flaky):
+            result = handoff_prune.apply(self.ctx, actions)
+        self.assertEqual([a.reason for a in result.skipped], ["denied"])
+        self.assertTrue(first.exists())
+        self.assertFalse(second.exists())

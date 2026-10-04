@@ -202,7 +202,7 @@ def _prune_lines(ctx):
         deleted = handoff_prune.prune(ctx, paths.handoffs_dir())
     except (GuildError, OSError, sqlite3.Error) as error:
         return ["handoff prune failed: {}".format(error)]
-    if deleted == 0:
+    if not deleted:
         return []
     return ["pruned {} handoff file(s)".format(deleted)]
 

@@ -1,8 +1,9 @@
 import re
+import stat
 from datetime import timedelta
 from pathlib import Path
 
-from guild import config, db, events, names, session_info, timeutil
+from guild import config, db, events, locking, names, session_info, timeutil
 from guild.errors import GuildError
 
 _NO_RETENTION_REASON = "no handoff_retention_days configured"
@@ -14,6 +15,12 @@ _MARKER_NAME_RE = re.compile(
     r"([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})"
     r"(?:-g\d+|-[0-9a-f]{16})?$"
 )
+
+
+class ApplyResult:
+    def __init__(self, deleted, skipped):
+        self.deleted = deleted
+        self.skipped = skipped
 
 
 class Plan:
@@ -100,6 +107,11 @@ def _verdict(handoffs_dir, row, reason):
     return Action("handoff", verb, label, path, detail, row["party"], row["generation"])
 
 
+def _unreadable_close_action(row):
+    path = Path(row["handoff_path"])
+    return Action("handoff", "skip", str(path), path, "unreadable close timestamp", row["party"], row["generation"])
+
+
 def _handoff_actions(ctx, handoffs_dir):
     actions = []
     kept_without_retention = 0
@@ -108,7 +120,11 @@ def _handoff_actions(ctx, handoffs_dir):
             reason = _superseded_reason(row)
             if reason is not None:
                 actions.append(_verdict(handoffs_dir, row, reason))
-        reason, kept = _latest_reason(ctx, rows[-1])
+        try:
+            reason, kept = _latest_reason(ctx, rows[-1])
+        except (ValueError, TypeError):
+            actions.append(_unreadable_close_action(rows[-1]))
+            continue
         kept_without_retention += 1 if kept else 0
         if reason is not None:
             actions.append(_verdict(handoffs_dir, rows[-1], reason))
@@ -122,30 +138,39 @@ def _protected_session_ids(ctx):
     return session_info.running_session_ids(ctx.sessions_dir) | {row["leader_session_id"] for row in rows}
 
 
-def _marker_candidates(state_dir):
+def _marker_entries(state_dir):
     for directory_name in _MARKER_DIRS:
         directory = state_dir / directory_name
         if not directory.is_dir():
             continue
         for entry in sorted(directory.iterdir()):
-            if entry.is_symlink() or not entry.is_file():
-                continue
-            if _MARKER_NAME_RE.match(entry.name) is None:
-                continue
-            yield entry
+            if _MARKER_NAME_RE.match(entry.name) is not None:
+                yield entry
+
+
+def _marker_skip(entry, reason):
+    return Action("marker", "skip", str(entry), entry, reason, None, None)
 
 
 def _marker_action(ctx, state_dir, protected, entry):
     session_id = _MARKER_NAME_RE.match(entry.name).group(1)
     if session_id in protected:
         return None
-    if ctx.now.timestamp() - entry.stat().st_mtime < _MARKER_MIN_AGE_SECONDS:
+    try:
+        entry_stat = entry.lstat()
+    except FileNotFoundError:
         return None
-    label = "{}/{}".format(entry.parent.name, entry.name)
+    except OSError as error:
+        return _marker_skip(entry, str(error))
+    if not stat.S_ISREG(entry_stat.st_mode):
+        return None
+    if ctx.now.timestamp() - entry_stat.st_mtime < _MARKER_MIN_AGE_SECONDS:
+        return None
     try:
         names.ensure_within(entry, state_dir)
     except GuildError:
-        return Action("marker", "skip", str(entry), entry, "outside state dir", None, None)
+        return _marker_skip(entry, "outside state dir")
+    label = "{}/{}".format(entry.parent.name, entry.name)
     return Action("marker", "delete", label, entry, "session not running", None, None)
 
 
@@ -153,7 +178,7 @@ def _marker_actions(ctx, state_dir):
     if not session_info.running_session_ids(ctx.sessions_dir):
         return [], True
     protected = _protected_session_ids(ctx)
-    actions = [_marker_action(ctx, state_dir, protected, entry) for entry in _marker_candidates(state_dir)]
+    actions = [_marker_action(ctx, state_dir, protected, entry) for entry in _marker_entries(state_dir)]
     return [action for action in actions if action is not None], False
 
 
@@ -163,8 +188,7 @@ def plan(ctx, handoffs_dir, state_dir):
     return Plan(handoff_actions + marker_actions, kept_without_retention, markers_skipped)
 
 
-def _apply_handoff(ctx, action):
-    action.path.unlink(missing_ok=True)
+def _record_pruned(ctx, action):
     project = ctx.conn.execute("SELECT project FROM parties WHERE name = ?", (action.party,)).fetchone()["project"]
     with db.writing(ctx.conn):
         events.record(
@@ -176,25 +200,40 @@ def _apply_handoff(ctx, action):
             project,
             "handoff.pruned",
             "local",
-            {"party": action.party, "generation": action.generation, "path": str(action.path)},
+            {"party": action.party, "generation": action.generation, "file": action.path.name},
         )
+
+
+def _apply_one(ctx, action):
+    action.path.unlink(missing_ok=True)
+    if action.kind == "handoff":
+        _record_pruned(ctx, action)
 
 
 def apply(ctx, actions):
     deleted = 0
+    skipped = []
     for action in actions:
         if not action.is_delete():
             continue
-        if action.kind == "handoff":
-            _apply_handoff(ctx, action)
-            deleted += 1
+        try:
+            _apply_one(ctx, action)
+        except OSError as error:
+            skipped.append(Action(action.kind, "skip", str(action.path), action.path, str(error), None, None))
             continue
-        action.path.unlink(missing_ok=True)
-    return deleted
+        deleted += 1 if action.kind == "handoff" else 0
+    return ApplyResult(deleted, skipped)
+
+
+def lock(ctx):
+    return locking.try_lock(ctx.state_dir / "handoff-prune", "prune.lock")
 
 
 def prune(ctx, handoffs_dir):
-    return apply(ctx, plan(ctx, handoffs_dir, ctx.state_dir).actions)
+    with lock(ctx) as acquired:
+        if not acquired:
+            return None
+        return apply(ctx, plan(ctx, handoffs_dir, ctx.state_dir).actions).deleted
 
 
 def _count_of(actions, kind):

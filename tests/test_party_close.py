@@ -1,5 +1,7 @@
 import sqlite3
 
+from guild import locking, paths
+
 from tests.testutil import GuildTestCase
 
 
@@ -42,6 +44,14 @@ class PartyCloseTests(GuildTestCase):
         self.assertEqual(code, 0, err)
         self.assertIn("pruned 1 handoff file(s)", out)
         self.assertFalse((self.data_home / "guild" / "handoffs" / "alpha-g1.md").exists())
+
+    def test_close_skips_prune_silently_when_locked(self):
+        self._expired_handoff_setup()
+        with locking.try_lock(paths.state_dir() / "handoff-prune", "prune.lock"):
+            code, out, err = self.run_cli(["party", "close", "alpha"], None, None)
+        self.assertEqual(code, 0, err)
+        self.assertNotIn("pruned", out)
+        self.assertTrue((self.data_home / "guild" / "handoffs" / "alpha-g1.md").exists())
 
     def test_close_omits_pruned_line_when_nothing_deleted(self):
         code, out, err = self.run_cli(["party", "close", "alpha"], None, None)

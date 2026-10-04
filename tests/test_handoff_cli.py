@@ -1,7 +1,7 @@
 import os
 import sqlite3
 
-from guild import paths
+from guild import locking, paths
 from tests.testutil import GuildTestCase
 
 _DEAD = "11111111-1111-4111-8111-111111111111"
@@ -77,3 +77,11 @@ class HandoffCliTests(GuildTestCase):
         code, out, err = self.run_cli(["handoff", "prune"], None, None)
         self.assertIn("delete marker ctx/{}: session not running".format(_DEAD), out)
         self.assertFalse(marker.exists())
+
+    def test_prune_reports_already_running_when_locked(self):
+        with locking.try_lock(paths.state_dir() / "handoff-prune", "prune.lock") as acquired:
+            self.assertTrue(acquired)
+            code, out, err = self.run_cli(["handoff", "prune"], None, None)
+        self.assertEqual(code, 0, err)
+        self.assertEqual(out.strip(), "prune already running")
+        self.assertTrue(self.first.exists())

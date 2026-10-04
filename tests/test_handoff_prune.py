@@ -2,8 +2,10 @@ import json
 import os
 import sqlite3
 from datetime import timedelta
+from pathlib import Path
+from unittest import mock
 
-from guild import db, handoff_prune, paths, timeutil
+from guild import db, handoff_prune, locking, paths, timeutil
 from guild.cli import _build_context
 from tests.testutil import GuildTestCase
 
@@ -80,7 +82,7 @@ class HandoffPruneRuleTests(PruneFixture):
         ctx, plan = self._plan()
         actions = plan.actions
         self.assertEqual([(a.verb, a.label, a.reason) for a in actions], [("delete", "alpha-g1.md", "superseded and consumed")])
-        self.assertEqual(handoff_prune.apply(ctx, actions), 1)
+        self.assertEqual(handoff_prune.apply(ctx, actions).deleted, 1)
         self.assertFalse(first.exists())
         self.assertTrue(second.exists())
         self.assertIsNone(self._leader(1)["handoff_path"])
@@ -152,7 +154,7 @@ class HandoffPruneSafetyTests(PruneFixture):
         ctx, plan = self._plan()
         actions = plan.actions
         self.assertEqual([(a.verb, a.reason) for a in actions], [("skip", "symlink")])
-        self.assertEqual(handoff_prune.apply(ctx, actions), 0)
+        self.assertEqual(handoff_prune.apply(ctx, actions).deleted, 0)
         self.assertEqual(target.read_text(), "keep")
         self.assertTrue(first.is_symlink())
         self.assertEqual(self._pruned_events(), [])
@@ -212,3 +214,68 @@ class HandoffPruneSafetyTests(PruneFixture):
             handoff_prune.report_lines(plan, False)[-1],
             "kept 2 closed-party handoff(s): no handoff_retention_days configured",
         )
+
+
+class HandoffPruneRobustnessTests(PruneFixture):
+    def _two_superseded(self):
+        self.run_cli(["party", "start", "beta"], "sess-b", self.repo_dir)
+        self._handoff("sess-1", 1)
+        self._resume("sess-2")
+        self._handoff("sess-2", 2)
+        self.run_cli(["handoff", "--in-flight", "x", "--learned", "y"], "sess-b", self.repo_dir)
+        self.run_cli(["party", "resume", "beta"], "sess-c", self.repo_dir)
+        self.run_cli(["handoff", "--in-flight", "x", "--learned", "y"], "sess-c", self.repo_dir)
+
+    def test_malformed_close_timestamp_keeps_handoff_and_reports(self):
+        self._handoff("sess-1", 1)
+        self.run_cli(["party", "close", "alpha"], None, None)
+        self._set_retention(30)
+        self._sql("UPDATE events SET ts = 'garbage' WHERE kind = 'party.closed'", ())
+        _, plan = self._plan(timeutil.utcnow() + timedelta(days=4000))
+        self.assertEqual(
+            [(a.verb, a.reason) for a in plan.actions], [("skip", "unreadable close timestamp")]
+        )
+
+    def test_unlink_permission_error_does_not_stop_other_entries(self):
+        self._two_superseded()
+        ctx, plan = self._plan()
+        self.assertEqual(len(plan.actions), 2)
+        real_unlink = Path.unlink
+
+        def flaky(path, missing_ok):
+            if path.name == "alpha-g1.md":
+                raise PermissionError("denied")
+            return real_unlink(path, missing_ok=missing_ok)
+
+        with mock.patch.object(Path, "unlink", autospec=True, side_effect=flaky):
+            result = handoff_prune.apply(ctx, plan.actions)
+        self.assertEqual(result.deleted, 1)
+        self.assertEqual([(a.verb, a.reason) for a in result.skipped], [("skip", "denied")])
+        self.assertTrue((self.handoffs / "alpha-g1.md").exists())
+        self.assertFalse((self.handoffs / "beta-g1.md").exists())
+        self.assertIsNotNone(self._leader(1)["handoff_path"])
+        self.assertEqual(len(self._pruned_events()), 1)
+
+    def test_file_vanishing_between_plan_and_apply_is_not_an_error(self):
+        self._two_superseded()
+        ctx, plan = self._plan()
+        (self.handoffs / "alpha-g1.md").unlink()
+        result = handoff_prune.apply(ctx, plan.actions)
+        self.assertEqual(result.deleted, 2)
+        self.assertEqual(result.skipped, [])
+
+    def test_pruned_event_carries_file_name_not_absolute_path(self):
+        self._two_superseded()
+        ctx, plan = self._plan()
+        handoff_prune.apply(ctx, plan.actions)
+        for payload in self._pruned_events():
+            self.assertEqual(set(payload), {"party", "generation", "file"})
+            self.assertNotIn("/", payload["file"])
+
+    def test_held_lock_makes_prune_skip_silently(self):
+        self._two_superseded()
+        ctx = self._ctx()
+        with locking.try_lock(ctx.state_dir / "handoff-prune", "prune.lock") as acquired:
+            self.assertTrue(acquired)
+            self.assertIsNone(handoff_prune.prune(ctx, self.handoffs))
+        self.assertEqual(handoff_prune.prune(ctx, self.handoffs), 2)
