@@ -2,7 +2,7 @@
 epic: session-lifecycle
 type: spec
 title: Handoffs that clean up and sessions that respawn
-status: active
+status: done
 owner: matpardo
 created: 2026-10-04
 updated: 2026-10-04
@@ -32,9 +32,9 @@ Every handoff writes a file that is never deleted, and per-session state (`ctx`,
 
 ## Success criteria
 
-- [ ] `handoff prune --dry-run` on a real data directory lists only superseded or expired files and dead-session markers.
-- [ ] A keeper at its threshold respawns with Remote Control and the old window closes.
-- [ ] A launch failure or bind timeout leaves the old session running.
+- [x] `handoff prune --dry-run` on a real data directory lists only superseded or expired files and dead-session markers.
+- [x] A keeper at its threshold respawns with Remote Control and the old window closes.
+- [x] A launch failure or bind timeout leaves the old session running.
 
 ## Security and data
 
