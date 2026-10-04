@@ -1,6 +1,7 @@
+import sqlite3
 from pathlib import Path
 
-from guild import config, db, events, identity, names, session_info
+from guild import config, db, events, handoff_prune, identity, names, paths, session_info
 from guild.commands import claim as claim_commands
 from guild.commands import next as next_commands
 from guild.commands import raid as raid_commands
@@ -56,7 +57,12 @@ def locate_if_changed(ctx, binding, permission_mode):
         )
 
 
-def start(ctx, name):
+def is_keeper(conn, party):
+    row = conn.execute("SELECT keeper FROM parties WHERE name = ?", (party,)).fetchone()
+    return row is not None and bool(row["keeper"])
+
+
+def start(ctx, name, keeper):
     names.validate_name(name, "party name")
     if ctx.session_id is None:
         raise GuildError("party start requires a Claude Code session", 1)
@@ -78,9 +84,13 @@ def start(ctx, name):
             project,
             "party.started",
             "local",
-            {"party": name, "session_name": session_name},
+            {"party": name, "session_name": session_name, "keeper": keeper},
         )
         record_location(ctx, name, project, 1, ctx.session_id, None)
+    if keeper:
+        return "party '{}' started, generation 1 (keeper)\nclose this session and run: guild revive --party {}".format(
+            name, name
+        )
     return "party '{}' started, generation 1".format(name)
 
 
@@ -187,6 +197,16 @@ def _require_lead_close_allowed(conn, now, party):
             )
 
 
+def _prune_lines(ctx):
+    try:
+        deleted = handoff_prune.prune(ctx, paths.handoffs_dir())
+    except (GuildError, OSError, sqlite3.Error) as error:
+        return ["handoff prune failed: {}".format(error)]
+    if not deleted:
+        return []
+    return ["pruned {} handoff file(s)".format(deleted)]
+
+
 def close(ctx, name, force):
     party = _close_target(ctx, name)
     row = ctx.conn.execute(
@@ -213,6 +233,7 @@ def close(ctx, name, force):
             {"party": party, "generation": row["generation"]},
         )
     lines = ["party '{}' closed: {}".format(party, summary)]
+    lines.extend(_prune_lines(ctx))
     if open_prs:
         lines.append("tracked PRs still open: {}".format(", ".join(open_prs)))
     return "\n".join(lines)

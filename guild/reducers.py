@@ -4,9 +4,9 @@ import json
 def _party_started(conn, event):
     payload = event["payload"]
     conn.execute(
-        "INSERT INTO parties (name, project, leader_session_id, generation, state)"
-        " VALUES (?, ?, ?, 1, 'active')",
-        (payload["party"], event["project"], event["session_id"]),
+        "INSERT INTO parties (name, project, leader_session_id, generation, state, keeper)"
+        " VALUES (?, ?, ?, 1, 'active', ?)",
+        (payload["party"], event["project"], event["session_id"], 1 if payload.get("keeper") else 0),
     )
     conn.execute(
         "INSERT INTO leaders (party, generation, session_id, session_name, started_at, ended_at)"
@@ -18,8 +18,17 @@ def _party_started(conn, event):
 def _party_resumed(conn, event):
     payload = event["payload"]
     conn.execute(
+        "UPDATE leaders SET handoff_consumed_at = ? WHERE party = ? AND generation = ?"
+        " AND handoff_consumed_at IS NULL",
+        (event["ts"], payload["party"], payload["generation"] - 1),
+    )
+    conn.execute(
         "UPDATE leaders SET ended_at = ? WHERE party = ? AND generation = ? AND ended_at IS NULL",
         (event["ts"], payload["party"], payload["generation"] - 1),
+    )
+    conn.execute(
+        "DELETE FROM leader_windows WHERE party = ? AND generation < ?",
+        (payload["party"], payload["generation"]),
     )
     conn.execute(
         "UPDATE parties SET leader_session_id = ?, generation = ?, state = 'active' WHERE name = ?",
@@ -45,6 +54,7 @@ def _party_closed(conn, event):
     conn.execute("UPDATE asks SET state = 'dismissed' WHERE party = ? AND state = 'open'", (payload["party"],))
     conn.execute("DELETE FROM claims WHERE party = ?", (payload["party"],))
     conn.execute("DELETE FROM raid_members WHERE party = ?", (payload["party"],))
+    conn.execute("DELETE FROM leader_windows WHERE party = ?", (payload["party"],))
     conn.execute(
         "UPDATE leaders SET ended_at = ? WHERE party = ? AND generation = ? AND ended_at IS NULL",
         (event["ts"], payload["party"], payload["generation"]),
@@ -57,6 +67,22 @@ def _party_handed_off(conn, event):
     conn.execute(
         "UPDATE leaders SET handoff_path = ? WHERE party = ? AND generation = ?",
         (payload["handoff_path"], payload["party"], payload["generation"]),
+    )
+
+
+def _handoff_pruned(conn, event):
+    payload = event["payload"]
+    conn.execute(
+        "UPDATE leaders SET handoff_path = NULL WHERE party = ? AND generation = ?",
+        (payload["party"], payload["generation"]),
+    )
+
+
+def _leader_window_launched(conn, event):
+    payload = event["payload"]
+    conn.execute(
+        "INSERT OR REPLACE INTO leader_windows (party, generation, window_id) VALUES (?, ?, ?)",
+        (payload["party"], payload["generation"], payload["window_id"]),
     )
 
 
@@ -576,7 +602,9 @@ _REDUCERS = {
     "party.resumed": _party_resumed,
     "party.closed": _party_closed,
     "party.handed_off": _party_handed_off,
+    "handoff.pruned": _handoff_pruned,
     "leader.located": _leader_located,
+    "leader.window_launched": _leader_window_launched,
     "quest.added": _quest_added,
     "quest.done": _quest_done,
     "quest.marked_incomplete": _quest_marked_incomplete,

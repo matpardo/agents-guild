@@ -1,30 +1,30 @@
 import json
 import os
-import shutil
-import subprocess
 
-from guild import party_status, resume
+from guild import db, events, party_status, resume, tmux_windows
 from guild.errors import GuildError
 
 TRANSCRIPT_LINE_LIMIT = 200
-_TMUX_SESSION = "guild"
 _NO_SELECTION_HINT = "select with --party <name> (repeatable), --all, or --list for copy-paste commands"
 _GOAL_REMINDER = "re-issue /goal in each revived session that used it: it is not restored"
 _TMUX_MISSING = "tmux not found: install tmux (e.g. sudo apt install tmux) or use --list"
 
 
-class Tmux:
-    def installed(self):
-        return shutil.which("tmux") is not None
-
-    def run(self, args):
-        completed = subprocess.run(["tmux", *args], capture_output=True, text=True)
-        return completed.returncode, completed.stdout
-
-
 class _Entry:
     def __init__(
-        self, party, project, generation, session_id, session_name, quests, status, last_activity, cwd, mode, transcript
+        self,
+        party,
+        project,
+        generation,
+        session_id,
+        session_name,
+        quests,
+        status,
+        last_activity,
+        cwd,
+        mode,
+        transcript,
+        keeper,
     ):
         self.party = party
         self.project = project
@@ -37,17 +37,23 @@ class _Entry:
         self.cwd = cwd
         self.mode = mode
         self.transcript = transcript
+        self.keeper = keeper
 
     def resumable(self):
         return self.transcript is not None
+
+    def launch_generation(self):
+        if self.resumable():
+            return self.generation
+        return self.generation + 1
 
     def mode_label(self):
         return "unknown" if self.mode is None else self.mode
 
     def command(self):
         if self.resumable():
-            return resume.resume_command(self.session_id, self.party, self.generation, self.mode)
-        return resume.fresh_command(self.party, self.generation + 1, None, self.mode)
+            return resume.resume_command(self.session_id, self.party, self.generation, self.mode, self.keeper)
+        return resume.fresh_command(self.party, self.generation + 1, None, self.mode, self.keeper)
 
 
 def find_transcript(projects_dir, session_id):
@@ -130,6 +136,7 @@ def _entry(ctx, transcripts_dir, party):
         cwd,
         mode,
         transcript,
+        bool(party["keeper"]),
     )
 
 
@@ -182,18 +189,6 @@ def _select_by_name(entries, party_names):
     return [entry for entry in entries if entry.party in party_names]
 
 
-def _tmux_ok(tmux, args):
-    returncode, _ = tmux.run(args)
-    return returncode == 0
-
-
-def _existing_windows(tmux):
-    returncode, output = tmux.run(["list-windows", "-t", _TMUX_SESSION, "-F", "#{window_name}"])
-    if returncode != 0:
-        return set()
-    return {line for line in output.splitlines() if line}
-
-
 def _skip_reason(entry, windows):
     if entry.party in windows:
         return "window already exists"
@@ -204,53 +199,47 @@ def _skip_reason(entry, windows):
     return None
 
 
-def _create_window(tmux, entry, session_exists):
-    if session_exists:
-        args = ["new-window", "-t", _TMUX_SESSION + ":", "-n", entry.party, "-c", entry.cwd]
-    else:
-        args = ["new-session", "-d", "-s", _TMUX_SESSION, "-n", entry.party, "-c", entry.cwd]
-    returncode, output = tmux.run([*args, "-P", "-F", "#{window_id}", entry.command()])
-    if returncode != 0:
-        return None
-    return output.strip()
+def _record_window(ctx, entry, window_id):
+    with db.writing(ctx.conn):
+        events.record(
+            ctx.conn,
+            ctx.now,
+            ctx.origin,
+            entry.party,
+            None,
+            entry.project,
+            "leader.window_launched",
+            "local",
+            {"party": entry.party, "generation": entry.launch_generation(), "window_id": window_id},
+        )
 
 
-def _pin_window_name(tmux, window_id):
-    return _tmux_ok(tmux, ["set-option", "-w", "-t", window_id, "automatic-rename", "off"]) and _tmux_ok(
-        tmux, ["set-option", "-w", "-t", window_id, "allow-rename", "off"]
-    )
-
-
-def _launch_line(tmux, entry, session_exists):
-    window_id = _create_window(tmux, entry, session_exists)
+def _launch_line(ctx, tmux, entry, session_is_up):
+    window_id = tmux_windows.create_window(tmux, entry.party, entry.cwd, entry.command(), session_is_up)
     if window_id is None:
         return "failed {}: tmux could not create the window".format(entry.party), False
-    if not _pin_window_name(tmux, window_id):
+    _record_window(ctx, entry, window_id)
+    if not tmux_windows.pin_window_name(tmux, window_id):
         return "failed {}: window created but its name could not be pinned".format(entry.party), True
     return "launched {} ({})".format(entry.party, "resume" if entry.resumable() else "fresh"), True
 
 
-def _set_title_options(tmux):
-    _tmux_ok(tmux, ["set-option", "-t", _TMUX_SESSION, "set-titles", "on"])
-    _tmux_ok(tmux, ["set-option", "-t", _TMUX_SESSION, "set-titles-string", "#W"])
-
-
-def _launch(tmux, selected):
+def _launch(ctx, tmux, selected):
     if not tmux.installed():
         raise GuildError(_TMUX_MISSING, 1)
-    session_exists = _tmux_ok(tmux, ["has-session", "-t", _TMUX_SESSION])
-    windows = _existing_windows(tmux) if session_exists else set()
+    session_is_up = tmux_windows.session_exists(tmux)
+    windows = tmux_windows.window_names(tmux) if session_is_up else set()
     lines = []
     for entry in selected:
         reason = _skip_reason(entry, windows)
         if reason is not None:
             lines.append("skipped {}: {}".format(entry.party, reason))
             continue
-        line, window_created = _launch_line(tmux, entry, session_exists)
+        line, window_created = _launch_line(ctx, tmux, entry, session_is_up)
         lines.append(line)
-        session_exists = session_exists or window_created
-    if session_exists:
-        _set_title_options(tmux)
+        session_is_up = session_is_up or window_created
+    if session_is_up:
+        tmux_windows.set_title_options(tmux)
     return lines
 
 
@@ -271,5 +260,5 @@ def run(ctx, party_names, select_all, list_only, transcripts_dir, tmux, ask_numb
         return "\n".join([*_listing_lines(entries, False), _NO_SELECTION_HINT])
     if not selected:
         return "nothing selected"
-    lines = _launch(tmux, selected)
-    return "\n".join([*lines, _GOAL_REMINDER, "tmux attach -t {}".format(_TMUX_SESSION)])
+    lines = _launch(ctx, tmux, selected)
+    return "\n".join([*lines, _GOAL_REMINDER, "tmux attach -t {}".format(tmux_windows.SESSION)])

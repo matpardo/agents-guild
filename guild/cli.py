@@ -38,6 +38,7 @@ def _handle_doctor(ctx, args):
 
 
 def _handle_revive(ctx, args):
+    from guild import tmux_windows
     from guild.commands import revive as revive_commands
 
     ask_numbers = input if sys.stdin.isatty() else None
@@ -48,7 +49,7 @@ def _handle_revive(ctx, args):
             args.all,
             args.list,
             paths.claude_projects_dir(),
-            revive_commands.Tmux(),
+            tmux_windows.Tmux(),
             ask_numbers,
         )
     )
@@ -72,7 +73,7 @@ def _handle_init_project(ctx, args):
 def _handle_party_start(ctx, args):
     from guild.commands import party as party_commands
 
-    _print(party_commands.start(ctx, args.name))
+    _print(party_commands.start(ctx, args.name, args.keeper))
     return 0
 
 
@@ -397,9 +398,37 @@ def _handle_board(ctx, args):
 
 
 def _handle_handoff(ctx, args):
+    import time
+
+    from guild import tmux_windows
     from guild.commands import handoff as handoff_commands
 
-    _print(handoff_commands.run(ctx, args.in_flight, args.learned, args.model))
+    if args.action == "prune":
+        provided = (
+            ("--in-flight", args.in_flight is not None),
+            ("--learned", args.learned is not None),
+            ("--model", args.model is not None),
+            ("--respawn", args.respawn),
+        )
+        for flag, given in provided:
+            if given:
+                raise GuildError("handoff prune does not take {}".format(flag), 1)
+        _print(handoff_commands.run_prune(ctx, args.dry_run))
+        return 0
+    if args.dry_run:
+        raise GuildError("--dry-run only applies to handoff prune", 1)
+    if args.in_flight is None:
+        raise GuildError("--in-flight is required", 1)
+    if args.learned is None:
+        raise GuildError("--learned is required", 1)
+    tmux = tmux_windows.Tmux()
+    text, pane_to_close = handoff_commands.run(
+        ctx, args.in_flight, args.learned, args.model, args.respawn, tmux, os.environ.get("TMUX_PANE"), time.sleep
+    )
+    _print(text)
+    sys.stdout.flush()
+    if pane_to_close is not None:
+        tmux_windows.kill_pane(tmux, pane_to_close)
     return 0
 
 
@@ -540,6 +569,7 @@ def _add_party_parser(subparsers):
 
     start = actions.add_parser("start")
     start.add_argument("name")
+    start.add_argument("--keeper", action="store_true")
     start.set_defaults(handler=_handle_party_start)
 
     resume = actions.add_parser("resume")
@@ -821,9 +851,12 @@ def build_parser():
     next_parser.set_defaults(handler=_handle_next)
 
     handoff = subparsers.add_parser("handoff")
-    handoff.add_argument("--in-flight", required=True)
-    handoff.add_argument("--learned", required=True)
+    handoff.add_argument("action", nargs="?", choices=["prune"])
+    handoff.add_argument("--in-flight")
+    handoff.add_argument("--learned")
     handoff.add_argument("--model")
+    handoff.add_argument("--dry-run", action="store_true")
+    handoff.add_argument("--respawn", action="store_true")
     handoff.set_defaults(handler=_handle_handoff)
 
     sync = subparsers.add_parser("sync")

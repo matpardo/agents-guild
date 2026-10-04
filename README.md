@@ -93,7 +93,7 @@ default so `guild doctor` stays fast and offline.
 guild whoami
 guild init-project <name> --config <file.json>
 
-guild party start <name>
+guild party start <name> [--keeper]   # --keeper: mark a Remote Control keeper party
 guild party resume <party> [--session <name>]   # --session: from a human terminal only
 guild party close [<party>] [--force]  # <party>: from a terminal, or your own party; --force overrides the raid-lead guard
 
@@ -138,7 +138,8 @@ guild raid resume <name>              # lifts the pause and posts a notice to ra
 guild raids
 
 guild next [--all]     # ranked action queue for the caller's party
-guild handoff --in-flight "..." --learned "..."
+guild handoff --in-flight "..." --learned "..." [--model <m>] [--respawn]
+guild handoff prune [--dry-run]
 
 guild merge-queue [--raid <name> | --party <name>]   # read-only: PRs in the order to merge by hand
 guild merge-queue pin   <owner/repo>#<a> --before <owner/repo>#<b>
@@ -1018,6 +1019,22 @@ for a leader (still active, closed, unknown or an invalid name), nothing is
 bound and the context says why (`GUILD_RESUME=<party> not applied: ...`). A
 session that already leads that party (e.g. after `/clear`) is left alone.
 
+`guild handoff --respawn` (keeper parties, see below) does not print a command for
+the human: it launches that same fresh command itself in a window of the `guild`
+tmux session (created when absent, named after the party, name pinned like
+`revive`), records the window (`leader.window_launched`, table `leader_windows`
+per party and generation) and waits up to 90 seconds for the new generation to
+bind (aborting early if the new window disappears or the party is gone). Once the new
+generation itself is bound it closes its own pane with `tmux kill-pane` (never the
+window, so panes you split into it survive), only when the tmux pane it runs in
+(`$TMUX_PANE`) is the window guild recorded as launching this generation and
+that window is still in the `guild` session; otherwise it prints `close this
+window yourself`. If tmux is missing, the cwd is gone or tmux cannot create the
+window it prints `respawn failed: <reason>; old session kept` plus the manual
+command; if the new generation does not bind in time the old window is kept and
+the new one is left running. Nothing else is ever killed. `--respawn` works for
+any party; only keepers get `--remote-control`.
+
 The manual path still works: `guild party resume <party>` prints the previous generation's handoff content
 plus a single (read-only, non-acknowledging) `guild next` line. A
 freshly-resumed generation's very next `SessionStart` (e.g. after `/clear`)
@@ -1029,6 +1046,45 @@ a session that already exists but was never bound (resolves the session id
 via `~/.claude/sessions` by its `/rename` name). It is refused from inside a
 Claude Code session (use the plain form there) and fails clearly when the
 name is not found.
+
+A handoff is marked consumed (`leaders.handoff_consumed_at`) when the next
+generation binds, by the automatic `SessionStart` resume or by `guild party
+resume` alike. `guild handoff prune [--dry-run]` deletes files nobody needs
+again and prints what it did (`would delete` with `--dry-run`, which changes
+nothing):
+
+- the latest handoff of every open party is always kept;
+- a superseded handoff is deleted once consumed (superseded and unconsumed is
+  kept), recording a local `handoff.pruned` event that clears
+  `leaders.handoff_path`;
+- a closed party's last handoff is kept until `handoff_retention_days` after
+  the close (project config, optional); without that key it is kept forever and
+  the summary says `kept N closed-party handoff(s): no handoff_retention_days
+  configured`;
+- state markers under `$XDG_STATE_HOME/guild/ctx` and `hints` (context
+  readings, nudge, resume and raid markers) of sessions that neither run
+  (`~/.claude/sessions`) nor lead an open party are deleted once a day old; with
+  no session registry nothing is deleted (`markers kept: no session registry`).
+  Other files in those directories, such as `human`, are kept.
+
+Only files under guild's handoffs and state directories are deleted, symlinks
+are never followed (reported as `skip ... symlink`) and paths outside the
+handoffs directory are skipped. Prune also runs at the end of every
+`sync --source gh` pass (so on each `SessionStart`) and on `party close`, which
+reports `pruned N handoff file(s)` when N is above zero.
+
+### Keeper parties
+
+`guild party start <name> --keeper` marks the party (`parties.keeper`, kept
+across generations and replays) and prints the hint `close this session and
+run: guild revive --party <name>`: a keeper must be launched with Remote
+Control, which only `revive` (or the handoff command) does. For a keeper,
+`guild revive` and the printed handoff command add `--remote-control
+<party>-g<N>` (resume form: after the other flags; fresh form: right before the
+prompt), and the context nudge asks for `guild handoff --respawn --in-flight
+"..." --learned "..."` instead of plain `guild handoff`. A keeper that waits on
+a permission prompt shows up as `session.waiting` and triggers the project
+`notify` command like any other party, so no extra setup is needed to be told.
 
 ### `guild revive`
 
@@ -1046,7 +1102,7 @@ guild revive --list            # no tmux needed: one copy-paste command per part
 
 - `resume` (the leader transcript exists under `~/.claude/projects`) runs
   `claude --resume <session-id> --name <party>-g<N> [--permission-mode <mode>]`
-  in the recorded cwd. `fresh` runs the handoff resume command
+  (plus `--remote-control <party>-g<N>` for keeper parties) in the recorded cwd. `fresh` runs the handoff resume command
   (`GUILD_RESUME=<party> claude -n <party>-g<N+1> ...`) from the same cwd.
 - cwd and permission mode come from the leader row (recorded by the
   `SessionStart` hook); when missing, the first lines of the transcript are
@@ -1354,7 +1410,11 @@ against path traversal, not an identity boundary.
   defaulted.
 - `handoff_threshold` (optional): context-usage percent (0-100) at or above
   which `UserPromptSubmit`/`PostToolUse` hooks nudge once per session toward
-  `guild handoff`. Absent → no nudge.
+  `guild handoff` (`guild handoff --respawn` for keeper parties). Absent → no
+  nudge.
+- `handoff_retention_days` (optional): positive integer, at most 3650. A closed
+  party's last handoff file is deleted by `guild handoff prune` that many days
+  after the party closed. Absent → it is kept forever, never defaulted.
 - `pii_patterns` (optional): list of explicit regexes, no hidden defaults.
   Checked, in addition to the built-in email pattern, against notice text,
   ask question/context, answer text and handoff `--in-flight`/`--learned` for
@@ -1450,7 +1510,7 @@ in `BEGIN IMMEDIATE`) plus projection tables kept in sync in the same
 transaction: `parties`, `leaders`, `quests`, `quest_tasks`, `epics`, `tasks`,
 `prs`, `cards`, `asks`, `notices`, `claims`, `raid_members`, `pr_shared_areas`,
 `merge_queue_pins`, `cost_samples`, `resource_samples`, `resource_machine`,
-`cursors`, `transcript_cursors`. `guild
+`leader_windows`, `cursors`, `transcript_cursors`. `guild
 rebuild` drops every projection and replays all events from scratch — the only
 exceptions are `cursors` and `transcript_cursors`, which are read positions
 (per session and per transcript), not domain state, and are left untouched by
@@ -1883,7 +1943,7 @@ contract appears.
 **Phase 4 (planned).** Lessons from the first real raid, specified under
 `sdd/epics/`: `session-liveness` (active: every party shows whether it is
 working, waiting on a permission prompt or stopped with work),
-`cost-metering`, `ask-context`, `session-lifecycle` (handoff retention,
+`cost-metering`, `ask-context`, `session-lifecycle` (active: handoff retention,
 respawn, a Remote Control keeper), `ephemeral-brief`, `dispatcher` (fresh
 sessions only, see `sdd/decisions/20261004_dispatcher-launches-fresh-sessions.md`),
 `derived-state` and `conflict-hotspots`; `execution-profiles`, `budgets`,

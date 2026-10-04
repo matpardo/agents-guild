@@ -3,6 +3,7 @@ from pathlib import Path
 
 from guild import config, links, paths, resume, sanitize, timeutil
 from guild.commands import ask as ask_commands
+from guild.commands import party as party_commands
 from guild.commands import revive
 from guild.errors import GuildError
 
@@ -142,7 +143,11 @@ def _resume(ctx, ask_row, origin):
     if leader is None:
         return None
     command = resume.resume_command(
-        session_id, ask_row["party"], leader["generation"], leader["permission_mode"]
+        session_id,
+        ask_row["party"],
+        leader["generation"],
+        leader["permission_mode"],
+        party_commands.is_keeper(ctx.conn, ask_row["party"]),
     )
     if revive.find_transcript(paths.claude_projects_dir(), session_id) is None:
         return "{} (transcript not found)".format(command)

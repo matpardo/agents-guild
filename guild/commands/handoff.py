@@ -1,9 +1,19 @@
-from guild import db, events, identity, names, paths, pii, render, resume, timeutil
+import os
+
+from guild import db, events, handoff_prune, identity, names, paths, pii, render, resume, timeutil, tmux_windows
 from guild.commands import claim as claim_commands
 from guild.commands import next as next_commands
+from guild.commands import party as party_commands
 from guild.commands import notice as notice_commands
 from guild.commands import raid as raid_commands
 from guild.errors import GuildError
+
+_BIND_POLLS = 90
+_BIND_POLL_SECONDS = 1
+_BOUND = "bound"
+_PARTY_GONE = "party-gone"
+_WINDOW_GONE = "window-gone"
+_TIMED_OUT = "timed-out"
 
 
 def _section(title, lines):
@@ -68,15 +78,11 @@ def _render_handoff(ctx, binding, in_flight, learned):
     return "\n".join(lines) + "\n"
 
 
-def run(ctx, in_flight, learned, model):
-    if not in_flight.strip():
-        raise GuildError("--in-flight must not be empty", 1)
-    if not learned.strip():
-        raise GuildError("--learned must not be empty", 1)
-    binding = identity.require_binding(ctx.conn, ctx.session_id)
-    patterns = pii.project_patterns(ctx.projects_dir, binding["project"])
-    pii.validate_field(in_flight, "--in-flight", pii.HANDOFF_FIELD_MAX_LENGTH, patterns)
-    pii.validate_field(learned, "--learned", pii.HANDOFF_FIELD_MAX_LENGTH, patterns)
+def _with_reminder(text):
+    return "{}\n{}".format(text, pii.BROADCAST_REMINDER)
+
+
+def _write_handoff(ctx, binding, in_flight, learned):
     party, generation = binding["party"], binding["generation"]
     content = _render_handoff(ctx, binding, in_flight, learned)
     handoffs_dir = paths.handoffs_dir()
@@ -96,4 +102,164 @@ def run(ctx, in_flight, learned, model):
             "local",
             {"party": party, "generation": generation, "handoff_path": str(handoff_path)},
         )
-    return "{}\n{}".format(resume.fresh_command(party, generation + 1, model, None), pii.BROADCAST_REMINDER)
+
+
+def _launch_blocker(tmux, cwd):
+    if not tmux.installed():
+        return "tmux not found"
+    if cwd is None:
+        return "cwd unknown"
+    if not os.path.isdir(cwd):
+        return "cwd missing ({})".format(cwd)
+    return None
+
+
+def _recorded_window(conn, party, generation):
+    row = conn.execute(
+        "SELECT window_id FROM leader_windows WHERE party = ? AND generation = ?", (party, generation)
+    ).fetchone()
+    if row is None:
+        return None
+    return row["window_id"]
+
+
+def _record_launch(ctx, binding, window_id):
+    with db.writing(ctx.conn):
+        events.record(
+            ctx.conn,
+            ctx.now,
+            ctx.origin,
+            binding["party"],
+            ctx.session_id,
+            binding["project"],
+            "leader.window_launched",
+            "local",
+            {"party": binding["party"], "generation": binding["generation"] + 1, "window_id": window_id},
+        )
+
+
+def _bind_status(conn, tmux, party, generation, old_session_id, new_window_id):
+    row = conn.execute(
+        "SELECT generation, leader_session_id, state FROM parties WHERE name = ?", (party,)
+    ).fetchone()
+    if row is None or row["state"] == "closed":
+        return _PARTY_GONE
+    if row["generation"] >= generation and row["leader_session_id"] != old_session_id:
+        return _BOUND
+    if not tmux_windows.window_in_session(tmux, new_window_id):
+        return _WINDOW_GONE
+    return None
+
+
+def _awaiting_bind(conn, tmux, party, generation, old_session_id, new_window_id, sleep):
+    for _ in range(_BIND_POLLS):
+        status = _bind_status(conn, tmux, party, generation, old_session_id, new_window_id)
+        if status is not None:
+            return status
+        sleep(_BIND_POLL_SECONDS)
+    return _TIMED_OUT
+
+
+def _closable_pane(tmux, tmux_pane, recorded_window):
+    if tmux_pane is None or recorded_window is None:
+        return None
+    own_window = tmux_windows.window_id_of_pane(tmux, tmux_pane)
+    if own_window != recorded_window:
+        return None
+    if not tmux_windows.window_in_session(tmux, own_window):
+        return None
+    return tmux_pane
+
+
+def _launch_next_generation(ctx, binding, command, cwd, tmux):
+    session_is_up = tmux_windows.session_exists(tmux)
+    window_id = tmux_windows.create_window(tmux, binding["party"], cwd, command, session_is_up)
+    if window_id is None:
+        return None
+    tmux_windows.pin_window_name(tmux, window_id)
+    tmux_windows.set_title_options(tmux)
+    _record_launch(ctx, binding, window_id)
+    return window_id
+
+
+def _respawn(ctx, binding, model, tmux, tmux_pane, sleep):
+    party, generation = binding["party"], binding["generation"]
+    leader = ctx.conn.execute(
+        "SELECT cwd, permission_mode FROM leaders WHERE party = ? AND generation = ?", (party, generation)
+    ).fetchone()
+    command = resume.fresh_command(
+        party, generation + 1, model, leader["permission_mode"], party_commands.is_keeper(ctx.conn, party)
+    )
+    blocker = _launch_blocker(tmux, leader["cwd"])
+    if blocker is None:
+        recorded_window = _recorded_window(ctx.conn, party, generation)
+        window_id = _launch_next_generation(ctx, binding, command, leader["cwd"], tmux)
+        blocker = "tmux could not create the window" if window_id is None else None
+    if blocker is not None:
+        return _with_reminder("respawn failed: {}; old session kept\n{}".format(blocker, command)), None
+    status = _awaiting_bind(
+        ctx.conn, tmux, party, generation + 1, ctx.session_id, window_id, sleep
+    )
+    if status == _PARTY_GONE:
+        return _with_reminder("respawn: party '{}' is gone or closed; old session kept".format(party)), None
+    if status == _WINDOW_GONE:
+        return _with_reminder("respawn: new window exited before binding; old session kept"), None
+    if status == _TIMED_OUT:
+        return _with_reminder(
+            "respawn: next generation did not bind within {}s; old window kept; new window {} left running".format(
+                _BIND_POLLS * _BIND_POLL_SECONDS, window_id
+            )
+        ), None
+    label = "{}-g{}".format(party, generation + 1)
+    pane = _closable_pane(tmux, tmux_pane, recorded_window)
+    if pane is None:
+        return _with_reminder(
+            "respawned: {} bound; close this window yourself (not a window guild launched)".format(label)
+        ), None
+    return _with_reminder(
+        "respawned: {} bound in window {}; closing this pane".format(label, recorded_window)
+    ), pane
+
+
+def run(ctx, in_flight, learned, model, respawn, tmux, tmux_pane, sleep):
+    if not in_flight.strip():
+        raise GuildError("--in-flight must not be empty", 1)
+    if not learned.strip():
+        raise GuildError("--learned must not be empty", 1)
+    binding = identity.require_binding(ctx.conn, ctx.session_id)
+    patterns = pii.project_patterns(ctx.projects_dir, binding["project"])
+    pii.validate_field(in_flight, "--in-flight", pii.HANDOFF_FIELD_MAX_LENGTH, patterns)
+    pii.validate_field(learned, "--learned", pii.HANDOFF_FIELD_MAX_LENGTH, patterns)
+    _write_handoff(ctx, binding, in_flight, learned)
+    if respawn:
+        return _respawn(ctx, binding, model, tmux, tmux_pane, sleep)
+    command = resume.fresh_command(
+        binding["party"],
+        binding["generation"] + 1,
+        model,
+        None,
+        party_commands.is_keeper(ctx.conn, binding["party"]),
+    )
+    return _with_reminder(command), None
+
+
+def _dry_run_text(ctx):
+    prune_plan = handoff_prune.plan(ctx, paths.handoffs_dir(), ctx.state_dir)
+    return "\n".join(handoff_prune.report_lines(prune_plan, True))
+
+
+def _real_run_text(ctx):
+    with handoff_prune.lock(ctx) as acquired:
+        if not acquired:
+            return "prune already running"
+        prune_plan = handoff_prune.plan(ctx, paths.handoffs_dir(), ctx.state_dir)
+        result = handoff_prune.apply(ctx, prune_plan.actions)
+    lines = handoff_prune.report_lines(prune_plan, False)
+    lines.extend("skip {}: {}".format(action.label, action.reason) for action in result.skipped)
+    return "\n".join(lines)
+
+
+def run_prune(ctx, dry_run):
+    if dry_run:
+        return _dry_run_text(ctx)
+    return _real_run_text(ctx)

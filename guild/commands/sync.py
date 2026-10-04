@@ -1,9 +1,10 @@
 import fnmatch
 import json
 import re
+import sqlite3
 from pathlib import Path
 
-from guild import config, db, events, localbase, timeutil
+from guild import config, db, events, handoff_prune, localbase, paths, timeutil
 from guild.adapters import github, jira_acli, sdd
 from guild.commands import claim as claim_commands
 from guild.commands import lifecycle as lifecycle_commands
@@ -450,6 +451,13 @@ def _sync_main_status(ctx, projects, failures):
             _sync_repo_main_status(ctx, project, clone["repo"], base, failures)
 
 
+def _prune_handoffs(ctx, failures):
+    try:
+        handoff_prune.prune(ctx, paths.handoffs_dir())
+    except (GuildError, OSError, sqlite3.Error) as error:
+        failures.append("handoff prune failed: {}".format(error))
+
+
 def _sync_gh(ctx, lifecycle_runner):
     rows = ctx.conn.execute(
         "SELECT * FROM prs WHERE lifecycle NOT IN ('merged', 'closed')"
@@ -475,6 +483,7 @@ def _sync_gh(ctx, lifecycle_runner):
     _sync_main_status(ctx, projects, failures)
     _close_met_notices(ctx)
     lifecycle_commands.run_sync_triggers(ctx, projects, triggers, lifecycle_runner)
+    _prune_handoffs(ctx, failures)
     return failures
 
 

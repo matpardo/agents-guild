@@ -169,6 +169,13 @@ class OriginAndResumeTests(AskDetailBase):
         self.assertTrue(resume_text.startswith("claude --resume sess-1 --name alpha-g1"))
         self.assertNotIn("transcript not found", resume_text)
 
+    def test_resume_command_for_keeper_includes_remote_control(self):
+        self.write_transcript()
+        with db.writing(self.conn):
+            self.conn.execute("UPDATE parties SET keeper = 1 WHERE name = 'alpha'")
+        self.ask("task:demo/T01")
+        self.assertTrue(self.model(1)["resume"].endswith("--name alpha-g1 --remote-control alpha-g1"))
+
     def test_resume_notes_missing_transcript(self):
         self.ask("task:demo/T01")
         self.assertTrue(self.model(1)["resume"].endswith(" (transcript not found)"))

@@ -19,6 +19,7 @@ PROJECTION_TABLES = (
     "cost_samples",
     "resource_samples",
     "resource_machine",
+    "leader_windows",
 )
 
 _RAID_MEMBERS_TABLE = """
@@ -272,6 +273,14 @@ _CREATE_STATEMENTS = (
     )
     """,
     """
+    CREATE TABLE IF NOT EXISTS leader_windows (
+        party TEXT NOT NULL,
+        generation INTEGER NOT NULL,
+        window_id TEXT NOT NULL,
+        PRIMARY KEY (party, generation)
+    )
+    """,
+    """
     CREATE TABLE IF NOT EXISTS transcript_cursors (
         path TEXT PRIMARY KEY,
         offset INTEGER NOT NULL
@@ -305,6 +314,8 @@ _COLUMN_MIGRATIONS = (
     ("prs", "card", "TEXT"),
     ("asks", "snapshot", "TEXT"),
     ("asks", "answered_at", "TEXT"),
+    ("leaders", "handoff_consumed_at", "TEXT"),
+    ("parties", "keeper", "INTEGER"),
 )
 
 

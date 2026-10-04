@@ -1,5 +1,7 @@
 import sqlite3
 
+from guild import locking, paths
+
 from tests.testutil import GuildTestCase
 
 
@@ -30,6 +32,30 @@ class PartyCloseTests(GuildTestCase):
         self.assertEqual(self._row("SELECT state FROM quests WHERE slug = ?", ("demo",))["state"], "done")
         self.assertEqual(self._row("SELECT state FROM asks WHERE id = 1", ())["state"], "dismissed")
         self.assertIsNone(self._row("SELECT area FROM claims WHERE area = ?", ("ci.yml",)))
+
+    def _expired_handoff_setup(self):
+        self.run_cli(["handoff", "--in-flight", "x", "--learned", "y"], "sess-1", self.repo_dir)
+        self.run_cli(["party", "resume", "alpha"], "sess-2", self.repo_dir)
+        self.run_cli(["handoff", "--in-flight", "x", "--learned", "y"], "sess-2", self.repo_dir)
+
+    def test_close_reports_pruned_handoff_count_when_files_deleted(self):
+        self._expired_handoff_setup()
+        code, out, err = self.run_cli(["party", "close", "alpha"], None, None)
+        self.assertEqual(code, 0, err)
+        self.assertIn("pruned 1 handoff file(s)", out)
+        self.assertFalse((self.data_home / "guild" / "handoffs" / "alpha-g1.md").exists())
+
+    def test_close_skips_prune_silently_when_locked(self):
+        self._expired_handoff_setup()
+        with locking.try_lock(paths.state_dir() / "handoff-prune", "prune.lock"):
+            code, out, err = self.run_cli(["party", "close", "alpha"], None, None)
+        self.assertEqual(code, 0, err)
+        self.assertNotIn("pruned", out)
+        self.assertTrue((self.data_home / "guild" / "handoffs" / "alpha-g1.md").exists())
+
+    def test_close_omits_pruned_line_when_nothing_deleted(self):
+        code, out, err = self.run_cli(["party", "close", "alpha"], None, None)
+        self.assertNotIn("pruned", out)
 
     def test_bound_session_closes_own_party_without_name(self):
         code, out, err = self.run_cli(["party", "close"], "sess-1", self.repo_dir)

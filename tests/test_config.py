@@ -334,5 +334,28 @@ class LoadAllProjectsTests(unittest.TestCase):
         self.assertEqual(config.load_all_projects(Path("/tmp/_does_not_exist_guild")), [])
 
 
+class HandoffRetentionConfigTests(unittest.TestCase):
+    def _data(self):
+        return {"name": "acme", "paths": ["/tmp/*"], "github": {"repos": []}}
+
+    def _with(self, value):
+        data = self._data()
+        data["handoff_retention_days"] = value
+        return data
+
+    def test_absent_is_valid(self):
+        config.validate_project_config(self._data())
+
+    def test_positive_integers_up_to_limit_are_accepted(self):
+        config.validate_project_config(self._with(30))
+        config.validate_project_config(self._with(3650))
+
+    def test_invalid_values_are_rejected(self):
+        for value in (0, -1, True, "30", 4000, 1.5):
+            with self.subTest(value=value):
+                with self.assertRaises(GuildError):
+                    config.validate_project_config(self._with(value))
+
+
 if __name__ == "__main__":
     unittest.main()

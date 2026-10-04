@@ -4,7 +4,7 @@ import subprocess
 from datetime import timedelta
 from unittest import mock
 
-from guild import db, origin, paths, timeutil
+from guild import db, locking, origin, paths, timeutil
 from guild.commands import sync as sync_commands
 from guild.context import RunContext
 from guild.errors import GuildError
@@ -26,6 +26,34 @@ class SyncTests(GuildTestCase):
             ["pr", "track", "acme/app#1", "--task", "demo/T01", "--what", "x", "--waits", "y"],
             "sess-1", self.repo_dir,
         )
+
+    def _two_generations(self):
+        self.run_cli(["handoff", "--in-flight", "x", "--learned", "y"], "sess-1", self.repo_dir)
+        self.run_cli(["party", "resume", "alpha"], "sess-2", self.repo_dir)
+        self.run_cli(["handoff", "--in-flight", "x", "--learned", "y"], "sess-2", self.repo_dir)
+        return paths.handoffs_dir() / "alpha-g1.md"
+
+    def test_sync_gh_prunes_superseded_handoffs(self):
+        first = self._two_generations()
+        code, out, err = self.run_cli(["sync", "--source", "gh"], "sess-2", self.repo_dir)
+        self.assertEqual(code, 0, err)
+        self.assertEqual(out, "")
+        self.assertFalse(first.exists())
+
+    def test_sync_gh_skips_prune_silently_when_locked(self):
+        first = self._two_generations()
+        with locking.try_lock(paths.state_dir() / "handoff-prune", "prune.lock"):
+            code, out, err = self.run_cli(["sync", "--source", "gh"], "sess-2", self.repo_dir)
+        self.assertEqual((code, err), (0, ""))
+        self.assertTrue(first.exists())
+
+    def test_sync_gh_reports_prune_failure_without_aborting(self):
+        first = self._two_generations()
+        with mock.patch("guild.handoff_prune.plan", side_effect=GuildError("boom", 1)):
+            code, out, err = self.run_cli(["sync", "--source", "gh"], "sess-2", self.repo_dir)
+        self.assertEqual(code, 1)
+        self.assertIn("handoff prune failed: boom", err)
+        self.assertTrue(first.exists())
 
     def test_sync_flips_merged_pr(self):
         self.write_gh_fixture(
