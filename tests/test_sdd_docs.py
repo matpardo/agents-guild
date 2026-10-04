@@ -147,6 +147,8 @@ class DispatcherDocsTests(unittest.TestCase):
         text = self._decision.read_text()
         self.assertIn("- **Status:** accepted", text)
         self.assertIn("never exceeds it", text)
+        self.assertIn("more restrictive of the configured mode", text)
+        self.assertIn("deferred and retried for 24 hours", text)
         self.assertIn("the intent is recorded before the launch", text)
         self.assertIn("Lifecycle commands stay in `sync`.", text)
 
@@ -157,6 +159,9 @@ class DispatcherDocsTests(unittest.TestCase):
         self.assertIn("### Dispatcher", _README)
         self.assertIn('"dispatcher": {"permission_mode": "acceptEdits", "max_launches_per_hour": 3,', _README)
         self.assertIn("`dispatch-failed`", _README)
+        self.assertIn("`deferred`", _README)
+        self.assertIn("set `permission_mode` to `manual`", _README)
+        self.assertIn("`NoNewPrivileges=yes` and `Nice=10`", _README)
         self.assertIn("tmux new -s guild", _README)
         self.assertIn("`dispatcher` (active: fresh", _README)
 

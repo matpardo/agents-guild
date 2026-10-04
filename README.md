@@ -1195,12 +1195,17 @@ the guild brief. Dispatched: ask #<id> was answered; read guild asks <id>.` or
 never reach the command line.
 
 Nothing is launched for a party that has a live session, an open window in the
-`guild` session, a launch in flight or a paused raid: those passes are silent
-and the trigger is decided on a later pass. A trigger is skipped once, with
+`guild` session, a launch in flight or a paused raid: the trigger is recorded
+as `deferred` with that reason (the key is not consumed, nothing is launched)
+and re-evaluated at the start of every pass, before new events, until the party
+is free. A deferral older than 24 hours is skipped with `deferred too long`
+and one project notice; a deferred ask that was dismissed, or checks that
+turned green, are dropped. The one-hour age guard applies to new events only.
+A trigger is skipped once, with
 the reason recorded (`guild dispatch status`), when the party did not hand off
 (a notice asks the human to run `guild revive --party <party>`), is a keeper
 or is closed, when its recorded cwd is unknown, missing or outside the
-project, when the `guild` tmux session is not running, when the project
+project or contains a `#` (`cwd unsafe`), when the `guild` tmux session is not running, when the project
 already launched `max_launches_per_hour` sessions in the last hour, or when a
 previous launch of that party never bound. Skips post a project notice,
 except keeper, closed and the previous-launch block.
@@ -1213,9 +1218,17 @@ except keeper, closed and the previous-launch block.
   local `dispatch.decided` event before the launch, so a crash never launches
   twice. A `dry-run` decision does not block the real one. `sync --source gh`
   records the head commit of each PR (`head_sha` in `pr.synced`).
-- Permission mode: the launched session never gets a mode more permissive than
-  `permission_mode`. A party last seen in `plan` or `manual` keeps that mode;
-  every other case uses the configured one.
+- Permission mode: the launched session gets the more restrictive of
+  `permission_mode` and the party's last recorded mode, ordered `plan` <
+  `manual` < `acceptEdits` < `auto`. A missing or unknown party mode, and
+  `bypassPermissions` or `dontAsk`, use the configured one, so the launched
+  mode is never above it.
+- The window is created detached (`tmux new-window -d`): it never takes the
+  focus of the window you are typing in. The dispatcher does not change the
+  `guild` session's title options; only `guild revive` does.
+- `checks_failing` ignores PRs from forks (`isCrossRepository`, recorded as
+  `cross_repository` in `pr.synced`); when `gh` does not say, the PR counts as
+  in-repo.
 - Each pass first confirms earlier launches: a party whose generation reached
   the launched one is `bound`. A launch whose window vanished, that was
   interrupted before tmux, or that did not bind within 10 minutes is marked
@@ -1237,13 +1250,21 @@ acme: cursor initialized at seq 1234
 acme: ask_answered ask #12 -> launched alpha g5 (window @12, mode acceptEdits)
 acme: checks_failing acme/app#7 -> planned: launch beta g3 (dry-run, mode manual)
 acme: checks_failing acme/app#9 -> skipped beta: party not handed off
+acme: ask_answered ask #14 -> deferred gamma: live session
 alpha g5 bound
 beta g3 launch failed: did not bind within 10m; window @9 left running
 acme: 2 events older than 1h ignored
 ```
 
+Security: a launched session reads CI output through `gh pr checks`, and that
+output can contain text written by whoever opened the PR. For a repository
+that accepts external pull requests, leave `checks_failing` off (or
+`dry-run`) and set `permission_mode` to `manual`, so a poisoned log can only
+ask for permission, never act on its own.
+
 Run it on a timer: `guild dispatch-timer install --every 5m` (same rules as
-`guild sync-timer`; `print` only prints the units). The dispatcher never
+`guild sync-timer`; `print` only prints the units; the service runs with
+`NoNewPrivileges=yes` and `Nice=10`). The dispatcher never
 creates the tmux session, so start it first with `tmux new -s guild` or run
 `guild revive`. To stop it, remove a rule or the whole `dispatcher` block
 from the project config, or run `guild dispatch-timer uninstall`.

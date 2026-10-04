@@ -1,4 +1,5 @@
 import json
+import os
 
 from guild import db, paths
 from guild.cli import _build_context
@@ -171,6 +172,27 @@ class FailingChecksTests(ChecksFailingBase):
     def test_pr_from_the_base_repository_launches(self):
         self.sync_cross_repository(False)
         self.assertEqual(len(self.run_pass()), 1)
+
+    def test_deferred_failing_checks_launch_once_the_session_ends(self):
+        self.write_session(os.getpid(), "sess-1", "alpha")
+        self.sync_open(_FAILING, "abc123")
+        lines = self.run_pass()
+        self.assertEqual(lines, ["acme: checks_failing acme/app#1 -> deferred alpha: live session"])
+        (self.sessions_dir / "{}.json".format(os.getpid())).unlink()
+        lines = self.run_pass()
+        self.assertEqual(
+            lines, ["acme: checks_failing acme/app#1 -> launched alpha g2 (window @10, mode acceptEdits)"]
+        )
+        self.assertEqual(self.run_pass(), ["nothing to dispatch"])
+
+    def test_deferred_checks_that_turn_green_launch_nothing(self):
+        self.write_session(os.getpid(), "sess-1", "alpha")
+        self.sync_open(_FAILING, "abc123")
+        self.run_pass()
+        self.sync_open(_PASSING, "abc123")
+        (self.sessions_dir / "{}.json".format(os.getpid())).unlink()
+        self.assertEqual(self.run_pass(), ["nothing to dispatch"])
+        self.assertEqual(self.tmux.launch_calls(), [])
 
     def test_missing_head_commit_launches_nothing(self):
         self.sync_open(_FAILING, None)

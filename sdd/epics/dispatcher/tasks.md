@@ -50,8 +50,8 @@ updated: 2026-10-04
 **What:** `guild/dispatch_launch.py` launches the next generation of a handed-off party in the `guild` tmux session through the handoff resume command with an explicit prompt, recording the intent before the launch.
 
 **Acceptance:**
-- [ ] A live session, an open window, a launch in flight and a paused raid skip without an event.
-- [ ] A party that did not hand off, a keeper, a closed party, a bad cwd, a missing `guild` session and the hourly limit skip once with the reason recorded; all but keeper and closed post a notice.
+- [ ] A live session, an open window, a launch in flight and a paused raid defer the trigger without consuming its key; a deferral is retried every pass and expires after 24 hours.
+- [ ] A party that did not hand off, a keeper, a closed party, a bad or unsafe cwd, a missing `guild` session and the hourly limit skip once with the reason recorded; all but keeper and closed post a notice.
 - [ ] The dispatcher never creates the tmux session.
 - [ ] A dry-run rule records `planned` and touches neither tmux nor notices.
 - [ ] A key is decided once and a dry-run decision does not block the real one.
