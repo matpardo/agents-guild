@@ -3,20 +3,16 @@ import subprocess
 from guild import timeutil
 from guild.errors import GuildError
 
-_SERVICE_NAME = "guild-sync-gh.service"
-_TIMER_NAME = "guild-sync-gh.timer"
-_PRINT_HINT = "run `guild sync-timer print` and install the units by hand"
-
 _SERVICE_TEMPLATE = """[Unit]
-Description=guild sync --source gh
+Description={description}
 
 [Service]
 Type=oneshot
-ExecStart={executable} sync --source gh
+{options}ExecStart={executable} {subcommand}
 """
 
 _TIMER_TEMPLATE = """[Unit]
-Description=Run guild sync --source gh periodically
+Description=Run {description} periodically
 
 [Timer]
 OnBootSec=2m
@@ -26,6 +22,35 @@ Unit={service}
 [Install]
 WantedBy=timers.target
 """
+
+
+class _UnitSpec:
+    def __init__(self, service_name, timer_name, description, subcommand, command_name, service_options):
+        self.service_name = service_name
+        self.timer_name = timer_name
+        self.description = description
+        self.subcommand = subcommand
+        self.command_name = command_name
+        self.service_options = service_options
+
+
+SYNC_GH = _UnitSpec(
+    "guild-sync-gh.service",
+    "guild-sync-gh.timer",
+    "guild sync --source gh",
+    "sync --source gh",
+    "sync-timer",
+    "",
+)
+RESOURCES_COLLECT = _UnitSpec(
+    "guild-resources-collect.service",
+    "guild-resources-collect.timer",
+    "guild resources collect",
+    "resources collect",
+    "resources-timer",
+    "Nice=19\nIOSchedulingClass=idle\n",
+)
+UNITS = {"sync-gh": SYNC_GH, "resources-collect": RESOURCES_COLLECT}
 
 
 def run_systemctl(argv):
@@ -52,33 +77,42 @@ def _systemctl(runner, arguments):
         raise GuildError("systemctl --user {} failed: {}".format(" ".join(arguments), stderr.strip()), 1)
 
 
-def render_units(guild_executable, every):
+def _print_hint(unit):
+    return "run `guild {} print` and install the units by hand".format(unit.command_name)
+
+
+def render_units(unit, guild_executable, every):
     seconds = int(timeutil.parse_duration(every).total_seconds())
-    service = _SERVICE_TEMPLATE.format(executable=_require_executable(guild_executable))
-    timer = _TIMER_TEMPLATE.format(seconds=seconds, service=_SERVICE_NAME)
+    service = _SERVICE_TEMPLATE.format(
+        description=unit.description,
+        options=unit.service_options,
+        executable=_require_executable(guild_executable),
+        subcommand=unit.subcommand,
+    )
+    timer = _TIMER_TEMPLATE.format(description=unit.description, seconds=seconds, service=unit.service_name)
     return service, timer
 
 
-def print_units(guild_executable, every):
-    service, timer = render_units(guild_executable, every)
-    return "# {}\n{}\n# {}\n{}".format(_SERVICE_NAME, service, _TIMER_NAME, timer)
+def print_units(unit, guild_executable, every):
+    service, timer = render_units(unit, guild_executable, every)
+    return "# {}\n{}\n# {}\n{}".format(unit.service_name, service, unit.timer_name, timer)
 
 
-def install(unit_dir, guild_executable, every, runner, platform, systemctl_available):
-    _require_systemd(platform, systemctl_available, _PRINT_HINT)
-    service, timer = render_units(guild_executable, every)
+def install(unit, unit_dir, guild_executable, every, runner, platform, systemctl_available):
+    _require_systemd(platform, systemctl_available, _print_hint(unit))
+    service, timer = render_units(unit, guild_executable, every)
     unit_dir.mkdir(parents=True, exist_ok=True)
-    (unit_dir / _SERVICE_NAME).write_text(service)
-    (unit_dir / _TIMER_NAME).write_text(timer)
+    (unit_dir / unit.service_name).write_text(service)
+    (unit_dir / unit.timer_name).write_text(timer)
     _systemctl(runner, ["daemon-reload"])
-    _systemctl(runner, ["enable", "--now", _TIMER_NAME])
-    return "installed {} (every {}) in {}".format(_TIMER_NAME, every, unit_dir)
+    _systemctl(runner, ["enable", "--now", unit.timer_name])
+    return "installed {} (every {}) in {}".format(unit.timer_name, every, unit_dir)
 
 
-def uninstall(unit_dir, runner, platform, systemctl_available):
+def uninstall(unit, unit_dir, runner, platform, systemctl_available):
     _require_systemd(platform, systemctl_available, "remove the units by hand")
-    _systemctl(runner, ["disable", "--now", _TIMER_NAME])
-    (unit_dir / _SERVICE_NAME).unlink(missing_ok=True)
-    (unit_dir / _TIMER_NAME).unlink(missing_ok=True)
+    _systemctl(runner, ["disable", "--now", unit.timer_name])
+    (unit_dir / unit.service_name).unlink(missing_ok=True)
+    (unit_dir / unit.timer_name).unlink(missing_ok=True)
     _systemctl(runner, ["daemon-reload"])
-    return "uninstalled {} from {}".format(_TIMER_NAME, unit_dir)
+    return "uninstalled {} from {}".format(unit.timer_name, unit_dir)

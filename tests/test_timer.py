@@ -23,7 +23,7 @@ class TimerTests(GuildTestCase):
         self.unit_dir = self.root / "units"
 
     def test_render_units_embeds_executable_and_interval(self):
-        service, timer = timer_commands.render_units("/opt/bin/guild", "15m")
+        service, timer = timer_commands.render_units(timer_commands.SYNC_GH, "/opt/bin/guild", "15m")
         self.assertIn("ExecStart=/opt/bin/guild sync --source gh", service)
         self.assertIn("Type=oneshot", service)
         self.assertIn("OnUnitActiveSec=900s", timer)
@@ -32,12 +32,12 @@ class TimerTests(GuildTestCase):
 
     def test_render_units_rejects_invalid_duration(self):
         with self.assertRaises(GuildError) as raised:
-            timer_commands.render_units("/opt/bin/guild", "soon")
+            timer_commands.render_units(timer_commands.SYNC_GH, "/opt/bin/guild", "soon")
         self.assertIn("invalid duration", raised.exception.message)
 
     def test_install_writes_units_and_enables_timer(self):
         runner = _RecordingRunner(0, "")
-        message = timer_commands.install(self.unit_dir, "/opt/bin/guild", "15m", runner, "linux", True)
+        message = timer_commands.install(timer_commands.SYNC_GH, self.unit_dir, "/opt/bin/guild", "15m", runner, "linux", True)
         self.assertTrue((self.unit_dir / "guild-sync-gh.service").exists())
         self.assertIn("OnUnitActiveSec=900s", (self.unit_dir / "guild-sync-gh.timer").read_text())
         self.assertEqual(
@@ -52,7 +52,7 @@ class TimerTests(GuildTestCase):
     def test_install_fails_off_linux_and_suggests_print(self):
         runner = _RecordingRunner(0, "")
         with self.assertRaises(GuildError) as raised:
-            timer_commands.install(self.unit_dir, "/opt/bin/guild", "15m", runner, "darwin", True)
+            timer_commands.install(timer_commands.SYNC_GH, self.unit_dir, "/opt/bin/guild", "15m", runner, "darwin", True)
         self.assertIn("guild sync-timer print", raised.exception.message)
         self.assertEqual(runner.calls, [])
         self.assertFalse(self.unit_dir.exists())
@@ -60,26 +60,26 @@ class TimerTests(GuildTestCase):
     def test_install_fails_without_systemctl_and_suggests_print(self):
         runner = _RecordingRunner(0, "")
         with self.assertRaises(GuildError) as raised:
-            timer_commands.install(self.unit_dir, "/opt/bin/guild", "15m", runner, "linux", False)
+            timer_commands.install(timer_commands.SYNC_GH, self.unit_dir, "/opt/bin/guild", "15m", runner, "linux", False)
         self.assertIn("guild sync-timer print", raised.exception.message)
         self.assertFalse(self.unit_dir.exists())
 
     def test_install_validates_duration_before_writing(self):
         runner = _RecordingRunner(0, "")
         with self.assertRaises(GuildError):
-            timer_commands.install(self.unit_dir, "/opt/bin/guild", "x", runner, "linux", True)
+            timer_commands.install(timer_commands.SYNC_GH, self.unit_dir, "/opt/bin/guild", "x", runner, "linux", True)
         self.assertFalse(self.unit_dir.exists())
 
     def test_install_reports_systemctl_failure(self):
         runner = _RecordingRunner(1, "boom")
         with self.assertRaises(GuildError) as raised:
-            timer_commands.install(self.unit_dir, "/opt/bin/guild", "15m", runner, "linux", True)
+            timer_commands.install(timer_commands.SYNC_GH, self.unit_dir, "/opt/bin/guild", "15m", runner, "linux", True)
         self.assertIn("boom", raised.exception.message)
 
     def test_uninstall_disables_and_removes_units(self):
-        timer_commands.install(self.unit_dir, "/opt/bin/guild", "15m", _RecordingRunner(0, ""), "linux", True)
+        timer_commands.install(timer_commands.SYNC_GH, self.unit_dir, "/opt/bin/guild", "15m", _RecordingRunner(0, ""), "linux", True)
         runner = _RecordingRunner(0, "")
-        timer_commands.uninstall(self.unit_dir, runner, "linux", True)
+        timer_commands.uninstall(timer_commands.SYNC_GH, self.unit_dir, runner, "linux", True)
         self.assertFalse((self.unit_dir / "guild-sync-gh.service").exists())
         self.assertFalse((self.unit_dir / "guild-sync-gh.timer").exists())
         self.assertEqual(
@@ -92,7 +92,7 @@ class TimerTests(GuildTestCase):
 
     def test_uninstall_fails_off_linux(self):
         with self.assertRaises(GuildError) as raised:
-            timer_commands.uninstall(self.unit_dir, _RecordingRunner(0, ""), "darwin", True)
+            timer_commands.uninstall(timer_commands.SYNC_GH, self.unit_dir, _RecordingRunner(0, ""), "darwin", True)
         self.assertIn("systemd", raised.exception.message)
 
 
