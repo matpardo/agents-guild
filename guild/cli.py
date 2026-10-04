@@ -510,8 +510,12 @@ def _handle_drift(ctx, args):
 
 def _handle_brief(ctx, args):
     from guild.commands import brief as brief_commands
+    from guild.commands import task_brief
 
-    _print_lines(brief_commands.render_brief(ctx))
+    if args.task is None:
+        _print_lines(brief_commands.render_brief(ctx))
+        return 0
+    _print_lines(task_brief.render_from_ref(ctx, args.task))
     return 0
 
 
@@ -894,6 +898,7 @@ def build_parser():
     revive.set_defaults(handler=_handle_revive)
 
     brief = subparsers.add_parser("brief")
+    brief.add_argument("task", nargs="?")
     brief.set_defaults(handler=_handle_brief)
 
     inbox = subparsers.add_parser("inbox")
