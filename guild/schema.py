@@ -20,6 +20,7 @@ PROJECTION_TABLES = (
     "resource_samples",
     "resource_machine",
     "leader_windows",
+    "dispatch_decisions",
 )
 
 _RAID_MEMBERS_TABLE = """
@@ -278,6 +279,30 @@ _CREATE_STATEMENTS = (
         generation INTEGER NOT NULL,
         window_id TEXT NOT NULL,
         PRIMARY KEY (party, generation)
+    )
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS dispatch_decisions (
+        project TEXT NOT NULL,
+        key TEXT NOT NULL,
+        mode TEXT NOT NULL,
+        rule TEXT NOT NULL,
+        outcome TEXT NOT NULL,
+        party TEXT,
+        generation INTEGER,
+        permission_mode TEXT,
+        subject TEXT NOT NULL,
+        reason TEXT,
+        decided_at TEXT NOT NULL,
+        window_id TEXT,
+        state TEXT,
+        PRIMARY KEY (project, key, mode)
+    )
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS dispatch_cursors (
+        project TEXT PRIMARY KEY,
+        last_seq INTEGER NOT NULL
     )
     """,
     """
