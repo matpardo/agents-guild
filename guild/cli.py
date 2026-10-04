@@ -903,6 +903,7 @@ def build_parser():
 
     _add_timer_parser(subparsers, "sync-timer", "sync-gh")
     _add_timer_parser(subparsers, "resources-timer", "resources-collect")
+    _add_timer_parser(subparsers, "dispatch-timer", "dispatch")
 
     drift = subparsers.add_parser("drift")
     drift_scope = drift.add_mutually_exclusive_group()
