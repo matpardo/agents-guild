@@ -2,7 +2,7 @@
 epic: ephemeral-brief
 type: spec
 title: Short sessions started from a task brief
-status: active
+status: done
 owner: matpardo
 created: 2026-10-04
 updated: 2026-10-04
@@ -32,8 +32,8 @@ Long sessions re-read hundreds of thousands of tokens per turn. A party is ident
 
 ## Success criteria
 
-- [ ] A session started from a task brief needs no further state commands to begin the task.
-- [ ] A party with no live session never shows `unknown`.
+- [x] A session started from a task brief needs no further state commands to begin the task.
+- [x] A party with no live session never shows `unknown`.
 
 ## Security and data
 
