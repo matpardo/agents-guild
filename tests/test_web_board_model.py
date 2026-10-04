@@ -346,6 +346,7 @@ class BoardModelSessionStatusTests(BoardModelTestCase):
         super().setUp()
         self.repo_dir = self.register_project("acme", ["acme/app"])
         self.run_cli(["party", "start", "alpha"], "sess-1", self.repo_dir)
+        self.write_session(111, "sess-1", "alpha-g1")
 
     def _model(self):
         ctx = self._ctx()
@@ -367,6 +368,11 @@ class BoardModelSessionStatusTests(BoardModelTestCase):
     def test_party_status_without_session_row_is_unknown(self):
         status = self._model()["parties"][0]["status"]
         self.assertEqual(status, {"name": "unknown", "since": None, "detail": None, "label": "unknown"})
+
+    def test_party_status_without_live_session_is_idle(self):
+        (self.sessions_dir / "111.json").unlink()
+        status = self._model()["parties"][0]["status"]
+        self.assertEqual(status, {"name": "idle", "since": None, "detail": None, "label": "idle"})
 
     def test_party_status_waiting_permission_and_blocked_list(self):
         self._notify("permission_prompt", "run ls")

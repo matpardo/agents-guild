@@ -1817,18 +1817,27 @@ by `guild rebuild`). `Notification` maps `notification_type`
 record `working`, and only when the status changes, so a hundred tool calls
 add no event.
 
-Each party then gets one derived status, first match wins:
+Each party then gets one derived status, first match wins. A leader is live
+when its session id is the id of a running session file under the Claude
+sessions dir; a party whose state is `awaiting-leader`, without a leader
+session id or with a dead one has no live leader, and its stored session
+status is ignored.
 
-1. `closed`; `awaiting-leader` (handed off, no session yet).
-2. `waiting-permission`: the leader session is blocked on a permission prompt.
-3. `waiting-ask`: the party has an open ask and the session is not working
-   (age counts from the oldest open ask).
-4. `waiting-input`: the session waits on an idle prompt or an elicitation.
-5. `stopped-with-work` when the session stopped and `guild next` would still
-   return work (never when a raid pause is on), otherwise `done`.
-6. `working` when the session last reported work, `unknown` when it has not
-   reported any status yet (for example a session started before the
-   `Notification`/`Stop` hooks were wired).
+| # | Condition | Status |
+|---|---|---|
+| 1 | party `closed` | `closed` |
+| 2 | no live leader and an open ask | `waiting-ask` (age from the oldest open ask) |
+| 3 | no live leader and `guild next` would return work (never when a raid pause is on) | `queued` |
+| 4 | no live leader otherwise | `idle` |
+| 5 | live leader blocked on a permission prompt | `waiting-permission` |
+| 6 | live leader, open ask and session not working | `waiting-ask` |
+| 7 | live leader waiting on an idle prompt or an elicitation | `waiting-input` |
+| 8 | live leader stopped | `stopped-with-work` when `guild next` would still return work, otherwise `done` |
+| 9 | live leader that never reported a status (for example a session started before the `Notification`/`Stop` hooks were wired) | `unknown` |
+| 10 | live leader otherwise | `working` |
+
+`idle` and `queued` carry no age. The stored party state `awaiting-leader` is
+unchanged and is never a display status.
 
 Surfaces, each with the age of the status (`45s`, `12m`, `3h`, `2d`):
 

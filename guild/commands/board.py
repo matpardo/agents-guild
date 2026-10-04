@@ -32,7 +32,8 @@ _STATUS_STYLES = {
     "working": "green",
     "done": "dim",
     "unknown": "dim",
-    "awaiting-leader": "dim",
+    "idle": "dim",
+    "queued": "cyan",
     "closed": "dim",
 }
 

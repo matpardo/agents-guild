@@ -1,4 +1,4 @@
-from guild import session_status, timeutil
+from guild import session_info, session_status, timeutil
 from guild.commands import next as next_commands
 
 
@@ -23,14 +23,28 @@ def _stopped_result(ctx, party_row, session_row):
     return _result("done", session_row["since"], None)
 
 
+def _has_live_leader(ctx, party_row):
+    if party_row["state"] == "awaiting-leader" or party_row["leader_session_id"] is None:
+        return False
+    return party_row["leader_session_id"] in session_info.running_session_ids(ctx.sessions_dir)
+
+
+def _offline_result(ctx, party_row):
+    ask_since = _oldest_open_ask_since(ctx.conn, party_row["name"])
+    if ask_since is not None:
+        return _result("waiting-ask", ask_since, None)
+    binding = {"party": party_row["name"], "project": party_row["project"]}
+    if next_commands.has_work(ctx, binding):
+        return _result("queued", None, None)
+    return _result("idle", None, None)
+
+
 def derive(ctx, party_row):
     if party_row["state"] == "closed":
         return _result("closed", None, None)
-    if party_row["state"] == "awaiting-leader":
-        return _result("awaiting-leader", None, None)
-    session_row = None
-    if party_row["leader_session_id"] is not None:
-        session_row = session_status.current(ctx.conn, party_row["leader_session_id"])
+    if not _has_live_leader(ctx, party_row):
+        return _offline_result(ctx, party_row)
+    session_row = session_status.current(ctx.conn, party_row["leader_session_id"])
     session_state = None if session_row is None else session_row["status"]
     if session_state == "waiting-permission":
         return _result("waiting-permission", session_row["since"], session_row["detail"])
