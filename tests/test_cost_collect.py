@@ -1,5 +1,6 @@
 import json
 from datetime import timedelta, timezone
+from unittest import mock
 
 from guild import cost_collect, db, events, timeutil
 from guild.cli import _build_context
@@ -61,6 +62,13 @@ class CostCollectTests(GuildTestCase):
         self._collect()
         ctx = self._collect()
         self.assertEqual(len(self._cost_events(ctx)), 1)
+
+    def test_unchanged_transcript_is_not_rescanned(self):
+        write_transcript(self.main_path, [_line("m1", _OLD, 1, 2)])
+        self._collect()
+        with mock.patch("guild.transcript_usage.scan") as scan:
+            self._collect()
+        scan.assert_not_called()
 
     def test_appended_usage_adds_delta_that_sums(self):
         write_transcript(self.main_path, [_line("m1", _OLD, 1, 2)])

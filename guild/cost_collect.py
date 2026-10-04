@@ -131,12 +131,20 @@ def _collect_transcript(ctx, path, windows, bindings):
         )
 
 
+def _known_offsets(conn):
+    rows = conn.execute("SELECT path, offset FROM transcript_cursors").fetchall()
+    return {row["path"]: row["offset"] for row in rows}
+
+
 def collect(ctx):
     projects_dir = paths.claude_projects_dir()
     windows = _task_windows(ctx.conn)
+    known_offsets = _known_offsets(ctx.conn)
     bindings = {}
     for path in _transcripts(projects_dir):
         try:
+            if path.stat().st_size == known_offsets.get(str(path)):
+                continue
             _collect_transcript(ctx, path, windows, bindings)
         except FileNotFoundError:
             continue
