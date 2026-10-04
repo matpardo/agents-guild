@@ -2,7 +2,7 @@
 epic: web-board
 type: spec
 title: Web view of the guild board
-status: done
+status: active
 owner: matpardo
 created: 2026-09-28
 updated: 2026-10-04
@@ -28,6 +28,7 @@ See the guild board, asks and notices in a browser, with a clearer layout than t
 - Status colors, matching the terminal board: PR lifecycle badges, check counts and task states, light and dark.
 - Marking notices seen from the human's view: a `new` marker on unseen notices in `guild notices`, the board and the web page, with buttons to mark one or all seen, without changing what is shown or delivered.
 - Notices carry their issue time and are listed newest first, in the terminal, the inbox and the web page.
+- Every status, badge and label on the page explains itself with a tooltip.
 
 ## Out of scope
 
