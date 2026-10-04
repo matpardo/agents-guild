@@ -16,6 +16,7 @@ PROJECTION_TABLES = (
     "merge_queue_pins",
     "main_status",
     "session_status",
+    "cost_samples",
 )
 
 _RAID_MEMBERS_TABLE = """
@@ -219,6 +220,27 @@ _CREATE_STATEMENTS = (
         status TEXT NOT NULL,
         detail TEXT,
         since TEXT NOT NULL
+    )
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS cost_samples (
+        session_id TEXT NOT NULL,
+        day TEXT NOT NULL,
+        model TEXT NOT NULL,
+        party TEXT NOT NULL,
+        quest TEXT NOT NULL,
+        tid TEXT NOT NULL,
+        input_tokens INTEGER NOT NULL,
+        cache_creation_tokens INTEGER NOT NULL,
+        cache_read_tokens INTEGER NOT NULL,
+        output_tokens INTEGER NOT NULL,
+        PRIMARY KEY (session_id, day, model, party, quest, tid)
+    )
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS transcript_cursors (
+        path TEXT PRIMARY KEY,
+        offset INTEGER NOT NULL
     )
     """,
     """

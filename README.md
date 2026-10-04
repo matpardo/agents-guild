@@ -147,6 +147,7 @@ guild main red <owner/repo> --reason "<text>"   # mark a repo's main branch red 
 guild main green <owner/repo>                   # clear the manual red mark
 
 guild history [--party <name>] [--raid <name>] [--project <name>]   # read-only: in-progress quests, completed quests, quests closed without completing, finished raids, totals
+guild cost [--since <dur>] [--by session|party|model|quest|task] [--project <name>]   # token usage from Claude Code transcripts, in M tokens
 guild board [--party <name> | --raid <name>]
 guild web --port <n>
 guild sync --source gh|sdd|tracker
@@ -369,6 +370,55 @@ Read-only record of what the guild has achieved. Five sections:
    time, handoffs.
 
 `--party`, `--raid` and `--project` narrow every section; they combine.
+
+### `guild cost`
+
+Reports token usage per session, party, model, quest or task, read from the
+Claude Code transcripts (`~/.claude/projects/*/<session>.jsonl` and
+`*/<session>/subagents/agent-*.jsonl`). Each run first collects new usage, then
+prints the table.
+
+What it reads: only `message.usage`, `message.model`, the line `type`, its
+`timestamp` and `message.id`. The id is used only to dedupe and the timestamp
+only to bucket by UTC day and task window. Nothing else from the transcript is
+stored.
+
+Collection is incremental: a byte-offset cursor per transcript
+(`transcript_cursors`) means a re-run reads only what was appended. A line
+without a trailing newline is not consumed until it is complete. Lines newer
+than a 10-minute grace are left for the next run, so a message still being
+streamed is not counted early. A file smaller than its cursor restarts from the
+beginning. Streamed chunks of one message id count once, with the highest value
+of each usage field.
+
+Each run records one `cost.sampled` local event per session, UTC day, model,
+party, quest and task, holding only the increment since the last run, and only
+when it is non-zero. The `cost_samples` projection sums them and `guild rebuild`
+reproduces it from events; the cursors are not rebuilt.
+
+Attribution: the session maps to a party through the latest event of that
+session that carries a party. A message belongs to a task when its timestamp
+falls inside a window that opens at `task.started` and closes at the next
+`task.blocked` or `task.done` of the same task (open-ended if none); when
+windows overlap the latest start wins. Everything else has no task, shown as `-`.
+Subagent transcripts count under their parent session.
+
+```
+guild cost --since 3d --by party
+party      input  cache write  cache read  output
+beta       0.004        1.820      96.310   0.211
+unbound    0.001        0.310       8.402   0.020
+total      0.005        2.130     104.712   0.231
+```
+
+`--since` takes a duration (`30m`, `8h`, `3d`) and keeps days from that date
+on. `--by` defaults to `session`; `task` shows `quest/tid`. `--project`
+keeps samples of parties in that project (unbound usage has no project and is
+excluded). Values are millions of tokens with three decimals, ordered by total
+descending. With nothing to show it prints `no cost data`.
+
+Limitations: usage recorded before a session is bound is `unbound` and is not
+reattributed afterwards. There is no pricing: only token counts.
 
 ### `guild sync-timer`
 
@@ -1173,10 +1223,11 @@ Append-only `events` table (SQLite, WAL, `busy_timeout=5000`, writes wrapped
 in `BEGIN IMMEDIATE`) plus projection tables kept in sync in the same
 transaction: `parties`, `leaders`, `quests`, `quest_tasks`, `epics`, `tasks`,
 `prs`, `cards`, `asks`, `notices`, `claims`, `raid_members`, `pr_shared_areas`,
-`merge_queue_pins`, `cursors`. `guild rebuild` drops every
-projection and replays all events from scratch — the only exception is
-`cursors`, which is a per-session read position, not domain state, and is
-left untouched by rebuild.
+`merge_queue_pins`, `cost_samples`, `cursors`, `transcript_cursors`. `guild
+rebuild` drops every projection and replays all events from scratch — the only
+exceptions are `cursors` and `transcript_cursors`, which are read positions
+(per session and per transcript), not domain state, and are left untouched by
+rebuild.
 
 `epics`/`tasks` are observed-only (never written by a guild command): they
 hold whatever `guild sync --source sdd` last read, keyed by
@@ -1199,6 +1250,7 @@ Default paths (all overridable via env, useful for tests):
 - Config: `$XDG_CONFIG_HOME/guild/` (default `~/.config/guild/`).
 - State: `$XDG_STATE_HOME/guild/` (default `~/.local/state/guild/`).
 - Claude sessions: `$GUILD_CLAUDE_SESSIONS_DIR` (default `~/.claude/sessions`).
+- Claude transcripts: `$GUILD_CLAUDE_PROJECTS_DIR` (default `~/.claude/projects`).
 
 `guild` sets `umask 0o077` at CLI entry and explicitly `chmod`s the DB file
 (and its `-wal`/`-shm` siblings) to `0600` and the DB, state, handoffs and
@@ -1226,6 +1278,13 @@ except `\n`/`\t`, DEL are stripped when the event is recorded) and again at
 `board` render time, as defense for data stored before this sanitizer
 existed. Text rendered on a single hook or inbox line additionally collapses
 `\n`/`\t` to spaces, so embedded newlines cannot forge extra lines.
+
+`guild cost` reads Claude Code transcripts, which hold full conversations. It
+parses only `message.usage`, `message.model`, `type`, `timestamp` and
+`message.id`; the id and timestamp are used to dedupe and bucket and are not
+stored. The stored `cost.sampled` events and `cost_samples` rows hold token
+counts, model name, UTC day, session id, party, quest and task, never
+conversation text.
 
 ## Seed schema
 

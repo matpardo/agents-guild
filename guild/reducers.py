@@ -500,6 +500,31 @@ def _session_working(conn, event):
     _set_session_status(conn, event, "working", None)
 
 
+def _cost_sampled(conn, event):
+    payload = event["payload"]
+    conn.execute(
+        "INSERT INTO cost_samples (session_id, day, model, party, quest, tid, input_tokens,"
+        " cache_creation_tokens, cache_read_tokens, output_tokens) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+        " ON CONFLICT (session_id, day, model, party, quest, tid) DO UPDATE SET"
+        " input_tokens = input_tokens + excluded.input_tokens,"
+        " cache_creation_tokens = cache_creation_tokens + excluded.cache_creation_tokens,"
+        " cache_read_tokens = cache_read_tokens + excluded.cache_read_tokens,"
+        " output_tokens = output_tokens + excluded.output_tokens",
+        (
+            event["session_id"],
+            payload["day"],
+            payload["model"],
+            event["party"] or "",
+            payload["quest"],
+            payload["tid"],
+            payload["input_tokens"],
+            payload["cache_creation_tokens"],
+            payload["cache_read_tokens"],
+            payload["output_tokens"],
+        ),
+    )
+
+
 def _dump(value):
     return json.dumps(value)
 
@@ -543,6 +568,7 @@ _REDUCERS = {
     "session.waiting": _session_waiting,
     "session.stopped": _session_stopped,
     "session.working": _session_working,
+    "cost.sampled": _cost_sampled,
 }
 
 
