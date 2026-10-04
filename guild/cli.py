@@ -791,7 +791,16 @@ def build_parser():
     hook = subparsers.add_parser("hook")
     hook.add_argument(
         "hook_name",
-        choices=["session-start", "prompt-submit", "pre-push", "post-tool-use", "pre-edit", "pre-commit"],
+        choices=[
+            "session-start",
+            "prompt-submit",
+            "pre-push",
+            "post-tool-use",
+            "pre-edit",
+            "pre-commit",
+            "notification",
+            "stop",
+        ],
     )
 
     seed = subparsers.add_parser("seed")
@@ -876,6 +885,12 @@ def _run_stateful_hook(hook_name, stdin_data):
             )
         elif hook_name == "post-tool-use":
             text = hook_commands.post_tool_use(ctx)
+        elif hook_name == "notification":
+            hook_commands.notification(ctx, stdin_data.get("notification_type"), stdin_data.get("message"))
+            text = None
+        elif hook_name == "stop":
+            hook_commands.stop(ctx)
+            text = None
         else:
             text = hook_commands.prompt_submit(ctx)
     except Exception as error:

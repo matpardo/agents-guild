@@ -897,3 +897,110 @@ if __name__ == "__main__":
     import unittest
 
     unittest.main()
+
+
+class SessionLivenessHookTests(GuildTestCase):
+    def _bound(self):
+        repo_dir = self.register_project("acme", ["acme/app"])
+        self.run_cli(["party", "start", "alpha"], "sess-1", repo_dir)
+        return repo_dir
+
+    def _payload(self, repo_dir, **extra):
+        payload = {"session_id": "sess-1", "cwd": str(repo_dir)}
+        payload.update(extra)
+        return payload
+
+    def _rows(self):
+        conn = sqlite3.connect(str(paths.db_path()))
+        conn.row_factory = sqlite3.Row
+        self.addCleanup(conn.close)
+        return conn
+
+    def _status(self):
+        row = self._rows().execute("SELECT status, detail FROM session_status WHERE session_id = 'sess-1'").fetchone()
+        return None if row is None else (row["status"], row["detail"])
+
+    def _count(self, kind):
+        return self._rows().execute("SELECT COUNT(*) AS n FROM events WHERE kind = ?", (kind,)).fetchone()["n"]
+
+    def _notify(self, repo_dir, notification_type, message):
+        return self.run_hook(
+            "notification",
+            self._payload(repo_dir, notification_type=notification_type, message=message),
+        )
+
+    def test_permission_prompt_records_waiting_once(self):
+        repo_dir = self._bound()
+        code, out, err = self._notify(repo_dir, "permission_prompt", "Claude needs permission to run ls")
+        self.assertEqual((code, out), (0, ""))
+        self.assertEqual(self._status(), ("waiting-permission", "Claude needs permission to run ls"))
+        self.assertEqual(self._count("session.waiting"), 1)
+        self._notify(repo_dir, "permission_prompt", "Claude needs permission to run ls")
+        self.assertEqual(self._count("session.waiting"), 1)
+
+    def test_idle_and_elicitation_map_to_waiting_input(self):
+        repo_dir = self._bound()
+        self._notify(repo_dir, "idle_prompt", "Claude is waiting for your input")
+        self.assertEqual(self._status()[0], "waiting-input")
+        events_row = self._rows().execute("SELECT payload FROM events WHERE kind = 'session.waiting'").fetchone()
+        self.assertEqual(json.loads(events_row["payload"])["wait"], "idle")
+        self.run_hook("post-tool-use", self._payload(repo_dir))
+        self._notify(repo_dir, "elicitation_dialog", "pick one")
+        self.assertEqual(self._status(), ("waiting-input", "pick one"))
+
+    def test_unmapped_notification_does_nothing(self):
+        repo_dir = self._bound()
+        code, out, err = self._notify(repo_dir, "auth_success", "ok")
+        self.assertEqual((code, out), (0, ""))
+        self.assertIsNone(self._status())
+        self.assertEqual(self._count("session.waiting"), 0)
+
+    def test_missing_fields_do_not_raise(self):
+        repo_dir = self._bound()
+        code, out, err = self.run_hook("notification", self._payload(repo_dir))
+        self.assertEqual((code, out), (0, ""))
+        code, out, err = self.run_hook("notification", self._payload(repo_dir, notification_type="permission_prompt"))
+        self.assertEqual((code, out), (0, ""))
+        self.assertEqual(self._status(), ("waiting-permission", ""))
+
+    def test_unbound_hooks_exit_zero_and_print_nothing(self):
+        payload = {"session_id": "sess-9", "cwd": str(self.root), "notification_type": "permission_prompt", "message": "x"}
+        for hook_name in ("notification", "stop"):
+            code, out, err = self.run_hook(hook_name, payload)
+            self.assertEqual((code, out), (0, ""))
+        self.run_hook("post-tool-use", payload)
+        self.run_hook("prompt-submit", payload)
+        self.assertEqual(self._rows().execute("SELECT COUNT(*) AS n FROM events").fetchone()["n"], 0)
+
+    def test_stop_records_once(self):
+        repo_dir = self._bound()
+        code, out, err = self.run_hook("stop", self._payload(repo_dir))
+        self.assertEqual((code, out), (0, ""))
+        self.assertEqual(self._status(), ("stopped", None))
+        self.run_hook("stop", self._payload(repo_dir))
+        self.assertEqual(self._count("session.stopped"), 1)
+
+    def test_post_tool_use_after_stopped_records_one_working(self):
+        repo_dir = self._bound()
+        self.run_hook("stop", self._payload(repo_dir))
+        self.run_hook("post-tool-use", self._payload(repo_dir))
+        self.run_hook("post-tool-use", self._payload(repo_dir))
+        self.assertEqual(self._status(), ("working", None))
+        self.assertEqual(self._count("session.working"), 1)
+
+    def test_prompt_submit_marks_working(self):
+        repo_dir = self._bound()
+        self.run_hook("stop", self._payload(repo_dir))
+        self.run_hook("prompt-submit", self._payload(repo_dir))
+        self.assertEqual(self._status(), ("working", None))
+
+    def test_session_start_marks_bound_leader_working(self):
+        repo_dir = self._bound()
+        self.run_hook("session-start", self._payload(repo_dir))
+        self.assertEqual(self._status(), ("working", None))
+
+    def test_hundred_tool_calls_add_one_working_event(self):
+        repo_dir = self._bound()
+        for _ in range(100):
+            self.run_hook("post-tool-use", self._payload(repo_dir))
+        self.assertEqual(self._count("session.working"), 1)
