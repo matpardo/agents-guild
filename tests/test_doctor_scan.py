@@ -2,7 +2,7 @@ import json
 import os
 from unittest import mock
 
-from tests.test_doctor import _ALL_HOOKS, _ASK_RULES
+from tests.test_doctor import _ALL_HOOKS, _ALLOW_RULES, _ASK_RULES
 from tests.testutil import GuildTestCase
 
 
@@ -12,7 +12,7 @@ class DoctorScanPrsTests(GuildTestCase):
         self.home = self.root / "home"
         (self.home / ".claude").mkdir(parents=True)
         (self.home / ".claude" / "settings.json").write_text(
-            json.dumps({"hooks": _ALL_HOOKS, "permissions": {"ask": _ASK_RULES}})
+            json.dumps({"hooks": _ALL_HOOKS, "permissions": {"ask": _ASK_RULES, "allow": _ALLOW_RULES}})
         )
         (self.home / ".claude" / "GUILD.md").write_text("rules")
         self.env = mock.patch.dict(os.environ, {"HOME": str(self.home)})

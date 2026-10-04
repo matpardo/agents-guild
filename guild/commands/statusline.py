@@ -1,4 +1,4 @@
-from guild import identity
+from guild import identity, session_status
 from guild.commands import notice as notice_commands
 from guild.commands import raid as raid_commands
 
@@ -53,4 +53,7 @@ def render(ctx, session_id):
     if targeting:
         noun = "notice" if len(targeting) == 1 else "notices"
         parts.append("{} {}".format(len(targeting), noun))
+    blocked = len(session_status.blocked_rows(ctx.conn, None))
+    if blocked:
+        parts.append("⏸{} blocked".format(blocked))
     return " · ".join(parts)

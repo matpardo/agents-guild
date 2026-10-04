@@ -2,7 +2,7 @@
 epic: session-liveness
 type: spec
 title: Every party shows whether it is working or stuck
-status: active
+status: done
 owner: matpardo
 created: 2026-10-04
 updated: 2026-10-04
@@ -35,9 +35,9 @@ In the first real raid a session hit a Claude Code permission prompt and sat the
 
 ## Success criteria
 
-- [ ] A permission prompt in a bound session shows as `waiting-permission` on the board and fires the push command once.
-- [ ] Approving it returns the party to `working` with no event per tool call.
-- [ ] A session that ends its turn with queued work shows `stopped-with-work`.
+- [x] A permission prompt in a bound session shows as `waiting-permission` on the board and fires the push command once.
+- [x] Approving it returns the party to `working` with no event per tool call.
+- [x] A session that ends its turn with queued work shows `stopped-with-work`.
 
 ## Security and data
 

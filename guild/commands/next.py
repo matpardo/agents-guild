@@ -318,20 +318,31 @@ def _paused_lines(paused_rows):
     return ["nothing actionable", "raid paused: {}".format(", ".join(row["raid"] for row in paused_rows))]
 
 
+def _collect(ctx, party, project):
+    stale_hours = _stale_hours(ctx.projects_dir, project)
+    tier1 = _tier1_candidates(ctx.conn, party)
+    tier2 = _tier2_candidates(ctx.conn, party)
+    tier3 = _tier3_candidates(ctx.conn, ctx.now, party, stale_hours)
+    if project is None:
+        return tier1, tier2, tier3, None, [], []
+    next_task, disagreements, blocked = _evaluate_next_task(ctx.conn, ctx.now, project, party)
+    return tier1, tier2, tier3, next_task, disagreements, blocked
+
+
+def has_work(ctx, binding):
+    party = binding["party"]
+    if raid_commands.paused_member_raids(ctx.conn, ctx.now, party):
+        return False
+    tier1, tier2, tier3, next_task, _, _ = _collect(ctx, party, binding["project"])
+    return bool(tier1 or tier2 or tier3 or next_task is not None)
+
+
 def run(ctx, binding, show_all, acknowledge):
     party, project = binding["party"], binding["project"]
     paused_rows = raid_commands.paused_member_raids(ctx.conn, ctx.now, party)
     if paused_rows:
         return _paused_lines(paused_rows)
-    stale_hours = _stale_hours(ctx.projects_dir, project)
-
-    tier1 = _tier1_candidates(ctx.conn, party)
-    tier2 = _tier2_candidates(ctx.conn, party)
-    tier3 = _tier3_candidates(ctx.conn, ctx.now, party, stale_hours)
-    if project is None:
-        next_task, disagreements, blocked = None, [], []
-    else:
-        next_task, disagreements, blocked = _evaluate_next_task(ctx.conn, ctx.now, project, party)
+    tier1, tier2, tier3, next_task, disagreements, blocked = _collect(ctx, party, project)
 
     raid_lines = _lead_raid_lines(ctx.conn, ctx.now, party)
 

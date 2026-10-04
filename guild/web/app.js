@@ -286,15 +286,33 @@
     return article;
   }
 
-  function renderAsks(asks) {
+  function renderBlocked(entry) {
+    var line = el("p");
+    line.className = "blocked-session";
+    line.appendChild(textEl("strong", entry.party));
+    line.appendChild(textEl("span", entry.label));
+    if (entry.detail) {
+      line.appendChild(textEl("code", entry.detail));
+    }
+    return line;
+  }
+
+  function renderAsks(asks, blocked) {
     var section = document.getElementById("asks");
     clear(section);
-    section.appendChild(textEl("h2", "asks (" + asks.length + ")"));
-    if (asks.length === 0) {
+    section.appendChild(textEl("h2", "asks (" + asks.length + ") · blocked (" + blocked.length + ")"));
+    if (asks.length === 0 && blocked.length === 0) {
       section.appendChild(textEl("p", "nothing needs you"));
       return;
     }
+    appendAll(section, blocked.map(renderBlocked));
     appendAll(section, asks.map(renderAsk));
+  }
+
+  function renderStatusBadge(status) {
+    var badge = textEl("span", status.label);
+    badge.className = "status-badge status-" + status.name;
+    return badge;
   }
 
   function renderNotice(notice) {
@@ -608,6 +626,7 @@
     var summary = el("summary");
     summary.appendChild(textEl("strong", party.name));
     summary.appendChild(renderRoleBadge(party.raids));
+    summary.appendChild(renderStatusBadge(party.status));
     summary.appendChild(textEl("span", party.state));
     summary.appendChild(textEl("span", "gen " + party.generation));
     summary.appendChild(textEl("span", party.leader_session_name || "no leader"));
@@ -702,6 +721,9 @@
       notices: data.notices.filter(function (notice) {
         return notice.party === state.partyFilter;
       }),
+      blocked: data.blocked.filter(function (entry) {
+        return entry.party === state.partyFilter;
+      }),
       parties: data.parties.filter(function (party) {
         return party.name === state.partyFilter;
       }),
@@ -766,6 +788,9 @@
       notices: data.notices.filter(function (notice) {
         return notice.scope === scope;
       }),
+      blocked: data.blocked.filter(function (entry) {
+        return members.indexOf(entry.party) !== -1;
+      }),
       parties: data.parties.filter(function (party) {
         return members.indexOf(party.name) !== -1;
       }),
@@ -806,7 +831,7 @@
     refreshPartyFilterOptions(data.parties);
     refreshRaidFilterOptions(data.raids);
     var filtered = applyRaidFilter(applyPartyFilter(data));
-    renderAsks(filtered.asks);
+    renderAsks(filtered.asks, filtered.blocked);
     renderNotices(filtered.notices);
     renderMergeQueues(filtered.merge_queues);
     renderDrift(filtered.drift);

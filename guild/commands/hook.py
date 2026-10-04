@@ -8,7 +8,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-from guild import config, db, identity, localbase, names, timeutil
+from guild import config, db, identity, localbase, names, session_status, timeutil
 from guild.adapters import github
 from guild.commands import brief as brief_commands
 from guild.commands import claim as claim_commands
@@ -133,12 +133,80 @@ def _pause_lines(ctx, binding):
     return lines
 
 
+_NOTIFICATION_WAITS = {
+    "permission_prompt": ("permission", "waiting-permission"),
+    "elicitation_dialog": ("elicitation", "waiting-input"),
+    "idle_prompt": ("idle", "waiting-input"),
+}
+
+
+def _mark_working(ctx, binding):
+    if binding is None:
+        return
+    if not session_status.is_change(ctx.conn, ctx.session_id, "working"):
+        return
+    session_status.record_change(ctx, binding, "session.working", {})
+
+
+def stop(ctx):
+    binding = identity.resolve_binding(ctx.conn, ctx.session_id)
+    if binding is None:
+        return
+    with db.writing(ctx.conn):
+        if not session_status.is_change(ctx.conn, ctx.session_id, "stopped"):
+            return
+        session_status.record_change(ctx, binding, "session.stopped", {})
+
+
+_BLOCKING_WAITS = ("permission", "elicitation")
+
+
+def _hides_pending_permission(wait, previous_row):
+    return wait == "idle" and previous_row is not None and previous_row["status"] == "waiting-permission"
+
+
+def _run_push(ctx, binding, wait, push_runner):
+    if binding["project"] is None:
+        return
+    notify_config = config.load_project(ctx.projects_dir, binding["project"]).get("notify")
+    if notify_config is None:
+        return
+    try:
+        push_runner(notify_config["command"] + [binding["party"], wait])
+    except OSError as error:
+        sys.stderr.write("guild: notify command failed: {}\n".format(error))
+
+
+def notification(ctx, notification_type, message, push_runner):
+    binding = identity.resolve_binding(ctx.conn, ctx.session_id)
+    if binding is None:
+        return
+    mapped = _NOTIFICATION_WAITS.get(notification_type)
+    if mapped is None:
+        return
+    wait, status = mapped
+    with db.writing(ctx.conn):
+        previous_row = session_status.current(ctx.conn, ctx.session_id)
+        if _hides_pending_permission(wait, previous_row):
+            return
+        if not session_status.is_change(ctx.conn, ctx.session_id, status):
+            return
+        session_status.record_change(
+            ctx, binding, "session.waiting", session_status.waiting_payload(wait, message)
+        )
+    if wait not in _BLOCKING_WAITS:
+        return
+    _run_push(ctx, binding, wait, push_runner)
+
+
 def session_start(ctx, resume_party, permission_mode):
     lines = _auto_resume_lines(ctx, resume_party, permission_mode)
     binding = identity.resolve_binding(ctx.conn, ctx.session_id)
     if binding is not None:
         party_commands.locate_if_changed(ctx, binding, permission_mode)
         lines.extend(_resume_lines(ctx, binding))
+        with db.writing(ctx.conn):
+            _mark_working(ctx, binding)
     lines.extend(brief_commands.render_brief(ctx))
     lines.extend(_membership_warning_lines(ctx, binding))
     _spawn_background_sync(ctx.cwd)
@@ -190,6 +258,7 @@ def prompt_submit(ctx):
     )
     with db.writing(ctx.conn):
         inbox_commands.advance_cursor(ctx.conn, identity.cursor_key(ctx.session_id), seq)
+        _mark_working(ctx, binding)
     return "\n".join(lines)
 
 
@@ -206,6 +275,7 @@ def post_tool_use(ctx):
     )
     with db.writing(ctx.conn):
         inbox_commands.advance_cursor(ctx.conn, identity.cursor_key(ctx.session_id), seq)
+        _mark_working(ctx, binding)
     if not lines:
         return None
     return json.dumps(

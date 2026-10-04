@@ -1,7 +1,7 @@
 import json
 import textwrap
 
-from guild import config, sanitize, timeutil
+from guild import config, party_status, sanitize, session_status, timeutil
 from guild.commands import claim as claim_commands
 from guild.commands import drift as drift_commands
 from guild.commands import merge_queue as merge_queue_commands
@@ -22,6 +22,17 @@ _FLAG_STYLES = (
     ("needs_ask_answer", "needs-ask-answer", "red"),
     ("needs_human_pr_review", "needs-human-pr-review", "yellow"),
 )
+
+_STATUS_STYLES = {
+    "waiting-permission": "red",
+    "waiting-ask": "yellow",
+    "waiting-input": "yellow",
+    "stopped-with-work": "cyan",
+    "working": "green",
+    "done": "dim",
+    "awaiting-leader": "dim",
+    "closed": "dim",
+}
 
 _LIFECYCLE_STYLES = {
     "converging": "yellow",
@@ -206,20 +217,39 @@ def _sorted_open_asks(conn, party_names):
     return rows
 
 
+def _needs_you_heading(ask_count, blocked_count):
+    parts = []
+    if ask_count:
+        parts.append("{} {}".format(ask_count, "open ask" if ask_count == 1 else "open asks"))
+    if blocked_count:
+        parts.append("{} blocked".format(blocked_count))
+    return "NEEDS YOU · {}".format(" · ".join(parts))
+
+
+def _blocked_line(ctx, painter, row):
+    status = {"status": "waiting-permission", "since": row["since"], "detail": row["detail"]}
+    text = "  ⏸ {} {}".format(row["party"], party_status.label(ctx, status))
+    if row["detail"]:
+        text = '{}: "{}"'.format(text, row["detail"])
+    return painter.paint(text, "red")
+
+
 def render_asks(ctx, party_names, color, width, detailed):
     painter = _Painter(color, width)
     rows = _sorted_open_asks(ctx.conn, party_names)
-    if not rows:
+    blocked = session_status.blocked_rows(ctx.conn, party_names)
+    if not rows and not blocked:
         return [painter.paint("NEEDS YOU · nothing", "green"), ""]
-    label = "open ask" if len(rows) == 1 else "open asks"
-    lines = [painter.paint("NEEDS YOU · {} {}".format(len(rows), label), "bold")]
+    lines = [painter.paint(_needs_you_heading(len(rows), len(blocked)), "bold")]
+    lines.extend(_blocked_line(ctx, painter, row) for row in blocked)
     if detailed:
         for row in rows:
             lines.extend(_ask_detail_lines(painter, ctx.conn, row))
         return lines
     for row in rows:
         lines.extend(_ask_summary_lines(painter, ctx.conn, row))
-    lines.append(painter.paint('  → guild asks (context) · guild answer <id> "..."', "dim"))
+    if rows:
+        lines.append(painter.paint('  → guild asks (context) · guild answer <id> "..."', "dim"))
     lines.append("")
     return lines
 
@@ -387,6 +417,10 @@ def _party_section(ctx, painter, party_row):
             painter.paint(_leader_label(ctx, party_row), "dim"),
         )
     ]
+    status = party_status.derive(ctx, party_row)
+    lines.append(
+        painter.paint("  status: {}".format(party_status.label(ctx, status)), _STATUS_STYLES[status["status"]])
+    )
     next_ref = merge_queue_commands.next_to_merge(ctx.conn, {party_row["name"]})
     for label in merge_queue_commands.main_red_labels(ctx.conn, {party_row["name"]}):
         lines.append(painter.paint("  MAIN RED: {}".format(label), "red"))
@@ -584,6 +618,28 @@ def _quest_model(conn, project, quest_row, prs_by_task, project_config):
     }
 
 
+def _status_model(ctx, party_row):
+    status = party_status.derive(ctx, party_row)
+    detail = status["detail"]
+    return {
+        "name": status["status"],
+        "since": status["since"],
+        "detail": _optional_text(detail),
+        "label": party_status.label(ctx, status),
+    }
+
+
+def _blocked_model(ctx, row):
+    status = {"status": "waiting-permission", "since": row["since"], "detail": row["detail"]}
+    return {
+        "party": row["party"],
+        "wait": "permission",
+        "since": row["since"],
+        "detail": _optional_text(row["detail"]),
+        "label": party_status.label(ctx, status),
+    }
+
+
 def _party_model(ctx, party_row, project_config):
     pr_rows = _party_pr_rows(ctx.conn, party_row["name"])
     prs_by_task = _prs_by_task(pr_rows)
@@ -599,6 +655,7 @@ def _party_model(ctx, party_row, project_config):
         "name": party_row["name"],
         "state": party_row["state"],
         "generation": party_row["generation"],
+        "status": _status_model(ctx, party_row),
         "leader_session_name": _leader_session_name(ctx.conn, party_row["name"]),
         "quests": quest_models,
         "prs": [_pr_model(pr_row, project_config) for pr_row in orphan_prs],
@@ -647,6 +704,7 @@ def board_model(ctx):
             _party_model(ctx, party_row, projects_by_name.get(party_row["project"]))
             for party_row in party_rows
         ],
+        "blocked": [_blocked_model(ctx, row) for row in session_status.blocked_rows(ctx.conn, None)],
         "drift": [drift_commands.board_findings(ctx, project_name) for project_name in project_names],
         "raids": _raid_models(ctx.conn, ctx.now),
         "merge_queues": merge_queue_commands.board_models(

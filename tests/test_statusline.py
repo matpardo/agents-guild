@@ -87,3 +87,41 @@ if __name__ == "__main__":
     import unittest
 
     unittest.main()
+
+
+class StatuslineBlockedTests(GuildTestCase):
+    def setUp(self):
+        super().setUp()
+        self.repo_dir = self.register_project("acme", ["acme/app"])
+        self.run_cli(["party", "start", "alpha"], "sess-1", self.repo_dir)
+        self.run_cli(["party", "start", "beta"], "sess-2", self.repo_dir)
+
+    def _block(self, session_id):
+        self.run_hook(
+            "notification",
+            {
+                "session_id": session_id,
+                "cwd": str(self.repo_dir),
+                "notification_type": "permission_prompt",
+                "message": "x",
+            },
+        )
+
+    def _statusline(self, session):
+        code, out, err = self.run_cli(["statusline", "--session", session], None, None)
+        self.assertEqual(code, 0)
+        return out.strip()
+
+    def test_omitted_when_nobody_blocked(self):
+        self.assertNotIn("blocked", self._statusline("sess-1"))
+
+    def test_counts_blocked_parties(self):
+        self._block("sess-2")
+        self.assertEqual(self._statusline("sess-1"), "g1 · ⏸1 blocked")
+        self._block("sess-1")
+        self.assertEqual(self._statusline("sess-1"), "g1 · ⏸2 blocked")
+
+    def test_closed_party_not_counted(self):
+        self._block("sess-2")
+        self.run_cli(["party", "close"], "sess-2", self.repo_dir)
+        self.assertNotIn("blocked", self._statusline("sess-1"))

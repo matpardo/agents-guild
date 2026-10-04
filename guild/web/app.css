@@ -554,6 +554,39 @@ main.history-main {
   color: var(--role-solo-fg);
 }
 
+.status-badge {
+  border-radius: 3px;
+  padding: 0 0.35rem;
+  font-size: 0.75rem;
+  background: var(--role-solo-bg);
+  color: var(--role-solo-fg);
+}
+
+.status-waiting-permission {
+  background: var(--danger);
+  color: var(--bg);
+}
+
+.status-waiting-ask,
+.status-waiting-input {
+  background: var(--lifecycle-converging-bg);
+  color: var(--lifecycle-converging-fg);
+}
+
+.status-working {
+  background: var(--lifecycle-ready-bg);
+  color: var(--lifecycle-ready-fg);
+}
+
+.status-stopped-with-work {
+  background: var(--role-lead-bg);
+  color: var(--role-lead-fg);
+}
+
+.blocked-session {
+  color: var(--danger);
+}
+
 .badge-warn {
   background: var(--lifecycle-converging-bg);
   color: var(--lifecycle-converging-fg);

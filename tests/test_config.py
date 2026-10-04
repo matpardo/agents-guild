@@ -61,6 +61,38 @@ class ValidateProjectConfigTests(unittest.TestCase):
                 }
             )
 
+    def _with_notify(self, notify):
+        return {"name": "acme", "paths": ["/tmp/*"], "github": {"repos": []}, "notify": notify}
+
+    def test_accepts_notify_command_list(self):
+        config.validate_project_config(self._with_notify({"command": ["notify-send", "guild"]}))
+
+    def test_rejects_notify_that_is_not_an_object(self):
+        with self.assertRaises(GuildError):
+            config.validate_project_config(self._with_notify(["notify-send"]))
+
+    def test_rejects_notify_without_command(self):
+        with self.assertRaises(GuildError):
+            config.validate_project_config(self._with_notify({}))
+
+    def test_rejects_notify_with_extra_keys(self):
+        with self.assertRaises(GuildError):
+            config.validate_project_config(self._with_notify({"command": ["x"], "shell": True}))
+
+    def test_rejects_notify_command_string(self):
+        with self.assertRaises(GuildError):
+            config.validate_project_config(self._with_notify({"command": "notify-send guild"}))
+
+    def test_rejects_empty_notify_command(self):
+        with self.assertRaises(GuildError):
+            config.validate_project_config(self._with_notify({"command": []}))
+
+    def test_rejects_notify_command_with_empty_or_non_string_item(self):
+        for command in (["notify-send", ""], ["notify-send", 3]):
+            with self.subTest(command=command):
+                with self.assertRaises(GuildError):
+                    config.validate_project_config(self._with_notify({"command": command}))
+
     def test_rejects_tracker_that_is_not_an_object(self):
         with self.assertRaises(GuildError):
             config.validate_project_config(

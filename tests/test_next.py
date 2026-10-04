@@ -4,6 +4,8 @@ from datetime import timedelta
 from unittest import mock
 
 from guild import timeutil
+from guild.cli import _build_context
+from guild.commands import next as next_commands
 from tests.testutil import GuildTestCase
 
 
@@ -432,6 +434,58 @@ class LeadRaidWorkTests(NextTestCase):
         code, out, err = self.run_cli(["next"], "sess-1", self.repo_dir)
         self.assertIn("task demo/T01", out)
         self.assertNotIn("raid ci", out)
+
+
+class HasWorkTests(NextTestCase):
+    def _has_work(self):
+        ctx = _build_context("sess-1", self.repo_dir)
+        binding = {"party": "alpha", "project": "acme", "generation": 1}
+        return next_commands.has_work(ctx, binding)
+
+    def _event_count(self):
+        conn = sqlite3.connect(str(self.data_home / "guild" / "guild.db"))
+        count = conn.execute("SELECT COUNT(*) FROM events").fetchone()[0]
+        conn.close()
+        return count
+
+    def _track_pr_with_comments(self):
+        self.run_cli(["quest", "add", "demo", "--title", "Demo", "--no-epic"], "sess-1", self.repo_dir)
+        self.run_cli(["task", "add", "demo/T01", "--title", "First"], "sess-1", self.repo_dir)
+        self.run_cli(["task", "start", "demo/T01"], "sess-1", self.repo_dir)
+        self.write_gh_fixture(
+            "view_acme-app_1",
+            {
+                "state": "OPEN", "isDraft": True, "headRefName": "feature/x", "title": "t",
+                "comments": [{"id": 1}, {"id": 2}],
+            },
+        )
+        self.run_cli(
+            ["pr", "track", "acme/app#1", "--task", "demo/T01", "--what", "x", "--waits", "y"],
+            "sess-1", self.repo_dir,
+        )
+        self.run_cli(["sync", "--source", "gh"], "sess-1", self.repo_dir)
+
+    def test_false_when_nothing_to_do(self):
+        self.assertFalse(self._has_work())
+
+    def test_true_with_queued_task(self):
+        self.run_cli(["quest", "add", "demo", "--title", "Demo", "--no-epic"], "sess-1", self.repo_dir)
+        self.run_cli(["task", "add", "demo/T01", "--title", "First"], "sess-1", self.repo_dir)
+        self.assertTrue(self._has_work())
+
+    def test_true_with_unseen_comments_without_acknowledging_or_writing(self):
+        self._track_pr_with_comments()
+        before = self._event_count()
+        self.assertTrue(self._has_work())
+        self.assertEqual(self._event_count(), before)
+        self.assertEqual(self._pr_row()["last_notified_comment_count"], 0)
+
+    def test_false_when_raid_paused(self):
+        self.run_cli(["quest", "add", "demo", "--title", "Demo", "--no-epic"], "sess-1", self.repo_dir)
+        self.run_cli(["task", "add", "demo/T01", "--title", "First"], "sess-1", self.repo_dir)
+        self.run_cli(["raid", "join", "ci", "--until-leave", "--lead"], "sess-1", self.repo_dir)
+        self.run_cli(["raid", "pause", "ci"], "sess-1", self.repo_dir)
+        self.assertFalse(self._has_work())
 
 
 if __name__ == "__main__":
