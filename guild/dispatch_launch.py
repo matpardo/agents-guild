@@ -245,6 +245,8 @@ class Launcher:
         cwd = None if leader is None else leader["cwd"]
         if cwd is None:
             return self._skip_with_notice(trigger, generation, "cwd unknown", announces)
+        if "#" in cwd:
+            return self._skip_with_notice(trigger, generation, "cwd unsafe", announces)
         if not os.path.isdir(cwd):
             return self._skip_with_notice(trigger, generation, "cwd missing", announces)
         projects = config.load_all_projects(self._ctx.projects_dir)

@@ -183,6 +183,14 @@ class SkipTests(LaunchBase):
         self.assert_skipped(line, "cwd outside project")
         self.assertEqual(len(self.notices()), 1)
 
+    def test_cwd_with_a_hash_is_skipped_as_unsafe_with_notice(self):
+        unsafe = self.repo_dir / "a#b"
+        unsafe.mkdir()
+        self.locate("alpha", 1, unsafe, None)
+        line = self.decide(self.trigger(12, "alpha"), "on")
+        self.assert_skipped(line, "cwd unsafe")
+        self.assertEqual(len(self.notices()), 1)
+
     def test_unknown_cwd_is_skipped_with_notice(self):
         self.ctx().conn.execute("UPDATE leaders SET cwd = NULL WHERE party = 'alpha'")
         line = self.decide(self.trigger(12, "alpha"), "on")
