@@ -96,13 +96,13 @@ class DuBytesTests(GuildTestCase):
         self.assertEqual(result, (10, "ok"))
         self.assertEqual(
             runner.calls[0]["argv"],
-            ["du", "-s", "-B1", "-x", "--exclude=/a/b \\[1]/c\\*", "--exclude=/a/d\\?", str(self.target)],
+            ["du", "-s", "-B1", "-x", "--exclude=/a/b \\[1]/c\\*", "--exclude=/a/d\\?", "--", str(self.target)],
         )
         self.assertEqual(runner.calls[0]["timeout_seconds"], _DU_TIMEOUT_SECONDS)
 
     def test_no_excludes_builds_plain_argv(self):
         _, runner = self._du(lambda argv: _du_line(10, self.target), [])
-        self.assertEqual(runner.calls[0]["argv"], ["du", "-s", "-B1", "-x", str(self.target)])
+        self.assertEqual(runner.calls[0]["argv"], ["du", "-s", "-B1", "-x", "--", str(self.target)])
 
     def test_exit_one_with_output_is_accepted(self):
         result, _ = self._du(

@@ -6,6 +6,7 @@ from guild.errors import GuildError
 
 _DURATION_RE = re.compile(r"^(\d+)([mhd])$")
 _UNIT_SECONDS = {"m": 60, "h": 3600, "d": 86400}
+_MAX_DURATION = timedelta(days=3650)
 
 MEMBERSHIP_WARNING_WINDOW = timedelta(hours=12)
 
@@ -29,7 +30,10 @@ def parse_duration(text):
             "invalid duration '{}': use formats like 30m, 8h, 3d".format(text), 1
         )
     amount, unit = match.groups()
-    return timedelta(seconds=int(amount) * _UNIT_SECONDS[unit])
+    seconds = int(amount) * _UNIT_SECONDS[unit]
+    if seconds > _MAX_DURATION.total_seconds():
+        raise GuildError("invalid duration '{}': at most 3650d".format(text), 1)
+    return timedelta(seconds=seconds)
 
 
 def expires_at_iso(now, duration_text):

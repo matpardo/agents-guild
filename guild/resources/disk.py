@@ -32,7 +32,7 @@ def _escape_exclude(path):
 def _du_argv(path, excludes):
     argv = ["du", "-s", "-B1", "-x"]
     argv.extend("--exclude={}".format(_escape_exclude(exclude)) for exclude in excludes)
-    argv.append(path)
+    argv.extend(["--", path])
     return argv
 
 
