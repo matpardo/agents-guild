@@ -70,3 +70,10 @@ updated: 2026-10-04
 **Status:** [x] done — #68
 
 **What:** every status, badge, chip and label on the page carries a `title` tooltip of one plain sentence saying what it means and, where useful, what to do: party statuses and states, PR lifecycles and human flags, check counts, task states, merge-queue states and actions, notice `new`, issue time, time left and scope, ask blocks, raid roles, drift rules, `MAIN RED`, blocked sessions and the filters. The explanations live in one frozen dictionary in `app.js`; a value with no entry gets no tooltip, and a test fails when a status the server can emit has none.
+
+## T10 — Two-column board with collapsible notices
+
+**Depends on:** T09
+**Status:** [x] done — #74
+
+**What:** on wide screens the board shows asks, notices, drift and resources on the left and the merge queue followed by the parties on the right; the notices section collapses and keeps its state across refreshes.
