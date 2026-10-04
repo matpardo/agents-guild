@@ -536,6 +536,37 @@ def _lifecycle_ran(conn, event):
     return
 
 
+def _resources_sampled(conn, event):
+    payload = event["payload"]
+    project = event["project"] or ""
+    for category, item, size, state, flag, detail in payload["items"]:
+        conn.execute(
+            "INSERT OR REPLACE INTO resource_samples (project, ts, category, item, bytes, state, flag, detail)"
+            " VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            (project, event["ts"], category, item, size, state, flag, detail),
+        )
+    machine = payload["machine"]
+    docker = machine["docker"] or {}
+    conn.execute(
+        "INSERT OR REPLACE INTO resource_machine (ts, disk_total, disk_used, mem_total, mem_available,"
+        " guild_db_bytes, docker_images, docker_images_reclaimable, docker_containers, docker_volumes,"
+        " docker_build_cache) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        (
+            event["ts"],
+            machine["disk_total"],
+            machine["disk_used"],
+            machine["mem_total"],
+            machine["mem_available"],
+            machine["guild_db_bytes"],
+            docker.get("images"),
+            docker.get("images_reclaimable"),
+            docker.get("containers"),
+            docker.get("volumes"),
+            docker.get("build_cache"),
+        ),
+    )
+
+
 def _dump(value):
     return json.dumps(value)
 
@@ -581,6 +612,7 @@ _REDUCERS = {
     "session.working": _session_working,
     "cost.sampled": _cost_sampled,
     "lifecycle.ran": _lifecycle_ran,
+    "resources.sampled": _resources_sampled,
 }
 
 

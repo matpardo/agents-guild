@@ -17,6 +17,8 @@ PROJECTION_TABLES = (
     "main_status",
     "session_status",
     "cost_samples",
+    "resource_samples",
+    "resource_machine",
 )
 
 _RAID_MEMBERS_TABLE = """
@@ -235,6 +237,38 @@ _CREATE_STATEMENTS = (
         cache_read_tokens INTEGER NOT NULL,
         output_tokens INTEGER NOT NULL,
         PRIMARY KEY (session_id, day, model, party, quest, tid)
+    )
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS resource_samples (
+        project TEXT NOT NULL,
+        ts TEXT NOT NULL,
+        category TEXT NOT NULL,
+        item TEXT NOT NULL,
+        bytes INTEGER,
+        state TEXT NOT NULL,
+        flag TEXT NOT NULL,
+        detail TEXT NOT NULL,
+        PRIMARY KEY (project, ts, category, item)
+    )
+    """,
+    """
+    CREATE INDEX IF NOT EXISTS idx_resource_samples_item
+        ON resource_samples (project, category, item, ts)
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS resource_machine (
+        ts TEXT PRIMARY KEY,
+        disk_total INTEGER,
+        disk_used INTEGER,
+        mem_total INTEGER,
+        mem_available INTEGER,
+        guild_db_bytes INTEGER NOT NULL,
+        docker_images INTEGER,
+        docker_images_reclaimable INTEGER,
+        docker_containers INTEGER,
+        docker_volumes INTEGER,
+        docker_build_cache INTEGER
     )
     """,
     """
