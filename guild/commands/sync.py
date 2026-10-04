@@ -105,7 +105,7 @@ def _sync_pr(ctx, projects, row, failures):
         row["number"],
         [
             "state", "isDraft", "mergedAt", "headRefName", "title", "statusCheckRollup",
-            "reviewDecision", "mergeable", "comments", "reviews",
+            "reviewDecision", "mergeable", "comments", "reviews", "headRefOid",
         ],
     )
     failing, passing, pending = _count_checks(gh_data.get("statusCheckRollup"))
@@ -117,6 +117,7 @@ def _sync_pr(ctx, projects, row, failures):
         "gh_state": gh_data.get("state"),
         "gh_draft": gh_data.get("isDraft"),
         "branch": gh_data.get("headRefName"),
+        "head_sha": gh_data.get("headRefOid"),
         "title": gh_data.get("title"),
         "checks_failing": failing,
         "checks_passing": passing,
