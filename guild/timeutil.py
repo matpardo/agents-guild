@@ -67,3 +67,14 @@ def membership_left_label(now, expires_at_text):
 def hours_until(now, expires_at_text):
     remaining = from_iso(expires_at_text) - now
     return max(1, math.ceil(remaining.total_seconds() / 3600))
+
+
+def age_label(now, since_iso):
+    seconds = max(0, int((now - from_iso(since_iso)).total_seconds()))
+    if seconds < 60:
+        return "{}s".format(seconds)
+    if seconds < 3600:
+        return "{}m".format(seconds // 60)
+    if seconds < 86400:
+        return "{}h".format(seconds // 3600)
+    return "{}d".format(seconds // 86400)

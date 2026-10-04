@@ -1,5 +1,5 @@
 import unittest
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from guild.errors import GuildError
 from guild import timeutil
@@ -40,6 +40,27 @@ class ExpiryTests(unittest.TestCase):
     def test_is_expired_false_when_future(self):
         now = datetime(2026, 1, 1, tzinfo=timezone.utc)
         self.assertFalse(timeutil.is_expired(now, "2026-01-01T01:00:00+00:00"))
+
+
+class AgeLabelTests(unittest.TestCase):
+    def _label(self, delta):
+        now = datetime(2026, 1, 10, tzinfo=timezone.utc)
+        return timeutil.age_label(now, timeutil.to_iso(now - delta))
+
+    def test_seconds(self):
+        self.assertEqual(self._label(timedelta(seconds=45)), "45s")
+
+    def test_minutes(self):
+        self.assertEqual(self._label(timedelta(minutes=12, seconds=30)), "12m")
+
+    def test_hours(self):
+        self.assertEqual(self._label(timedelta(hours=3, minutes=59)), "3h")
+
+    def test_days(self):
+        self.assertEqual(self._label(timedelta(days=2, hours=5)), "2d")
+
+    def test_future_since_is_zero_seconds(self):
+        self.assertEqual(self._label(timedelta(seconds=-5)), "0s")
 
 
 if __name__ == "__main__":
