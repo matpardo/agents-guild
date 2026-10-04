@@ -1,4 +1,5 @@
 import os
+import re
 from pathlib import Path
 
 
@@ -49,6 +50,17 @@ def claude_projects_dir():
     if value:
         return Path(value).expanduser()
     return Path.home() / ".claude" / "projects"
+
+
+def claude_scratch_dir():
+    value = os.environ.get("GUILD_CLAUDE_SCRATCH_DIR")
+    if value:
+        return Path(value).expanduser()
+    return Path("/tmp/claude-{}".format(os.getuid()))
+
+
+def encode_cwd(path):
+    return re.sub(r"[^A-Za-z0-9]", "-", str(path))
 
 
 def ensure_private_dir(path):
