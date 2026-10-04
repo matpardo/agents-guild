@@ -8,6 +8,7 @@ _SDD_ROOT = Path(__file__).resolve().parent.parent / "sdd"
 _EPICS_DIR = _SDD_ROOT / "epics"
 _DECISIONS_DIR = _SDD_ROOT / "decisions"
 _README = (_SDD_ROOT.parent / "README.md").read_text()
+_GUILD_MD = (_SDD_ROOT.parent / "GUILD.md").read_text()
 _NEW_VOCABULARY = "20261004_vocabulary-short-sessions"
 _STATUSES = {"draft", "active", "done", "archived"}
 _SPEC_KEYS = {"epic", "type", "title", "status", "owner", "created", "updated"}
@@ -101,6 +102,33 @@ class VocabularyDecisionTests(unittest.TestCase):
         self.assertIn("the live session of a party: zero or one", glossary)
         for term in ("generation", "keeper", "raid lead", "brief"):
             self.assertIn("- **{}**".format(term), glossary)
+
+
+class EphemeralBriefDocsTests(unittest.TestCase):
+    def test_epic_is_active_with_tasks(self):
+        epic_dir = _EPICS_DIR / "ephemeral-brief"
+        self.assertEqual(_frontmatter(epic_dir / "spec.md")["status"], "active")
+        tasks = sdd.parse_tasks_file(epic_dir / "tasks.md", _PATTERNS)
+        self.assertEqual([task["tid"] for task in tasks], ["T01", "T02", "T03", "T04", "T05", "T06"])
+
+    def test_readme_documents_the_task_brief(self):
+        self.assertIn(
+            "guild brief [<party>/<quest>/<tid>]   # no argument: per-session view;"
+            " with a task: read-only, budgeted brief for a fresh session",
+            _README,
+        )
+        self.assertIn("### Task brief", _README)
+        self.assertIn("'Continue the work described in the guild brief.'", _README)
+        self.assertNotIn("described in the guild handoff", _README)
+        self.assertIn("Recommended: 40, so sessions stay short and each fresh generation starts from the brief.", _README)
+        self.assertIn('"handoff_threshold": 40,', _README)
+
+    def test_guild_md_says_sessions_are_short(self):
+        self.assertIn(
+            "Sessions are meant to be short: the new session starts from"
+            " `guild brief <party>/<quest>/<tid>`, injected for you at session start.",
+            _GUILD_MD,
+        )
 
 
 if __name__ == "__main__":

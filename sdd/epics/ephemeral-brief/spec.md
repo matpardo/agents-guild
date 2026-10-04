@@ -2,7 +2,7 @@
 epic: ephemeral-brief
 type: spec
 title: Short sessions started from a task brief
-status: draft
+status: active
 owner: matpardo
 created: 2026-10-04
 updated: 2026-10-04
@@ -20,8 +20,10 @@ Long sessions re-read hundreds of thousands of tokens per turn. A party is ident
 
 ## Scope
 
-- `guild brief <party>/<quest>/<tid>` from a terminal: task, PR and its open threads, open and answered asks, targeted notices, last handoff.
+- `guild brief <party>/<quest>/<tid>` from a terminal: task, PR and its review comment counts, open and answered asks, targeted notices, claims, last handoff. Guild stores only the review comment count and how many were already notified, so the brief shows `review comments: N (M unseen)`, not threads.
 - `revive` and handoff resume commands use it as the prompt.
+- `revive` and handoff resume: the `SessionStart` injection of a fresh generation carries the task brief.
+- A party without a live session is a normal state: display statuses `idle` and `queued` replace `awaiting-leader` and `unknown` for it; vocabulary amended (decision of the dev, 2026-10-04).
 - Recommend a lower `handoff_threshold` (40) in the docs.
 
 ## Out of scope
@@ -31,7 +33,8 @@ Long sessions re-read hundreds of thousands of tokens per turn. A party is ident
 ## Success criteria
 
 - [ ] A session started from a task brief needs no further state commands to begin the task.
+- [ ] A party with no live session never shows `unknown`.
 
 ## Security and data
 
-The brief is local text injected as data, framed like other inbox content.
+The brief is local text injected as data, framed like other inbox content. Every dynamic field is stripped of control sequences and single-lined; the brief is capped at 4000 characters with explicit truncation markers; it is read-only (no cursor, no acknowledgement, no event).
