@@ -2,6 +2,8 @@ import os
 import shlex
 from datetime import timedelta
 
+from unittest import mock
+
 from guild import dispatch_launch, timeutil
 from tests.dispatch_fixtures import PROMPT, LaunchBase
 from tests.fake_tmux import FakeTmux
@@ -375,3 +377,34 @@ class ErrorIsolationTests(LaunchBase):
         self.assertIn("-> error alpha: RuntimeError", line)
         row = self.decisions()[0]
         self.assertEqual((row["outcome"], row["reason"]), ("skipped", "error: RuntimeError"))
+
+
+class ErrorAfterIntentTests(LaunchBase):
+    def decide_failing_after_intent(self):
+        ctx = self.ctx()
+        launcher = dispatch_launch.Launcher(ctx, self.tmux, self.pushes.append)
+        trigger = self.trigger(12, "alpha")
+
+        def execute(project_config, trigger_arg, mode, verdict):
+            launcher._record_decided(trigger_arg, mode, "launching", 2, "acceptEdits", None)
+            raise RuntimeError("boom")
+
+        with mock.patch.object(launcher, "_execute", execute):
+            return launcher.decide(self.project_config(), trigger, "on")
+
+    def test_error_after_the_intent_fails_the_launching_row_instead_of_replacing_it(self):
+        line = self.decide_failing_after_intent()
+        self.assertIn("launch failed alpha g2: RuntimeError", line)
+        row = self.decisions()[0]
+        self.assertEqual((row["outcome"], row["state"], row["reason"]), ("launching", "failed", "RuntimeError"))
+        self.assertEqual(self.kinds(), ["dispatch.decided", "dispatch.launch_failed"])
+        self.assertEqual(len(self.notices()), 1)
+        self.assertEqual(self.pushes, [["notify-send", "guild", "alpha", "dispatch-failed"]])
+
+    def test_error_after_the_failure_was_recorded_keeps_the_failed_row(self):
+        self.tmux.create_returncode = 1
+        with mock.patch("guild.commands.notice.create_announcing", side_effect=RuntimeError("boom")):
+            line = self.decide(self.trigger(12, "alpha"), "on")
+        self.assertIn("error alpha: RuntimeError", line)
+        row = self.decisions()[0]
+        self.assertEqual((row["outcome"], row["state"]), ("launching", "failed"))

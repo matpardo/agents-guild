@@ -71,7 +71,7 @@ class Launcher:
             verdict = self.evaluate(project_config, trigger, mode)
             return self._execute(project_config, trigger, mode, verdict)
         except Exception as error:
-            return self._record_error(trigger, mode, error)
+            return self._record_error(project_config, trigger, mode, error)
 
     def preview(self, project_config, trigger, mode):
         verdict = self.evaluate(project_config, trigger, mode)
@@ -320,10 +320,21 @@ class Launcher:
             self._prefix(trigger), trigger.party, verdict.generation, reason
         )
 
-    def _record_error(self, trigger, mode, error):
-        reason = "error: {}".format(type(error).__name__)
-        self._record_decided(trigger, mode, "skipped", None, None, reason)
-        return "{}error {}: {}".format(self._prefix(trigger), trigger.party, type(error).__name__)
+    def _record_error(self, project_config, trigger, mode, error):
+        name = type(error).__name__
+        existing = self._ctx.conn.execute(
+            "SELECT generation, state, window_id FROM dispatch_decisions WHERE project = ? AND key = ? AND mode = ?",
+            (trigger.project, trigger.key, mode),
+        ).fetchone()
+        if existing is None:
+            self._record_decided(trigger, mode, "skipped", None, None, "error: {}".format(name))
+        elif existing["state"] == "launching":
+            return self._launch_failure_line(project_config, trigger, existing, name)
+        return "{}error {}: {}".format(self._prefix(trigger), trigger.party, name)
+
+    def _launch_failure_line(self, project_config, trigger, row, reason):
+        self._fail_launch(project_config, trigger.key, trigger.party, row["generation"], reason, row["window_id"])
+        return "{}launch failed {} g{}: {}".format(self._prefix(trigger), trigger.party, row["generation"], reason)
 
     def _record(self, party, project, kind, payload):
         with db.writing(self._ctx.conn):
