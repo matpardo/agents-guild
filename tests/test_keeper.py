@@ -90,6 +90,25 @@ class RemoteControlCommandTests(GuildTestCase):
         )
 
 
+class PartyNameQuotingTests(GuildTestCase):
+    def test_resume_command_quotes_generation_name_everywhere(self):
+        self.assertEqual(
+            resume.resume_command("sess-1", "a b", 3, None, True),
+            "claude --resume sess-1 --name 'a b-g3' --remote-control 'a b-g3'",
+        )
+
+    def test_fresh_command_quotes_party_everywhere(self):
+        self.assertEqual(
+            resume.fresh_command("a b", 4, None, None, True),
+            "GUILD_RESUME='a b' claude -n 'a b-g4' --remote-control 'a b-g4' " + _PROMPT,
+        )
+
+    def test_fresh_command_without_remote_control_quotes_party(self):
+        self.assertTrue(
+            resume.fresh_command("a;b", 2, None, None, False).startswith("GUILD_RESUME='a;b' claude -n 'a;b-g2' ")
+        )
+
+
 class KeeperSurfacesTests(GuildTestCase):
     def setUp(self):
         super().setUp()
