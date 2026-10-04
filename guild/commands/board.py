@@ -290,7 +290,7 @@ def _all_ask_lines(painter, row):
         return lines
     lines.extend(painter.wrap("answer: {}".format(row["answer"]), "     "))
     if row["answered_at"] is not None:
-        lines.append("     answered_at: {}".format(row["answered_at"]))
+        lines.append("     answered: {}".format(timeutil.issued_label(row["answered_at"])))
     return lines
 
 

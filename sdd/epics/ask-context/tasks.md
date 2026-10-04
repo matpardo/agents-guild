@@ -73,3 +73,10 @@ updated: 2026-10-04
 **Acceptance:**
 - [x] README matches the CLI.
 - [x] `test_sdd_docs` passes.
+
+## T07 — Local times in ask views
+
+**Depends on:** T04
+**Status:** [x] done — #72
+
+**What:** `guild asks <id>`, `guild asks --all` and the web detail show creation, answer and event times as local `YYYY-MM-DD HH:MM`; the models keep the ISO fields and add `created`, `answered` and per-event `time` labels.

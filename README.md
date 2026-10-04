@@ -211,7 +211,7 @@ detail is served at `GET /api/asks/<id>` and opens from the `detail` control of
 each ask on the web board.
 
 `guild asks --all` lists open, answered and dismissed asks in id order, with the
-answer and `answered_at` of answered ones. `--party` and `--since` (on
+answer and answer time (local `YYYY-MM-DD HH:MM`) of answered ones; `guild asks <id>` shows creation, answer and event times in local time too. `--party` and `--since` (on
 `created_at`) narrow it and need `--all`; `<id>` takes no filters.
 
 ### `guild next`

@@ -92,7 +92,7 @@ class AsksAllCliTests(AsksAllTests):
                 "  #4 beta · dismissed · Rename flag?",
                 "  #5 alpha · answered · Which base branch?",
                 "     answer: main",
-                "     answered_at: 2026-10-03T09:12:40+00:00",
+                "     answered: {}".format(timeutil.issued_label("2026-10-03T09:12:40+00:00")),
                 "  #7 alpha · open · Should the retry cap be 3 or 5?",
                 "",
             ],

@@ -197,7 +197,7 @@ class RecentEventsTests(AskDetailBase):
         self.assertEqual(len(events_list), 10)
         self.assertEqual(events_list[0]["kind"], "ask.created")
         self.assertEqual(events_list[0]["summary"], "#1")
-        self.assertEqual(events_list[1], {"ts": events_list[1]["ts"], "kind": "task.added", "summary": "demo/X11"})
+        self.assertEqual(events_list[1], {"ts": events_list[1]["ts"], "time": events_list[1]["time"], "kind": "task.added", "summary": "demo/X11"})
 
     def test_other_party_and_other_kinds_are_excluded(self):
         with db.writing(self.conn):
@@ -268,7 +268,7 @@ class CliTests(AskDetailBase):
         self.run_cli(["answer", "1", "five"], None, None)
         code, out, err = self.run_cli(["asks", "1"], None, None)
         self.assertIn("  answer: five", out)
-        self.assertIn("  answered_at: ", out)
+        self.assertIn("  answered: ", out)
         self.assertNotIn("guild answer", out)
 
     def test_unknown_id(self):
