@@ -305,6 +305,7 @@ _COLUMN_MIGRATIONS = (
     ("prs", "card", "TEXT"),
     ("asks", "snapshot", "TEXT"),
     ("asks", "answered_at", "TEXT"),
+    ("leaders", "handoff_consumed_at", "TEXT"),
 )
 
 

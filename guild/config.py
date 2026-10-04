@@ -10,6 +10,7 @@ _TRACKER_BROWSE_URL_PREFIX = "https://"
 _LIFECYCLE_EVENTS = ("on_pr_merged", "on_pr_closed")
 _LIFECYCLE_ENTRY_KEYS = {"command", "timeout_minutes"}
 _LIFECYCLE_MAX_TIMEOUT_MINUTES = 1440
+_HANDOFF_RETENTION_MAX_DAYS = 3650
 
 
 def _validate_tracker_config(tracker_config):
@@ -67,6 +68,18 @@ def _validate_fast_forward_base_config(data):
         return
     if not isinstance(fast_forward_base, bool):
         raise GuildError("project config 'fast_forward_base' must be a boolean", 1)
+
+
+def _validate_handoff_retention_config(data):
+    days = data.get("handoff_retention_days")
+    if days is None:
+        return
+    if isinstance(days, bool) or not isinstance(days, int) or days <= 0:
+        raise GuildError("project config 'handoff_retention_days' must be a positive integer", 1)
+    if days > _HANDOFF_RETENTION_MAX_DAYS:
+        raise GuildError(
+            "project config 'handoff_retention_days' must be at most {}".format(_HANDOFF_RETENTION_MAX_DAYS), 1
+        )
 
 
 def _validate_lifecycle_command(event, command):
@@ -149,6 +162,7 @@ def validate_project_config(data):
     _validate_migration_paths_config(data)
     _validate_fast_forward_base_config(data)
     _validate_lifecycle_config(data)
+    _validate_handoff_retention_config(data)
 
 
 def load_project_file(config_file):

@@ -18,6 +18,11 @@ def _party_started(conn, event):
 def _party_resumed(conn, event):
     payload = event["payload"]
     conn.execute(
+        "UPDATE leaders SET handoff_consumed_at = ? WHERE party = ? AND generation = ?"
+        " AND handoff_consumed_at IS NULL",
+        (event["ts"], payload["party"], payload["generation"] - 1),
+    )
+    conn.execute(
         "UPDATE leaders SET ended_at = ? WHERE party = ? AND generation = ? AND ended_at IS NULL",
         (event["ts"], payload["party"], payload["generation"] - 1),
     )
@@ -57,6 +62,14 @@ def _party_handed_off(conn, event):
     conn.execute(
         "UPDATE leaders SET handoff_path = ? WHERE party = ? AND generation = ?",
         (payload["handoff_path"], payload["party"], payload["generation"]),
+    )
+
+
+def _handoff_pruned(conn, event):
+    payload = event["payload"]
+    conn.execute(
+        "UPDATE leaders SET handoff_path = NULL WHERE party = ? AND generation = ?",
+        (payload["party"], payload["generation"]),
     )
 
 
@@ -576,6 +589,7 @@ _REDUCERS = {
     "party.resumed": _party_resumed,
     "party.closed": _party_closed,
     "party.handed_off": _party_handed_off,
+    "handoff.pruned": _handoff_pruned,
     "leader.located": _leader_located,
     "quest.added": _quest_added,
     "quest.done": _quest_done,
