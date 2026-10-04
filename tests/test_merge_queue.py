@@ -15,6 +15,7 @@ def _pr(number, **overrides):
         "party": "alpha",
         "quest": "demo",
         "tid": "T{:02d}".format(number),
+        "card": None,
         "lifecycle": "ready",
         "checks_failing": 0,
         "checks_passing": 3,

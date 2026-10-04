@@ -4,7 +4,7 @@ _CLOSED_LIFECYCLES = ("merged", "closed")
 def pr_line(row):
     failing = row["checks_failing"] if row["checks_failing"] is not None else 0
     passing = row["checks_passing"] if row["checks_passing"] is not None else 0
-    tid = row["task_tid"] or ""
+    tid = row["task_tid"] or row["card"] or ""
     line = "{}#{} [{}] checks:✗{} ✓{}  {} {}".format(
         row["repo"], row["number"], row["lifecycle"], failing, passing, tid, row["what"]
     )

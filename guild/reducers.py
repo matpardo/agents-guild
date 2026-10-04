@@ -194,17 +194,18 @@ def _pr_tracked(conn, event):
     payload = event["payload"]
     values = _flags_and_lifecycle(payload, {field: 0 for field in _PR_FLAG_FIELDS})
     conn.execute(
-        "INSERT INTO prs (repo, number, party, task_quest, task_tid, what, waits, lifecycle,"
+        "INSERT INTO prs (repo, number, party, task_quest, task_tid, card, what, waits, lifecycle,"
         " branch, title, gh_state, gh_draft, checks_failing, checks_passing, seeded, synced_at,"
         " mergeable, review_comment_count, last_notified_comment_count, last_activity_at,"
         " needs_ask_answer, needs_human_pr_review)"
-        " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, ?, NULL, NULL, 0, 0, ?, ?, ?)",
+        " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, ?, NULL, NULL, 0, 0, ?, ?, ?)",
         (
             payload["repo"],
             payload["number"],
             payload["party"],
             payload["task_quest"],
             payload["task_tid"],
+            payload.get("card"),
             payload["what"],
             payload["waits"],
             values["lifecycle"],

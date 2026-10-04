@@ -149,7 +149,15 @@ def _handle_pr_track(ctx, args):
     from guild.commands import pr as pr_commands
 
     _print(
-        pr_commands.track(ctx, args.ref, args.task, args.what, args.waits, args.needs_human_pr_review)
+        pr_commands.track(
+            ctx,
+            args.ref,
+            args.task,
+            args.card,
+            args.what,
+            args.waits,
+            args.needs_human_pr_review,
+        )
     )
     return 0
 
@@ -554,7 +562,9 @@ def _add_pr_parser(subparsers):
 
     track = actions.add_parser("track")
     track.add_argument("ref")
-    track.add_argument("--task", required=True)
+    target = track.add_mutually_exclusive_group(required=True)
+    target.add_argument("--task")
+    target.add_argument("--card")
     track.add_argument("--what", required=True)
     track.add_argument("--waits", required=True)
     track.add_argument("--needs-human-pr-review", action="store_true")

@@ -1,7 +1,7 @@
 import sqlite3
 import unittest
 
-from guild import db, paths, schema
+from guild import db, events, paths, schema, timeutil
 from tests.testutil import GuildTestCase
 
 _OLD_LEADERS = """
@@ -124,6 +124,36 @@ class MigrationTests(GuildTestCase):
         pr_row = again.execute("SELECT * FROM prs WHERE number = 1").fetchone()
         self.assertEqual((pr_row["lifecycle"], pr_row["needs_ask_answer"]), ("draft", 1))
         again.close()
+
+    def test_old_schema_db_gains_prs_card_column(self):
+        db_path = self.data_home / "guild.db"
+        _make_old_schema_db(db_path)
+
+        conn = db.connect(db_path)
+
+        pr_row = conn.execute("SELECT * FROM prs WHERE number = 1").fetchone()
+        self.assertIn("card", pr_row.keys())
+        self.assertIsNone(pr_row["card"])
+
+    def test_rebuild_replays_a_pr_tracked_event_without_card(self):
+        conn = db.connect(paths.db_path())
+        events.record(
+            conn, timeutil.utcnow(), "tester@host", "alpha", None, "acme", "pr.tracked", "guild",
+            {
+                "repo": "acme/app", "number": 1, "party": "alpha", "task_quest": "demo",
+                "task_tid": "T01", "what": "x", "waits": "y", "lifecycle": "draft",
+                "branch": "feature/x", "title": "t", "gh_state": "OPEN", "gh_draft": True,
+                "seeded": 0,
+            },
+        )
+        conn.commit()
+        conn.close()
+        code, out, err = self.run_cli(["rebuild"], None, None)
+        self.assertEqual(code, 0, err)
+        conn = db.connect(paths.db_path())
+        pr_row = conn.execute("SELECT * FROM prs WHERE number = 1").fetchone()
+        conn.close()
+        self.assertEqual((pr_row["task_tid"], pr_row["card"]), ("T01", None))
 
     def test_old_schema_db_gains_cards_table(self):
         db_path = self.data_home / "guild.db"

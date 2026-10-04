@@ -114,6 +114,7 @@ _CREATE_STATEMENTS = (
         party TEXT NOT NULL,
         task_quest TEXT,
         task_tid TEXT,
+        card TEXT,
         what TEXT NOT NULL,
         waits TEXT,
         lifecycle TEXT NOT NULL,
@@ -235,6 +236,7 @@ _COLUMN_MIGRATIONS = (
     ("prs", "checks_pending", "INTEGER"),
     ("prs", "needs_ask_answer", "INTEGER"),
     ("prs", "needs_human_pr_review", "INTEGER"),
+    ("prs", "card", "TEXT"),
 )
 
 

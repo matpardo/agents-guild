@@ -214,6 +214,18 @@ class Tier4Tests(NextTestCase):
         code, out, err = self.run_cli(["next"], "sess-1", self.repo_dir)
         self.assertIn('task wave1/T02: "Second task" — ready', out)
 
+    def test_task_added_to_an_epic_quest_is_queued(self):
+        self.run_cli(["task", "start", "wave1/T02"], "sess-1", self.repo_dir)
+        self.run_cli(["task", "done", "wave1/T02"], "sess-1", self.repo_dir)
+        self.run_cli(["task", "start", "wave1/T03"], "sess-1", self.repo_dir)
+        self.run_cli(["task", "done", "wave1/T03"], "sess-1", self.repo_dir)
+        code, out, err = self.run_cli(
+            ["task", "add", "wave1/T09", "--title", "Extra"], "sess-1", self.repo_dir
+        )
+        self.assertEqual(code, 0, err)
+        code, out, err = self.run_cli(["next"], "sess-1", self.repo_dir)
+        self.assertIn('task wave1/T09: "Extra" — ready', out)
+
     def test_next_task_blocked_by_pending_dep_reports_source(self):
         self.sync_sdd(
             self.repo_dir,
