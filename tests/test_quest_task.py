@@ -434,6 +434,14 @@ class TaskLifecycleTests(GuildTestCase):
         self.assertIn("epic quest", err)
         self.assertIn("--followups-of epicq", err)
 
+    def test_cannot_add_task_to_done_quest(self):
+        self.run_cli(["quest", "done", "demo", "--force"], "sess-1", self.repo_dir)
+        code, out, err = self.run_cli(
+            ["task", "add", "demo/T01", "--title", "First"], "sess-1", self.repo_dir
+        )
+        self.assertEqual(code, 1)
+        self.assertIn("quest 'demo' is done", err)
+
     def test_start_block_done_cycle(self):
         self.run_cli(["task", "add", "demo/T01", "--title", "First"], "sess-1", self.repo_dir)
         code, out, err = self.run_cli(

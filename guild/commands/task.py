@@ -4,7 +4,7 @@ from guild.errors import GuildError
 
 def _load_quest(ctx, quest):
     row = ctx.conn.execute(
-        "SELECT slug, project, party, epic FROM quests WHERE slug = ?", (quest,)
+        "SELECT slug, project, party, epic, state FROM quests WHERE slug = ?", (quest,)
     ).fetchone()
     if row is None:
         raise GuildError("unknown quest '{}'".format(quest), 1)
@@ -37,6 +37,8 @@ def add(ctx, quest, tid, title):
         )
     binding = identity.require_binding(ctx.conn, ctx.session_id)
     _require_owner(binding, quest_row)
+    if quest_row["state"] != "active":
+        raise GuildError("quest '{}' is done".format(quest), 1)
     existing = ctx.conn.execute(
         "SELECT tid FROM quest_tasks WHERE quest = ? AND tid = ?", (quest, tid)
     ).fetchone()
