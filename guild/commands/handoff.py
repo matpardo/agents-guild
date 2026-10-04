@@ -1,4 +1,4 @@
-from guild import db, events, identity, names, paths, pii, render, resume
+from guild import db, events, identity, names, paths, pii, render, resume, timeutil
 from guild.commands import claim as claim_commands
 from guild.commands import next as next_commands
 from guild.commands import notice as notice_commands
@@ -35,7 +35,10 @@ def _ask_lines(conn, party):
 
 def _notice_lines(conn, now, party):
     rows = [row for row in notice_commands.active_notices(conn, now) if row["party"] == party]
-    return ["- #{}: {}".format(row["id"], row["text"]) for row in rows]
+    return [
+        "- #{} ({}): {}".format(row["id"], timeutil.issued_label(row["created_at"]), row["text"])
+        for row in rows
+    ]
 
 
 def _claim_lines(conn, now, party):

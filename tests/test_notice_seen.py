@@ -20,6 +20,14 @@ class NoticeSeenTestCase(GuildTestCase):
         self.assertEqual(code, 0, err)
         return out
 
+    def _issued(self, notice_id):
+        conn = db.connect(paths.db_path())
+        try:
+            row = conn.execute("SELECT created_at FROM notices WHERE id = ?", (notice_id,)).fetchone()
+        finally:
+            conn.close()
+        return timeutil.issued_label(row["created_at"])
+
     def _after(self, delta):
         return mock.patch("guild.timeutil.utcnow", return_value=timeutil.utcnow() + delta)
 
@@ -135,8 +143,8 @@ class SeenListTests(NoticeSeenTestCase):
         self._create("pipeline down", "5h")
         self._create("ci flaky", "2h")
         out = self._notices().splitlines()
-        self.assertEqual(out[0], "new #1 [human] pipeline down (guild, 4h left)")
-        self.assertEqual(out[1], "new #2 [human] ci flaky (guild, 1h left)")
+        self.assertEqual(out[0], "new #2 [human] ci flaky (guild, {}, 1h left)".format(self._issued(2)))
+        self.assertEqual(out[1], "new #1 [human] pipeline down (guild, {}, 4h left)".format(self._issued(1)))
         self.assertEqual(out[2], "2 new")
 
     def test_seen_notice_stays_listed_without_the_marker(self):
@@ -144,14 +152,16 @@ class SeenListTests(NoticeSeenTestCase):
         self._create("ci flaky", "2h")
         self.run_cli(["notice", "seen", "1"], None, None)
         out = self._notices().splitlines()
-        self.assertEqual(out[0], "#1 [human] pipeline down (guild, 4h left)")
-        self.assertEqual(out[1], "new #2 [human] ci flaky (guild, 1h left)")
+        self.assertEqual(out[0], "new #2 [human] ci flaky (guild, {}, 1h left)".format(self._issued(2)))
+        self.assertEqual(out[1], "#1 [human] pipeline down (guild, {}, 4h left)".format(self._issued(1)))
         self.assertEqual(out[2], "1 new")
 
     def test_no_count_line_when_everything_is_seen(self):
         self._create("pipeline down", "5h")
         self.run_cli(["notice", "seen", "1"], None, None)
-        self.assertEqual(self._notices(), "#1 [human] pipeline down (guild, 4h left)\n")
+        self.assertEqual(
+            self._notices(), "#1 [human] pipeline down (guild, {}, 4h left)\n".format(self._issued(1))
+        )
 
     def test_unseen_restores_the_marker(self):
         self._create("pipeline down", "5h")
@@ -191,8 +201,8 @@ class SeenBoardTests(NoticeSeenTestCase):
         self.run_cli(["notice", "seen", "1"], None, None)
         out = self._board()
         self.assertIn("NOTICES · 2 active (1 new)", out)
-        self.assertIn("  #1 human · guild · 4h left", out)
-        self.assertIn("  new #2 human · guild · 1h left", out)
+        self.assertIn("  #1 human · {} · guild · 4h left".format(self._issued(1)), out)
+        self.assertIn("  new #2 human · {} · guild · 1h left".format(self._issued(2)), out)
         self.assertIn("pipeline down", out)
         self.assertIn("ci flaky", out)
 
@@ -226,7 +236,7 @@ class SeenNeverChangesDeliveryTests(NoticeSeenTestCase):
 
     def test_inbox_still_delivers_a_seen_notice(self):
         code, out, err = self.run_cli(["inbox", "--since-last"], "sess-2", self.repo_dir)
-        self.assertIn('- notice #1 from human: "pipeline down"', out)
+        self.assertIn('- notice #1 from human at {}: "pipeline down"'.format(self._issued(1)), out)
 
     def test_prompt_submit_still_delivers_a_seen_notice(self):
         code, out, err = self.run_hook("prompt-submit", self.payload)

@@ -167,7 +167,7 @@ def count_new(rows):
 
 
 def active_notices(conn, now):
-    rows = conn.execute("SELECT * FROM notices WHERE state = 'active'").fetchall()
+    rows = conn.execute("SELECT * FROM notices WHERE state = 'active' ORDER BY created_at DESC, id DESC").fetchall()
     result = []
     for row in rows:
         if timeutil.is_expired(now, row["expires_at"]):
@@ -176,10 +176,12 @@ def active_notices(conn, now):
     return result
 
 
-def format_notice_line(notice_id, party, text):
+def format_notice_line(notice_id, party, issued_at, text):
     author = party or "human"
     clean_text = sanitize.collapse_to_single_line(text)
-    return '- notice #{} from {}: "{}"'.format(notice_id, author, clean_text)
+    return '- notice #{} from {} at {}: "{}"'.format(
+        notice_id, author, timeutil.issued_label(issued_at), clean_text
+    )
 
 
 def targeting(rows, project, scope_guild_always, raid_member_of):
@@ -197,8 +199,14 @@ def targeting(rows, project, scope_guild_always, raid_member_of):
 def _list_line(ctx, row):
     author = row["party"] or "human"
     prefix = "new " if is_new(row) else ""
-    return "{}#{} [{}] {} ({}, {})".format(
-        prefix, row["id"], author, row["text"], row["scope"], timeutil.time_left_label(ctx.now, row["expires_at"])
+    return "{}#{} [{}] {} ({}, {}, {})".format(
+        prefix,
+        row["id"],
+        author,
+        row["text"],
+        row["scope"],
+        timeutil.issued_label(row["created_at"]),
+        timeutil.time_left_label(ctx.now, row["expires_at"]),
     )
 
 

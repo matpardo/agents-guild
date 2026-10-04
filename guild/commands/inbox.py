@@ -44,7 +44,7 @@ def new_lines(ctx, binding):
                 continue
             if notice.targeting([payload], project, True, raid_member_of):
                 lines.append(
-                    notice.format_notice_line(payload["id"], payload["party"], payload["text"])
+                    notice.format_notice_line(payload["id"], payload["party"], event["ts"], payload["text"])
                 )
         elif event["kind"] == "ask.created" and caller_party is not None and payload["party"] != caller_party:
             question = sanitize.collapse_to_single_line(payload["question"])

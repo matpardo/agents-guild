@@ -42,6 +42,10 @@ def is_expired(now, expires_at_text):
     return now > from_iso(expires_at_text)
 
 
+def issued_label(issued_at_text):
+    return from_iso(issued_at_text).astimezone().strftime("%Y-%m-%d %H:%M")
+
+
 def clock_label(expires_at_text):
     return from_iso(expires_at_text).strftime("%H:%M")
 

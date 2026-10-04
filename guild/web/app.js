@@ -304,6 +304,7 @@
     head.className = "card-head";
     head.appendChild(textEl("span", "#" + notice.id));
     head.appendChild(textEl("span", notice.party || "human"));
+    head.appendChild(textEl("span", notice.issued));
     head.appendChild(textEl("span", notice.scope));
     head.appendChild(textEl("span", notice.time_left));
     if (!notice.seen) {
