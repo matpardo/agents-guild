@@ -4,9 +4,9 @@ import json
 def _party_started(conn, event):
     payload = event["payload"]
     conn.execute(
-        "INSERT INTO parties (name, project, leader_session_id, generation, state)"
-        " VALUES (?, ?, ?, 1, 'active')",
-        (payload["party"], event["project"], event["session_id"]),
+        "INSERT INTO parties (name, project, leader_session_id, generation, state, keeper)"
+        " VALUES (?, ?, ?, 1, 'active', ?)",
+        (payload["party"], event["project"], event["session_id"], 1 if payload.get("keeper") else 0),
     )
     conn.execute(
         "INSERT INTO leaders (party, generation, session_id, session_name, started_at, ended_at)"

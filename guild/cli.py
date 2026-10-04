@@ -72,7 +72,7 @@ def _handle_init_project(ctx, args):
 def _handle_party_start(ctx, args):
     from guild.commands import party as party_commands
 
-    _print(party_commands.start(ctx, args.name))
+    _print(party_commands.start(ctx, args.name, args.keeper))
     return 0
 
 
@@ -552,6 +552,7 @@ def _add_party_parser(subparsers):
 
     start = actions.add_parser("start")
     start.add_argument("name")
+    start.add_argument("--keeper", action="store_true")
     start.set_defaults(handler=_handle_party_start)
 
     resume = actions.add_parser("resume")

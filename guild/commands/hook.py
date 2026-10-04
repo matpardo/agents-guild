@@ -221,9 +221,10 @@ def _nudge_marker_path(ctx):
     return ctx.state_dir / "hints" / "nudge-{}".format(identity.cursor_key(ctx.session_id))
 
 
-def _ctx_nudge_lines(ctx, project):
-    if project is None:
+def _ctx_nudge_lines(ctx, binding):
+    if binding is None or binding["project"] is None:
         return []
+    project = binding["project"]
     pct = statusline_commands.read_ctx(ctx.state_dir, ctx.session_id)
     if pct is None:
         return []
@@ -236,6 +237,12 @@ def _ctx_nudge_lines(ctx, project):
         return []
     marker.parent.mkdir(parents=True, exist_ok=True)
     marker.touch()
+    if party_commands.is_keeper(ctx.conn, binding["party"]):
+        return [
+            'Context at {}%. Finish current step, run `guild handoff --respawn --in-flight "..." --learned "..."`.'.format(
+                pct
+            )
+        ]
     return ["Context at {}%. Finish current step, run `guild handoff`.".format(pct)]
 
 
@@ -249,10 +256,9 @@ def prompt_submit(ctx):
             marker.parent.mkdir(parents=True, exist_ok=True)
             marker.touch()
             lines = [UNBOUND_HINT] + lines
-    project = binding["project"] if binding is not None else None
     lines = (
         lines
-        + _ctx_nudge_lines(ctx, project)
+        + _ctx_nudge_lines(ctx, binding)
         + _membership_warning_lines(ctx, binding)
         + _pause_lines(ctx, binding)
     )
@@ -266,10 +272,9 @@ def post_tool_use(ctx):
     binding = identity.resolve_binding(ctx.conn, ctx.session_id)
     message_lines, seq = inbox_commands.new_lines(ctx, binding)
     lines = inbox_commands.framed(message_lines)
-    project = binding["project"] if binding is not None else None
     lines = (
         lines
-        + _ctx_nudge_lines(ctx, project)
+        + _ctx_nudge_lines(ctx, binding)
         + _membership_warning_lines(ctx, binding)
         + _pause_lines(ctx, binding)
     )

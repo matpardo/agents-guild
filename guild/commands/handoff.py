@@ -1,6 +1,7 @@
 from guild import db, events, handoff_prune, identity, names, paths, pii, render, resume, timeutil
 from guild.commands import claim as claim_commands
 from guild.commands import next as next_commands
+from guild.commands import party as party_commands
 from guild.commands import notice as notice_commands
 from guild.commands import raid as raid_commands
 from guild.errors import GuildError
@@ -96,7 +97,7 @@ def run(ctx, in_flight, learned, model):
             "local",
             {"party": party, "generation": generation, "handoff_path": str(handoff_path)},
         )
-    return "{}\n{}".format(resume.fresh_command(party, generation + 1, model, None), pii.BROADCAST_REMINDER)
+    return "{}\n{}".format(resume.fresh_command(party, generation + 1, model, None, party_commands.is_keeper(ctx.conn, party)), pii.BROADCAST_REMINDER)
 
 
 def run_prune(ctx, dry_run):

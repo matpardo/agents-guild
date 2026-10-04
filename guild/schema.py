@@ -306,6 +306,7 @@ _COLUMN_MIGRATIONS = (
     ("asks", "snapshot", "TEXT"),
     ("asks", "answered_at", "TEXT"),
     ("leaders", "handoff_consumed_at", "TEXT"),
+    ("parties", "keeper", "INTEGER"),
 )
 
 
