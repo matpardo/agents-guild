@@ -2,7 +2,7 @@
 epic: cost-metering
 type: spec
 title: Measure what each party costs
-status: active
+status: done
 owner: matpardo
 created: 2026-10-04
 updated: 2026-10-04
@@ -31,8 +31,8 @@ A three-day sample of the first raid showed output is 0.1–0.3% of the volume: 
 
 ## Success criteria
 
-- [ ] The totals for one session match a manual sum over its transcript.
-- [ ] A second run over unchanged transcripts adds no event.
+- [x] The totals for one session match a manual sum over its transcript.
+- [x] A second run over unchanged transcripts adds no event.
 
 ## Security and data
 
