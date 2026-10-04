@@ -499,6 +499,16 @@ def _handle_timer(ctx, args):
     return 0
 
 
+def _handle_dispatch(ctx, args):
+    from guild.commands import dispatch as dispatch_commands
+
+    if args.dispatch_action == "status":
+        _print_lines(dispatch_commands.status(ctx))
+        return 0
+    _print_lines(dispatch_commands.run(ctx, args.dry_run))
+    return 0
+
+
 def _handle_drift(ctx, args):
     from guild import config
     from guild.commands import drift as drift_commands
@@ -881,6 +891,14 @@ def build_parser():
     resources.set_defaults(handler=_handle_resources)
     resources_actions = resources.add_subparsers(dest="resources_action", required=False)
     resources_actions.add_parser("collect")
+
+    dispatch = subparsers.add_parser("dispatch")
+    dispatch_actions = dispatch.add_subparsers(dest="dispatch_action", required=True)
+    dispatch_run = dispatch_actions.add_parser("run")
+    dispatch_run.add_argument("--dry-run", action="store_true")
+    dispatch_run.set_defaults(handler=_handle_dispatch)
+    dispatch_status = dispatch_actions.add_parser("status")
+    dispatch_status.set_defaults(handler=_handle_dispatch)
 
     _add_timer_parser(subparsers, "sync-timer", "sync-gh")
     _add_timer_parser(subparsers, "resources-timer", "resources-collect")
