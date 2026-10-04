@@ -161,6 +161,8 @@ class DiscoverTests(GuildTestCase):
         self.assertEqual({entry["repo"] for entry in found["entries"]}, {"acme/app"})
         roots = {Path(root).resolve() for root in found["roots"]["acme"]}
         self.assertEqual(roots, {clone.resolve(), linked.resolve(), self.base.resolve()})
+        checkouts = {Path(path).resolve() for path in found["checkouts"]["acme"]}
+        self.assertEqual(checkouts, {clone.resolve(), linked.resolve()})
 
     def test_path_is_deduped_first_project_alphabetically_wins(self):
         clone = self.base / "app"
@@ -170,12 +172,14 @@ class DiscoverTests(GuildTestCase):
         found = disk.discover([second, first])
         self.assertEqual([entry["project"] for entry in found["entries"]], ["alpha"])
         self.assertIn(str(clone), found["roots"]["beta"])
+        self.assertIn(str(clone), found["checkouts"]["beta"])
 
     def test_literal_prefix_of_glob_is_a_root_even_without_clones(self):
         project = self._project("acme", ["acme/app"], [str(self.base) + "/team-*/app"])
         found = disk.discover([project])
         self.assertEqual(found["entries"], [])
         self.assertEqual(found["roots"]["acme"], [str(self.base)])
+        self.assertEqual(found["checkouts"]["acme"], [])
 
     def test_clone_is_sampled_even_when_worktree_listing_fails(self):
         clone = self.base / "app"

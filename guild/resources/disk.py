@@ -77,11 +77,12 @@ def _clone_entries(clone):
 
 def _project_entries(project, seen_paths):
     entries = []
-    roots = {_literal_prefix(pattern) for pattern in project["paths"]}
+    checkouts = set()
+    prefixes = {_literal_prefix(pattern) for pattern in project["paths"]}
     for clone in localbase.locate_clones(project):
-        roots.add(clone["path"])
+        checkouts.add(clone["path"])
         for worktree in _clone_entries(clone):
-            roots.add(worktree["path"])
+            checkouts.add(worktree["path"])
             if worktree["path"] in seen_paths:
                 continue
             seen_paths.add(worktree["path"])
@@ -89,18 +90,20 @@ def _project_entries(project, seen_paths):
             entry["project"] = project["name"]
             entry["repo"] = clone["repo"]
             entries.append(entry)
-    return entries, sorted(roots)
+    return entries, sorted(prefixes | checkouts), sorted(checkouts)
 
 
 def discover(projects):
     entries = []
     roots = {}
+    checkouts = {}
     seen_paths = set()
     for project in sorted(projects, key=lambda candidate: candidate["name"]):
-        project_entries, project_roots = _project_entries(project, seen_paths)
+        project_entries, project_roots, project_checkouts = _project_entries(project, seen_paths)
         entries.extend(project_entries)
         roots[project["name"]] = project_roots
-    return {"entries": entries, "roots": roots}
+        checkouts[project["name"]] = project_checkouts
+    return {"entries": entries, "roots": roots, "checkouts": checkouts}
 
 
 def _is_strictly_inside(path, parent):

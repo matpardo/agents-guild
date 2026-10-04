@@ -1,0 +1,212 @@
+{
+  "Images": [
+    {
+      "Containers": "1",
+      "CreatedAt": "2026-10-03 16:02:59 -0300 -03",
+      "Digest": "",
+      "ID": "sha256:a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1",
+      "Repository": "feat-x-web",
+      "SharedSize": "2.225GB",
+      "Size": "2.29GB",
+      "Tag": "latest",
+      "UniqueSize": "64.69MB"
+    },
+    {
+      "Containers": "1",
+      "CreatedAt": "2026-10-03 16:02:59 -0300 -03",
+      "Digest": "",
+      "ID": "sha256:b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2",
+      "Repository": "old-task-web",
+      "SharedSize": "1.09GB",
+      "Size": "2.29GB",
+      "Tag": "latest",
+      "UniqueSize": "1.2GB"
+    },
+    {
+      "Containers": "3",
+      "CreatedAt": "2026-10-03 16:02:59 -0300 -03",
+      "Digest": "",
+      "ID": "sha256:c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3",
+      "Repository": "postgres",
+      "SharedSize": "450MB",
+      "Size": "450MB",
+      "Tag": "18",
+      "UniqueSize": "0B"
+    },
+    {
+      "Containers": "0",
+      "CreatedAt": "2026-10-03 16:02:59 -0300 -03",
+      "Digest": "",
+      "ID": "sha256:d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4",
+      "Repository": "gone-task-web",
+      "SharedSize": "1.2GB",
+      "Size": "2.1GB",
+      "Tag": "latest",
+      "UniqueSize": "900MB"
+    },
+    {
+      "Containers": "0",
+      "CreatedAt": "2026-10-03 16:02:59 -0300 -03",
+      "Digest": "",
+      "ID": "sha256:5e6f7a8b9c0de1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1",
+      "Repository": "<none>",
+      "SharedSize": "0B",
+      "Size": "1.4GB",
+      "Tag": "<none>",
+      "UniqueSize": "1.4GB"
+    },
+    {
+      "Containers": "0",
+      "CreatedAt": "2026-10-03 16:02:59 -0300 -03",
+      "Digest": "",
+      "ID": "sha256:f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6",
+      "Repository": "scratch-tool",
+      "SharedSize": "0B",
+      "Size": "18.49kB",
+      "Tag": "1",
+      "UniqueSize": "18.49kB"
+    },
+    {
+      "Containers": "1",
+      "CreatedAt": "2026-10-03 16:02:59 -0300 -03",
+      "Digest": "",
+      "ID": "sha256:0707070707070707070707070707070707070707070707070707070707070707",
+      "Repository": "redis",
+      "SharedSize": "0B",
+      "Size": "120MB",
+      "Tag": "7",
+      "UniqueSize": "120MB"
+    }
+  ],
+  "Containers": [
+    {
+      "Command": "\"bash\"",
+      "CreatedAt": "2026-10-03 16:03:09 -0300 -03",
+      "ID": "c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1",
+      "Image": "feat-x-web",
+      "Labels": "com.docker.compose.config-hash=1d74c92f338b2c352e063ff3224bda3683a3b7597b8342bf049402acae2dcfeb,com.docker.compose.container-number=1,com.docker.compose.depends_on=db:service_healthy:false,com.docker.compose.oneoff=False,com.docker.compose.project.config_files=/home/u/acme/app/.claude/worktrees/feat-x/docker-compose.yml,/home/u/acme/app/.claude/worktrees/feat-x/docker-compose.override.yml,com.docker.compose.project.working_dir=/home/u/acme/app/.claude/worktrees/feat-x,com.docker.compose.project=feat-x,com.docker.compose.service=web,com.docker.compose.version=2.40.0",
+      "LocalVolumes": "1",
+      "Names": "feat-x-web-1",
+      "State": "running",
+      "Status": "Up 3 hours",
+      "Size": "21.7MB (virtual 1.74GB)"
+    },
+    {
+      "Command": "\"bash\"",
+      "CreatedAt": "2026-10-03 16:03:09 -0300 -03",
+      "ID": "c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2",
+      "Image": "postgres:18",
+      "Labels": "com.docker.compose.config-hash=1d74c92f338b2c352e063ff3224bda3683a3b7597b8342bf049402acae2dcfeb,com.docker.compose.container-number=1,com.docker.compose.depends_on=db:service_healthy:false,com.docker.compose.oneoff=False,com.docker.compose.project.config_files=/home/u/acme/app/.claude/worktrees/feat-x/docker-compose.yml,/home/u/acme/app/.claude/worktrees/feat-x/docker-compose.override.yml,com.docker.compose.project.working_dir=/home/u/acme/app/.claude/worktrees/feat-x,com.docker.compose.project=feat-x,com.docker.compose.service=db,com.docker.compose.version=2.40.0",
+      "LocalVolumes": "1",
+      "Names": "feat-x-db-1",
+      "State": "running",
+      "Status": "Up 3 hours",
+      "Size": "16.4kB"
+    },
+    {
+      "Command": "\"bash\"",
+      "CreatedAt": "2026-10-03 16:03:09 -0300 -03",
+      "ID": "c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3",
+      "Image": "old-task-web",
+      "Labels": "com.docker.compose.config-hash=1d74c92f338b2c352e063ff3224bda3683a3b7597b8342bf049402acae2dcfeb,com.docker.compose.container-number=1,com.docker.compose.depends_on=db:service_healthy:false,com.docker.compose.oneoff=False,com.docker.compose.project.config_files=/home/u/acme/app/.claude/worktrees/old-task/docker-compose.yml,/home/u/acme/app/.claude/worktrees/old-task/docker-compose.override.yml,com.docker.compose.project.working_dir=/home/u/acme/app/.claude/worktrees/old-task,com.docker.compose.project=old-task,com.docker.compose.service=web,com.docker.compose.version=2.40.0",
+      "LocalVolumes": "1",
+      "Names": "old-task-web-1",
+      "State": "exited",
+      "Status": "Up 3 hours",
+      "Size": "12.6MB"
+    },
+    {
+      "Command": "\"bash\"",
+      "CreatedAt": "2026-10-03 16:03:09 -0300 -03",
+      "ID": "c4c4c4c4c4c4c4c4c4c4c4c4c4c4c4c4c4c4c4c4c4c4c4c4c4c4c4c4c4c4c4c4",
+      "Image": "postgres:18",
+      "Labels": "com.docker.compose.config-hash=1d74c92f338b2c352e063ff3224bda3683a3b7597b8342bf049402acae2dcfeb,com.docker.compose.container-number=1,com.docker.compose.depends_on=db:service_healthy:false,com.docker.compose.oneoff=False,com.docker.compose.project.config_files=/home/u/acme/app/.claude/worktrees/old-task/docker-compose.yml,/home/u/acme/app/.claude/worktrees/old-task/docker-compose.override.yml,com.docker.compose.project.working_dir=/home/u/acme/app/.claude/worktrees/old-task,com.docker.compose.project=old-task,com.docker.compose.service=db,com.docker.compose.version=2.40.0",
+      "LocalVolumes": "1",
+      "Names": "old-task-db-1",
+      "State": "exited",
+      "Status": "Up 3 hours",
+      "Size": "16.4kB"
+    },
+    {
+      "Command": "\"bash\"",
+      "CreatedAt": "2026-10-03 16:03:09 -0300 -03",
+      "ID": "c5c5c5c5c5c5c5c5c5c5c5c5c5c5c5c5c5c5c5c5c5c5c5c5c5c5c5c5c5c5c5c5",
+      "Image": "redis:7",
+      "Labels": "",
+      "LocalVolumes": "1",
+      "Names": "standalone-redis",
+      "State": "running",
+      "Status": "Up 3 hours",
+      "Size": "1.2MB"
+    },
+    {
+      "Command": "\"bash\"",
+      "CreatedAt": "2026-10-03 16:03:09 -0300 -03",
+      "ID": "c6c6c6c6c6c6c6c6c6c6c6c6c6c6c6c6c6c6c6c6c6c6c6c6c6c6c6c6c6c6c6c6",
+      "Image": "postgres:18",
+      "Labels": "com.docker.compose.config-hash=1d74c92f338b2c352e063ff3224bda3683a3b7597b8342bf049402acae2dcfeb,com.docker.compose.container-number=1,com.docker.compose.depends_on=db:service_healthy:false,com.docker.compose.oneoff=False,com.docker.compose.project.config_files=/home/u/zeta/svc/docker-compose.yml,com.docker.compose.project.working_dir=/home/u/zeta/svc,com.docker.compose.project=zeta,com.docker.compose.service=db,com.docker.compose.version=2.40.0",
+      "LocalVolumes": "1",
+      "Names": "zeta-db-1",
+      "State": "running",
+      "Status": "Up 3 hours",
+      "Size": "16.4kB"
+    }
+  ],
+  "Volumes": [
+    {
+      "Driver": "local",
+      "Labels": "com.docker.compose.project=feat-x,com.docker.compose.version=2.40.0,com.docker.compose.volume=postgres_data",
+      "Links": "1",
+      "Mountpoint": "/var/lib/docker/volumes/feat-x_postgres_data/_data",
+      "Name": "feat-x_postgres_data",
+      "Scope": "local",
+      "Size": "167MB"
+    },
+    {
+      "Driver": "local",
+      "Labels": "com.docker.compose.project=old-task,com.docker.compose.version=2.40.0,com.docker.compose.volume=postgres_data",
+      "Links": "1",
+      "Mountpoint": "/var/lib/docker/volumes/old-task_postgres_data/_data",
+      "Name": "old-task_postgres_data",
+      "Scope": "local",
+      "Size": "320MB"
+    },
+    {
+      "Driver": "local",
+      "Labels": "com.docker.compose.project=gone-task,com.docker.compose.version=2.40.0,com.docker.compose.volume=postgres_data",
+      "Links": "1",
+      "Mountpoint": "/var/lib/docker/volumes/gone-task_postgres_data/_data",
+      "Name": "gone-task_postgres_data",
+      "Scope": "local",
+      "Size": "N/A"
+    },
+    {
+      "Driver": "local",
+      "Labels": "com.docker.compose.project=feat-y,com.docker.compose.version=2.40.0,com.docker.compose.volume=postgres_data",
+      "Links": "1",
+      "Mountpoint": "/var/lib/docker/volumes/feat-y_postgres_data/_data",
+      "Name": "feat-y_postgres_data",
+      "Scope": "local",
+      "Size": "88MB"
+    },
+    {
+      "Driver": "local",
+      "Labels": "",
+      "Links": "1",
+      "Mountpoint": "/var/lib/docker/volumes/loose_volume/_data",
+      "Name": "loose_volume",
+      "Scope": "local",
+      "Size": "1.5kB"
+    }
+  ],
+  "BuildCache": [
+    {
+      "CacheType": "regular",
+      "ID": "ay700cxz0s89wtef4f80joxm6",
+      "InUse": "false",
+      "Shared": "true",
+      "Size": "3.85MB",
+      "UsageCount": "1"
+    }
+  ]
+}
