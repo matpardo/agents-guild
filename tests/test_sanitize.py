@@ -25,6 +25,23 @@ class StripControlSequencesTests(unittest.TestCase):
     def test_strips_c1_controls(self):
         self.assertEqual(sanitize.strip_control_sequences("a\x9bb"), "ab")
 
+    def test_strips_zero_width_and_bidi_format_characters(self):
+        for char in ("\u200b", "\u200d", "\u200f", "\u2060", "\u202a", "\u202e", "\u2066", "\u2069", "\ufeff"):
+            with self.subTest(char=hex(ord(char))):
+                self.assertEqual(sanitize.strip_control_sequences("a{}b".format(char)), "ab")
+
+    def test_strips_surrogates(self):
+        self.assertEqual(sanitize.strip_control_sequences("a\ud800b"), "ab")
+
+    def test_strips_private_use(self):
+        self.assertEqual(sanitize.strip_control_sequences("a\ue000b\U000f0000c"), "abc")
+
+    def test_strips_tag_block(self):
+        self.assertEqual(sanitize.strip_control_sequences("a\U000e0041\U000e007fb"), "ab")
+
+    def test_keeps_accents_and_plain_emoji(self):
+        self.assertEqual(sanitize.strip_control_sequences("canción ✓ 🙂"), "canción ✓ 🙂")
+
     def test_leaves_plain_text_untouched(self):
         self.assertEqual(sanitize.strip_control_sequences("plain text, ok!"), "plain text, ok!")
 
