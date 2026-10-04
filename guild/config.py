@@ -7,6 +7,8 @@ from guild.errors import GuildError
 
 _REQUIRED_KEYS = ("name", "paths", "github")
 _TRACKER_BROWSE_URL_PREFIX = "https://"
+_LIFECYCLE_EVENTS = ("on_pr_merged", "on_pr_closed")
+_LIFECYCLE_ENTRY_KEYS = {"command", "timeout_minutes"}
 
 
 def _validate_tracker_config(tracker_config):
@@ -66,6 +68,58 @@ def _validate_fast_forward_base_config(data):
         raise GuildError("project config 'fast_forward_base' must be a boolean", 1)
 
 
+def _validate_lifecycle_command(event, command):
+    label = "project config 'lifecycle.{}.command' must be a non-empty list of strings".format(event)
+    if not isinstance(command, list) or not command:
+        raise GuildError(label, 1)
+    if not all(isinstance(item, str) and item for item in command):
+        raise GuildError(label, 1)
+
+
+def _validate_lifecycle_timeout(event, timeout):
+    if isinstance(timeout, bool) or not isinstance(timeout, int) or timeout <= 0:
+        raise GuildError(
+            "project config 'lifecycle.{}.timeout_minutes' must be a positive integer".format(event), 1
+        )
+
+
+def _validate_lifecycle_entry(event, entry):
+    if not isinstance(entry, dict):
+        raise GuildError(
+            "project config 'lifecycle.{}' must be an object with 'command' and 'timeout_minutes'".format(
+                event
+            ),
+            1,
+        )
+    if set(entry) != _LIFECYCLE_ENTRY_KEYS:
+        raise GuildError(
+            "project config 'lifecycle.{}' must have exactly the keys 'command' and 'timeout_minutes'".format(
+                event
+            ),
+            1,
+        )
+    _validate_lifecycle_command(event, entry["command"])
+    _validate_lifecycle_timeout(event, entry["timeout_minutes"])
+
+
+def _validate_lifecycle_config(data):
+    lifecycle = data.get("lifecycle")
+    if lifecycle is None:
+        return
+    if not isinstance(lifecycle, dict):
+        raise GuildError("project config 'lifecycle' must be an object", 1)
+    for event in lifecycle:
+        if event not in _LIFECYCLE_EVENTS:
+            raise GuildError(
+                "project config 'lifecycle' has unknown event '{}': allowed are {}".format(
+                    event, ", ".join(_LIFECYCLE_EVENTS)
+                ),
+                1,
+            )
+    for event, entry in lifecycle.items():
+        _validate_lifecycle_entry(event, entry)
+
+
 def validate_project_config(data):
     for key in _REQUIRED_KEYS:
         if key not in data:
@@ -85,6 +139,7 @@ def validate_project_config(data):
     _validate_shared_areas_config(data)
     _validate_migration_paths_config(data)
     _validate_fast_forward_base_config(data)
+    _validate_lifecycle_config(data)
 
 
 def load_project_file(config_file):
