@@ -446,6 +446,59 @@ descending. With nothing to show it prints `no cost data`.
 Limitations: usage recorded before a session is bound is `unbound` and is not
 reattributed afterwards. There is no pricing: only token counts.
 
+### Lifecycle commands
+
+A project can declare a command per PR lifecycle event in its `lifecycle`
+config block (see "Project config"). Guild launches it without a model, from
+the main checkout, and records the outcome. It never learns what the command
+does.
+
+```json
+"lifecycle": {
+  "on_pr_merged": {"command": ["scripts/cleanup-merged.sh", "--dry-run"], "timeout_minutes": 30},
+  "on_pr_closed": {"command": ["scripts/cleanup-merged.sh"], "timeout_minutes": 30}
+}
+```
+
+- When it fires: `guild sync --source gh` sees a tracked PR become `merged`
+  (`on_pr_merged`) or `closed` without merging (`on_pr_closed`). PRs already
+  merged or closed when tracked, seeded PRs and anything that happened before
+  the PR was tracked never fire: events are never historic.
+- Argv only: guild runs exactly the declared argv with no shell and no
+  interpolation of PR data, and never appends flags. A dry-run flag in the
+  config is the project's own choice.
+- Where and how: from the main checkout of the first triggering repo (sorted),
+  in its own process group, blocking, after the rest of the sync pass. When
+  `timeout_minutes` elapses the whole process group is killed. A missing
+  checkout is an error, never a fallback.
+- Debounce and lock: triggers seen in one pass are grouped per project and
+  event and run once. A lock per project and event
+  (`$XDG_STATE_HOME/guild/lifecycle/<project>-<event>.lock`) stops overlapping
+  runs; a run that finds it held is recorded as `skipped` (reason `locked`)
+  and its triggers are lost: guild does not retry them.
+- Record: a local `lifecycle.ran` event with the project, event, repo,
+  triggers (`acme/app#12`, or `manual`), argv, cwd, status (`ok`, `failed`,
+  `timeout`, `error`, `skipped`), exit code, duration and the last 2000
+  characters of merged stdout and stderr with control sequences stripped.
+  The output tail stays local: it is never exported to guild visibility.
+- Failure notice: a failed, timed-out or unlaunchable command, or a missing
+  checkout, posts one notice to `project:<name>` (12h) such as
+  `lifecycle on_pr_merged failed for acme (exit 1): see guild history`. It
+  carries no output and no argv. Sync does not count it as a failure and its
+  exit code is unchanged.
+- By hand: `guild lifecycle run <on_pr_merged|on_pr_closed> [--repo R]
+  [--dry-run]` resolves the project from the current directory and the
+  checkout from `--repo` or the single clone (several clones need `--repo`).
+  `--dry-run` only prints `would run: <argv> (cwd <path>, timeout 30m)` and
+  records nothing. A real run takes the same lock, records the trigger
+  `manual`, prints `lifecycle on_pr_merged: ok (exit 0, 3.2s)` and exits 1 on
+  failure, timeout or error.
+
+Out of scope: `on_main_red` (sync cannot tell a first red observation from a
+new failure), `on_worktree_created`, a resource officer (see the `officers`
+epic), detached runs, retries, re-running lock-skipped triggers, and moving
+the runner under the dispatcher (see the `dispatcher` epic).
+
 ### `guild sync-timer`
 
 `guild` has no daemon. To keep `sync --source gh` fresh without running it by
@@ -1109,7 +1162,11 @@ against path traversal, not an identity boundary.
   },
   "tracker": {"kind": "jira-acli", "browse_url": "https://acme.atlassian.net/browse/"},
   "next": {"stale_hours": 8},
-  "handoff_threshold": 80
+  "handoff_threshold": 80,
+  "lifecycle": {
+    "on_pr_merged": {"command": ["scripts/cleanup-merged.sh", "--dry-run"], "timeout_minutes": 30},
+    "on_pr_closed": {"command": ["scripts/cleanup-merged.sh"], "timeout_minutes": 30}
+  }
 }
 ```
 
@@ -1184,6 +1241,12 @@ against path traversal, not an identity boundary.
   fast-forwards the local base branch of merged repos (see "Base branch
   fast-forward" under `sync`). Must be a boolean or the config fails to load.
   Absent → no clone is ever modified.
+- `lifecycle` (optional): commands run on PR lifecycle events (see
+  "Lifecycle commands"). Keys are `on_pr_merged` and `on_pr_closed`, any
+  other key fails to load. Each value is an object with exactly `command`
+  (non-empty list of non-empty strings, never a shell string) and
+  `timeout_minutes` (positive integer, required: no default). Absent → no
+  command ever runs.
 - Unknown top-level keys are allowed.
 
 ### SDD parsing rules

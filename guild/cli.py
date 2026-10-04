@@ -422,6 +422,14 @@ def _handle_sync(ctx, args):
     return 1 if failures else 0
 
 
+def _handle_lifecycle_run(ctx, args):
+    from guild import lifecycle
+    from guild.commands import lifecycle as lifecycle_commands
+
+    _print(lifecycle_commands.run_manual(ctx, args.event, args.repo, args.dry_run, lifecycle.run_process))
+    return 0
+
+
 def _handle_sync_timer(ctx, args):
     from guild.commands import timer as timer_commands
 
@@ -798,6 +806,14 @@ def build_parser():
     sync = subparsers.add_parser("sync")
     sync.add_argument("--source", required=True, choices=["gh", "sdd", "tracker"])
     sync.set_defaults(handler=_handle_sync)
+
+    lifecycle_parser = subparsers.add_parser("lifecycle")
+    lifecycle_actions = lifecycle_parser.add_subparsers(dest="lifecycle_action", required=True)
+    lifecycle_run = lifecycle_actions.add_parser("run")
+    lifecycle_run.add_argument("event", choices=["on_pr_merged", "on_pr_closed"])
+    lifecycle_run.add_argument("--repo")
+    lifecycle_run.add_argument("--dry-run", action="store_true")
+    lifecycle_run.set_defaults(handler=_handle_lifecycle_run)
 
     sync_timer = subparsers.add_parser("sync-timer")
     sync_timer_actions = sync_timer.add_subparsers(dest="timer_action", required=True)
