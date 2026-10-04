@@ -1060,6 +1060,18 @@ newest 3 answered with their answer), active notices that target the party,
 its claims (up to 5), the previous generation's handoff (or `handoff: none
 recorded`) and the local-only reminder.
 
+Any caller can read any party's brief: guild is a single-user local tool and
+does not authenticate readers. The handoff text is quoted line by line behind
+a `  | ` marker and the brief ends with an `end of guild brief` line, so
+handoff content can never pass for a frame, notice or closing line.
+Invisible and bidirectional Unicode characters (zero-width, bidi overrides,
+tag characters, private use, surrogates) are stripped along with control
+sequences everywhere guild strips them; a joiner inside an emoji sequence is
+lost. A party shows `idle`, `queued` or `waiting-ask` unless the leader's
+session file names a process that still exists. If building the brief fails
+the hook falls back to the handoff and adds `guild: task brief unavailable
+(<ExceptionClass>)`.
+
 Every dynamic field is stripped of control sequences and single-lined, and
 cut at 300 characters. The whole brief is capped at 4000 characters: the
 handoff is truncated first, then the tail of the other sections, each with an
