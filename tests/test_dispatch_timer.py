@@ -23,7 +23,7 @@ class DispatchUnitTests(unittest.TestCase):
         self.assertEqual(
             service,
             "[Unit]\nDescription=guild dispatch run\n\n[Service]\nType=oneshot\n"
-            "ExecStart=/opt/bin/guild dispatch run\n",
+            "NoNewPrivileges=yes\nNice=10\nExecStart=/opt/bin/guild dispatch run\n",
         )
 
     def test_timer_fires_at_the_requested_interval_for_its_own_service(self):

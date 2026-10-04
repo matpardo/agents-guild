@@ -56,7 +56,7 @@ DISPATCH = _UnitSpec(
     "guild dispatch run",
     "dispatch run",
     "dispatch-timer",
-    "",
+    "NoNewPrivileges=yes\nNice=10\n",
 )
 UNITS = {"sync-gh": SYNC_GH, "resources-collect": RESOURCES_COLLECT, "dispatch": DISPATCH}
 
