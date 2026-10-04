@@ -53,6 +53,135 @@
     });
   }
 
+  function deepFreeze(value) {
+    Object.keys(value).forEach(function (key) {
+      if (typeof value[key] === "object") {
+        deepFreeze(value[key]);
+      }
+    });
+    return Object.freeze(value);
+  }
+
+  var TOOLTIPS = deepFreeze({
+    partyStatus: {
+      "waiting-permission": "The leader session is blocked on a Claude Code permission prompt; approve or deny it in that session.",
+      "waiting-ask": "The party has an open ask and its leader is not working; answer the ask below.",
+      "waiting-input": "The leader session is idle and waiting for you to type something in it.",
+      "stopped-with-work": "The leader session stopped but the party still has unfinished work; resume it.",
+      working: "The leader session is running.",
+      done: "The leader session stopped and the party has no work left.",
+      unknown: "The leader session never reported its status, so guild cannot tell what it is doing.",
+      "awaiting-leader": "The party has no running leader; start or resume a session to lead it.",
+      closed: "The party is closed and its work is over.",
+    },
+    partyState: {
+      active: "The party has a leader session bound to it.",
+      "awaiting-leader": "The party lost its leader and waits for a new session to take over.",
+      closed: "The party was closed.",
+    },
+    lifecycle: {
+      draft: "The PR is a draft; mark it ready for review when the work is complete.",
+      converging: "The PR is a draft that is being polished toward ready for review.",
+      ready: "The PR is ready for review and can be merged once its checks pass.",
+      merged: "The PR was merged.",
+      closed: "The PR was closed without merging.",
+    },
+    flag: {
+      "needs-ask-answer": "The PR is stopped on an open ask; answer it so work can resume.",
+      "needs-human-pr-review": "The PR touches something sensitive and needs a human review before merging.",
+    },
+    checks: {
+      failing: "Number of failing CI checks; red when above zero.",
+      passing: "Number of passing CI checks.",
+      pending: "Number of CI checks still running.",
+      none: "No CI checks were reported for this PR.",
+    },
+    taskState: {
+      queued: "The task is waiting to be started.",
+      active: "The task is being worked on.",
+      blocked: "The task cannot move forward; see the reason shown below it.",
+      done: "The task is finished.",
+    },
+    queueState: {
+      ready: "Nothing stands in the way of this PR.",
+      waiting: "The PR is waiting on checks that are still running.",
+      blocked: "Something must be fixed before this PR can merge.",
+    },
+    queueAction: {
+      merge: "Merge this PR by hand; guild never merges.",
+      promote: "Mark this draft ready for review with gh pr ready.",
+      review: "A human must review this PR, then merge it by hand.",
+      fix: "Fix the listed problems; the party named is the one to do it.",
+      wait: "Wait for the listed checks to finish.",
+    },
+    scope: {
+      guild: "Delivered to every party.",
+      project: "Delivered to every party of that project.",
+      raid: "Delivered to the members of that raid.",
+    },
+    role: {
+      solo: "The party is not in any raid.",
+      lead: "The party leads the raid listed (RL = raid lead).",
+      member: "The party is a member of the raid listed.",
+    },
+    blockedWait: {
+      permission: "The session is blocked on a Claude Code permission prompt; approve or deny it in that session.",
+    },
+    drift: {
+      "merged PR, task not done": "A PR was merged but its task is not marked done.",
+      "tracker and SDD disagree": "The tracker card and the SDD task show different states.",
+      "SDD task without card": "An SDD task has no tracker card.",
+      "card not under its epic": "A card exists that is not under its epic in the tracker.",
+      "PR open, card not started": "A PR is open but its card was never started.",
+      "PR closed unmerged": "A PR was closed without merging while its task is still open.",
+      "party has no running leader": "A party with open work has no running leader session.",
+      "epic done with open work": "The epic is marked done but still has open work.",
+      "quest task not in SDD": "A quest task has no matching task in the SDD.",
+      "task done, SDD not done": "A task is done in guild but not in the SDD.",
+    },
+    ui: {
+      noticeNew: "You have not marked this notice as seen yet.",
+      issued: "When the notice was issued, in local time.",
+      timeLeft: "How long until the notice expires.",
+      askBlocks: "How many references (tasks, PRs) still wait on this ask; 0 may mean the list is stale.",
+      mainRed: "The main branch of this repo is failing; fix it before merging anything else.",
+      generation: "How many times the party's leader session was replaced.",
+      leader: "The leader session of the party.",
+      noLeader: "The party has no leader session right now.",
+      claims: "Areas this party has reserved so other parties do not edit them.",
+      synced: "How fresh the PR data from GitHub is.",
+    },
+  });
+
+  function explain(node, group, key) {
+    if (Object.prototype.hasOwnProperty.call(TOOLTIPS[group], key)) {
+      node.title = TOOLTIPS[group][key];
+    }
+    return node;
+  }
+
+  function explainLabel(node, label) {
+    explain(node, "lifecycle", label);
+    return explain(node, "flag", label);
+  }
+
+  function scopeKind(scope) {
+    if (scope === "guild") {
+      return "guild";
+    }
+    if (scope.indexOf("project:") === 0) {
+      return "project";
+    }
+    if (scope.indexOf("raid:") === 0) {
+      return "raid";
+    }
+    return "";
+  }
+
+  function actionKind(action) {
+    return action.split(":")[0];
+  }
+
   function partyOpen(name) {
     return state.openParties[name] !== false;
   }
@@ -446,7 +575,7 @@
       article.appendChild(textEl("p", "options: " + ask.options.join(" | ")));
     }
     article.appendChild(textEl("p", "refs: " + ask.refs.join(", ")));
-    article.appendChild(textEl("p", blocksText(ask)));
+    article.appendChild(explain(textEl("p", blocksText(ask)), "ui", "askBlocks"));
 
     var details = el("details");
     details.open = contextOpen(ask.id);
@@ -466,7 +595,7 @@
     var line = el("p");
     line.className = "blocked-session";
     line.appendChild(textEl("strong", entry.party));
-    line.appendChild(textEl("span", entry.label));
+    line.appendChild(explain(textEl("span", entry.label), "blockedWait", entry.wait));
     if (entry.detail) {
       line.appendChild(textEl("code", entry.detail));
     }
@@ -488,7 +617,7 @@
   function renderStatusBadge(status) {
     var badge = textEl("span", status.label);
     badge.className = "status-badge status-" + status.name;
-    return badge;
+    return explain(badge, "partyStatus", status.name);
   }
 
   function renderNotice(notice) {
@@ -498,13 +627,13 @@
     head.className = "card-head";
     head.appendChild(textEl("span", "#" + notice.id));
     head.appendChild(textEl("span", notice.party || "human"));
-    head.appendChild(textEl("span", notice.issued));
-    head.appendChild(textEl("span", notice.scope));
-    head.appendChild(textEl("span", notice.time_left));
+    head.appendChild(explain(textEl("span", notice.issued), "ui", "issued"));
+    head.appendChild(explain(textEl("span", notice.scope), "scope", scopeKind(notice.scope)));
+    head.appendChild(explain(textEl("span", notice.time_left), "ui", "timeLeft"));
     if (!notice.seen) {
       var badge = textEl("span", "new");
       badge.className = "badge notice-new";
-      head.appendChild(badge);
+      head.appendChild(explain(badge, "ui", "noticeNew"));
     }
     article.appendChild(head);
     article.appendChild(textEl("p", notice.text));
@@ -560,7 +689,7 @@
     var article = el("article");
     article.className = "card drift";
     article.appendChild(textEl("h3", entry.project));
-    article.appendChild(textEl("p", entry.scope));
+    article.appendChild(explain(textEl("p", entry.scope), "scope", scopeKind(entry.scope)));
     var ruleNames = Object.keys(entry.findings);
     if (ruleNames.length === 0) {
       article.appendChild(textEl("p", "no drift"));
@@ -568,7 +697,7 @@
     }
     ruleNames.forEach(function (rule) {
       var findings = entry.findings[rule];
-      article.appendChild(textEl("h4", rule + " (" + findings.length + ")"));
+      article.appendChild(explain(textEl("h4", rule + " (" + findings.length + ")"), "drift", rule));
       var list = el("ul");
       findings.forEach(function (finding) {
         list.appendChild(textEl("li", finding));
@@ -596,7 +725,7 @@
     entry.labels.forEach(function (label) {
       var pill = textEl("span", label);
       pill.className = "pill lifecycle-" + label;
-      head.appendChild(pill);
+      head.appendChild(explainLabel(pill, label));
     });
     head.appendChild(renderChecks(entry));
     head.appendChild(textEl("span", entry.party));
@@ -604,16 +733,24 @@
     return head;
   }
 
+  function renderQueueSummary(entry) {
+    var summary = el("p");
+    summary.className = "queue-reason";
+    if (entry.next_action) {
+      summary.appendChild(document.createTextNode("\u25b6 next action: "));
+    }
+    summary.appendChild(explain(textEl("span", entry.state), "queueState", entry.state));
+    summary.appendChild(document.createTextNode(" \u00b7 unblocks " + entry.unblocks + " \u2014 "));
+    summary.appendChild(explain(textEl("span", entry.action), "queueAction", actionKind(entry.action)));
+    return summary;
+  }
+
   function renderQueueEntry(entry) {
     var item = el("li");
     item.className = "queue-entry queue-" + entry.state;
     item.value = entry.position;
     item.appendChild(renderQueueEntryHead(entry));
-    var summary = entry.state + " \u00b7 unblocks " + entry.unblocks + " \u2014 " + entry.action;
-    if (entry.next_action) {
-      summary = "\u25b6 next action: " + summary;
-    }
-    item.appendChild(classedText("p", summary, "queue-reason"));
+    item.appendChild(renderQueueSummary(entry));
     if (entry.why) {
       item.appendChild(classedText("p", entry.why, "queue-reason"));
     }
@@ -622,7 +759,7 @@
 
   function renderMainRow(row) {
     var text = "MAIN RED " + row.repo + " \u2014 " + row.reason + " (" + row.source + ") \u2192 fix before anything";
-    return classedText("p", text, "queue-main-red");
+    return explain(classedText("p", text, "queue-main-red"), "ui", "mainRed");
   }
 
   function renderMergeQueue(queue) {
@@ -630,8 +767,8 @@
     article.className = "card merge-queue";
     var head = el("div");
     head.className = "card-head";
-    head.appendChild(textEl("strong", queue.scope));
-    head.appendChild(textEl("span", queue.synced_label));
+    head.appendChild(explain(textEl("strong", queue.scope), "scope", scopeKind(queue.scope)));
+    head.appendChild(explain(textEl("span", queue.synced_label), "ui", "synced"));
     article.appendChild(head);
     appendAll(article, queue.main.map(renderMainRow));
     var list = el("ol");
@@ -671,21 +808,21 @@
     if (pr.checks_failing === 0 && pr.checks_passing === 0 && pr.checks_pending === 0) {
       var none = textEl("span", "no checks");
       none.className = "checks-none";
-      checks.appendChild(none);
+      checks.appendChild(explain(none, "checks", "none"));
       return checks;
     }
     var failing = textEl("span", "✗" + pr.checks_failing);
     failing.className = pr.checks_failing > 0 ? "checks-failing" : "checks-clear";
     var passing = textEl("span", "✓" + pr.checks_passing);
     passing.className = "checks-passing";
-    checks.appendChild(failing);
+    checks.appendChild(explain(failing, "checks", "failing"));
     checks.appendChild(document.createTextNode(" "));
-    checks.appendChild(passing);
+    checks.appendChild(explain(passing, "checks", "passing"));
     if (pr.checks_pending > 0) {
       var pending = textEl("span", "⏳" + pr.checks_pending);
       pending.className = "checks-pending";
       checks.appendChild(document.createTextNode(" "));
-      checks.appendChild(pending);
+      checks.appendChild(explain(pending, "checks", "pending"));
     }
     return checks;
   }
@@ -696,16 +833,16 @@
     row.appendChild(link(pr.url, pr.repo + "#" + pr.number));
     var lifecycle = textEl("span", pr.lifecycle);
     lifecycle.className = "pill lifecycle-" + pr.lifecycle;
-    row.appendChild(lifecycle);
+    row.appendChild(explain(lifecycle, "lifecycle", pr.lifecycle));
     if (pr.needs_ask_answer) {
       var ask = textEl("span", "needs-ask-answer");
       ask.className = "pill lifecycle-needs-ask-answer";
-      row.appendChild(ask);
+      row.appendChild(explain(ask, "flag", "needs-ask-answer"));
     }
     if (pr.needs_human_pr_review) {
       var review = textEl("span", "needs-human-pr-review");
       review.className = "pill lifecycle-needs-human-pr-review";
-      row.appendChild(review);
+      row.appendChild(explain(review, "flag", "needs-human-pr-review"));
     }
     row.appendChild(renderChecks(pr));
     if (pr.card_url) {
@@ -740,7 +877,7 @@
     head.appendChild(textEl("span", task.title));
     var taskState = textEl("span", task.state);
     taskState.className = "state state-" + task.state;
-    head.appendChild(taskState);
+    head.appendChild(explain(taskState, "taskState", task.state));
     if (task.card_url) {
       head.appendChild(link(task.card_url, task.tid + " card"));
     }
@@ -776,6 +913,7 @@
     });
     var modifier = raids.length === 0 ? "role-solo" : isLead ? "role-lead" : "role-member";
     badge.className = "role-badge " + modifier;
+    explain(badge, "role", modifier.slice("role-".length));
     badge.textContent =
       raids.length === 0
         ? "solo"
@@ -803,9 +941,10 @@
     summary.appendChild(textEl("strong", party.name));
     summary.appendChild(renderRoleBadge(party.raids));
     summary.appendChild(renderStatusBadge(party.status));
-    summary.appendChild(textEl("span", party.state));
-    summary.appendChild(textEl("span", "gen " + party.generation));
-    summary.appendChild(textEl("span", party.leader_session_name || "no leader"));
+    summary.appendChild(explain(textEl("span", party.state), "partyState", party.state));
+    summary.appendChild(explain(textEl("span", "gen " + party.generation), "ui", "generation"));
+    var leaderKey = party.leader_session_name ? "leader" : "noLeader";
+    summary.appendChild(explain(textEl("span", party.leader_session_name || "no leader"), "ui", leaderKey));
     details.appendChild(summary);
 
     appendAll(details, party.quests.map(renderQuest));
@@ -822,7 +961,7 @@
           return claim.area;
         })
         .join(", ");
-      details.appendChild(textEl("p", "claims: " + claimsText));
+      details.appendChild(explain(textEl("p", "claims: " + claimsText), "ui", "claims"));
     }
 
     var raidsList = renderRaidMembershipList(party.raids);
@@ -841,7 +980,7 @@
     if (raid.lead) {
       var badge = textEl("span", "lead");
       badge.className = "badge";
-      item.appendChild(badge);
+      item.appendChild(explain(badge, "role", "lead"));
     }
     return item;
   }
