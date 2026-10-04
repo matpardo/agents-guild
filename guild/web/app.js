@@ -256,6 +256,181 @@
     return controls;
   }
 
+  var askDetails = { open: {}, cache: {} };
+
+  function detailText(tag, value, tooltip) {
+    var node = textEl(tag, value);
+    node.title = tooltip;
+    return node;
+  }
+
+  function detailLink(url, label, tooltip) {
+    if (typeof url !== "string" || url.indexOf("https://") !== 0) {
+      return detailText("span", label, tooltip);
+    }
+    var anchor = link(url, label);
+    anchor.title = tooltip;
+    return anchor;
+  }
+
+  function detailLine(parts) {
+    var line = el("p");
+    line.className = "ask-detail-line";
+    appendAll(line, parts);
+    return line;
+  }
+
+  function renderTaskRef(ref) {
+    if (ref.missing) {
+      return [detailLine([detailText("strong", "task " + ref.quest + "/" + ref.tid, "Quest task the ask points at"), detailText("span", " (not found)", "The task no longer exists in the local database")])];
+    }
+    var lines = [
+      detailLine([
+        detailText("strong", "task " + ref.quest + "/" + ref.tid, "Quest task the ask points at"),
+        detailText("span", " " + ref.title + " [" + ref.state + "]", "Task title and current state"),
+        detailText("span", ref.epic ? " epic: " + ref.epic : "", "SDD epic the task belongs to"),
+      ]),
+    ];
+    if (ref.spec) {
+      lines.push(detailLine([detailText("span", "spec: ", "Path of the epic spec"), detailText("code", ref.spec, "Path of the epic spec")]));
+    }
+    if (ref.tasks) {
+      lines.push(detailLine([detailText("span", "tasks: ", "Path of the epic task list"), detailText("code", ref.tasks, "Path of the epic task list")]));
+    }
+    return lines;
+  }
+
+  function renderCardRef(ref) {
+    if (ref.missing) {
+      return [detailLine([detailText("strong", "card " + ref.key, "Tracker card the ask points at"), detailText("span", " (not found)", "The card is not known locally")])];
+    }
+    return [
+      detailLine([
+        detailText("strong", "card " + ref.key, "Tracker card the ask points at"),
+        detailText("span", ref.status ? " " + ref.status : "", "Card status at the last tracker sync"),
+        ref.url ? detailLink(ref.url, " open card", "Open the card in the tracker") : detailText("span", "", "No tracker link configured"),
+      ]),
+    ];
+  }
+
+  function renderPrRef(ref) {
+    var name = ref.ref.slice("pr:".length);
+    if (ref.missing) {
+      return [detailLine([detailLink(ref.url, "PR " + name, "Open the pull request on GitHub"), detailText("span", " (not found)", "The PR is not tracked locally")])];
+    }
+    var checks = ref.checks_passing + " passing, " + ref.checks_failing + " failing, " + ref.checks_pending + " pending";
+    var parts = [
+      detailLink(ref.url, "PR " + name, "Open the pull request on GitHub"),
+      detailText("span", " lifecycle: " + ref.lifecycle, "Guild lifecycle of the PR"),
+      detailText("span", " checks: " + checks, "CI checks at the last sync"),
+    ];
+    if (ref.waits) {
+      parts.push(detailText("span", " waits: " + ref.waits, "What the PR waits on"));
+    }
+    return [detailLine(parts)];
+  }
+
+  function renderRefDetail(ref) {
+    if (ref.kind === "task") {
+      return renderTaskRef(ref);
+    }
+    if (ref.kind === "card") {
+      return renderCardRef(ref);
+    }
+    return renderPrRef(ref);
+  }
+
+  function renderOriginDetail(origin) {
+    if (origin === null) {
+      return [detailLine([detailText("span", "origin: not recorded", "The ask predates origin snapshots")])];
+    }
+    var session = origin.session_name ? origin.session_id + " (" + origin.session_name + ")" : origin.session_id;
+    var tasks = origin.in_progress.map(function (task) {
+      return task.quest + "/" + task.tid + " " + task.title;
+    });
+    var lines = [
+      detailLine([detailText("strong", "origin (at creation)", "State of the asking party when the ask was created")]),
+      detailLine([detailText("span", "session: " + session, "Session that created the ask")]),
+      detailLine([detailText("span", "in progress: " + (tasks.join(", ") || "none"), "Tasks in progress at creation")]),
+      detailLine([detailText("span", "epics: " + (origin.epics.join(", ") || "none") + "  cards: " + (origin.cards.join(", ") || "none"), "Epics and cards linked at creation")]),
+    ];
+    if (origin.handoff_path) {
+      lines.push(detailLine([detailText("span", "handoff: ", "Latest handoff file of the party"), detailText("code", origin.handoff_path, "Latest handoff file of the party")]));
+    }
+    return lines;
+  }
+
+  function renderAskDetail(model) {
+    var wrapper = el("div");
+    wrapper.className = "ask-detail";
+    model.refs.forEach(function (ref) {
+      appendAll(wrapper, renderRefDetail(ref));
+    });
+    appendAll(wrapper, renderOriginDetail(model.origin));
+    if (model.resume) {
+      wrapper.appendChild(detailLine([detailText("span", "resume: ", "Command that reopens the asking session"), detailText("code", model.resume, "Command that reopens the asking session")]));
+    }
+    if (model.answer !== null) {
+      wrapper.appendChild(detailLine([detailText("span", "answer: " + model.answer, "Answer given to the ask")]));
+    }
+    wrapper.appendChild(detailLine([detailText("strong", "recent events", "Latest events of the asking party")]));
+    model.events.forEach(function (event) {
+      wrapper.appendChild(detailLine([detailText("code", event.ts + " " + event.kind + " " + event.summary, "Event timestamp, kind and subject")]));
+    });
+    return wrapper;
+  }
+
+  function showAskDetail(container, askId) {
+    clear(container);
+    var model = askDetails.cache[askId];
+    if (model === undefined) {
+      container.appendChild(detailText("p", "loading...", "Detail is being fetched"));
+      return;
+    }
+    container.appendChild(renderAskDetail(model));
+  }
+
+  function fetchAskDetail(askId, container) {
+    fetch("/api/asks/" + askId)
+      .then(function (response) {
+        return response.json();
+      })
+      .then(function (model) {
+        if (typeof model.error === "string") {
+          clear(container);
+          container.appendChild(detailText("p", model.error, "Why the detail could not load"));
+          return;
+        }
+        askDetails.cache[askId] = model;
+        showAskDetail(container, askId);
+      })
+      .catch(function () {
+        clear(container);
+        container.appendChild(detailText("p", "detail request failed", "Why the detail could not load"));
+      });
+  }
+
+  function renderAskDetailControl(ask) {
+    var details = el("details");
+    details.className = "ask-detail-control";
+    details.open = askDetails.open[ask.id] === true;
+    details.appendChild(detailText("summary", "detail", "Task, card, PR, origin session and recent events behind this ask"));
+    var container = el("div");
+    details.appendChild(container);
+    if (details.open) {
+      showAskDetail(container, ask.id);
+      fetchAskDetail(ask.id, container);
+    }
+    details.addEventListener("toggle", function () {
+      askDetails.open[ask.id] = details.open;
+      if (details.open) {
+        showAskDetail(container, ask.id);
+        fetchAskDetail(ask.id, container);
+      }
+    });
+    return details;
+  }
+
   function renderAsk(ask) {
     var article = el("article");
     article.className = "card ask";
@@ -281,6 +456,7 @@
       state.openContexts[ask.id] = details.open;
     });
     article.appendChild(details);
+    article.appendChild(renderAskDetailControl(ask));
     article.appendChild(renderAskControls(ask));
 
     return article;

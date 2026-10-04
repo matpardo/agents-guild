@@ -7,7 +7,7 @@ from http import server as http_server
 from pathlib import Path
 from urllib.parse import parse_qs, urlsplit
 
-from guild import context, db, origin, paths, timeutil
+from guild import ask_detail, context, db, origin, paths, timeutil
 from guild.commands import ask as ask_commands
 from guild.commands import board as board_commands
 from guild.commands import history as history_commands
@@ -27,6 +27,7 @@ _MAX_BODY_BYTES = 16384
 _ASK_ACTION_RE = re.compile(r"^/api/asks/([^/]+)/(answer|dismiss)$")
 _NOTICE_ACTION_RE = re.compile(r"^/api/notices/([^/]+)/(seen|unseen)$")
 _SEEN_ALL_PATH = "/api/notices/seen-all"
+_ASK_DETAIL_RE = re.compile(r"^/api/asks/(\d+)$")
 _ASK_ID_RE = re.compile(r"^[1-9][0-9]{0,17}$")
 _JSON_CONTENT_TYPE = "application/json; charset=utf-8"
 
@@ -252,6 +253,16 @@ class BoardRequestHandler(http_server.BaseHTTPRequestHandler):
         body = json.dumps(payload).encode("utf-8")
         self._write(200, body, "application/json; charset=utf-8", "no-store")
 
+    def _serve_ask_detail(self, ask_id):
+        ctx = _board_context()
+        try:
+            row = ctx.conn.execute("SELECT * FROM asks WHERE id = ?", (ask_id,)).fetchone()
+            if row is None:
+                return self._write_json(404, {"error": "unknown ask #{}".format(ask_id)})
+            return self._write_json(200, ask_detail.build(ctx, row))
+        finally:
+            ctx.conn.close()
+
     def _route_get(self):
         parts = urlsplit(self.path)
         path = parts.path
@@ -259,6 +270,9 @@ class BoardRequestHandler(http_server.BaseHTTPRequestHandler):
             return self._serve_file("index.html", "text/html; charset=utf-8")
         if path == "/api/board":
             return self._serve_model(board_commands.board_model)
+        ask_match = _ASK_DETAIL_RE.match(path)
+        if ask_match is not None:
+            return self._serve_ask_detail(int(ask_match.group(1)))
         if path == "/history":
             return self._serve_file("history.html", "text/html; charset=utf-8")
         if path == "/progress":
