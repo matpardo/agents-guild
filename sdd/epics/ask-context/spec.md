@@ -2,7 +2,7 @@
 epic: ask-context
 type: spec
 title: Asks that carry the context to decide them
-status: active
+status: done
 owner: matpardo
 created: 2026-10-04
 updated: 2026-10-04
