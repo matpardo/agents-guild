@@ -113,10 +113,10 @@ guild pr set   <owner/repo>#<n> [--lifecycle draft|converging|ready] [--waits ".
                                [--needs-ask-answer | --no-needs-ask-answer]
                                [--needs-human-pr-review | --no-needs-human-pr-review]
 
-guild ask "<question>" --context "..." --ref <ref> [--ref <ref> ...] [--option "..." ...]
+guild ask "<question>" --context "..." [--ref <ref> ...] [--option "..."]   # refs: pr:<owner/repo>#<n>, task:<quest>/<tid>, card:<KEY>; with exactly one task in progress and no task:/card: ref it is added for you
 guild answer <id> "<text>"
 guild dismiss <id>
-guild asks
+guild asks [<id> | --all [--party <name>] [--since <dur>]]   # open asks; <id> shows task, card, PR, SDD paths, resume command and recent events; --all adds answered and dismissed with answers
 
 guild notice create "<text>" --to project:<name>|guild|raid:<name> --ttl <dur> [--until pr:<owner/repo>#<n>:merged|closed]
 guild notice close <id>
@@ -169,7 +169,7 @@ guild rebuild
 guild export --visibility guild
 ```
 
-Refs use two literal formats: `pr:<owner/repo>#<n>` and `task:<quest>/<tid>`.
+Refs use three literal formats: `pr:<owner/repo>#<n>`, `task:<quest>/<tid>` and `card:<KEY>`.
 Durations: `30m`, `8h`, `3d` — anything else is rejected.
 
 ### Ask ordering
@@ -183,7 +183,33 @@ assume done). A `task:` ref is blocked while that quest task's state is not
 `done`; an unknown task ref counts as blocked. The board summary line adds
 `· blocks <n>` when `n > 0`; `guild asks` prints `blocks: <n> of <total> refs
 still open`, or `blocks: 0 of <total> refs still open (may be stale)` when
-every ref has resolved — a hint the ask can probably be dismissed.
+every ref has resolved — a hint the ask can probably be dismissed. A `card:`
+ref never counts as blocked.
+
+### Ask context
+
+A `card:<KEY>` ref is accepted when the key is in the synced `cards` of the
+asking party's project or fully matches that project's `sdd.key_ref`.
+
+When an ask is created guild stores a snapshot of its origin: session id and
+name, the party's in-progress tasks, their epics, the card keys of the party's
+PRs and of those tasks, and the latest handoff file. With no `task:` or `card:`
+ref and exactly one task in progress, `task:<quest>/<tid>` is added and
+`auto-ref: task:<quest>/<tid>` is printed. With no ref and no single in-progress
+task the ask is refused. `--context` stays required.
+
+`guild asks <id>` expands the ask: the task with its SDD spec and tasks paths
+(from the project `sdd` block: the filesystem path with `root`, or
+`git:<ref>:<path>` with `git_repo`/`git_ref`), the card with its status and
+tracker link (`tracker.browse_url`), the PR with URL, lifecycle and checks, the
+origin snapshot, the command that resumes the asking session and the party's last
+10 events. Asks created before snapshots print `origin: not recorded`. The same
+detail is served at `GET /api/asks/<id>` and opens from the `detail` control of
+each ask on the web board.
+
+`guild asks --all` lists open, answered and dismissed asks in id order, with the
+answer and `answered_at` of answered ones. `--party` and `--since` (on
+`created_at`) narrow it and need `--all`; `<id>` takes no filters.
 
 ### `guild next`
 

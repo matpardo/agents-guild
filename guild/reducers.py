@@ -324,11 +324,17 @@ def _pr_comments_acknowledged(conn, event):
     )
 
 
+def _snapshot_json(snapshot):
+    if snapshot is None:
+        return None
+    return _dump(snapshot)
+
+
 def _ask_created(conn, event):
     payload = event["payload"]
     conn.execute(
-        "INSERT INTO asks (id, party, question, context, refs, options, state, answer, created_at)"
-        " VALUES (?, ?, ?, ?, ?, ?, 'open', NULL, ?)",
+        "INSERT INTO asks (id, party, question, context, refs, options, state, answer, created_at,"
+        " snapshot) VALUES (?, ?, ?, ?, ?, ?, 'open', NULL, ?, ?)",
         (
             payload["id"],
             payload["party"],
@@ -337,6 +343,7 @@ def _ask_created(conn, event):
             _dump(payload["refs"]),
             _dump(payload["options"]),
             event["ts"],
+            _snapshot_json(payload.get("snapshot")),
         ),
     )
 
@@ -344,8 +351,8 @@ def _ask_created(conn, event):
 def _ask_answered(conn, event):
     payload = event["payload"]
     conn.execute(
-        "UPDATE asks SET state = 'answered', answer = ? WHERE id = ?",
-        (payload["answer"], payload["id"]),
+        "UPDATE asks SET state = 'answered', answer = ?, answered_at = ? WHERE id = ?",
+        (payload["answer"], event["ts"], payload["id"]),
     )
 
 

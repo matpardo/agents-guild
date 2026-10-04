@@ -1,12 +1,13 @@
 import json
 import textwrap
 
-from guild import config, party_status, sanitize, session_status, timeutil
+from guild import config, links, party_status, sanitize, session_status, timeutil
 from guild.commands import claim as claim_commands
 from guild.commands import drift as drift_commands
 from guild.commands import merge_queue as merge_queue_commands
 from guild.commands import notice as notice_commands
 from guild.commands import raid as raid_commands
+from guild.errors import GuildError
 
 _STYLES = {
     "bold": "1",
@@ -167,6 +168,8 @@ def _task_ref_blocked(conn, ref):
 def _blocked_ref_count(conn, ref_list):
     count = 0
     for ref in ref_list:
+        if ref.startswith("card:"):
+            continue
         blocked = _pr_ref_blocked(conn, ref) if ref.startswith("pr:") else _task_ref_blocked(conn, ref)
         if blocked:
             count += 1
@@ -251,6 +254,58 @@ def render_asks(ctx, party_names, color, width, detailed):
         lines.extend(_ask_summary_lines(painter, ctx.conn, row))
     if rows:
         lines.append(painter.paint('  → guild asks (context) · guild answer <id> "..."', "dim"))
+    lines.append("")
+    return lines
+
+
+def _all_ask_rows(conn, party, since_cutoff):
+    rows = conn.execute("SELECT * FROM asks ORDER BY id ASC").fetchall()
+    if party is not None:
+        rows = [row for row in rows if row["party"] == party]
+    if since_cutoff is not None:
+        rows = [row for row in rows if timeutil.from_iso(row["created_at"]) >= since_cutoff]
+    return rows
+
+
+def _all_asks_heading(rows):
+    counts = {"open": 0, "answered": 0, "dismissed": 0}
+    for row in rows:
+        counts[row["state"]] += 1
+    return "ASKS · {} ({} open · {} answered · {} dismissed)".format(
+        len(rows), counts["open"], counts["answered"], counts["dismissed"]
+    )
+
+
+def _all_ask_lines(painter, row):
+    state_style = {"open": "red", "answered": "green", "dismissed": "dim"}[row["state"]]
+    lines = [
+        "  {} {} · {} · {}".format(
+            painter.paint("#{}".format(row["id"]), "red"),
+            painter.paint(row["party"], "cyan"),
+            painter.paint(row["state"], state_style),
+            painter.paint(row["question"], "bold"),
+        )
+    ]
+    if row["state"] != "answered":
+        return lines
+    lines.extend(painter.wrap("answer: {}".format(row["answer"]), "     "))
+    if row["answered_at"] is not None:
+        lines.append("     answered_at: {}".format(row["answered_at"]))
+    return lines
+
+
+def render_all_asks(ctx, party, since_cutoff, color, width):
+    painter = _Painter(color, width)
+    if party is not None:
+        known = ctx.conn.execute("SELECT name FROM parties WHERE name = ?", (party,)).fetchone()
+        if known is None:
+            raise GuildError("unknown party '{}'".format(party), 1)
+    rows = _all_ask_rows(ctx.conn, party, since_cutoff)
+    if not rows:
+        return [painter.paint("ASKS · nothing", "green"), ""]
+    lines = [painter.paint(_all_asks_heading(rows), "bold")]
+    for row in rows:
+        lines.extend(_all_ask_lines(painter, row))
     lines.append("")
     return lines
 
@@ -528,8 +583,8 @@ def _pr_model(pr_row, project_config):
         "what": sanitize.strip_control_sequences(pr_row["what"]),
         "waits": _optional_text(_visible_waits(pr_row)),
         "card": card,
-        "card_url": _card_url(project_config, card),
-        "url": "https://github.com/{}/pull/{}".format(pr_row["repo"], pr_row["number"]),
+        "card_url": links.card_url(project_config, card),
+        "url": links.pr_url(pr_row["repo"], pr_row["number"]),
     }
 
 
@@ -545,18 +600,6 @@ def _task_card_key(conn, project, epic, tid):
     return row["jira_key"]
 
 
-def _card_url(project_config, key):
-    if key is None or project_config is None:
-        return None
-    tracker_config = project_config.get("tracker")
-    if tracker_config is None:
-        return None
-    browse_url = tracker_config.get("browse_url")
-    if browse_url is None:
-        return None
-    return browse_url + key
-
-
 def _ask_model(conn, row):
     ref_list = json.loads(row["refs"])
     return {
@@ -569,6 +612,9 @@ def _ask_model(conn, row):
         "blocked": _blocked_ref_count(conn, ref_list),
         "total_refs": len(ref_list),
         "created_at": row["created_at"],
+        "state": row["state"],
+        "answer": _optional_text(row["answer"]),
+        "answered_at": row["answered_at"],
     }
 
 
@@ -594,7 +640,7 @@ def _task_model(conn, project, epic, task_row, task_prs, project_config):
         "state": task_row["state"],
         "summary": _optional_text(task_row["summary"]),
         "blocked_reason": _optional_text(task_row["blocked_reason"]),
-        "card_url": _card_url(project_config, key),
+        "card_url": links.card_url(project_config, key),
         "prs": [_pr_model(pr_row, project_config) for pr_row in task_prs],
     }
 

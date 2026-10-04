@@ -269,6 +269,8 @@ _COLUMN_MIGRATIONS = (
     ("prs", "needs_ask_answer", "INTEGER"),
     ("prs", "needs_human_pr_review", "INTEGER"),
     ("prs", "card", "TEXT"),
+    ("asks", "snapshot", "TEXT"),
+    ("asks", "answered_at", "TEXT"),
 )
 
 
