@@ -5,7 +5,7 @@ title: Web view of the guild board
 status: done
 owner: matpardo
 created: 2026-09-28
-updated: 2026-09-29
+updated: 2026-10-04
 ---
 
 # Spec: Web view of the guild board
@@ -27,6 +27,7 @@ See the guild board, asks and notices in a browser, with a clearer layout than t
 - Writing from the page: answering and dismissing open asks, with the same validation as `guild answer` and `guild dismiss`, acting as the human actor.
 - Status colors, matching the terminal board: PR lifecycle badges, check counts and task states, light and dark.
 - Marking notices seen from the human's view: a `new` marker on unseen notices in `guild notices`, the board and the web page, with buttons to mark one or all seen, without changing what is shown or delivered.
+- Notices carry their issue time and are listed newest first, in the terminal, the inbox and the web page.
 
 ## Out of scope
 
