@@ -120,6 +120,69 @@ class InboxTests(GuildTestCase):
         self.assertNotIn("\nnotice #99", out)
 
 
+class InboxSessionWaitingTests(GuildTestCase):
+    def setUp(self):
+        super().setUp()
+        self.repo_dir = self.register_project("acme", ["acme/app"])
+        self.run_cli(["party", "start", "alpha"], "sess-1", self.repo_dir)
+        self.run_cli(["party", "start", "beta"], "sess-2", self.repo_dir)
+        self.run_cli(["party", "start", "gamma"], "sess-3", self.repo_dir)
+        self.run_cli(["raid", "join", "ci", "--until-leave", "--lead"], "sess-1", self.repo_dir)
+        self.run_cli(["raid", "join", "ci", "--until-leave"], "sess-2", self.repo_dir)
+        self.run_cli(["raid", "join", "ci", "--until-leave"], "sess-3", self.repo_dir)
+
+    def _notify(self, session_id, notification_type, message):
+        self.run_hook(
+            "notification",
+            {
+                "session_id": session_id,
+                "cwd": str(self.repo_dir),
+                "notification_type": notification_type,
+                "message": message,
+            },
+        )
+
+    def _inbox(self, session_id):
+        code, out, err = self.run_cli(["inbox", "--since-last"], session_id, self.repo_dir)
+        self.assertEqual(code, 0, err)
+        return out
+
+    def test_lead_sees_member_permission_wait_without_message(self):
+        self._notify("sess-2", "permission_prompt", "SECRET-COMMAND rm -rf")
+        out = self._inbox("sess-1")
+        self.assertIn("- beta (raid ci) waiting on permission", out)
+        self.assertNotIn("SECRET-COMMAND", out)
+
+    def test_lead_sees_member_elicitation_wait_as_input(self):
+        self._notify("sess-2", "elicitation_dialog", "pick")
+        self.assertIn("- beta (raid ci) waiting on input", self._inbox("sess-1"))
+
+    def test_idle_wait_is_not_forwarded(self):
+        self._notify("sess-2", "idle_prompt", "idle")
+        self.assertNotIn("waiting on", self._inbox("sess-1"))
+
+    def test_non_lead_member_gets_nothing(self):
+        self._notify("sess-2", "permission_prompt", "x")
+        self.assertNotIn("waiting on", self._inbox("sess-3"))
+
+    def test_own_wait_not_forwarded_to_self(self):
+        self._notify("sess-1", "permission_prompt", "x")
+        self.assertNotIn("waiting on", self._inbox("sess-1"))
+
+    def test_non_member_party_wait_not_forwarded(self):
+        self.run_cli(["party", "start", "delta"], "sess-4", self.repo_dir)
+        self._notify("sess-4", "permission_prompt", "x")
+        self.assertNotIn("delta", self._inbox("sess-1"))
+
+    def test_wait_lines_follow_ask_lines(self):
+        self._notify("sess-2", "permission_prompt", "x")
+        self.run_cli(["quest", "add", "bq", "--title", "B", "--no-epic"], "sess-2", self.repo_dir)
+        self.run_cli(["task", "add", "bq/T01", "--title", "First"], "sess-2", self.repo_dir)
+        self.run_cli(["ask", "ready?", "--context", "x", "--ref", "task:bq/T01"], "sess-2", self.repo_dir)
+        out = self._inbox("sess-1")
+        self.assertLess(out.index("ask #1 from beta"), out.index("beta (raid ci) waiting on permission"))
+
+
 class BoardTests(GuildTestCase):
     def test_board_filters_by_party(self):
         repo_dir = self.register_project("acme", ["acme/app"])
@@ -201,6 +264,75 @@ class BoardTests(GuildTestCase):
         self.run_cli(["raid", "join", "infra", "--ttl", "2h", "--lead"], "sess-1", repo_dir)
         code, out, err = self.run_cli(["board"], None, None)
         self.assertIn("(gen 1, active, RL infra)", out)
+
+
+class BoardSessionStatusTests(GuildTestCase):
+    def setUp(self):
+        super().setUp()
+        self.repo_dir = self.register_project("acme", ["acme/app"])
+        self.run_cli(["party", "start", "alpha"], "sess-1", self.repo_dir)
+
+    def _hook_payload(self, notification_type, message):
+        return {
+            "session_id": "sess-1",
+            "cwd": str(self.repo_dir),
+            "notification_type": notification_type,
+            "message": message,
+        }
+
+    def _block(self):
+        self.run_hook("notification", self._hook_payload("permission_prompt", "needs permission to run ls"))
+
+    def _ask(self):
+        self.run_cli(["quest", "add", "demo", "--title", "Demo", "--no-epic"], "sess-1", self.repo_dir)
+        self.run_cli(["task", "add", "demo/T01", "--title", "First"], "sess-1", self.repo_dir)
+        self.run_cli(["ask", "Ship it?", "--context", "x", "--ref", "task:demo/T01"], "sess-1", self.repo_dir)
+
+    def test_party_section_shows_working_status_without_session_row(self):
+        code, out, err = self.run_cli(["board"], None, None)
+        self.assertIn("\n  status: working\n", out)
+
+    def test_party_section_shows_waiting_permission_with_age(self):
+        self._block()
+        code, out, err = self.run_cli(["board"], None, None)
+        self.assertRegex(out, r"\n  status: waiting-permission \d+s\n")
+
+    def test_needs_you_counts_blocked_sessions(self):
+        self._block()
+        code, out, err = self.run_cli(["board"], None, None)
+        self.assertIn("NEEDS YOU · 1 blocked", out)
+        self.assertNotIn("NEEDS YOU · nothing", out)
+        self.assertRegex(out, r'  ⏸ alpha waiting-permission \d+s: "needs permission to run ls"')
+
+    def test_needs_you_counts_asks_and_blocked_with_blocked_listed_first(self):
+        self._ask()
+        self._block()
+        code, out, err = self.run_cli(["board"], None, None)
+        self.assertIn("NEEDS YOU · 1 open ask · 1 blocked", out)
+        self.assertLess(out.index("⏸ alpha"), out.index("#1 alpha · Ship it?"))
+
+    def test_needs_you_nothing_when_no_asks_and_no_blocked(self):
+        code, out, err = self.run_cli(["board"], None, None)
+        self.assertIn("NEEDS YOU · nothing", out)
+        self.assertNotIn("⏸", out)
+
+    def test_blocked_detail_is_stripped_of_control_sequences(self):
+        self.run_hook("notification", self._hook_payload("permission_prompt", "rm\x1b[31m -rf\nforged"))
+        code, out, err = self.run_cli(["board"], None, None)
+        self.assertNotIn("\x1b", out)
+        self.assertIn("rm -rf forged", out)
+
+    def test_waiting_input_is_not_listed_as_blocked(self):
+        self.run_hook("notification", self._hook_payload("idle_prompt", "idle"))
+        code, out, err = self.run_cli(["board"], None, None)
+        self.assertIn("NEEDS YOU · nothing", out)
+        self.assertRegex(out, r"\n  status: waiting-input \d+s\n")
+
+    def test_blocked_scoped_to_party_filter(self):
+        self.run_cli(["party", "start", "beta"], "sess-2", self.repo_dir)
+        self._block()
+        code, out, err = self.run_cli(["board", "--party", "beta"], None, None)
+        self.assertIn("NEEDS YOU · nothing", out)
 
 
 if __name__ == "__main__":

@@ -3,7 +3,7 @@ import os
 import shutil
 import subprocess
 
-from guild import resume
+from guild import party_status, resume
 from guild.errors import GuildError
 
 TRANSCRIPT_LINE_LIMIT = 200
@@ -23,13 +23,16 @@ class Tmux:
 
 
 class _Entry:
-    def __init__(self, party, project, generation, session_id, session_name, quests, last_activity, cwd, mode, transcript):
+    def __init__(
+        self, party, project, generation, session_id, session_name, quests, status, last_activity, cwd, mode, transcript
+    ):
         self.party = party
         self.project = project
         self.generation = generation
         self.session_id = session_id
         self.session_name = session_name
         self.quests = quests
+        self.status = status
         self.last_activity = last_activity
         self.cwd = cwd
         self.mode = mode
@@ -122,6 +125,7 @@ def _entry(ctx, transcripts_dir, party):
         session_id,
         None if leader is None else leader["session_name"],
         _quest_label(ctx.conn, party["name"]),
+        party_status.label(ctx, party_status.derive(ctx, party)),
         last_activity,
         cwd,
         mode,
@@ -145,6 +149,7 @@ def _listing_lines(entries, with_commands):
             )
         )
         lines.append("   quest: {} | last activity: {}".format(entry.quests, entry.last_activity or "-"))
+        lines.append("   status: {}".format(entry.status))
         lines.append("   session: {} | mode: {}".format(entry.session_name or "-", entry.mode_label()))
         lines.append("   cwd: {}".format(entry.cwd or "unknown"))
         if with_commands:

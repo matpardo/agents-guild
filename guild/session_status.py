@@ -35,3 +35,15 @@ def is_change(conn, session_id, status):
         "SELECT status FROM session_status WHERE session_id = ?", (session_id,)
     ).fetchone()
     return row is None or row["status"] != status
+
+
+def blocked_rows(conn, party_names):
+    rows = conn.execute(
+        "SELECT s.party, s.detail, s.since FROM session_status s"
+        " JOIN parties p ON p.name = s.party AND p.leader_session_id = s.session_id"
+        " WHERE s.status = 'waiting-permission' AND p.state = 'active'"
+        " ORDER BY s.since ASC, s.party ASC"
+    ).fetchall()
+    if party_names is None:
+        return rows
+    return [row for row in rows if row["party"] in party_names]

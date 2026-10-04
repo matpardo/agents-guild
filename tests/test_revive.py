@@ -174,6 +174,23 @@ class ListTests(ReviveBase):
         self.assertIn("acceptEdits", out)
         self.assertEqual(tmux.calls, [])
 
+    def test_list_shows_status_line_after_quest_line(self):
+        self.run_hook(
+            "notification",
+            {
+                "session_id": "sess-a",
+                "cwd": str(self.work_a),
+                "notification_type": "permission_prompt",
+                "message": "x",
+            },
+        )
+        out = self._revive([], False, True, self._tmux(installed=False), None)
+        lines = out.splitlines()
+        alpha_quest = next(i for i, line in enumerate(lines) if line.startswith("   quest: demo 0/2"))
+        self.assertRegex(lines[alpha_quest + 1], r"^   status: waiting-permission \d+s$")
+        beta_status = next(line for line in lines if line.startswith("   status: ") and "working" in line)
+        self.assertEqual(beta_status, "   status: working")
+
     def test_list_prints_copy_paste_one_liner_per_party(self):
         self._set_leader("alpha", str(self.work_a), "acceptEdits")
         _write_transcript(self.claude_projects_dir, "-a", "sess-a", [{"cwd": str(self.work_a)}])

@@ -187,7 +187,7 @@ class BoardModelShapeTests(BoardModelTestCase):
         party = model["parties"][0]
         self.assertEqual(
             set(party),
-            {"name", "state", "generation", "leader_session_name", "quests", "prs", "raids", "claims"},
+            {"name", "state", "generation", "status", "leader_session_name", "quests", "prs", "raids", "claims"},
         )
         self.assertEqual(party["name"], "alpha")
         self.assertEqual(party["state"], "active")
@@ -335,3 +335,53 @@ if __name__ == "__main__":
     import unittest
 
     unittest.main()
+
+
+class BoardModelSessionStatusTests(BoardModelTestCase):
+    def setUp(self):
+        super().setUp()
+        self.repo_dir = self.register_project("acme", ["acme/app"])
+        self.run_cli(["party", "start", "alpha"], "sess-1", self.repo_dir)
+
+    def _model(self):
+        ctx = self._ctx()
+        model = board_commands.board_model(ctx)
+        ctx.conn.close()
+        return model
+
+    def _notify(self, notification_type, message):
+        self.run_hook(
+            "notification",
+            {
+                "session_id": "sess-1",
+                "cwd": str(self.repo_dir),
+                "notification_type": notification_type,
+                "message": message,
+            },
+        )
+
+    def test_party_status_defaults_to_working(self):
+        status = self._model()["parties"][0]["status"]
+        self.assertEqual(status, {"name": "working", "since": None, "detail": None, "label": "working"})
+
+    def test_party_status_waiting_permission_and_blocked_list(self):
+        self._notify("permission_prompt", "run ls")
+        model = self._model()
+        status = model["parties"][0]["status"]
+        self.assertEqual(status["name"], "waiting-permission")
+        self.assertEqual(status["detail"], "run ls")
+        self.assertRegex(status["label"], r"^waiting-permission \d+s$")
+        self.assertEqual(len(model["blocked"]), 1)
+        blocked = model["blocked"][0]
+        self.assertEqual((blocked["party"], blocked["wait"], blocked["detail"]), ("alpha", "permission", "run ls"))
+        self.assertEqual(blocked["since"], status["since"])
+        self.assertEqual(blocked["label"], status["label"])
+
+    def test_blocked_empty_when_not_waiting_on_permission(self):
+        self._notify("idle_prompt", "idle")
+        self.assertEqual(self._model()["blocked"], [])
+
+    def test_status_and_blocked_detail_sanitized(self):
+        self._notify("permission_prompt", "a\x1b[31mb")
+        model = self._model()
+        self.assertNotIn("\x1b", json.dumps(model))
