@@ -357,5 +357,97 @@ class HandoffRetentionConfigTests(unittest.TestCase):
                     config.validate_project_config(self._with(value))
 
 
+class DispatcherConfigTests(unittest.TestCase):
+    def _block(self):
+        return {
+            "permission_mode": "acceptEdits",
+            "max_launches_per_hour": 3,
+            "rules": {"ask_answered": "on", "checks_failing": "dry-run"},
+        }
+
+    def _data(self, block):
+        return {"name": "acme", "paths": ["/tmp/*"], "github": {"repos": []}, "dispatcher": block}
+
+    def _message(self, block):
+        with self.assertRaises(GuildError) as raised:
+            config.validate_project_config(self._data(block))
+        return raised.exception.message
+
+    def test_absent_block_is_valid(self):
+        config.validate_project_config({"name": "acme", "paths": ["/tmp/*"], "github": {"repos": []}})
+
+    def test_valid_block_is_accepted(self):
+        config.validate_project_config(self._data(self._block()))
+
+    def test_every_allowed_mode_is_accepted(self):
+        for mode in ("manual", "acceptEdits", "auto"):
+            with self.subTest(mode=mode):
+                block = self._block()
+                block["permission_mode"] = mode
+                config.validate_project_config(self._data(block))
+
+    def test_empty_rules_object_is_accepted(self):
+        block = self._block()
+        block["rules"] = {}
+        config.validate_project_config(self._data(block))
+
+    def test_block_that_is_not_an_object_is_rejected(self):
+        self.assertIn("'dispatcher' must be an object", self._message(["x"]))
+
+    def test_each_missing_key_is_rejected(self):
+        for key in ("permission_mode", "max_launches_per_hour", "rules"):
+            with self.subTest(key=key):
+                block = self._block()
+                del block[key]
+                self.assertIn("exactly the keys", self._message(block))
+
+    def test_extra_key_is_rejected(self):
+        block = self._block()
+        block["shell"] = True
+        self.assertIn("exactly the keys", self._message(block))
+
+    def test_permissive_or_unknown_modes_are_rejected(self):
+        for mode in ("bypassPermissions", "dontAsk", "plan", "default", "", 3):
+            with self.subTest(mode=mode):
+                block = self._block()
+                block["permission_mode"] = mode
+                self.assertIn("'dispatcher.permission_mode' must be one of", self._message(block))
+
+    def test_max_launches_out_of_range_or_wrong_type_is_rejected(self):
+        for value in (0, -1, 21, True, "3", 1.5):
+            with self.subTest(value=value):
+                block = self._block()
+                block["max_launches_per_hour"] = value
+                self.assertIn("'dispatcher.max_launches_per_hour' must be an integer", self._message(block))
+
+    def test_max_launches_bounds_are_accepted(self):
+        for value in (1, 20):
+            with self.subTest(value=value):
+                block = self._block()
+                block["max_launches_per_hour"] = value
+                config.validate_project_config(self._data(block))
+
+    def test_rules_that_is_not_an_object_is_rejected(self):
+        block = self._block()
+        block["rules"] = ["ask_answered"]
+        self.assertIn("'dispatcher.rules' must be an object", self._message(block))
+
+    def test_unknown_rule_is_rejected(self):
+        block = self._block()
+        block["rules"] = {"merge_everything": "on"}
+        self.assertIn("unknown rule 'merge_everything'", self._message(block))
+
+    def test_off_is_rejected_with_hint(self):
+        block = self._block()
+        block["rules"] = {"ask_answered": "off"}
+        message = self._message(block)
+        self.assertIn("remove the rule to disable it", message)
+
+    def test_other_rule_values_are_rejected(self):
+        block = self._block()
+        block["rules"] = {"ask_answered": True}
+        self.assertIn("must be 'dry-run' or 'on'", self._message(block))
+
+
 if __name__ == "__main__":
     unittest.main()

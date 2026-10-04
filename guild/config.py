@@ -11,6 +11,12 @@ _LIFECYCLE_EVENTS = ("on_pr_merged", "on_pr_closed")
 _LIFECYCLE_ENTRY_KEYS = {"command", "timeout_minutes"}
 _LIFECYCLE_MAX_TIMEOUT_MINUTES = 1440
 _HANDOFF_RETENTION_MAX_DAYS = 3650
+_DISPATCHER_KEYS = {"permission_mode", "max_launches_per_hour", "rules"}
+_DISPATCHER_PERMISSION_MODES = ("manual", "acceptEdits", "auto")
+_DISPATCHER_RULES = ("ask_answered", "checks_failing")
+_DISPATCHER_RULE_MODES = ("dry-run", "on")
+_DISPATCHER_MIN_LAUNCHES_PER_HOUR = 1
+_DISPATCHER_MAX_LAUNCHES_PER_HOUR = 20
 
 
 def _validate_tracker_config(tracker_config):
@@ -141,6 +147,62 @@ def _validate_lifecycle_config(data):
         _validate_lifecycle_entry(event, entry)
 
 
+def _validate_dispatcher_rules(rules):
+    if not isinstance(rules, dict):
+        raise GuildError("project config 'dispatcher.rules' must be an object", 1)
+    for rule, mode in rules.items():
+        if rule not in _DISPATCHER_RULES:
+            raise GuildError(
+                "project config 'dispatcher.rules' has unknown rule '{}': allowed are {}".format(
+                    rule, ", ".join(_DISPATCHER_RULES)
+                ),
+                1,
+            )
+        if mode == "off":
+            raise GuildError(
+                "project config 'dispatcher.rules.{}' cannot be 'off': remove the rule to disable it".format(rule),
+                1,
+            )
+        if mode not in _DISPATCHER_RULE_MODES:
+            raise GuildError(
+                "project config 'dispatcher.rules.{}' must be 'dry-run' or 'on'".format(rule), 1
+            )
+
+
+def _validate_dispatcher_config(data):
+    dispatcher = data.get("dispatcher")
+    if dispatcher is None:
+        return
+    if not isinstance(dispatcher, dict):
+        raise GuildError("project config 'dispatcher' must be an object", 1)
+    if set(dispatcher) != _DISPATCHER_KEYS:
+        raise GuildError(
+            "project config 'dispatcher' must have exactly the keys 'permission_mode', "
+            "'max_launches_per_hour' and 'rules'",
+            1,
+        )
+    if dispatcher["permission_mode"] not in _DISPATCHER_PERMISSION_MODES:
+        raise GuildError(
+            "project config 'dispatcher.permission_mode' must be one of {}".format(
+                ", ".join(_DISPATCHER_PERMISSION_MODES)
+            ),
+            1,
+        )
+    limit = dispatcher["max_launches_per_hour"]
+    if (
+        isinstance(limit, bool)
+        or not isinstance(limit, int)
+        or not _DISPATCHER_MIN_LAUNCHES_PER_HOUR <= limit <= _DISPATCHER_MAX_LAUNCHES_PER_HOUR
+    ):
+        raise GuildError(
+            "project config 'dispatcher.max_launches_per_hour' must be an integer from {} to {}".format(
+                _DISPATCHER_MIN_LAUNCHES_PER_HOUR, _DISPATCHER_MAX_LAUNCHES_PER_HOUR
+            ),
+            1,
+        )
+    _validate_dispatcher_rules(dispatcher["rules"])
+
+
 def validate_project_config(data):
     for key in _REQUIRED_KEYS:
         if key not in data:
@@ -163,6 +225,7 @@ def validate_project_config(data):
     _validate_fast_forward_base_config(data)
     _validate_lifecycle_config(data)
     _validate_handoff_retention_config(data)
+    _validate_dispatcher_config(data)
 
 
 def load_project_file(config_file):
