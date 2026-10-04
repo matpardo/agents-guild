@@ -16,7 +16,7 @@ _DRY_RUN_MODE = "dry-run"
 _REAL_MODE = "on"
 _HANDED_OFF_STATE = "awaiting-leader"
 _CLOSED_STATE = "closed"
-_RESTRICTIVE_PARTY_MODES = ("plan", "manual")
+_MODES_BY_PERMISSIVENESS = ("plan", "manual", "acceptEdits", "auto")
 _IN_FLIGHT_STATES = ("launching", "launched")
 _RATE_WINDOW = timedelta(hours=1)
 _NOTICE_TTL = "12h"
@@ -43,9 +43,9 @@ class Verdict:
 
 
 def effective_mode(configured_mode, party_mode):
-    if party_mode in _RESTRICTIVE_PARTY_MODES:
-        return party_mode
-    return configured_mode
+    if party_mode not in _MODES_BY_PERMISSIVENESS:
+        return configured_mode
+    return min(configured_mode, party_mode, key=_MODES_BY_PERMISSIVENESS.index)
 
 
 def launches_last_hour(conn, now, project):
