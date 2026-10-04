@@ -304,7 +304,6 @@ class Launcher:
             if window_id is None:
                 return self._launch_failure(project_config, trigger, verdict, _WINDOW_FAILURE, None)
             tmux_windows.pin_window_name(self._tmux, window_id)
-            tmux_windows.set_title_options(self._tmux)
             self._record_window(trigger, verdict, window_id)
             self._record_launched(trigger, verdict, window_id)
         except Exception as error:

@@ -31,7 +31,7 @@ def window_names(tmux):
 
 def create_window(tmux, name, cwd, command, session_is_up):
     if session_is_up:
-        args = ["new-window", "-t", SESSION + ":", "-n", name, "-c", cwd]
+        args = ["new-window", "-t", SESSION + ":", "-n", name, "-c", cwd, "-d"]
     else:
         args = ["new-session", "-d", "-s", SESSION, "-n", name, "-c", cwd]
     returncode, output = tmux.run([*args, "-P", "-F", "#{window_id}", command])

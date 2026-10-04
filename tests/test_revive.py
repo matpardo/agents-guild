@@ -341,6 +341,7 @@ class LaunchTests(ReviveBase):
         self.assertNotIn("new-session", tmux.verbs())
         new_window = [call for call in tmux.calls if call[0] == "new-window"][0]
         self.assertEqual(new_window[:6], ["new-window", "-t", "guild:", "-n", "alpha", "-c"])
+        self.assertIn("-d", new_window[:-1])
 
     def test_existing_window_for_party_is_skipped(self):
         tmux = self._tmux(sessions=["guild"], windows=["alpha"])

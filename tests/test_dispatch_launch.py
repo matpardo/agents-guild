@@ -29,10 +29,17 @@ class HappyPathTests(LaunchBase):
         window = self.ctx().conn.execute("SELECT * FROM leader_windows WHERE party = 'alpha'").fetchone()
         self.assertEqual((window["generation"], window["window_id"]), (2, "@10"))
 
-    def test_window_is_pinned_and_titles_are_set(self):
+    def test_window_is_pinned_and_session_titles_are_left_alone(self):
         self.decide(self.trigger(12, "alpha"), "on")
         self.assertIn(["set-option", "-w", "-t", "@10", "automatic-rename", "off"], self.tmux.calls)
-        self.assertIn(["set-option", "-t", "guild", "set-titles", "on"], self.tmux.calls)
+        self.assertNotIn(["set-option", "-t", "guild", "set-titles", "on"], self.tmux.calls)
+        self.assertFalse([call for call in self.tmux.calls if "set-titles" in call])
+
+    def test_window_is_created_detached_so_focus_never_moves(self):
+        self.decide(self.trigger(12, "alpha"), "on")
+        launch = self.tmux.launch_calls()[0]
+        self.assertEqual(launch[0], "new-window")
+        self.assertIn("-d", launch[:-1])
 
     def test_intent_is_committed_before_tmux_is_invoked(self):
         seen = []
