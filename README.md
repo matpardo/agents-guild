@@ -1617,8 +1617,17 @@ Any unexpected exception inside a hook is swallowed to a single line
 ## Development
 
 ```
-python3 -m unittest discover -s tests
+TMPDIR=/dev/shm python3 tests/run_parallel.py
 ```
+
+Runs every `tests/test_*.py` module in its own process, `--jobs` at a time
+(the CPU count unless given), prints the output of failing modules and a
+`N modules, N tests, N failed` line, and exits 1 on any failure. Each test
+builds a fresh SQLite database; `TMPDIR=/dev/shm` keeps them in memory, which
+avoids an `fsync` per schema statement and is several times faster than a
+disk-backed `/tmp`. A single module still runs with
+`python3 -m unittest tests.test_<name>`, and the serial
+`python3 -m unittest discover -s tests` keeps working.
 
 Coverage (dev-only, not a runtime dependency):
 
