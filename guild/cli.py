@@ -433,7 +433,10 @@ def _handle_lifecycle_run(ctx, args):
 def _handle_resources(ctx, args):
     from guild.commands import resources as resources_commands
 
-    _print(resources_commands.run_collect(ctx))
+    if args.resources_action == "collect":
+        _print(resources_commands.run_collect(ctx))
+        return 0
+    _print_lines(resources_commands.run_report(ctx, args.project, args.since))
     return 0
 
 
@@ -823,9 +826,11 @@ def build_parser():
     lifecycle_run.set_defaults(handler=_handle_lifecycle_run)
 
     resources = subparsers.add_parser("resources")
-    resources_actions = resources.add_subparsers(dest="resources_action", required=True)
-    resources_collect = resources_actions.add_parser("collect")
-    resources_collect.set_defaults(handler=_handle_resources)
+    resources.add_argument("--project")
+    resources.add_argument("--since", default="1d")
+    resources.set_defaults(handler=_handle_resources)
+    resources_actions = resources.add_subparsers(dest="resources_action", required=False)
+    resources_actions.add_parser("collect")
 
     sync_timer = subparsers.add_parser("sync-timer")
     sync_timer_actions = sync_timer.add_subparsers(dest="timer_action", required=True)
