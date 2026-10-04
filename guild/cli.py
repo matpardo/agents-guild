@@ -352,6 +352,13 @@ def _handle_history(ctx, args):
     return 0
 
 
+def _handle_cost(ctx, args):
+    from guild.commands import cost as cost_commands
+
+    _print_lines(cost_commands.run(ctx, args.since, args.by, args.project))
+    return 0
+
+
 def _handle_board(ctx, args):
     from guild.commands import board as board_commands
 
@@ -740,6 +747,12 @@ def build_parser():
     history.add_argument("--raid")
     history.add_argument("--project")
     history.set_defaults(handler=_handle_history)
+
+    cost = subparsers.add_parser("cost")
+    cost.add_argument("--since", default=None)
+    cost.add_argument("--by", choices=("session", "party", "model", "quest", "task"), default="session")
+    cost.add_argument("--project", default=None)
+    cost.set_defaults(handler=_handle_cost)
 
     next_parser = subparsers.add_parser("next")
     next_parser.add_argument("--all", action="store_true")

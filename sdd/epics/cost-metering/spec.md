@@ -2,7 +2,7 @@
 epic: cost-metering
 type: spec
 title: Measure what each party costs
-status: draft
+status: active
 owner: matpardo
 created: 2026-10-04
 updated: 2026-10-04
@@ -22,7 +22,7 @@ A three-day sample of the first raid showed output is 0.1–0.3% of the volume: 
 
 - Read `message.usage` and `message.model` from Claude Code transcripts (sessions and subagents), with a per-transcript byte-offset cursor so re-runs are incremental.
 - Map session to party through the event log; attribute to a task by the `task.started`–`task.done` window.
-- Store one `cost.sampled` local event per session, day and model (aggregate, never per message).
+- Aggregate per session, day, model and task: `cost.sampled` local events carry increments, never one event per message.
 - `guild cost [--since] [--by session|party|model|quest|task] [--project]`.
 
 ## Out of scope
@@ -36,4 +36,4 @@ A three-day sample of the first raid showed output is 0.1–0.3% of the volume: 
 
 ## Security and data
 
-Transcripts hold full conversations; only the `usage` and `model` fields are read and nothing else is stored.
+Transcripts hold full conversations; only the usage and model fields, plus type, timestamp and message id used only to dedupe and bucket, are read and nothing else is stored.
