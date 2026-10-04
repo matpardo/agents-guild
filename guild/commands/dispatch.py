@@ -49,10 +49,18 @@ def _decision_line(launcher, project_config, trigger, mode, dry_run):
     return launcher.decide(project_config, trigger, mode)
 
 
+def _trigger_or_error(ctx, projects, trigger_for, event, lines):
+    try:
+        return trigger_for(ctx.conn, projects, event)
+    except Exception as error:
+        lines.append("{}: event {} skipped ({})".format(event["project"] or "-", event["seq"], type(error).__name__))
+        return None
+
+
 def _event_lines(ctx, launcher, projects, enabled, active, event, dry_run, ignored):
     lines = []
     for rule, trigger_for in dispatch_rules.RULES.items():
-        trigger = trigger_for(ctx.conn, projects, event)
+        trigger = _trigger_or_error(ctx, projects, trigger_for, event, lines)
         if trigger is None:
             continue
         project_config = enabled.get(trigger.project)

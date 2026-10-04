@@ -1,7 +1,8 @@
 import json
 import os
+from unittest import mock
 
-from guild import db, events
+from guild import db, dispatch_rules, events
 from guild.cli import _build_context
 from guild.commands import dispatch as dispatch_commands
 from tests.fake_tmux import FakeTmux
@@ -162,3 +163,49 @@ class AnsweredAskTests(AskAnsweredBase):
         self.answer(1, "yes")
         self.assertEqual(self.run_pass(), ["nothing to dispatch"])
         self.assertEqual(self.tmux.launch_calls(), [])
+
+
+def _malformed(conn, projects, event):
+    if event["kind"] != "notice.seen":
+        return None
+    return event["payload"]["missing"]
+
+
+class PoisonEventTests(AskAnsweredBase):
+    def setUp(self):
+        super().setUp()
+        patcher = mock.patch.dict(dispatch_rules.RULES, {"malformed": _malformed})
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
+    def record_poison(self):
+        ctx = _build_context(None, self.repo_dir)
+        try:
+            with db.writing(ctx.conn):
+                return events.record(
+                    ctx.conn, ctx.now, ctx.origin, None, None, "acme", "notice.seen", "guild", {"id": 1}
+                )
+        finally:
+            ctx.conn.close()
+
+    def test_malformed_event_is_skipped_and_the_pass_continues(self):
+        self.prepare()
+        bad = self.record_poison()
+        self.answer(1, "yes")
+        lines = self.run_pass()
+        self.assertEqual(lines[0], "acme: event {} skipped (KeyError)".format(bad["seq"]))
+        self.assertEqual(len(lines), 2)
+        self.assertEqual(len(self.tmux.launch_calls()), 1)
+        ctx = _build_context(None, self.repo_dir)
+        cursor = ctx.conn.execute("SELECT last_seq FROM dispatch_cursors WHERE project = 'acme'").fetchone()
+        ctx.conn.close()
+        self.assertGreater(cursor["last_seq"], bad["seq"])
+        self.assertEqual(self.run_pass(), ["nothing to dispatch"])
+
+    def test_malformed_event_in_dry_run_is_reported_too(self):
+        self.prepare()
+        bad = self.record_poison()
+        ctx = _build_context(None, self.repo_dir)
+        lines = dispatch_commands.run(ctx, True, self.tmux, self.pushes.append)
+        ctx.conn.close()
+        self.assertEqual(lines, ["acme: event {} skipped (KeyError)".format(bad["seq"])])
