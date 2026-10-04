@@ -135,6 +135,20 @@ main {
   max-width: 60rem;
 }
 
+.column {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.notices-section > summary {
+  cursor: pointer;
+}
+
+.notices-section > summary h2 {
+  display: inline;
+}
+
 @media (min-width: 1000px) {
   main {
     display: grid;
@@ -144,18 +158,16 @@ main {
     gap: 1.5rem;
   }
 
-  main > section {
-    grid-column: 1;
+  .column {
     min-width: 0;
   }
 
-  #merge-queues {
+  .column-left {
+    grid-column: 1;
+  }
+
+  .column-right {
     grid-column: 2;
-    grid-row: 1 / span 4;
-    position: sticky;
-    top: 1rem;
-    max-height: calc(100vh - 2rem);
-    overflow-y: auto;
   }
 }
 

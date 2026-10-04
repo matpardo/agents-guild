@@ -17,6 +17,7 @@
     raidFilter: "all",
     openParties: {},
     resourcesOpen: false,
+    noticesOpen: true,
     openResourceProjects: {},
     openContexts: {},
     drafts: {},
@@ -701,9 +702,18 @@
     var newCount = notices.filter(function (notice) {
       return !notice.seen;
     }).length;
-    section.appendChild(textEl("h2", "notices (" + notices.length + ") · " + newCount + " new"));
-    section.appendChild(renderSeenAllControls(newCount));
-    appendAll(section, notices.map(renderNotice));
+    var details = el("details");
+    details.className = "notices-section";
+    details.open = state.noticesOpen;
+    details.addEventListener("toggle", function () {
+      state.noticesOpen = details.open;
+    });
+    var summary = el("summary");
+    summary.appendChild(textEl("h2", "notices (" + notices.length + ") · " + newCount + " new"));
+    details.appendChild(summary);
+    details.appendChild(renderSeenAllControls(newCount));
+    appendAll(details, notices.map(renderNotice));
+    section.appendChild(details);
   }
 
   function renderDriftEntry(entry) {
