@@ -24,6 +24,7 @@ Communication is pull-only: answered asks, red CI and merged PRs reach a party o
 - Rules: answered ask → launch the asking party on that task; failing checks → launch the PR owner with the filtered log; converged and green PR → mark it ready and notify; merged PR → tell the next in the queue to rebase.
 - Opt-in per project and per rule; dry-run unless enabled; never launch a party whose session is working (`session-liveness`).
 - Decision `20261004_dispatcher-launches-fresh-sessions`.
+- Lifecycle commands (`lifecycle-commands`) run from `guild sync --source gh` today; they move under the dispatcher when it lands, reusing the same runner and lock.
 
 ## Out of scope
 

@@ -6,6 +6,7 @@ from pathlib import Path
 from guild import config, db, events, localbase, timeutil
 from guild.adapters import github, jira_acli, sdd
 from guild.commands import claim as claim_commands
+from guild.commands import lifecycle as lifecycle_commands
 from guild.commands import notice as notice_commands
 from guild.commands import raid as raid_commands
 from guild.errors import GuildError
@@ -26,6 +27,7 @@ _STATUS_CONTEXT_SUCCESS_STATE = "SUCCESS"
 _DRAFT_SUB_LIFECYCLES = ("converging",)
 
 _MERGED_GH_STATE = "MERGED"
+_CLOSED_GH_STATE = "CLOSED"
 _MERGE_NOTICE_TTL = "12h"
 _MERGE_NOTICE_TEMPLATE = "{}#{} merged in main ({}). Parties with open branches: rebase."
 _MERGE_NOTICE_SHARED_AREAS_SUFFIX = " Shared areas touched: {}"
@@ -143,6 +145,20 @@ def _sync_pr(ctx, projects, row, failures):
 
 def _became_merged(row, lifecycle):
     return lifecycle == "merged" and row["gh_state"] != _MERGED_GH_STATE
+
+
+def _became_closed(row, lifecycle):
+    return lifecycle == "closed" and row["gh_state"] != _CLOSED_GH_STATE
+
+
+def _lifecycle_trigger(row, lifecycle):
+    if row["seeded"] == 1:
+        return None
+    if _became_merged(row, lifecycle):
+        return ("on_pr_merged", row["repo"], row["number"])
+    if _became_closed(row, lifecycle):
+        return ("on_pr_closed", row["repo"], row["number"])
+    return None
 
 
 def _project_for_repo(projects, repo):
@@ -434,13 +450,14 @@ def _sync_main_status(ctx, projects, failures):
             _sync_repo_main_status(ctx, project, clone["repo"], base, failures)
 
 
-def _sync_gh(ctx):
+def _sync_gh(ctx, lifecycle_runner):
     rows = ctx.conn.execute(
         "SELECT * FROM prs WHERE lifecycle NOT IN ('merged', 'closed')"
     ).fetchall()
     failures = []
     projects = config.load_all_projects(ctx.projects_dir)
     merged_repos = set()
+    triggers = []
     for row in rows:
         try:
             lifecycle = _sync_pr(ctx, projects, row, failures)
@@ -450,10 +467,14 @@ def _sync_gh(ctx):
         if _became_merged(row, lifecycle):
             _handle_merge(ctx, projects, row, failures)
             merged_repos.add(row["repo"])
+        trigger = _lifecycle_trigger(row, lifecycle)
+        if trigger is not None:
+            triggers.append(trigger)
     _fast_forward_merged_bases_mutating_git(ctx, projects, merged_repos)
     _check_migration_clashes(ctx, projects, failures)
     _sync_main_status(ctx, projects, failures)
     _close_met_notices(ctx)
+    lifecycle_commands.run_sync_triggers(ctx, projects, triggers, lifecycle_runner)
     return failures
 
 
@@ -678,9 +699,9 @@ def _sync_tracker(ctx):
     return failures
 
 
-def run(ctx, source):
+def run(ctx, source, lifecycle_runner):
     if source == "gh":
-        return _sync_gh(ctx)
+        return _sync_gh(ctx, lifecycle_runner)
     if source == "sdd":
         return _sync_sdd(ctx)
     if source == "tracker":

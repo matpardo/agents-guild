@@ -23,6 +23,7 @@ Leaders spend tokens checking the merge queue, CI, tracker and SDD drift, and op
 - Officers as dispatcher rules with a check script: red main, tracker and SDD drift, stalled PRs, conflicts on hot files, cost over budget.
 - On a finding, an officer opens an incident for the owning party or launches one session through the dispatcher.
 - A generated summary for the human after an absence, instead of the notice feed.
+- A resource officer: watches disk and RAM thresholds, runs the project's declared cleanup command (see `lifecycle-commands`) and warns the human; it never deletes volumes or caches on its own.
 
 ## Out of scope
 

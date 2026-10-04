@@ -93,6 +93,92 @@ class ValidateProjectConfigTests(unittest.TestCase):
                 with self.assertRaises(GuildError):
                     config.validate_project_config(self._with_notify({"command": command}))
 
+    def _with_lifecycle(self, lifecycle):
+        return {"name": "acme", "paths": ["/tmp/*"], "github": {"repos": []}, "lifecycle": lifecycle}
+
+    def _assert_lifecycle_rejected(self, lifecycle, fragment):
+        with self.assertRaises(GuildError) as raised:
+            config.validate_project_config(self._with_lifecycle(lifecycle))
+        self.assertIn(fragment, raised.exception.message)
+
+    def test_accepts_absent_lifecycle(self):
+        config.validate_project_config({"name": "acme", "paths": ["/tmp/*"], "github": {"repos": []}})
+
+    def test_accepts_valid_lifecycle(self):
+        config.validate_project_config(
+            self._with_lifecycle(
+                {
+                    "on_pr_merged": {"command": ["scripts/cleanup-merged.sh", "--dry-run"], "timeout_minutes": 30},
+                    "on_pr_closed": {"command": ["scripts/cleanup-merged.sh"], "timeout_minutes": 5},
+                }
+            )
+        )
+
+    def test_rejects_lifecycle_that_is_not_an_object(self):
+        self._assert_lifecycle_rejected(["x"], "'lifecycle' must be an object")
+
+    def test_rejects_unknown_lifecycle_event(self):
+        self._assert_lifecycle_rejected(
+            {"on_main_red": {"command": ["x"], "timeout_minutes": 1}}, "on_main_red"
+        )
+
+    def test_rejects_lifecycle_command_string(self):
+        self._assert_lifecycle_rejected(
+            {"on_pr_merged": {"command": "scripts/x.sh", "timeout_minutes": 1}},
+            "project config 'lifecycle.on_pr_merged.command' must be a non-empty list of strings",
+        )
+
+    def test_rejects_bare_list_event_value_with_hint(self):
+        self._assert_lifecycle_rejected(
+            {"on_pr_merged": ["scripts/x.sh"]},
+            "project config 'lifecycle.on_pr_merged' must be an object with 'command' and 'timeout_minutes'",
+        )
+
+    def test_rejects_empty_lifecycle_command(self):
+        self._assert_lifecycle_rejected(
+            {"on_pr_merged": {"command": [], "timeout_minutes": 1}}, "'lifecycle.on_pr_merged.command'"
+        )
+
+    def test_rejects_lifecycle_command_with_empty_element(self):
+        self._assert_lifecycle_rejected(
+            {"on_pr_merged": {"command": ["x", ""], "timeout_minutes": 1}}, "'lifecycle.on_pr_merged.command'"
+        )
+
+    def test_rejects_missing_timeout(self):
+        self._assert_lifecycle_rejected(
+            {"on_pr_closed": {"command": ["x"]}}, "exactly the keys 'command' and 'timeout_minutes'"
+        )
+
+    def test_rejects_invalid_timeout_values(self):
+        for timeout in (True, 0, -3, "30", 1.5):
+            with self.subTest(timeout=timeout):
+                self._assert_lifecycle_rejected(
+                    {"on_pr_merged": {"command": ["x"], "timeout_minutes": timeout}},
+                    "project config 'lifecycle.on_pr_merged.timeout_minutes' must be a positive integer",
+                )
+
+    def test_rejects_timeout_above_one_day(self):
+        self._assert_lifecycle_rejected(
+            {"on_pr_merged": {"command": ["x"], "timeout_minutes": 1441}}, "at most 1440"
+        )
+
+    def test_accepts_timeout_of_one_day(self):
+        config.validate_project_config(
+            self._with_lifecycle({"on_pr_merged": {"command": ["x"], "timeout_minutes": 1440}})
+        )
+
+    def test_rejects_project_names_that_traverse_paths(self):
+        for name in ("../evil", "a/b", ".hidden", "a..b"):
+            with self.subTest(name=name):
+                with self.assertRaises(GuildError):
+                    config.validate_project_config({"name": name, "paths": ["/tmp/*"], "github": {"repos": []}})
+
+    def test_rejects_extra_lifecycle_event_key(self):
+        self._assert_lifecycle_rejected(
+            {"on_pr_merged": {"command": ["x"], "timeout_minutes": 1, "shell": True}},
+            "exactly the keys 'command' and 'timeout_minutes'",
+        )
+
     def test_rejects_tracker_that_is_not_an_object(self):
         with self.assertRaises(GuildError):
             config.validate_project_config(
