@@ -194,9 +194,23 @@ def _handle_dismiss(ctx, args):
     return 0
 
 
+def _handle_ask_detail(ctx, args):
+    from guild import ask_detail
+
+    if args.all or args.party is not None or args.since is not None:
+        raise GuildError("guild asks <id> takes no filters", 1)
+    row = ctx.conn.execute("SELECT * FROM asks WHERE id = ?", (args.ask_id,)).fetchone()
+    if row is None:
+        raise GuildError("unknown ask #{}".format(args.ask_id), 1)
+    _print_lines(ask_detail.render_lines(ask_detail.build(ctx, row)))
+    return 0
+
+
 def _handle_asks(ctx, args):
     from guild.commands import board as board_commands
 
+    if args.ask_id is not None:
+        return _handle_ask_detail(ctx, args)
     if not args.all:
         if args.party is not None or args.since is not None:
             raise GuildError("--party/--since need --all", 1)
@@ -720,6 +734,7 @@ def build_parser():
     dismiss.set_defaults(handler=_handle_dismiss)
 
     asks = subparsers.add_parser("asks")
+    asks.add_argument("ask_id", type=int, nargs="?")
     asks.add_argument("--all", action="store_true")
     asks.add_argument("--party")
     asks.add_argument("--since")

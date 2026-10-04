@@ -5,7 +5,7 @@ from guild.ids import next_id
 from guild.errors import GuildError
 
 
-def _card_known(ctx, project, project_config, key):
+def card_known(ctx, project, project_config, key):
     if project is not None:
         row = ctx.conn.execute(
             "SELECT key FROM cards WHERE project = ? AND key = ?", (project, key)
@@ -34,7 +34,7 @@ def _validate_refs(ctx, project, project_config, ref_list):
             if row is None:
                 raise GuildError("ask ref '{}' does not match a tracked PR".format(raw), 1)
         elif parsed.startswith("card:"):
-            if not _card_known(ctx, project, project_config, parsed[len("card:"):]):
+            if not card_known(ctx, project, project_config, parsed[len("card:"):]):
                 raise GuildError("ask ref '{}' does not match a known card".format(raw), 1)
         else:
             quest, tid = parsed[len("task:"):].split("/", 1)
