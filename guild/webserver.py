@@ -13,6 +13,7 @@ from guild.commands import board as board_commands
 from guild.commands import history as history_commands
 from guild.commands import notice as notice_commands
 from guild.errors import GuildError
+from guild.resources import report as resources_report
 
 _WEB_DIR = Path(__file__).resolve().parent / "web"
 
@@ -30,6 +31,7 @@ _SEEN_ALL_PATH = "/api/notices/seen-all"
 _ASK_DETAIL_RE = re.compile(r"^/api/asks/(\d+)$")
 _ASK_ID_RE = re.compile(r"^[1-9][0-9]{0,17}$")
 _JSON_CONTENT_TYPE = "application/json; charset=utf-8"
+_RESOURCES_SINCE = "1d"
 
 _SECURITY_HEADERS = (
     (
@@ -69,6 +71,18 @@ def _history_model(query):
             _first_param(params, "raid"),
             _first_param(params, "project"),
             ctx.projects_dir,
+        )
+
+    return build
+
+
+def _resources_model(query):
+    params = parse_qs(query)
+    since = _first_param(params, "since") or _RESOURCES_SINCE
+
+    def build(ctx):
+        return resources_report.build_model(
+            ctx.conn, ctx.now, _first_param(params, "project"), since, ctx.projects_dir
         )
 
     return build
@@ -248,6 +262,8 @@ class BoardRequestHandler(http_server.BaseHTTPRequestHandler):
         ctx = _board_context()
         try:
             payload = build_model(ctx)
+        except GuildError as error:
+            return self._write_json(422, {"error": error.message})
         finally:
             ctx.conn.close()
         body = json.dumps(payload).encode("utf-8")
@@ -279,6 +295,8 @@ class BoardRequestHandler(http_server.BaseHTTPRequestHandler):
             return self._serve_file("progress.html", "text/html; charset=utf-8")
         if path == "/api/history":
             return self._serve_model(_history_model(parts.query))
+        if path == "/api/resources":
+            return self._serve_model(_resources_model(parts.query))
         if path == "/api/session":
             return self._serve_session()
         if path in _STATIC_FILES:

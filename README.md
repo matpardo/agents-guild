@@ -148,6 +148,9 @@ guild main green <owner/repo>                   # clear the manual red mark
 
 guild history [--party <name>] [--raid <name>] [--project <name>]   # read-only: in-progress quests, completed quests, quests closed without completing, finished raids, totals
 guild cost [--since <dur>] [--by session|party|model|quest|task] [--project <name>]   # token usage from Claude Code transcripts, in M tokens
+guild resources [--project <name>] [--since <dur>]   # read-only: what each project costs the machine in disk, with growth since the baseline
+guild resources collect                                # measure and record a resources.sampled event per project
+guild resources-timer install --every <dur> | uninstall | print
 guild board [--party <name> | --raid <name>]
 guild web --port <n>
 guild sync --source gh|sdd|tracker
@@ -445,6 +448,126 @@ descending. With nothing to show it prints `no cost data`.
 
 Limitations: usage recorded before a session is bound is `unbound` and is not
 reattributed afterwards. There is no pricing: only token counts.
+
+### `guild resources`
+
+Shows per project how much disk the repo occupies and how it grew, so a repo
+filling the machine is noticed before the disk is full, even when nobody was
+watching. It measures and reports; it never deletes, cleans or alerts (cleanup
+belongs to the lifecycle commands), it does not measure per-container or
+per-process memory, and it has no thresholds.
+
+```
+guild resources collect                 # measure now and record the samples
+guild resources [--project <name>] [--since 1d]
+guild resources-timer install --every 2h | uninstall | print --every 2h
+```
+
+`collect` is what records history; the report only reads it. Run `collect` on a
+timer: `guild resources-timer install --every 2h` writes
+`guild-resources-collect.service` and `guild-resources-collect.timer` next to
+the sync timer (same rules as `guild sync-timer`; `print` only prints them).
+The service runs at `Nice=19` and `IOSchedulingClass=idle`. Every 2 hours is
+the recommended cadence.
+
+What is measured:
+
+| Category | Source | Attributed to |
+| --- | --- | --- |
+| `worktree` | `du -s -B1 -x` of each clone and `git worktree list` entry, excluding worktrees nested inside it | the project whose clone lists it |
+| `docker_container` | writable layer of each container | compose working directory label |
+| `docker_image` | unique size of each image | its containers, else the compose project name prefix |
+| `docker_volume` | size of each volume | compose project label |
+| `claude_scratch` | `/tmp/claude-<uid>/<encoded cwd>/...` | the checkout whose encoded path matches |
+| `claude_transcripts` | `~/.claude/projects/<encoded cwd>/...` | the checkout whose encoded path matches |
+| `docker` | marker row, only when Docker cannot be read | unattributed |
+
+Machine totals are stored with every sample: disk used and total of `/`,
+memory total and available, Docker totals (images, reclaimable images,
+containers, volumes, build cache) and the size of the guild database with its
+`-wal` and `-shm` files. Build cache is machine-level only.
+
+Attribution: a checkout directory name encoded like Claude Code does
+(`/home/u/app` becomes `-home-u-app`) matches the directories whose name is
+that or starts with it plus `-`; when several checkouts match, across all
+projects, the longest path wins. A Docker object follows the compose labels
+`com.docker.compose.project` and `com.docker.compose.project.working_dir`: a
+container goes to the project whose checkout or `paths` prefix contains the
+working directory (longest wins, a tie goes to the first project by name). A
+volume follows the working directory of its compose project, or a worktree
+whose name matches the compose project. An image follows the containers that
+use it when they agree, else the longest compose project name that prefixes its
+repository. What cannot be attributed goes to `unattributed`. Image size is the
+unique size, so layers shared between images are not counted per image and the
+sum is approximate.
+
+Flags, computed at collect time and stored with the sample:
+
+- `merged, still on disk` and `closed, still on disk`: the latest PR of the
+  worktree's branch is merged or closed. The main checkout and detached
+  worktrees are never flagged.
+- `orphaned`: the compose project's working directory no longer exists, or it
+  has no container and no checkout whose name matches it.
+- `dangling`: an image with no repository. `unused`: an unattributed image no
+  container uses (dangling wins).
+
+Reading the report: it compares the latest sample of each project with a
+baseline, the newest sample at or before `--since` (default `1d`) or, if none is
+that old, the oldest one, marked `(oldest available)`. With a single sample
+there is no baseline and no deltas. Per category it shows the total and delta
+and the 10 biggest items (`+N more` for the rest); an item absent from the
+baseline is `new`. `top growers` lists the up to 5 items that grew at least
+1 MiB (a new item counts with its whole size). The `machine` line shows disk
+use, memory available, Docker totals, the database size and the sample age.
+`untracked growth` appears when the disk grew at least 1 GiB more than every
+tracked delta together, which is how the next unknown cause shows up.
+
+```
+machine   disk 82% used (412.0 GB of 500.0 GB, +6.0 GB in 1d)   ram 9.0 GB available of 31.0 GB
+          docker 17.4 GB (reclaimable 5.2 GB)   guild.db 173 MB   sampled 41m ago
+untracked growth: +1.4 GB (machine +6.0 GB, tracked +4.6 GB)
+
+acme   total 9.7 GB (+4.4 GB)   baseline 2026-10-02 09:00 (sampled 41m ago)
+  worktree           7.3 GB (+2.1 GB)
+    /home/u/acme/app                            4.1 GB   +300 MB
+    /home/u/acme/app/.claude/worktrees/feat-x   3.2 GB   +1.8 GB   merged, still on disk
+  docker_image       2.3 GB (+2.2 GB)
+    acme-feat-x-web:latest                      2.3 GB   +2.2 GB   orphaned
+  top growers: acme-feat-x-web:latest +2.2 GB, feat-x +1.8 GB, app +300 MB
+```
+
+Unavailable and slow parts: nothing that cannot be measured stops a collect or
+becomes a zero. An item that could not be read is `unavailable`, one whose
+`du` hit the 300 s limit or arrived after the 20 minute whole-run deadline is
+`skipped`, and a vanished worktree is `missing`; all store null bytes, show as
+`?` and are left out of totals and deltas. Docker failures record a `docker`
+marker with the reason (`not installed`, `permission denied`, `daemon
+unreachable`, `timeout`, `unparseable`). The summary line, for example
+`sampled 4 projects, 87 items in 94s; unavailable: docker (permission denied);
+skipped: 2`, exits 0 unless there are no projects or the write fails. A
+collect that finds another one running prints `collect already running` and
+exits 0 (lock `$XDG_STATE_HOME/guild/resources/collect.lock`).
+
+Cost and storage: sizes are measured one at a time with `du`, which can take
+minutes on large trees, hence the timer's low priority. All measuring happens
+before a single write transaction records every event, so the database is
+never locked while `du` or Docker runs. Each collect adds one `resources.sampled`
+local event per project plus one for unattributed items, roughly 3 KB each; at
+the recommended cadence that is about 30-40 MB a year in total. Samples are not
+pruned: there is no retention policy yet.
+
+Web: the board has a collapsible "resources" section built from
+`GET /api/resources[?project=<name>&since=<dur>]` (default `since=1d`), the
+same model as the CLI: `machine`, `projects` and `unattributed`, each with
+categories, items, growers and the baseline. An unknown project or invalid
+window answers 422. It is not part of `/api/board`, and every category and flag
+has a tooltip.
+
+Privacy: collection is read-only and runs a fixed argv with no shell and a
+timeout; nothing from a project config is executed. Samples hold local paths,
+branch names, Docker object names and byte counts, as local events that are
+never exported. Of a container only its name, size, compose project name and
+working directory are read: no commands, environment or other labels.
 
 ### Lifecycle commands
 
@@ -787,7 +910,8 @@ page re-fetches `/api/board` every 15 seconds,
 keeping the current filters and which blocks are collapsed. PR links open
 `https://github.com/<repo>/pull/<n>` in a new tab; a task also links to its
 tracker card when the project configures `tracker.browse_url` (see
-"Project config").
+"Project config"). A collapsible "resources" section at the bottom shows the
+`guild resources` report from `GET /api/resources` (see "`guild resources`").
 
 **Colors**: the page uses the terminal board's meanings, with CSS classes
 only (no inline style) and light and dark variants through
@@ -1325,7 +1449,8 @@ Append-only `events` table (SQLite, WAL, `busy_timeout=5000`, writes wrapped
 in `BEGIN IMMEDIATE`) plus projection tables kept in sync in the same
 transaction: `parties`, `leaders`, `quests`, `quest_tasks`, `epics`, `tasks`,
 `prs`, `cards`, `asks`, `notices`, `claims`, `raid_members`, `pr_shared_areas`,
-`merge_queue_pins`, `cost_samples`, `cursors`, `transcript_cursors`. `guild
+`merge_queue_pins`, `cost_samples`, `resource_samples`, `resource_machine`,
+`cursors`, `transcript_cursors`. `guild
 rebuild` drops every projection and replays all events from scratch — the only
 exceptions are `cursors` and `transcript_cursors`, which are read positions
 (per session and per transcript), not domain state, and are left untouched by
@@ -1353,6 +1478,7 @@ Default paths (all overridable via env, useful for tests):
 - State: `$XDG_STATE_HOME/guild/` (default `~/.local/state/guild/`).
 - Claude sessions: `$GUILD_CLAUDE_SESSIONS_DIR` (default `~/.claude/sessions`).
 - Claude transcripts: `$GUILD_CLAUDE_PROJECTS_DIR` (default `~/.claude/projects`).
+- Claude scratchpads: `$GUILD_CLAUDE_SCRATCH_DIR` (default `/tmp/claude-<uid>`).
 
 `guild` sets `umask 0o077` at CLI entry and explicitly `chmod`s the DB file
 (and its `-wal`/`-shm` siblings) to `0600` and the DB, state, handoffs and
@@ -1387,6 +1513,12 @@ parses only `message.usage`, `message.model`, `type`, `timestamp` and
 stored. The stored `cost.sampled` events and `cost_samples` rows hold token
 counts, model name, UTC day, session id, party, quest and task, never
 conversation text.
+
+`guild resources collect` stores local paths of checkouts and worktrees, branch
+names, Docker object names, compose project names and byte counts in
+`resources.sampled` events and the `resource_samples` and `resource_machine`
+projections. They are local events, never exported, and contain no file
+contents, container commands or environment.
 
 ## Seed schema
 

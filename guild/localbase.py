@@ -9,6 +9,7 @@ _URL_SEPARATOR = re.compile(r"[/:]")
 _GIT_SUFFIX = ".git"
 _BRANCH_PREFIX = "branch refs/heads/"
 _WORKTREE_PREFIX = "worktree "
+_PRUNABLE_PREFIX = "prunable"
 
 
 def _git(path, args):
@@ -118,6 +119,29 @@ def _checked_out_worktree(clone_path, base):
         elif line == _BRANCH_PREFIX + base:
             return current
     return None
+
+
+def _worktree_block(lines, is_main):
+    entry = {"path": lines[0][len(_WORKTREE_PREFIX):], "branch": None, "is_main": is_main, "prunable": False}
+    for line in lines[1:]:
+        if line.startswith(_BRANCH_PREFIX):
+            entry["branch"] = line[len(_BRANCH_PREFIX):]
+        elif line == _PRUNABLE_PREFIX or line.startswith(_PRUNABLE_PREFIX + " "):
+            entry["prunable"] = True
+    return entry
+
+
+def worktrees(clone_path):
+    code, out, _ = _git(clone_path, ["worktree", "list", "--porcelain"])
+    if code != 0:
+        return []
+    entries = []
+    for block in out.split("\n\n"):
+        lines = [line for line in block.splitlines() if line]
+        if not lines or not lines[0].startswith(_WORKTREE_PREFIX):
+            continue
+        entries.append(_worktree_block(lines, not entries))
+    return entries
 
 
 def origin_tip(clone_path, base):

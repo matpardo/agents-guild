@@ -22,6 +22,15 @@ class DurationParsingTests(unittest.TestCase):
         with self.assertRaises(GuildError):
             timeutil.parse_duration("30 minutes")
 
+    def test_rejects_duration_beyond_ten_years(self):
+        with self.assertRaises(GuildError):
+            timeutil.parse_duration("99999999999d")
+        with self.assertRaises(GuildError):
+            timeutil.parse_duration("3651d")
+
+    def test_accepts_ten_years(self):
+        self.assertEqual(timeutil.parse_duration("3650d"), timedelta(days=3650))
+
     def test_rejects_unit_missing(self):
         with self.assertRaises(GuildError):
             timeutil.parse_duration("30")

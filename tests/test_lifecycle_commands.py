@@ -186,7 +186,7 @@ class RunSyncTriggersTests(LifecycleFixture):
         )
 
     def test_lock_failure_is_recorded_as_error(self):
-        with mock.patch("guild.commands.lifecycle.paths.ensure_private_dir", side_effect=OSError("disk full")):
+        with mock.patch("guild.locking.paths.ensure_private_dir", side_effect=OSError("disk full")):
             self._run([("on_pr_merged", "acme/app", 1)], FakeRunner([]))
         payload = self.ran_payloads()[0]
         self.assertEqual((payload["status"], payload["reason"]), ("error", "OSError: disk full"))

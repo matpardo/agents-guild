@@ -430,23 +430,35 @@ def _handle_lifecycle_run(ctx, args):
     return 0
 
 
-def _handle_sync_timer(ctx, args):
+def _handle_resources(ctx, args):
+    from guild.commands import resources as resources_commands
+
+    if args.resources_action == "collect":
+        _print(resources_commands.run_collect(ctx))
+        return 0
+    _print_lines(resources_commands.run_report(ctx, args.project, args.since))
+    return 0
+
+
+def _handle_timer(ctx, args):
     from guild.commands import timer as timer_commands
 
+    unit = timer_commands.UNITS[args.timer_unit]
     guild_executable = shutil.which("guild")
     if args.timer_action == "print":
-        _print(timer_commands.print_units(guild_executable, args.every))
+        _print(timer_commands.print_units(unit, guild_executable, args.every))
         return 0
     systemctl_available = shutil.which("systemctl") is not None
     if args.timer_action == "uninstall":
         _print(
             timer_commands.uninstall(
-                paths.systemd_user_dir(), timer_commands.run_systemctl, sys.platform, systemctl_available
+                unit, paths.systemd_user_dir(), timer_commands.run_systemctl, sys.platform, systemctl_available
             )
         )
         return 0
     _print(
         timer_commands.install(
+            unit,
             paths.systemd_user_dir(),
             guild_executable,
             args.every,
@@ -705,6 +717,17 @@ def _add_main_parser(subparsers):
     green.set_defaults(handler=_handle_main_green)
 
 
+def _add_timer_parser(subparsers, command_name, timer_unit):
+    parser = subparsers.add_parser(command_name)
+    actions = parser.add_subparsers(dest="timer_action", required=True)
+    for action in ("install", "print"):
+        action_parser = actions.add_parser(action)
+        action_parser.add_argument("--every", required=True)
+        action_parser.set_defaults(handler=_handle_timer, timer_unit=timer_unit)
+    uninstall = actions.add_parser("uninstall")
+    uninstall.set_defaults(handler=_handle_timer, timer_unit=timer_unit)
+
+
 def build_parser():
     parser = argparse.ArgumentParser(prog="guild")
     subparsers = parser.add_subparsers(dest="command", required=True)
@@ -815,14 +838,15 @@ def build_parser():
     lifecycle_run.add_argument("--dry-run", action="store_true")
     lifecycle_run.set_defaults(handler=_handle_lifecycle_run)
 
-    sync_timer = subparsers.add_parser("sync-timer")
-    sync_timer_actions = sync_timer.add_subparsers(dest="timer_action", required=True)
-    for action in ("install", "print"):
-        action_parser = sync_timer_actions.add_parser(action)
-        action_parser.add_argument("--every", required=True)
-        action_parser.set_defaults(handler=_handle_sync_timer)
-    sync_timer_uninstall = sync_timer_actions.add_parser("uninstall")
-    sync_timer_uninstall.set_defaults(handler=_handle_sync_timer)
+    resources = subparsers.add_parser("resources")
+    resources.add_argument("--project")
+    resources.add_argument("--since", default="1d")
+    resources.set_defaults(handler=_handle_resources)
+    resources_actions = resources.add_subparsers(dest="resources_action", required=False)
+    resources_actions.add_parser("collect")
+
+    _add_timer_parser(subparsers, "sync-timer", "sync-gh")
+    _add_timer_parser(subparsers, "resources-timer", "resources-collect")
 
     drift = subparsers.add_parser("drift")
     drift_scope = drift.add_mutually_exclusive_group()

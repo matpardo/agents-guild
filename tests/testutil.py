@@ -24,6 +24,7 @@ class GuildTestCase(unittest.TestCase):
         self.state_home = self.root / "state"
         self.sessions_dir = self.root / "sessions"
         self.claude_projects_dir = self.root / "claude-projects"
+        self.claude_scratch_dir = self.root / "claude-scratch"
         self.gh_fixtures_dir = self.root / "gh-fixtures"
         self.acli_fixtures_dir = self.root / "acli-fixtures"
         self.bin_dir = self.root / "bin"
@@ -33,6 +34,7 @@ class GuildTestCase(unittest.TestCase):
             self.state_home,
             self.sessions_dir,
             self.claude_projects_dir,
+            self.claude_scratch_dir,
             self.gh_fixtures_dir,
             self.acli_fixtures_dir,
             self.bin_dir,
@@ -51,6 +53,7 @@ class GuildTestCase(unittest.TestCase):
         os.environ["XDG_STATE_HOME"] = str(self.state_home)
         os.environ["GUILD_CLAUDE_SESSIONS_DIR"] = str(self.sessions_dir)
         os.environ["GUILD_CLAUDE_PROJECTS_DIR"] = str(self.claude_projects_dir)
+        os.environ["GUILD_CLAUDE_SCRATCH_DIR"] = str(self.claude_scratch_dir)
         os.environ["GUILD_TEST_GH_DIR"] = str(self.gh_fixtures_dir)
         os.environ["GUILD_TEST_ACLI_DIR"] = str(self.acli_fixtures_dir)
         os.environ["GUILD_ORIGIN"] = "tester@host"
