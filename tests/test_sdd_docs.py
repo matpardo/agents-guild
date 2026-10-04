@@ -6,6 +6,9 @@ from guild.adapters import sdd
 
 _SDD_ROOT = Path(__file__).resolve().parent.parent / "sdd"
 _EPICS_DIR = _SDD_ROOT / "epics"
+_DECISIONS_DIR = _SDD_ROOT / "decisions"
+_README = (_SDD_ROOT.parent / "README.md").read_text()
+_NEW_VOCABULARY = "20261004_vocabulary-short-sessions"
 _STATUSES = {"draft", "active", "done", "archived"}
 _SPEC_KEYS = {"epic", "type", "title", "status", "owner", "created", "updated"}
 _CHILD_KEYS = {"epic", "type", "title", "status", "updated"}
@@ -79,6 +82,25 @@ class SddDocsTests(unittest.TestCase):
                 if status == "done":
                     pending = [task["tid"] for task in tasks if task["sdd_status"] != "done"]
                     self.assertEqual(pending, [])
+
+
+class VocabularyDecisionTests(unittest.TestCase):
+    def test_old_vocabulary_points_at_the_new_one(self):
+        old = (_DECISIONS_DIR / "20260927_vocabulary.md").read_text()
+        self.assertIn("- **Status:** superseded by {}".format(_NEW_VOCABULARY), old)
+
+    def test_new_vocabulary_is_accepted_and_names_every_term(self):
+        new = (_DECISIONS_DIR / "{}.md".format(_NEW_VOCABULARY)).read_text()
+        self.assertIn("- **Status:** accepted", new)
+        self.assertIn("Supersedes `20260927_vocabulary`", new)
+        for term in ("guild", "party", "leader", "generation", "keeper", "quest", "raid lead", "brief"):
+            self.assertIn("| {} |".format(term), new)
+
+    def test_readme_glossary_matches(self):
+        glossary = _README.split("## Glossary")[1].split("## Install")[0]
+        self.assertIn("the live session of a party: zero or one", glossary)
+        for term in ("generation", "keeper", "raid lead", "brief"):
+            self.assertIn("- **{}**".format(term), glossary)
 
 
 if __name__ == "__main__":

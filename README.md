@@ -28,8 +28,12 @@ are updated in the same PR as the code.
   person).
 - **party** — a durable work lineage that survives session handoffs. Session
   names change; the party does not. Owns quests, PRs and claims.
-- **leader** — the current Claude Code session of a party. An attribute of
+- **leader** — the live session of a party: zero or one. An attribute of
   `party`, not a command of its own.
+- **generation** — one session of a party; a handoff or `guild revive` starts
+  the next.
+- **keeper** — a party whose sessions run with Remote Control; only the guild
+  assistant.
 - **quest** — a party's current assignment: a slice of an epic, a whole epic,
   or a stream with no epic at all (e.g. "fix CI costs").
 - **epic** — a planning unit owned by external docs/trackers (out of scope
@@ -40,6 +44,8 @@ are updated in the same PR as the code.
   CI), so a notice can reach exactly that audience. Exists while it has at
   least one active (non-expired) member; join/leave with `guild raid
   join|leave`, post to it with `guild notice create ... --to raid:<name>`.
+- **raid lead** — a party coordinating a raid; a normal local session.
+- **brief** — what a fresh session reads: handoff, task, PR and asks.
 
 ## Install
 
