@@ -165,7 +165,7 @@ class ResumeCommandShellTests(GuildTestCase):
         self.assertFalse(marker.exists())
         self.assertEqual(
             result.stdout.splitlines(),
-            ["alpha", "-n", "alpha-g2", "Continue the work described in the guild handoff."],
+            ["alpha", "-n", "alpha-g2", "Continue the work described in the guild brief."],
         )
 
 

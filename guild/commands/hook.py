@@ -17,6 +17,7 @@ from guild.commands import next as next_commands
 from guild.commands import party as party_commands
 from guild.commands import raid as raid_commands
 from guild.commands import statusline as statusline_commands
+from guild.commands import task_brief
 from guild.errors import GuildError
 from guild.identity import UNBOUND_HINT
 
@@ -50,19 +51,27 @@ def _resume_marker_path(ctx, generation):
     return ctx.state_dir / "hints" / "resumed-{}-g{}".format(identity.cursor_key(ctx.session_id), generation)
 
 
+def _touch_marker(marker):
+    marker.parent.mkdir(parents=True, exist_ok=True)
+    marker.touch()
+
+
 def _resume_lines(ctx, binding):
     if binding["generation"] <= 1:
         return []
     marker = _resume_marker_path(ctx, binding["generation"])
     if marker.exists():
         return []
+    brief_lines = task_brief.render_for_binding(ctx, binding)
+    if brief_lines:
+        _touch_marker(marker)
+        return brief_lines + [""] + next_commands.run(ctx, binding, False, False)
     handoff_content = party_commands.previous_handoff_content(
         ctx.conn, binding["party"], binding["generation"]
     )
     if handoff_content is None:
         return []
-    marker.parent.mkdir(parents=True, exist_ok=True)
-    marker.touch()
+    _touch_marker(marker)
     return [handoff_content, ""] + next_commands.run(ctx, binding, False, False)
 
 

@@ -1,6 +1,6 @@
 import shlex
 
-_RESUME_PROMPT = "Continue the work described in the guild handoff."
+_RESUME_PROMPT = "Continue the work described in the guild brief."
 
 
 def _mode_flag(permission_mode):

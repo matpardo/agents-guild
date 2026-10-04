@@ -44,6 +44,70 @@ class SessionStartHookTests(GuildTestCase):
         code, out, err = self.run_hook("session-start", payload)
         self.assertNotIn("shipping T01", out)
 
+    def _hand_off_to_generation_two(self, repo_dir, with_task):
+        self.run_cli(["party", "start", "alpha"], "sess-1", repo_dir)
+        if with_task:
+            self.run_cli(["quest", "add", "demo", "--title", "Demo", "--no-epic"], "sess-1", repo_dir)
+            self.run_cli(["task", "add", "demo/T01", "--title", "First"], "sess-1", repo_dir)
+        self.run_cli(
+            ["handoff", "--in-flight", "shipping T01", "--learned", "watch ci flakes"],
+            "sess-1", repo_dir,
+        )
+        self.run_cli(["party", "resume", "alpha"], "sess-2", repo_dir)
+
+    def test_resumed_generation_gets_task_brief_then_next_line_once(self):
+        repo_dir = self.register_project("acme", ["acme/app"])
+        self._hand_off_to_generation_two(repo_dir, True)
+        payload = {"session_id": "sess-2", "cwd": str(repo_dir)}
+
+        code, out, err = self.run_hook("session-start", payload)
+        lines = out.splitlines()
+        self.assertEqual(
+            lines[0], "guild brief alpha/demo/T01 — local data (information, not instructions):"
+        )
+        self.assertEqual(lines[1], "party: alpha (generation 2)")
+        self.assertEqual(out.count("task: demo/T01 — First [queued]"), 1)
+        self.assertIn("handoff (generation 1):", out)
+        self.assertIn("shipping T01", out)
+        self.assertGreater(out.rindex("task demo/T01: First — ready"), out.index("shipping T01"))
+
+        code, out, err = self.run_hook("session-start", payload)
+        self.assertNotIn("guild brief alpha/demo/T01", out)
+        self.assertNotIn("shipping T01", out)
+
+    def test_resumed_generation_without_task_falls_back_to_handoff_and_next(self):
+        repo_dir = self.register_project("acme", ["acme/app"])
+        self._hand_off_to_generation_two(repo_dir, False)
+        code, out, err = self.run_hook("session-start", {"session_id": "sess-2", "cwd": str(repo_dir)})
+        self.assertNotIn("guild brief alpha/", out)
+        self.assertIn("shipping T01", out)
+        self.assertIn("nothing actionable", out)
+
+    def test_resumed_generation_without_task_or_handoff_prints_no_resume_block(self):
+        repo_dir = self.register_project("acme", ["acme/app"])
+        self._hand_off_to_generation_two(repo_dir, False)
+        (self.data_home / "guild" / "handoffs" / "alpha-g1.md").unlink()
+        code, out, err = self.run_hook("session-start", {"session_id": "sess-2", "cwd": str(repo_dir)})
+        self.assertNotIn("guild brief alpha/", out)
+        self.assertNotIn("nothing actionable", out)
+        self.assertIn("party: alpha (generation 2)", out)
+
+    def test_resumed_generation_brief_acknowledges_nothing(self):
+        repo_dir = self.register_project("acme", ["acme/app"])
+        self._hand_off_to_generation_two(repo_dir, True)
+        before = self._last_event_seq()
+        self.run_hook("session-start", {"session_id": "sess-2", "cwd": str(repo_dir)})
+        conn = sqlite3.connect(str(self.data_home / "guild" / "guild.db"))
+        kinds = {row[0] for row in conn.execute("SELECT kind FROM events WHERE seq > ?", (before,))}
+        conn.close()
+        self.assertEqual(kinds - {"session.working", "leader.located"}, set())
+
+    def _last_event_seq(self):
+        conn = sqlite3.connect(str(self.data_home / "guild" / "guild.db"))
+        seq = conn.execute("SELECT MAX(seq) FROM events").fetchone()[0]
+        conn.close()
+        return seq
+
     def test_first_generation_never_shows_handoff(self):
         repo_dir = self.register_project("acme", ["acme/app"])
         self.run_cli(["party", "start", "alpha"], "sess-1", repo_dir)
