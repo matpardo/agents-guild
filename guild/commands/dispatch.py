@@ -3,7 +3,6 @@ from datetime import timedelta
 from guild import config, db, dispatch_launch, dispatch_rules, events, locking, timeutil
 
 _MAX_TRIGGER_AGE = timedelta(hours=1)
-_RATE_WINDOW = timedelta(hours=1)
 _LOCK_DIR_NAME = "dispatch"
 _LOCK_FILE_NAME = "dispatch.lock"
 _BUSY_LINE = "another dispatch pass is running"
@@ -44,14 +43,13 @@ def _is_stale(ctx, event):
     return ctx.now - timeutil.from_iso(event["ts"]) > _MAX_TRIGGER_AGE
 
 
-def _decision_line(ctx, trigger, mode, dry_run):
-    verdict = dispatch_launch.evaluate(ctx, trigger, mode)
+def _decision_line(launcher, project_config, trigger, mode, dry_run):
     if dry_run:
-        return dispatch_launch.dry_run_line(trigger, verdict)
-    return dispatch_launch.execute(ctx, trigger, mode, verdict)
+        return launcher.preview(project_config, trigger, mode)
+    return launcher.decide(project_config, trigger, mode)
 
 
-def _event_lines(ctx, projects, enabled, active, event, dry_run, ignored):
+def _event_lines(ctx, launcher, projects, enabled, active, event, dry_run, ignored):
     lines = []
     for rule, trigger_for in dispatch_rules.RULES.items():
         trigger = trigger_for(ctx.conn, projects, event)
@@ -67,7 +65,7 @@ def _event_lines(ctx, projects, enabled, active, event, dry_run, ignored):
         if _is_stale(ctx, event):
             ignored[trigger.project] = ignored.get(trigger.project, 0) + 1
             continue
-        line = _decision_line(ctx, trigger, mode, dry_run)
+        line = _decision_line(launcher, project_config, trigger, mode, dry_run)
         if line is not None:
             lines.append(line)
     return lines
@@ -80,7 +78,7 @@ def _advance_cursors(ctx, active, new_events):
             _set_cursor(ctx.conn, project, last_seq)
 
 
-def _pass(ctx, dry_run):
+def _pass(ctx, launcher, dry_run):
     projects = {project["name"]: project for project in config.load_all_projects(ctx.projects_dir)}
     enabled = {name: project for name, project in projects.items() if "dispatcher" in project}
     known = _cursors(ctx.conn)
@@ -94,7 +92,7 @@ def _pass(ctx, dry_run):
     new_events = events.events_after(ctx.conn, min(active.values()))
     ignored = {}
     for event in new_events:
-        lines.extend(_event_lines(ctx, projects, enabled, active, event, dry_run, ignored))
+        lines.extend(_event_lines(ctx, launcher, projects, enabled, active, event, dry_run, ignored))
     if new_events and not dry_run:
         _advance_cursors(ctx, active, new_events)
     for project in sorted(ignored):
@@ -102,21 +100,14 @@ def _pass(ctx, dry_run):
     return lines or [_NOTHING_LINE]
 
 
-def run(ctx, dry_run):
+def run(ctx, dry_run, tmux, push_runner):
+    launcher = dispatch_launch.Launcher(ctx, tmux, push_runner)
     if dry_run:
-        return _pass(ctx, True)
+        return _pass(ctx, launcher, True)
     with locking.try_lock(ctx.state_dir / _LOCK_DIR_NAME, _LOCK_FILE_NAME) as acquired:
         if not acquired:
             return [_BUSY_LINE]
-        return _pass(ctx, False)
-
-
-def _launches_last_hour(ctx, project):
-    rows = ctx.conn.execute(
-        "SELECT decided_at FROM dispatch_decisions WHERE project = ? AND mode = 'on' AND outcome = 'launching'",
-        (project,),
-    ).fetchall()
-    return len([row for row in rows if ctx.now - timeutil.from_iso(row["decided_at"]) <= _RATE_WINDOW])
+        return _pass(ctx, launcher, False)
 
 
 def _in_flight_line(ctx, row):
@@ -152,7 +143,7 @@ def _project_status(ctx, project_config, cursors):
         "{}: cursor {} | launches last hour {}/{} | mode {}".format(
             name,
             "not initialized" if cursor is None else cursor,
-            _launches_last_hour(ctx, name),
+            dispatch_launch.launches_last_hour(ctx.conn, ctx.now, name),
             block["max_launches_per_hour"],
             block["permission_mode"],
         )

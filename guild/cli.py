@@ -500,12 +500,13 @@ def _handle_timer(ctx, args):
 
 
 def _handle_dispatch(ctx, args):
+    from guild import tmux_windows
     from guild.commands import dispatch as dispatch_commands
 
     if args.dispatch_action == "status":
         _print_lines(dispatch_commands.status(ctx))
         return 0
-    _print_lines(dispatch_commands.run(ctx, args.dry_run))
+    _print_lines(dispatch_commands.run(ctx, args.dry_run, tmux_windows.Tmux(), notify.spawn_detached))
     return 0
 
 

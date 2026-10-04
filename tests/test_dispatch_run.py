@@ -5,6 +5,7 @@ from unittest import mock
 from guild import db, dispatch_rules, events, locking, timeutil
 from guild.cli import _build_context
 from guild.commands import dispatch as dispatch_commands
+from tests.fake_tmux import FakeTmux
 from tests.testutil import GuildTestCase
 
 
@@ -27,6 +28,9 @@ class DispatchRunBase(GuildTestCase):
         self.repo_dir = self.register_project("acme", ["acme/app"])
         self.register_project("beta", ["beta/app"])
         self.set_block({"ask_answered": "dry-run"})
+        self.pushes = []
+        self.run_cli(["party", "start", "alpha"], "sess-1", self.repo_dir)
+        self.run_cli(["handoff", "--in-flight", "x", "--learned", "y"], "sess-1", self.repo_dir)
         patcher = mock.patch.dict(dispatch_rules.RULES, {"ask_answered": _ask_trigger}, clear=True)
         patcher.start()
         self.addCleanup(patcher.stop)
@@ -58,13 +62,16 @@ class DispatchRunBase(GuildTestCase):
 
     def run_pass(self, dry_run):
         ctx = self.ctx()
-        return dispatch_commands.run(ctx, dry_run)
+        return dispatch_commands.run(ctx, dry_run, FakeTmux(True, True, {}, 0), self.pushes.append)
 
     def cursor(self, project):
         row = self.ctx().conn.execute(
             "SELECT last_seq FROM dispatch_cursors WHERE project = ?", (project,)
         ).fetchone()
         return None if row is None else row["last_seq"]
+
+    def max_seq(self):
+        return events.max_seq(self.ctx().conn)
 
     def event_count(self):
         return self.ctx().conn.execute("SELECT COUNT(*) AS n FROM events").fetchone()["n"]
@@ -82,7 +89,7 @@ class FirstPassTests(DispatchRunBase):
         self.assertEqual(self.decisions(), [])
 
     def test_project_without_block_has_no_cursor(self):
-        self.assertEqual(self.run_pass(False), ["acme: cursor initialized at seq 0"])
+        self.assertEqual(self.run_pass(False), ["acme: cursor initialized at seq {}".format(self.max_seq())])
         self.assertIsNone(self.cursor("beta"))
 
     def test_no_enabled_project_prints_nothing_to_dispatch(self):
@@ -110,7 +117,7 @@ class SecondPassTests(DispatchRunBase):
     def test_event_after_cursor_is_decided_and_cursor_advances(self):
         seq = self.answered(7, timedelta(minutes=1))
         lines = self.run_pass(False)
-        self.assertEqual(lines, ["acme: ask_answered ask #7 -> planned: launch alpha"])
+        self.assertEqual(lines, ["acme: ask_answered ask #7 -> planned: launch alpha g2 (dry-run, mode acceptEdits)"])
         self.assertEqual(self.cursor("acme"), seq)
         self.assertEqual([row["key"] for row in self.decisions()], ["ask_answered:7"])
 
@@ -173,7 +180,7 @@ class DryRunTests(DispatchRunBase):
         before = self.event_count()
         cursor_before = self.cursor("acme")
         lines = self.run_pass(True)
-        self.assertEqual(lines, ["acme: ask_answered ask #7 -> would plan launch alpha"])
+        self.assertEqual(lines, ["acme: ask_answered ask #7 -> would plan launch alpha g2 (mode acceptEdits)"])
         self.assertEqual(self.event_count(), before)
         self.assertEqual(self.cursor("acme"), cursor_before)
         self.assertLess(cursor_before, seq)
@@ -200,7 +207,7 @@ class CliTests(DispatchRunBase):
     def test_cli_dry_run_flag(self):
         code, out, err = self.run_cli(["dispatch", "run", "--dry-run"], None, self.repo_dir)
         self.assertEqual(code, 0)
-        self.assertIn("acme: would initialize cursor at seq 0", out)
+        self.assertIn("acme: would initialize cursor at seq {}".format(self.max_seq()), out)
 
     def test_invalid_dispatcher_block_exits_with_error(self):
         path = self.config_home / "guild" / "projects" / "acme.json"

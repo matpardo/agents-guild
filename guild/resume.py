@@ -1,6 +1,6 @@
 import shlex
 
-_RESUME_PROMPT = "Continue the work described in the guild brief."
+RESUME_PROMPT = "Continue the work described in the guild brief."
 
 
 def _mode_flag(permission_mode):
@@ -28,7 +28,7 @@ def resume_command(session_id, party, generation, permission_mode, remote_contro
     )
 
 
-def fresh_command(party, next_generation, model, permission_mode, remote_control):
+def fresh_command(party, next_generation, model, permission_mode, remote_control, prompt):
     model_flag = "" if model is None else " --model {}".format(shlex.quote(model))
     return "GUILD_RESUME={} claude -n {}{}{}{} {}".format(
         shlex.quote(party),
@@ -36,7 +36,7 @@ def fresh_command(party, next_generation, model, permission_mode, remote_control
         model_flag,
         _mode_flag(permission_mode),
         _remote_control_flag(remote_control, party, next_generation),
-        shlex.quote(_RESUME_PROMPT),
+        shlex.quote(prompt),
     )
 
 

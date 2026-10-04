@@ -61,13 +61,13 @@ class ResumeHelperTests(GuildTestCase):
         )
 
     def test_fresh_command_keeps_generation_name_and_adds_mode(self):
-        command = resume.fresh_command("alpha", 3, None, "plan", False)
+        command = resume.fresh_command("alpha", 3, None, "plan", False, resume.RESUME_PROMPT)
         self.assertTrue(
             command.startswith("GUILD_RESUME=alpha claude -n alpha-g3 --permission-mode plan ")
         )
 
     def test_fresh_command_without_mode_or_model(self):
-        command = resume.fresh_command("alpha", 2, None, None, False)
+        command = resume.fresh_command("alpha", 2, None, None, False, resume.RESUME_PROMPT)
         self.assertNotIn("--permission-mode", command)
         self.assertNotIn("--model", command)
 

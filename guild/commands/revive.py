@@ -53,7 +53,9 @@ class _Entry:
     def command(self):
         if self.resumable():
             return resume.resume_command(self.session_id, self.party, self.generation, self.mode, self.keeper)
-        return resume.fresh_command(self.party, self.generation + 1, None, self.mode, self.keeper)
+        return resume.fresh_command(
+            self.party, self.generation + 1, None, self.mode, self.keeper, resume.RESUME_PROMPT
+        )
 
 
 def find_transcript(projects_dir, session_id):
