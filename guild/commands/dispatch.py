@@ -79,6 +79,31 @@ def _event_lines(ctx, launcher, projects, enabled, active, event, dry_run, ignor
     return lines
 
 
+def _deferred_lines(ctx, launcher, enabled, dry_run):
+    rows = ctx.conn.execute(
+        "SELECT * FROM dispatch_decisions WHERE outcome = 'deferred' ORDER BY decided_at ASC, rowid ASC"
+    ).fetchall()
+    lines = []
+    for row in rows:
+        project_config = enabled.get(row["project"])
+        if project_config is None:
+            continue
+        mode = project_config["dispatcher"]["rules"].get(row["rule"])
+        trigger = dispatch_rules.deferred_trigger(ctx.conn, row)
+        if mode is None or trigger is None:
+            continue
+        line = _retry_line(launcher, project_config, trigger, mode, dry_run)
+        if line is not None:
+            lines.append(line)
+    return lines
+
+
+def _retry_line(launcher, project_config, trigger, mode, dry_run):
+    if dry_run:
+        return launcher.preview(project_config, trigger, mode)
+    return launcher.retry_deferred(project_config, trigger, mode)
+
+
 def _advance_cursors(ctx, active, new_events):
     last_seq = new_events[-1]["seq"]
     with db.writing(ctx.conn):
@@ -96,6 +121,7 @@ def _pass(ctx, launcher, dry_run):
     lines = _initialize_cursors(ctx, fresh, dry_run) if fresh else []
     if not dry_run:
         lines.extend(launcher.reconcile(projects))
+    lines.extend(_deferred_lines(ctx, launcher, enabled, dry_run))
     active = {name: known[name] for name in enabled if name in known}
     if not active:
         return lines or [_NOTHING_LINE]
@@ -131,8 +157,8 @@ def _in_flight_line(ctx, row):
 
 
 def _outcome_label(row):
-    if row["outcome"] == "skipped":
-        return "skipped {}: {}".format(row["party"], row["reason"])
+    if row["outcome"] in ("skipped", "deferred"):
+        return "{} {}: {}".format(row["outcome"], row["party"], row["reason"])
     verb = "launched" if row["outcome"] == "launching" else row["outcome"]
     label = "{} {} g{}".format(verb, row["party"], row["generation"])
     if row["state"] is None:

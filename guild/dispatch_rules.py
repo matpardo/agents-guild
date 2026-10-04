@@ -14,6 +14,22 @@ class Trigger:
         self.prompt = prompt
 
 
+def _ask_trigger(project, party, ask_id):
+    prompt = "{} Dispatched: ask #{} was answered; read guild asks {}.".format(
+        resume.RESUME_PROMPT, ask_id, ask_id
+    )
+    return Trigger(project, "ask_answered", "ask_answered:{}".format(ask_id), party, "ask #{}".format(ask_id), prompt)
+
+
+def _checks_trigger(project, party, repo, number, head_sha):
+    subject = "{}#{}".format(repo, number)
+    prompt = "{} Dispatched: checks fail on {}; run gh pr checks {} --repo {}.".format(
+        resume.RESUME_PROMPT, subject, number, repo
+    )
+    key = "checks_failing:{}:{}".format(subject, head_sha)
+    return Trigger(project, "checks_failing", key, party, subject, prompt)
+
+
 def _ask_answered(conn, projects, event):
     if event["kind"] != "ask.answered":
         return None
@@ -25,12 +41,7 @@ def _ask_answered(conn, projects, event):
     ).fetchone()
     if ask is None or ask["project"] is None:
         return None
-    prompt = "{} Dispatched: ask #{} was answered; read guild asks {}.".format(
-        resume.RESUME_PROMPT, ask_id, ask_id
-    )
-    return Trigger(
-        ask["project"], "ask_answered", "ask_answered:{}".format(ask_id), ask["party"], "ask #{}".format(ask_id), prompt
-    )
+    return _ask_trigger(ask["project"], ask["party"], ask_id)
 
 
 def _checks_failing(conn, projects, event):
@@ -53,12 +64,39 @@ def _checks_failing(conn, projects, event):
         return None
     if repo not in projects[owner["project"]]["github"]["repos"]:
         return None
-    subject = "{}#{}".format(repo, number)
-    prompt = "{} Dispatched: checks fail on {}; run gh pr checks {} --repo {}.".format(
-        resume.RESUME_PROMPT, subject, number, repo
-    )
-    key = "checks_failing:{}:{}".format(subject, payload["head_sha"])
-    return Trigger(owner["project"], "checks_failing", key, owner["party"], subject, prompt)
+    return _checks_trigger(owner["project"], owner["party"], repo, number, payload["head_sha"])
+
+
+def _deferred_ask(conn, row):
+    ask_id = int(row["key"].split(":", 1)[1])
+    answered = conn.execute("SELECT 1 FROM asks WHERE id = ? AND state = 'answered'", (ask_id,)).fetchone()
+    if answered is None:
+        return None
+    return _ask_trigger(row["project"], row["party"], ask_id)
+
+
+def _deferred_checks(conn, row):
+    subject, head_sha = row["key"].split(":", 1)[1].rsplit(":", 1)
+    repo, number = subject.rsplit("#", 1)
+    pr = conn.execute(
+        "SELECT lifecycle, checks_failing, checks_pending FROM prs WHERE repo = ? AND number = ? AND seeded = 0",
+        (repo, int(number)),
+    ).fetchone()
+    if pr is None or pr["lifecycle"] not in _CHECKED_LIFECYCLES:
+        return None
+    if not pr["checks_failing"] or pr["checks_pending"] != 0:
+        return None
+    return _checks_trigger(row["project"], row["party"], repo, int(number), head_sha)
+
+
+_DEFERRED = {"ask_answered": _deferred_ask, "checks_failing": _deferred_checks}
+
+
+def deferred_trigger(conn, row):
+    rebuild = _DEFERRED.get(row["rule"])
+    if rebuild is None:
+        return None
+    return rebuild(conn, row)
 
 
 RULES = {"ask_answered": _ask_answered, "checks_failing": _checks_failing}

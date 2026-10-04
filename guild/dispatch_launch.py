@@ -24,6 +24,8 @@ _WINDOW_FAILURE = "tmux could not create the window"
 _FAILURE_WAIT = "dispatch-failed"
 _HOUR_FORMAT = "%Y-%m-%dT%H"
 _BIND_DEADLINE = timedelta(minutes=10)
+_DEFER_DEADLINE = timedelta(hours=24)
+_DEFERRED_TOO_LONG = "deferred too long"
 
 
 class _Notice:
@@ -78,7 +80,9 @@ class Launcher:
         if verdict.kind == _DUPLICATE:
             return None
         prefix = self._prefix(trigger)
-        if verdict.kind in (_BUSY, _SKIP):
+        if verdict.kind == _BUSY:
+            return "{}would defer {}: {}".format(prefix, trigger.party, verdict.reason)
+        if verdict.kind == _SKIP:
             return "{}would skip {}: {}".format(prefix, trigger.party, verdict.reason)
         verb = "would plan launch" if verdict.kind == _PLAN else "would launch"
         return "{}{} {} g{} (mode {})".format(
@@ -186,7 +190,8 @@ class Launcher:
 
     def _already_decided(self, trigger, mode):
         rows = self._ctx.conn.execute(
-            "SELECT mode FROM dispatch_decisions WHERE project = ? AND key = ?", (trigger.project, trigger.key)
+            "SELECT mode FROM dispatch_decisions WHERE project = ? AND key = ? AND outcome != 'deferred'",
+            (trigger.project, trigger.key),
         ).fetchall()
         if mode == _REAL_MODE:
             return any(row["mode"] == _REAL_MODE for row in rows)
@@ -279,9 +284,11 @@ class Launcher:
         return _verdict_without_launch(_SKIP, reason, notice, generation)
 
     def _execute(self, project_config, trigger, mode, verdict):
-        if verdict.kind in (_DUPLICATE, _BUSY):
+        if verdict.kind == _DUPLICATE:
             return None
         prefix = self._prefix(trigger)
+        if verdict.kind == _BUSY:
+            return self._defer(trigger, mode, verdict)
         if verdict.kind == _SKIP:
             self._record_decided(trigger, mode, "skipped", verdict.generation, None, verdict.reason)
             if verdict.notice is not None:
@@ -293,6 +300,33 @@ class Launcher:
                 prefix, trigger.party, verdict.generation, mode, verdict.permission_mode
             )
         return self._launch(project_config, trigger, mode, verdict)
+
+    def _defer(self, trigger, mode, verdict):
+        if self._deferred_row(trigger, mode) is not None:
+            return None
+        self._record_decided(trigger, mode, "deferred", verdict.generation, None, verdict.reason)
+        return "{}deferred {}: {}".format(self._prefix(trigger), trigger.party, verdict.reason)
+
+    def _deferred_row(self, trigger, mode):
+        return self._ctx.conn.execute(
+            "SELECT decided_at FROM dispatch_decisions WHERE project = ? AND key = ? AND mode = ?"
+            " AND outcome = 'deferred'",
+            (trigger.project, trigger.key, mode),
+        ).fetchone()
+
+    def retry_deferred(self, project_config, trigger, mode):
+        deferred = self._deferred_row(trigger, mode)
+        if deferred is not None and self._ctx.now - timeutil.from_iso(deferred["decided_at"]) > _DEFER_DEADLINE:
+            return self._expire_deferred(trigger, mode)
+        return self.decide(project_config, trigger, mode)
+
+    def _expire_deferred(self, trigger, mode):
+        self._record_decided(trigger, mode, "skipped", None, None, _DEFERRED_TOO_LONG)
+        text = "dispatch gave up on {}: {}".format(trigger.party, _DEFERRED_TOO_LONG)
+        self._post_notice(
+            trigger.project, _Notice(text, "dispatch:{}:{}:expired".format(trigger.project, trigger.key))
+        )
+        return "{}skipped {}: {}".format(self._prefix(trigger), trigger.party, _DEFERRED_TOO_LONG)
 
     def _launch(self, project_config, trigger, mode, verdict):
         prefix = self._prefix(trigger)

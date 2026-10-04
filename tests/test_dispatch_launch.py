@@ -89,52 +89,76 @@ class DedupeTests(LaunchBase):
 
     def test_two_triggers_for_one_party_launch_once(self):
         self.assertIn("launched", self.decide(self.trigger(12, "alpha"), "on"))
-        self.assertIsNone(self.decide(self.trigger(13, "alpha"), "on"))
+        self.assertIn("deferred alpha: open window", self.decide(self.trigger(13, "alpha"), "on"))
         self.assertEqual(len(self.tmux.launch_calls()), 1)
 
 
 class BusyTests(LaunchBase):
-    def assert_silent(self):
-        self.assertIsNone(self.decide(self.trigger(12, "alpha"), "on"))
-        self.assertEqual(self.kinds(), [])
+    def assert_deferred(self, reason):
+        line = self.decide(self.trigger(12, "alpha"), "on")
+        self.assertEqual(line, "acme: ask_answered ask #12 -> deferred alpha: {}".format(reason))
         self.assertEqual(self.tmux.launch_calls(), [])
         self.assertEqual(self.notices(), [])
+        row = self.decisions()[0]
+        self.assertEqual((row["outcome"], row["state"], row["reason"]), ("deferred", None, reason))
+        self.assertEqual((row["party"], row["generation"]), ("alpha", 2))
 
-    def test_live_leader_session_is_silent(self):
+    def test_live_leader_session_is_deferred(self):
         self.write_session(os.getpid(), "sess-1", "alpha")
-        self.assert_silent()
+        self.assert_deferred("live session")
 
-    def test_open_window_named_after_party_is_silent(self):
+    def test_open_window_named_after_party_is_deferred(self):
         self.tmux.windows = {"@3": "alpha"}
-        self.assert_silent()
+        self.assert_deferred("open window")
 
-    def test_launch_in_flight_is_silent(self):
+    def test_launch_in_flight_is_deferred(self):
         self.seed_decision("ask_answered:5", "alpha", 2, "launching", "launched", timedelta(minutes=2))
-        self.assert_silent_after_seed()
-
-    def assert_silent_after_seed(self):
-        before = self.kinds()
-        self.assertIsNone(self.decide(self.trigger(12, "alpha"), "on"))
-        self.assertEqual(self.kinds(), before)
+        line = self.decide(self.trigger(12, "alpha"), "on")
+        self.assertEqual(line, "acme: ask_answered ask #12 -> deferred alpha: launch in flight")
         self.assertEqual(self.tmux.launch_calls(), [])
 
-    def test_paused_member_raid_is_silent(self):
+    def test_paused_member_raid_is_deferred(self):
         now = self.ctx().now
         expires = timeutil.to_iso(now + timedelta(hours=8))
         self.record("raid.joined", "alpha", {"raid": "ci", "party": "alpha", "expires_at": expires, "lead": True}, now)
         self.record("raid.paused", "alpha", {"raid": "ci", "party": "alpha"}, now)
-        self.assert_silent_after_seed()
+        self.assert_deferred("raid ci paused")
 
     def test_busy_reason_is_shown_in_preview(self):
         self.tmux.windows = {"@3": "alpha"}
         line = self.preview(self.trigger(12, "alpha"), "on")
-        self.assertEqual(line, "acme: ask_answered ask #12 -> would skip alpha: open window")
+        self.assertEqual(line, "acme: ask_answered ask #12 -> would defer alpha: open window")
+        self.assertEqual(self.kinds(), [])
 
-    def test_busy_does_not_consume_the_key(self):
+    def test_deferral_does_not_consume_the_key(self):
         self.tmux.windows = {"@3": "alpha"}
-        self.assertIsNone(self.decide(self.trigger(12, "alpha"), "on"))
+        self.decide(self.trigger(12, "alpha"), "on")
         self.tmux.windows = {}
         self.assertIn("launched alpha g2", self.decide(self.trigger(12, "alpha"), "on"))
+        row = self.decisions()[0]
+        self.assertEqual((row["outcome"], row["state"]), ("launching", "launched"))
+
+    def test_still_busy_again_records_nothing_new(self):
+        self.tmux.windows = {"@3": "alpha"}
+        self.decide(self.trigger(12, "alpha"), "on")
+        before = self.decisions()
+        self.assertIsNone(self.decide(self.trigger(12, "alpha"), "on"))
+        self.assertEqual(self.decisions(), before)
+        self.assertEqual(self.kinds(), ["dispatch.decided"])
+
+    def test_deferred_party_that_closed_is_skipped(self):
+        self.tmux.windows = {"@3": "alpha"}
+        self.decide(self.trigger(12, "alpha"), "on")
+        self.run_cli(["party", "close", "alpha", "--force"], None, self.repo_dir)
+        line = self.decide(self.trigger(12, "alpha"), "on")
+        self.assertIn("skipped alpha: party closed", line)
+        self.assertEqual(self.decisions()[0]["outcome"], "skipped")
+
+    def test_dry_run_rule_defers_too(self):
+        self.tmux.windows = {"@3": "alpha"}
+        line = self.decide(self.trigger(12, "alpha"), "dry-run")
+        self.assertIn("deferred alpha: open window", line)
+        self.assertEqual(self.decisions()[0]["mode"], "dry-run")
 
 
 class SkipTests(LaunchBase):

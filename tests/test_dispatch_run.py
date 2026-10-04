@@ -262,6 +262,13 @@ class StatusTests(DispatchRunBase):
             ],
         )
 
+    def test_status_shows_deferred_decisions_with_their_reason(self):
+        self.run_pass(False)
+        now = self.ctx().now
+        self._decide("ask_answered:5", "on", "deferred", "alpha", 2, "ask #5", "live session", now - timedelta(minutes=1))
+        lines = dispatch_commands.status(self.ctx())
+        self.assertTrue(any(line.endswith("ask_answered ask #5 -> deferred alpha: live session") for line in lines))
+
     def test_status_recent_is_limited_to_ten_rows(self):
         self.run_pass(False)
         now = self.ctx().now
