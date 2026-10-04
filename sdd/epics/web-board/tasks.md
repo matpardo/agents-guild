@@ -2,7 +2,7 @@
 epic: web-board
 type: tasks
 title: Web view of the guild board
-status: active
+status: done
 updated: 2026-10-04
 ---
 
@@ -67,6 +67,6 @@ updated: 2026-10-04
 ## T09 — Tooltips on every web label
 
 **Depends on:** T08
-**Status:** [ ] pending
+**Status:** [x] done — #68
 
 **What:** every status, badge, chip and label on the page carries a `title` tooltip of one plain sentence saying what it means and, where useful, what to do: party statuses and states, PR lifecycles and human flags, check counts, task states, merge-queue states and actions, notice `new`, issue time, time left and scope, ask blocks, raid roles, drift rules, `MAIN RED`, blocked sessions and the filters. The explanations live in one frozen dictionary in `app.js`; a value with no entry gets no tooltip, and a test fails when a status the server can emit has none.
