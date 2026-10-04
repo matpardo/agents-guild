@@ -377,17 +377,17 @@ class RenderTests(ReportFixture):
             "untracked growth: +1.4 GB (machine +6.0 GB, tracked +4.6 GB)",
             "",
             "acme   total 9.7 GB (+4.4 GB)   baseline {} (sampled 41m ago)".format(baseline),
-            "  worktree          7.3 GB (+2.1 GB)",
+            "  worktree           7.3 GB (+2.1 GB)",
             "    /home/u/acme/app                            4.1 GB   +300 MB",
             "    /home/u/acme/app/.claude/worktrees/feat-x   3.2 GB   +1.8 GB   merged, still on disk",
-            "  docker_image      2.3 GB (+2.2 GB)",
+            "  docker_image       2.3 GB (+2.2 GB)",
             "    acme-feat-x-web:latest                      2.3 GB   +2.2 GB   orphaned",
-            "  claude_scratch    100 MB (+100 MB)",
+            "  claude_scratch     100 MB (+100 MB)",
             "    /home/u/acme/app                            100 MB   new",
             "  top growers: acme-feat-x-web:latest +2.2 GB, feat-x +1.8 GB, app +300 MB, app +100 MB",
             "",
             "unattributed   total 1.4 GB (+200 MB)   baseline {} (sampled 41m ago)".format(baseline),
-            "  docker_image      1.4 GB (+200 MB)",
+            "  docker_image       1.4 GB (+200 MB)",
             "    5e6f7a8b9c0d   1.4 GB   +200 MB   dangling",
             "  top growers: 5e6f7a8b9c0d +200 MB",
         ]
@@ -419,7 +419,7 @@ class RenderTests(ReportFixture):
     def test_docker_marker_renders_as_unavailable_category(self):
         self.sample(None, _ago(hours=1), [_row("docker", "-", None, "unavailable", "", "permission denied")], _PLAIN_MACHINE)
         lines = self._lines(None, "1d")
-        self.assertIn("  docker            unavailable (permission denied)", lines)
+        self.assertIn("  docker             unavailable (permission denied)", lines)
 
     def test_machine_line_without_docker_or_memory(self):
         machine = _machine(400 * _GB, 500 * _GB, None)

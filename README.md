@@ -528,10 +528,10 @@ machine   disk 82% used (412.0 GB of 500.0 GB, +6.0 GB in 1d)   ram 9.0 GB avail
 untracked growth: +1.4 GB (machine +6.0 GB, tracked +4.6 GB)
 
 acme   total 9.7 GB (+4.4 GB)   baseline 2026-10-02 09:00 (sampled 41m ago)
-  worktree          7.3 GB (+2.1 GB)
+  worktree           7.3 GB (+2.1 GB)
     /home/u/acme/app                            4.1 GB   +300 MB
     /home/u/acme/app/.claude/worktrees/feat-x   3.2 GB   +1.8 GB   merged, still on disk
-  docker_image      2.3 GB (+2.2 GB)
+  docker_image       2.3 GB (+2.2 GB)
     acme-feat-x-web:latest                      2.3 GB   +2.2 GB   orphaned
   top growers: acme-feat-x-web:latest +2.2 GB, feat-x +1.8 GB, app +300 MB
 ```

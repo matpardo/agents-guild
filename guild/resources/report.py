@@ -343,11 +343,11 @@ def _header(label, model, now):
 
 def _category_line(category):
     if category["category"] == docker.MARKER_CATEGORY:
-        return "  {:<17} {} ({})".format(category["category"], category["state"], category["detail"])
+        return "  {:<18} {} ({})".format(category["category"], category["state"], category["detail"])
     text = _bytes_label(category["bytes"])
     if category["delta_bytes"] is not None:
         text += " ({})".format(_signed(category["delta_bytes"]))
-    return "  {:<17} {}".format(category["category"], text)
+    return "  {:<18} {}".format(category["category"], text)
 
 
 def _delta_label(entry, has_baseline):
