@@ -399,6 +399,18 @@ def _handle_board(ctx, args):
 def _handle_handoff(ctx, args):
     from guild.commands import handoff as handoff_commands
 
+    if args.action == "prune":
+        for flag, value in (("--in-flight", args.in_flight), ("--learned", args.learned), ("--model", args.model)):
+            if value is not None:
+                raise GuildError("handoff prune does not take {}".format(flag), 1)
+        _print(handoff_commands.run_prune(ctx, args.dry_run))
+        return 0
+    if args.dry_run:
+        raise GuildError("--dry-run only applies to handoff prune", 1)
+    if args.in_flight is None:
+        raise GuildError("--in-flight is required", 1)
+    if args.learned is None:
+        raise GuildError("--learned is required", 1)
     _print(handoff_commands.run(ctx, args.in_flight, args.learned, args.model))
     return 0
 
@@ -821,9 +833,11 @@ def build_parser():
     next_parser.set_defaults(handler=_handle_next)
 
     handoff = subparsers.add_parser("handoff")
-    handoff.add_argument("--in-flight", required=True)
-    handoff.add_argument("--learned", required=True)
+    handoff.add_argument("action", nargs="?", choices=["prune"])
+    handoff.add_argument("--in-flight")
+    handoff.add_argument("--learned")
     handoff.add_argument("--model")
+    handoff.add_argument("--dry-run", action="store_true")
     handoff.set_defaults(handler=_handle_handoff)
 
     sync = subparsers.add_parser("sync")

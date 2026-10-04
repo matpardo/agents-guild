@@ -1,6 +1,7 @@
+import sqlite3
 from pathlib import Path
 
-from guild import config, db, events, identity, names, session_info
+from guild import config, db, events, handoff_prune, identity, names, paths, session_info
 from guild.commands import claim as claim_commands
 from guild.commands import next as next_commands
 from guild.commands import raid as raid_commands
@@ -187,6 +188,16 @@ def _require_lead_close_allowed(conn, now, party):
             )
 
 
+def _prune_lines(ctx):
+    try:
+        deleted = handoff_prune.prune(ctx, paths.handoffs_dir())
+    except (GuildError, OSError, sqlite3.Error) as error:
+        return ["handoff prune failed: {}".format(error)]
+    if deleted == 0:
+        return []
+    return ["pruned {} handoff file(s)".format(deleted)]
+
+
 def close(ctx, name, force):
     party = _close_target(ctx, name)
     row = ctx.conn.execute(
@@ -213,6 +224,7 @@ def close(ctx, name, force):
             {"party": party, "generation": row["generation"]},
         )
     lines = ["party '{}' closed: {}".format(party, summary)]
+    lines.extend(_prune_lines(ctx))
     if open_prs:
         lines.append("tracked PRs still open: {}".format(", ".join(open_prs)))
     return "\n".join(lines)

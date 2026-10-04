@@ -31,7 +31,7 @@ class PruneFixture(GuildTestCase):
         ctx = self._ctx()
         if now is not None:
             ctx.now = now
-        return ctx, handoff_prune.plan(ctx, self.handoffs)
+        return ctx, handoff_prune.plan(ctx, self.handoffs, ctx.state_dir)
 
     def _sql(self, statement, params):
         conn = sqlite3.connect(str(paths.db_path()))
@@ -67,7 +67,9 @@ class PruneFixture(GuildTestCase):
 class HandoffPruneRuleTests(PruneFixture):
     def test_latest_handoff_of_open_party_is_kept(self):
         self._handoff("sess-1", 1)
-        _, (actions, kept) = self._plan()
+        _, plan = self._plan()
+        actions = plan.actions
+        kept = plan.kept_without_retention
         self.assertEqual(actions, [])
         self.assertEqual(kept, 0)
 
@@ -75,7 +77,8 @@ class HandoffPruneRuleTests(PruneFixture):
         first = self._handoff("sess-1", 1)
         self._resume("sess-2")
         second = self._handoff("sess-2", 2)
-        ctx, (actions, _) = self._plan()
+        ctx, plan = self._plan()
+        actions = plan.actions
         self.assertEqual([(a.verb, a.label, a.reason) for a in actions], [("delete", "alpha-g1.md", "superseded and consumed")])
         self.assertEqual(handoff_prune.apply(ctx, actions), 1)
         self.assertFalse(first.exists())
@@ -88,14 +91,17 @@ class HandoffPruneRuleTests(PruneFixture):
         self._resume("sess-2")
         self._handoff("sess-2", 2)
         self._sql("UPDATE leaders SET handoff_consumed_at = NULL WHERE generation = 1", ())
-        _, (actions, _) = self._plan()
+        _, plan = self._plan()
+        actions = plan.actions
         self.assertEqual(actions, [])
         self.assertTrue(first.exists())
 
     def test_closed_party_without_retention_config_is_kept_and_counted(self):
         self._handoff("sess-1", 1)
         self.run_cli(["party", "close", "alpha"], None, None)
-        _, (actions, kept) = self._plan(timeutil.utcnow() + timedelta(days=4000))
+        _, plan = self._plan(timeutil.utcnow() + timedelta(days=4000))
+        actions = plan.actions
+        kept = plan.kept_without_retention
         self.assertEqual(actions, [])
         self.assertEqual(kept, 1)
 
@@ -104,8 +110,10 @@ class HandoffPruneRuleTests(PruneFixture):
         self.run_cli(["party", "close", "alpha"], None, None)
         self._set_retention(30)
         closed_at = self._closed_at()
-        _, (before, _) = self._plan(closed_at + timedelta(days=30) - timedelta(seconds=1))
-        _, (at, _) = self._plan(closed_at + timedelta(days=30))
+        _, plan = self._plan(closed_at + timedelta(days=30) - timedelta(seconds=1))
+        before = plan.actions
+        _, plan = self._plan(closed_at + timedelta(days=30))
+        at = plan.actions
         self.assertEqual(before, [])
         self.assertEqual([(a.verb, a.reason) for a in at], [("delete", "closed party, retention 30d expired")])
 
@@ -113,14 +121,18 @@ class HandoffPruneRuleTests(PruneFixture):
         self._handoff("sess-1", 1)
         self.run_cli(["party", "close", "alpha"], None, None)
         self._sql("UPDATE parties SET project = NULL WHERE name = 'alpha'", ())
-        _, (actions, kept) = self._plan(timeutil.utcnow() + timedelta(days=4000))
+        _, plan = self._plan(timeutil.utcnow() + timedelta(days=4000))
+        actions = plan.actions
+        kept = plan.kept_without_retention
         self.assertEqual((actions, kept), ([], 1))
 
     def test_unreadable_project_config_keeps_handoff_without_raising(self):
         self._handoff("sess-1", 1)
         self.run_cli(["party", "close", "alpha"], None, None)
         (self.config_home / "guild" / "projects" / "acme.json").write_text("{not json")
-        _, (actions, kept) = self._plan(timeutil.utcnow() + timedelta(days=4000))
+        _, plan = self._plan(timeutil.utcnow() + timedelta(days=4000))
+        actions = plan.actions
+        kept = plan.kept_without_retention
         self.assertEqual((actions, kept), ([], 1))
 
 
@@ -137,7 +149,8 @@ class HandoffPruneSafetyTests(PruneFixture):
         target.write_text("keep")
         first.unlink()
         os.symlink(str(target), str(first))
-        ctx, (actions, _) = self._plan()
+        ctx, plan = self._plan()
+        actions = plan.actions
         self.assertEqual([(a.verb, a.reason) for a in actions], [("skip", "symlink")])
         self.assertEqual(handoff_prune.apply(ctx, actions), 0)
         self.assertEqual(target.read_text(), "keep")
@@ -149,7 +162,8 @@ class HandoffPruneSafetyTests(PruneFixture):
         outside = self.root / "outside.md"
         outside.write_text("keep")
         self._sql("UPDATE leaders SET handoff_path = ? WHERE generation = 1", (str(outside),))
-        ctx, (actions, _) = self._plan()
+        ctx, plan = self._plan()
+        actions = plan.actions
         self.assertEqual([(a.verb, a.reason, a.label) for a in actions], [("skip", "outside handoffs dir", str(outside))])
         handoff_prune.apply(ctx, actions)
         self.assertEqual(outside.read_text(), "keep")
@@ -157,16 +171,19 @@ class HandoffPruneSafetyTests(PruneFixture):
     def test_missing_file_still_records_event_and_clears_path(self):
         first = self._superseded_pair()
         first.unlink()
-        ctx, (actions, _) = self._plan()
+        ctx, plan = self._plan()
+        actions = plan.actions
         handoff_prune.apply(ctx, actions)
         self.assertIsNone(self._leader(1)["handoff_path"])
         self.assertEqual(len(self._pruned_events()), 1)
 
     def test_second_run_deletes_and_records_nothing(self):
         self._superseded_pair()
-        ctx, (actions, _) = self._plan()
+        ctx, plan = self._plan()
+        actions = plan.actions
         handoff_prune.apply(ctx, actions)
-        _, (again, _) = self._plan()
+        _, plan = self._plan()
+        again = plan.actions
         self.assertEqual(again, [])
         self.assertEqual(len(self._pruned_events()), 1)
 
@@ -174,21 +191,24 @@ class HandoffPruneSafetyTests(PruneFixture):
         self._superseded_pair()
         orphan = self.handoffs / "stray-g1.md"
         orphan.write_text("x")
-        ctx, (actions, _) = self._plan()
+        ctx, plan = self._plan()
+        actions = plan.actions
         handoff_prune.apply(ctx, actions)
         self.assertTrue(orphan.exists())
 
     def test_report_lines_use_would_delete_in_dry_run(self):
         self._superseded_pair()
-        _, (actions, kept) = self._plan()
+        _, plan = self._plan()
         self.assertEqual(
-            handoff_prune.report_lines(actions, True, kept),
+            handoff_prune.report_lines(plan, True),
             [
-                "handoff prune (dry-run): 1 handoffs",
+                "handoff prune (dry-run): 1 handoffs, 0 markers",
                 "would delete handoff alpha-g1.md: superseded and consumed",
+                "markers kept: no session registry",
             ],
         )
+        plan.kept_without_retention = 2
         self.assertEqual(
-            handoff_prune.report_lines(actions, False, 2)[-1],
+            handoff_prune.report_lines(plan, False)[-1],
             "kept 2 closed-party handoff(s): no handoff_retention_days configured",
         )

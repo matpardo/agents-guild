@@ -27,6 +27,27 @@ class SyncTests(GuildTestCase):
             "sess-1", self.repo_dir,
         )
 
+    def _two_generations(self):
+        self.run_cli(["handoff", "--in-flight", "x", "--learned", "y"], "sess-1", self.repo_dir)
+        self.run_cli(["party", "resume", "alpha"], "sess-2", self.repo_dir)
+        self.run_cli(["handoff", "--in-flight", "x", "--learned", "y"], "sess-2", self.repo_dir)
+        return paths.handoffs_dir() / "alpha-g1.md"
+
+    def test_sync_gh_prunes_superseded_handoffs(self):
+        first = self._two_generations()
+        code, out, err = self.run_cli(["sync", "--source", "gh"], "sess-2", self.repo_dir)
+        self.assertEqual(code, 0, err)
+        self.assertEqual(out, "")
+        self.assertFalse(first.exists())
+
+    def test_sync_gh_reports_prune_failure_without_aborting(self):
+        first = self._two_generations()
+        with mock.patch("guild.handoff_prune.plan", side_effect=GuildError("boom", 1)):
+            code, out, err = self.run_cli(["sync", "--source", "gh"], "sess-2", self.repo_dir)
+        self.assertEqual(code, 1)
+        self.assertIn("handoff prune failed: boom", err)
+        self.assertTrue(first.exists())
+
     def test_sync_flips_merged_pr(self):
         self.write_gh_fixture(
             "view_acme-app_1",

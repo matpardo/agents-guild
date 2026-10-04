@@ -1,4 +1,4 @@
-from guild import db, events, identity, names, paths, pii, render, resume, timeutil
+from guild import db, events, handoff_prune, identity, names, paths, pii, render, resume, timeutil
 from guild.commands import claim as claim_commands
 from guild.commands import next as next_commands
 from guild.commands import notice as notice_commands
@@ -97,3 +97,10 @@ def run(ctx, in_flight, learned, model):
             {"party": party, "generation": generation, "handoff_path": str(handoff_path)},
         )
     return "{}\n{}".format(resume.fresh_command(party, generation + 1, model, None), pii.BROADCAST_REMINDER)
+
+
+def run_prune(ctx, dry_run):
+    prune_plan = handoff_prune.plan(ctx, paths.handoffs_dir(), ctx.state_dir)
+    if not dry_run:
+        handoff_prune.apply(ctx, prune_plan.actions)
+    return "\n".join(handoff_prune.report_lines(prune_plan, dry_run))
