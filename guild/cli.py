@@ -398,11 +398,20 @@ def _handle_board(ctx, args):
 
 
 def _handle_handoff(ctx, args):
+    import time
+
+    from guild import tmux_windows
     from guild.commands import handoff as handoff_commands
 
     if args.action == "prune":
-        for flag, value in (("--in-flight", args.in_flight), ("--learned", args.learned), ("--model", args.model)):
-            if value is not None:
+        provided = (
+            ("--in-flight", args.in_flight is not None),
+            ("--learned", args.learned is not None),
+            ("--model", args.model is not None),
+            ("--respawn", args.respawn),
+        )
+        for flag, given in provided:
+            if given:
                 raise GuildError("handoff prune does not take {}".format(flag), 1)
         _print(handoff_commands.run_prune(ctx, args.dry_run))
         return 0
@@ -412,7 +421,14 @@ def _handle_handoff(ctx, args):
         raise GuildError("--in-flight is required", 1)
     if args.learned is None:
         raise GuildError("--learned is required", 1)
-    _print(handoff_commands.run(ctx, args.in_flight, args.learned, args.model))
+    tmux = tmux_windows.Tmux()
+    text, window_to_close = handoff_commands.run(
+        ctx, args.in_flight, args.learned, args.model, args.respawn, tmux, os.environ.get("TMUX_PANE"), time.sleep
+    )
+    _print(text)
+    sys.stdout.flush()
+    if window_to_close is not None:
+        tmux_windows.kill_window(tmux, window_to_close)
     return 0
 
 
@@ -840,6 +856,7 @@ def build_parser():
     handoff.add_argument("--learned")
     handoff.add_argument("--model")
     handoff.add_argument("--dry-run", action="store_true")
+    handoff.add_argument("--respawn", action="store_true")
     handoff.set_defaults(handler=_handle_handoff)
 
     sync = subparsers.add_parser("sync")

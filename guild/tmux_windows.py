@@ -49,3 +49,21 @@ def pin_window_name(tmux, window_id):
 def set_title_options(tmux):
     _ok(tmux, ["set-option", "-t", SESSION, "set-titles", "on"])
     _ok(tmux, ["set-option", "-t", SESSION, "set-titles-string", "#W"])
+
+
+def window_id_of_pane(tmux, pane):
+    returncode, output = tmux.run(["display-message", "-p", "-t", pane, "#{window_id}"])
+    if returncode != 0:
+        return None
+    return output.strip() or None
+
+
+def window_in_session(tmux, window_id):
+    returncode, output = tmux.run(["list-windows", "-t", SESSION, "-F", "#{window_id}"])
+    if returncode != 0:
+        return False
+    return window_id in output.splitlines()
+
+
+def kill_window(tmux, window_id):
+    return _ok(tmux, ["kill-window", "-t", window_id])
