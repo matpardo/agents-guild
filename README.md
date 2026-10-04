@@ -1476,3 +1476,12 @@ that can change without notice. `guild handoff` instead prints the one
 `GUILD_RESUME=<party> claude -n <party>-g<N+1> '...'` command for a human (or an orchestrating
 agent) to run; revisit auto-spawn if a public, documented session-control
 contract appears.
+
+**Phase 4 (planned).** Lessons from the first real raid, specified under
+`sdd/epics/`: `session-liveness` (active: every party shows whether it is
+working, waiting on a permission prompt or stopped with work),
+`cost-metering`, `ask-context`, `session-lifecycle` (handoff retention,
+respawn, a Remote Control keeper), `ephemeral-brief`, `dispatcher` (fresh
+sessions only, see `sdd/decisions/20261004_dispatcher-launches-fresh-sessions.md`),
+`derived-state` and `conflict-hotspots`; `execution-profiles`, `budgets`,
+`officers` and `federation` follow as drafts.
