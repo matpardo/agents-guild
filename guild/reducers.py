@@ -27,6 +27,10 @@ def _party_resumed(conn, event):
         (event["ts"], payload["party"], payload["generation"] - 1),
     )
     conn.execute(
+        "DELETE FROM leader_windows WHERE party = ? AND generation < ?",
+        (payload["party"], payload["generation"]),
+    )
+    conn.execute(
         "UPDATE parties SET leader_session_id = ?, generation = ?, state = 'active' WHERE name = ?",
         (event["session_id"], payload["generation"], payload["party"]),
     )
@@ -50,6 +54,7 @@ def _party_closed(conn, event):
     conn.execute("UPDATE asks SET state = 'dismissed' WHERE party = ? AND state = 'open'", (payload["party"],))
     conn.execute("DELETE FROM claims WHERE party = ?", (payload["party"],))
     conn.execute("DELETE FROM raid_members WHERE party = ?", (payload["party"],))
+    conn.execute("DELETE FROM leader_windows WHERE party = ?", (payload["party"],))
     conn.execute(
         "UPDATE leaders SET ended_at = ? WHERE party = ? AND generation = ? AND ended_at IS NULL",
         (event["ts"], payload["party"], payload["generation"]),
@@ -70,6 +75,14 @@ def _handoff_pruned(conn, event):
     conn.execute(
         "UPDATE leaders SET handoff_path = NULL WHERE party = ? AND generation = ?",
         (payload["party"], payload["generation"]),
+    )
+
+
+def _leader_window_launched(conn, event):
+    payload = event["payload"]
+    conn.execute(
+        "INSERT OR REPLACE INTO leader_windows (party, generation, window_id) VALUES (?, ?, ?)",
+        (payload["party"], payload["generation"], payload["window_id"]),
     )
 
 
@@ -591,6 +604,7 @@ _REDUCERS = {
     "party.handed_off": _party_handed_off,
     "handoff.pruned": _handoff_pruned,
     "leader.located": _leader_located,
+    "leader.window_launched": _leader_window_launched,
     "quest.added": _quest_added,
     "quest.done": _quest_done,
     "quest.marked_incomplete": _quest_marked_incomplete,

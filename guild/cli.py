@@ -38,6 +38,7 @@ def _handle_doctor(ctx, args):
 
 
 def _handle_revive(ctx, args):
+    from guild import tmux_windows
     from guild.commands import revive as revive_commands
 
     ask_numbers = input if sys.stdin.isatty() else None
@@ -48,7 +49,7 @@ def _handle_revive(ctx, args):
             args.all,
             args.list,
             paths.claude_projects_dir(),
-            revive_commands.Tmux(),
+            tmux_windows.Tmux(),
             ask_numbers,
         )
     )

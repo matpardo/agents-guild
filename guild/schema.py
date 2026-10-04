@@ -19,6 +19,7 @@ PROJECTION_TABLES = (
     "cost_samples",
     "resource_samples",
     "resource_machine",
+    "leader_windows",
 )
 
 _RAID_MEMBERS_TABLE = """
@@ -269,6 +270,14 @@ _CREATE_STATEMENTS = (
         docker_containers INTEGER,
         docker_volumes INTEGER,
         docker_build_cache INTEGER
+    )
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS leader_windows (
+        party TEXT NOT NULL,
+        generation INTEGER NOT NULL,
+        window_id TEXT NOT NULL,
+        PRIMARY KEY (party, generation)
     )
     """,
     """
