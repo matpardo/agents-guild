@@ -4,6 +4,7 @@ from pathlib import Path
 
 from guild import merge_queue
 from guild.commands import board
+from guild.resources import report
 
 _ROOT = Path(__file__).resolve().parent.parent
 _APP_JS = (_ROOT / "guild" / "web" / "app.js").read_text()
@@ -76,6 +77,12 @@ class TooltipCoverageTests(unittest.TestCase):
         rules = _DRIFT_RULE_RE.findall(_DRIFT_PY) + [_DRIFT_EXTRA_RULE]
         self.assertGreater(len(rules), 1)
         self.assertCovers("drift", rules)
+
+    def test_resource_categories(self):
+        self.assertCovers("resourceCategory", report._CATEGORIES)
+
+    def test_resource_flags(self):
+        self.assertCovers("resourceFlag", report._FLAG_LABELS)
 
     def test_standalone_labels(self):
         self.assertCovers(

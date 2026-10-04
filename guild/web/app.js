@@ -4,6 +4,9 @@
   var REFRESH_INTERVAL_MS = 15000;
   var BOARD_URL = "/api/board";
   var SESSION_URL = "/api/session";
+  var RESOURCES_URL = "/api/resources";
+  var RESOURCE_ITEMS_PER_CATEGORY = 10;
+  var NO_RESOURCES_MESSAGE = "no samples yet; run guild resources collect";
   var EMPTY_ANSWER_MESSAGE = "write an answer first";
   var NO_SESSION_MESSAGE = "session token not loaded, reload the page";
   var sessionToken = null;
@@ -13,6 +16,8 @@
     stateFilter: "all",
     raidFilter: "all",
     openParties: {},
+    resourcesOpen: false,
+    openResourceProjects: {},
     openContexts: {},
     drafts: {},
     statuses: {},
@@ -138,6 +143,22 @@
       "epic done with open work": "The epic is marked done but still has open work.",
       "quest task not in SDD": "A quest task has no matching task in the SDD.",
       "task done, SDD not done": "A task is done in guild but not in the SDD.",
+    },
+    resourceCategory: {
+      worktree: "Disk used by a git checkout of the project; worktrees nested inside it are counted on their own.",
+      docker_container: "Writable layer of a Docker container tied to the project through its compose label.",
+      docker_image: "Unique size of a Docker image; layers shared with other images are not included, so the sum is approximate.",
+      docker_volume: "Docker volume tied to the project through its compose label.",
+      claude_scratch: "Claude Code scratchpad files created while working in the checkout.",
+      claude_transcripts: "Claude Code session transcripts stored for the checkout.",
+      docker: "Docker could not be read; the detail says why.",
+    },
+    resourceFlag: {
+      merged: "The PR of this branch was merged but the worktree is still on disk.",
+      closed: "The PR of this branch was closed but the worktree is still on disk.",
+      orphaned: "The compose project of this object no longer has a working directory or a checkout.",
+      dangling: "A Docker image with no name and no tag.",
+      unused: "A Docker image that no container uses.",
     },
     ui: {
       noticeNew: "You have not marked this notice as seen yet.",
@@ -1140,6 +1161,188 @@
     });
   }
 
+  var RESOURCE_FLAG_LABELS = {
+    merged: "merged, still on disk",
+    closed: "closed, still on disk",
+    orphaned: "orphaned",
+    dangling: "dangling",
+    unused: "unused",
+  };
+  var BYTE_UNITS = [[1e12, "TB", 1], [1e9, "GB", 1], [1e6, "MB", 0], [1e3, "kB", 0]];
+
+  function formatBytes(value) {
+    if (value === null) {
+      return "?";
+    }
+    for (var index = 0; index < BYTE_UNITS.length; index += 1) {
+      var unit = BYTE_UNITS[index];
+      if (value >= unit[0]) {
+        return (value / unit[0]).toFixed(unit[2]) + " " + unit[1];
+      }
+    }
+    return value + " B";
+  }
+
+  function signedBytes(value) {
+    if (value === null) {
+      return "?";
+    }
+    return (value < 0 ? "-" : "+") + formatBytes(Math.abs(value));
+  }
+
+  function resourceDelta(entry, hasBaseline) {
+    if (!hasBaseline) {
+      return "";
+    }
+    if (entry.new) {
+      return "new";
+    }
+    return signedBytes(entry.delta_bytes);
+  }
+
+  function renderResourceItem(entry, hasBaseline) {
+    var row = el("li");
+    row.appendChild(textEl("code", entry.item));
+    row.appendChild(textEl("span", " " + formatBytes(entry.bytes)));
+    var delta = resourceDelta(entry, hasBaseline);
+    if (delta) {
+      row.appendChild(textEl("span", " " + delta));
+    }
+    if (entry.flag) {
+      row.appendChild(explain(textEl("span", " " + (RESOURCE_FLAG_LABELS[entry.flag] || entry.flag)), "resourceFlag", entry.flag));
+    }
+    return row;
+  }
+
+  function resourceCategoryText(category, hasBaseline) {
+    if (category.category === "docker") {
+      return category.category + " " + category.state + " (" + category.detail + ")";
+    }
+    var text = category.category + " " + formatBytes(category.bytes);
+    if (hasBaseline && category.delta_bytes !== null) {
+      text += " (" + signedBytes(category.delta_bytes) + ")";
+    }
+    return text;
+  }
+
+  function renderResourceCategory(project, category, hasBaseline) {
+    var wrapper = el("div");
+    wrapper.appendChild(explain(textEl("h4", resourceCategoryText(category, hasBaseline)), "resourceCategory", category.category));
+    var items = project.items.filter(function (entry) {
+      return entry.category === category.category;
+    });
+    items.sort(function (left, right) {
+      return (right.bytes === null ? -1 : right.bytes) - (left.bytes === null ? -1 : left.bytes);
+    });
+    var list = el("ul");
+    items.slice(0, RESOURCE_ITEMS_PER_CATEGORY).forEach(function (entry) {
+      list.appendChild(renderResourceItem(entry, hasBaseline));
+    });
+    if (items.length > RESOURCE_ITEMS_PER_CATEGORY) {
+      list.appendChild(textEl("li", "(+" + (items.length - RESOURCE_ITEMS_PER_CATEGORY) + " more)"));
+    }
+    wrapper.appendChild(list);
+    return wrapper;
+  }
+
+  function resourceHeadline(label, project) {
+    var hasBaseline = project.baseline_at !== null;
+    var text = label + " total " + formatBytes(project.total_bytes);
+    if (hasBaseline && project.delta_bytes !== null) {
+      text += " (" + signedBytes(project.delta_bytes) + ")";
+    }
+    if (!hasBaseline) {
+      text += " no earlier sample";
+    }
+    return text;
+  }
+
+  function renderResourceProject(label, project) {
+    var details = el("details");
+    details.className = "party";
+    details.open = state.openResourceProjects[label] === true;
+    details.addEventListener("toggle", function () {
+      state.openResourceProjects[label] = details.open;
+    });
+    details.appendChild(textEl("summary", resourceHeadline(label, project)));
+    var hasBaseline = project.baseline_at !== null;
+    project.categories.forEach(function (category) {
+      details.appendChild(renderResourceCategory(project, category, hasBaseline));
+    });
+    if (project.growers.length > 0) {
+      var growers = project.growers.map(function (grower) {
+        return grower.item + " " + signedBytes(grower.delta_bytes);
+      });
+      details.appendChild(textEl("p", "top growers: " + growers.join(", ")));
+    }
+    return details;
+  }
+
+  function resourceMachineLines(machine, since) {
+    var lines = [];
+    var disk = "disk n/a";
+    if (machine.disk_percent !== null) {
+      disk = "disk " + machine.disk_percent + "% used (" + formatBytes(machine.disk_used) + " of " + formatBytes(machine.disk_total);
+      if (machine.disk_delta !== null) {
+        disk += ", " + signedBytes(machine.disk_delta) + " in " + since;
+      }
+      disk += ")";
+    }
+    var ram = "ram n/a";
+    if (machine.mem_available !== null) {
+      ram = "ram " + formatBytes(machine.mem_available) + " available of " + formatBytes(machine.mem_total);
+    }
+    var docker = "docker n/a";
+    if (machine.docker !== null) {
+      docker = "docker " + formatBytes(machine.docker.total) + " (reclaimable " + formatBytes(machine.docker.images_reclaimable) + ")";
+    }
+    lines.push(disk + " \u00b7 " + ram);
+    lines.push(docker + " \u00b7 guild.db " + formatBytes(machine.guild_db_bytes));
+    if (machine.untracked_growth !== null) {
+      lines.push("untracked growth: " + signedBytes(machine.untracked_growth));
+    }
+    return lines;
+  }
+
+  function renderResources(model) {
+    var section = document.getElementById("resources");
+    clear(section);
+    var details = el("details");
+    details.open = state.resourcesOpen;
+    details.addEventListener("toggle", function () {
+      state.resourcesOpen = details.open;
+    });
+    details.appendChild(textEl("summary", "resources"));
+    section.appendChild(details);
+    if (model.machine === null) {
+      details.appendChild(textEl("p", NO_RESOURCES_MESSAGE));
+      return;
+    }
+    resourceMachineLines(model.machine, model.since).forEach(function (line) {
+      details.appendChild(textEl("p", line));
+    });
+    details.appendChild(classedText("p", "sampled at " + model.machine.sampled_at, "muted"));
+    model.projects.forEach(function (project) {
+      details.appendChild(renderResourceProject(project.name, project));
+    });
+    if (model.unattributed !== null) {
+      details.appendChild(renderResourceProject("unattributed", model.unattributed));
+    }
+  }
+
+  function fetchResources() {
+    fetch(RESOURCES_URL)
+      .then(function (response) {
+        return response.ok ? response.json() : null;
+      })
+      .then(function (model) {
+        if (model !== null) {
+          renderResources(model);
+        }
+      })
+      .catch(function () {});
+  }
+
   function render(data) {
     rememberFocus();
     document.getElementById("generated-at").textContent = "generated at " + data.generated_at;
@@ -1189,6 +1392,8 @@
     });
     fetchSession();
     fetchBoard();
+    fetchResources();
     setInterval(fetchBoard, REFRESH_INTERVAL_MS);
+    setInterval(fetchResources, REFRESH_INTERVAL_MS);
   });
 })();
