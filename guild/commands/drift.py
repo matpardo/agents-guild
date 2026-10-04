@@ -222,6 +222,47 @@ def _rule_epic_done_with_open_work(conn, project, epics):
     return findings
 
 
+def _rule_quest_task_not_in_sdd(conn, project, epics, party_states):
+    rows = conn.execute(
+        "SELECT quests.epic AS epic, quest_tasks.quest AS quest, quest_tasks.tid AS tid"
+        " FROM quest_tasks"
+        " JOIN quests ON quests.slug = quest_tasks.quest"
+        " JOIN parties ON parties.name = quests.party"
+        " WHERE quests.project = ? AND quests.epic IS NOT NULL"
+        " AND NOT EXISTS (SELECT 1 FROM tasks WHERE tasks.project = quests.project"
+        " AND tasks.epic = quests.epic AND tasks.tid = quest_tasks.tid)"
+        + _epic_clause("quests", epics) + _party_clause(party_states)
+        + " ORDER BY quests.epic, quest_tasks.quest, quest_tasks.tid",
+        _epic_params(project, epics) + _party_params(party_states),
+    ).fetchall()
+    return [
+        "task:{}/{}: not in epic {} tasks.md, add it".format(row["quest"], row["tid"], row["epic"])
+        for row in rows
+    ]
+
+
+def _rule_task_done_sdd_not_done(conn, project, epics, party_states):
+    rows = conn.execute(
+        "SELECT quests.epic AS epic, quest_tasks.quest AS quest, quest_tasks.tid AS tid,"
+        " tasks.sdd_status AS sdd_status"
+        " FROM quest_tasks"
+        " JOIN quests ON quests.slug = quest_tasks.quest"
+        " JOIN tasks ON tasks.project = quests.project AND tasks.epic = quests.epic"
+        " AND tasks.tid = quest_tasks.tid"
+        " JOIN parties ON parties.name = quests.party"
+        " WHERE quests.project = ? AND quest_tasks.state = 'done' AND tasks.sdd_status != 'done'"
+        + _epic_clause("quests", epics) + _party_clause(party_states)
+        + " ORDER BY quests.epic, quest_tasks.quest, quest_tasks.tid",
+        _epic_params(project, epics) + _party_params(party_states),
+    ).fetchall()
+    return [
+        "task:{}/{} done, epic {} tasks.md says {}".format(
+            row["quest"], row["tid"], row["epic"], row["sdd_status"]
+        )
+        for row in rows
+    ]
+
+
 def _collect_epic_scoped(conn, project, epics, party_states):
     return [
         ("merged PR, task not done", _rule_merged_pr_task_not_done(conn, project, epics, party_states)),
@@ -231,6 +272,8 @@ def _collect_epic_scoped(conn, project, epics, party_states):
         ("PR open, card not started", _rule_pr_open_card_not_started(conn, project, epics, party_states)),
         ("PR closed unmerged", _rule_pr_closed_unmerged(conn, project, epics, party_states)),
         ("epic done with open work", _rule_epic_done_with_open_work(conn, project, epics)),
+        ("quest task not in SDD", _rule_quest_task_not_in_sdd(conn, project, epics, party_states)),
+        ("task done, SDD not done", _rule_task_done_sdd_not_done(conn, project, epics, party_states)),
     ]
 
 

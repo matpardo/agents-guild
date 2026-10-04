@@ -62,7 +62,7 @@ def _claim_holders(conn, now, project, epic, party):
     return holders
 
 
-def _reject_taken_tasks(conn, now, project, epic, tasks, party):
+def reject_taken_tasks(conn, now, project, epic, tasks, party):
     quest_holders = _quest_holders(conn, project, epic, party)
     claim_holders = _claim_holders(conn, now, project, epic, party)
     conflicts = []
@@ -221,7 +221,7 @@ def add(ctx, slug, title, epic, tasks_csv, titles_csv, no_epic, followups_of):
         tasks = _free_tasks(tasks_csv, titles_csv)
     if not free:
         tasks = _resolve_epic_tasks(ctx.conn, project, epic, tasks_csv)
-        _reject_taken_tasks(ctx.conn, ctx.now, project, epic, tasks, binding["party"])
+        reject_taken_tasks(ctx.conn, ctx.now, project, epic, tasks, binding["party"])
     with db.writing(ctx.conn):
         events.record(
             ctx.conn,

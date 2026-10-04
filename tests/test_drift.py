@@ -128,6 +128,8 @@ class MergedPrTaskNotDoneTests(DriftTestCase):
         self.assertIn("1 findings", out)
 
     def test_merged_pr_with_task_done_is_not_a_finding(self):
+        self._write_epic("wave1", "status: active\n", "## T01 — First\n\n**Deps:** —\n**Status:** [x] done\n")
+        self._sync_sdd()
         self.run_cli(["task", "done", "wave1/T01"], "sess-1", self.repo_dir)
         self._set_pr_lifecycle(1, "merged")
         code, out, err = self._drift()
@@ -345,6 +347,78 @@ class EpicDoneWithOpenWorkTests(DriftTestCase):
         code, out, err = self._drift()
         self.assertEqual(code, 0, err)
         self.assertNotIn("epic done with open work", out)
+
+
+class QuestTaskNotInSddTests(DriftTestCase):
+    def setUp(self):
+        super().setUp()
+        self._write_epic("wave9", "status: active\n", "## T01 — First\n\n**Deps:** —\n**Status:** [ ] pending\n")
+        self._sync_sdd()
+        self.run_cli(
+            ["quest", "add", "wave9", "--title", "Wave 9", "--epic", "wave9", "--tasks", "T01"],
+            "sess-1", self.repo_dir,
+        )
+
+    def test_task_added_to_an_epic_quest_but_not_to_the_sdd_is_a_finding(self):
+        self.run_cli(["task", "add", "wave9/T09", "--title", "Extra"], "sess-1", self.repo_dir)
+        code, out, err = self._drift("wave9")
+        self.assertEqual(code, 0, err)
+        self.assertIn("quest task not in SDD (1)", out)
+        self.assertIn("task:wave9/T09: not in epic wave9 tasks.md, add it", out)
+
+    def test_task_present_in_the_sdd_is_not_a_finding(self):
+        self.run_cli(["task", "add", "wave9/T09", "--title", "Extra"], "sess-1", self.repo_dir)
+        self._write_epic(
+            "wave9", "status: active\n",
+            "## T01 — First\n\n**Deps:** —\n**Status:** [ ] pending\n\n"
+            "## T09 — Extra\n\n**Deps:** —\n**Status:** [ ] pending\n",
+        )
+        self._sync_sdd()
+        code, out, err = self._drift("wave9")
+        self.assertNotIn("quest task not in SDD", out)
+
+    def test_no_epic_quest_task_is_not_a_finding(self):
+        self.run_cli(["quest", "add", "free", "--title", "Free", "--no-epic"], "sess-1", self.repo_dir)
+        self.run_cli(["task", "add", "free/A", "--title", "A"], "sess-1", self.repo_dir)
+        code, out, err = self._drift("wave9")
+        self.assertNotIn("quest task not in SDD", out)
+
+    def test_quest_done_is_refused_while_the_task_is_missing_from_the_sdd(self):
+        self.run_cli(["task", "add", "wave9/T09", "--title", "Extra"], "sess-1", self.repo_dir)
+        self.run_cli(["task", "done", "wave9/T09"], "sess-1", self.repo_dir)
+        self.run_cli(["task", "done", "wave9/T01"], "sess-1", self.repo_dir)
+        code, out, err = self.run_cli(["quest", "done", "wave9"], "sess-1", self.repo_dir)
+        self.assertEqual(code, 1)
+        self.assertIn("task:wave9/T09: not in epic wave9 tasks.md", err)
+
+
+class TaskDoneSddNotDoneTests(DriftTestCase):
+    def setUp(self):
+        super().setUp()
+        self._write_epic("wave10", "status: active\n", "## T01 — First\n\n**Deps:** —\n**Status:** [ ] pending\n")
+        self._sync_sdd()
+        self.run_cli(
+            ["quest", "add", "wave10", "--title", "Wave 10", "--epic", "wave10", "--tasks", "T01"],
+            "sess-1", self.repo_dir,
+        )
+        self.run_cli(["task", "done", "wave10/T01"], "sess-1", self.repo_dir)
+
+    def test_done_task_with_pending_sdd_is_a_finding(self):
+        code, out, err = self._drift("wave10")
+        self.assertEqual(code, 0, err)
+        self.assertIn("task done, SDD not done (1)", out)
+        self.assertIn("task:wave10/T01 done, epic wave10 tasks.md says pending", out)
+
+    def test_done_task_with_done_sdd_is_not_a_finding(self):
+        self._write_epic("wave10", "status: active\n", "## T01 — First\n\n**Deps:** —\n**Status:** [x] done\n")
+        self._sync_sdd()
+        code, out, err = self._drift("wave10")
+        self.assertNotIn("task done, SDD not done", out)
+
+    def test_quest_done_is_refused_while_the_sdd_is_not_done(self):
+        code, out, err = self.run_cli(["quest", "done", "wave10"], "sess-1", self.repo_dir)
+        self.assertEqual(code, 1)
+        self.assertIn("task:wave10/T01 done, epic wave10 tasks.md says pending", err)
 
 
 class EpicFilterTests(DriftTestCase):

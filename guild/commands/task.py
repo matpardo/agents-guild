@@ -1,4 +1,5 @@
 from guild import db, events, identity
+from guild.commands import quest as quest_commands
 from guild.errors import GuildError
 
 
@@ -27,14 +28,14 @@ def _load_task(ctx, quest, tid):
     return row
 
 
+def _with_sdd_hint(message, quest_row, hint_template, tid):
+    if quest_row["epic"] is None:
+        return message
+    return "{}\n{}".format(message, hint_template.format(tid, quest_row["epic"]))
+
+
 def add(ctx, quest, tid, title):
     quest_row = _load_quest(ctx, quest)
-    if quest_row["epic"] is not None:
-        raise GuildError(
-            "quest '{}' is an epic quest; tasks come from `quest add --tasks`;"
-            " for extra work use `quest add <slug> --followups-of {}`".format(quest, quest),
-            1,
-        )
     binding = identity.require_binding(ctx.conn, ctx.session_id)
     _require_owner(binding, quest_row)
     if quest_row["state"] != "active":
@@ -44,6 +45,10 @@ def add(ctx, quest, tid, title):
     ).fetchone()
     if existing is not None:
         raise GuildError("task '{}/{}' already exists".format(quest, tid), 1)
+    if quest_row["epic"] is not None:
+        quest_commands.reject_taken_tasks(
+            ctx.conn, ctx.now, quest_row["project"], quest_row["epic"], [{"tid": tid}], binding["party"]
+        )
     with db.writing(ctx.conn):
         events.record(
             ctx.conn,
@@ -56,7 +61,9 @@ def add(ctx, quest, tid, title):
             "local",
             {"quest": quest, "tid": tid, "title": title},
         )
-    return "task '{}/{}' added".format(quest, tid)
+    return _with_sdd_hint(
+        "task '{}/{}' added".format(quest, tid), quest_row, "add {} to {} tasks.md in the SDD", tid
+    )
 
 
 def start(ctx, quest, tid, summary):
@@ -122,4 +129,6 @@ def done(ctx, quest, tid, summary):
             "local",
             {"quest": quest, "tid": tid, "summary": summary},
         )
-    return "task '{}/{}' done".format(quest, tid)
+    return _with_sdd_hint(
+        "task '{}/{}' done".format(quest, tid), quest_row, "mark {} done in {} tasks.md in the SDD", tid
+    )

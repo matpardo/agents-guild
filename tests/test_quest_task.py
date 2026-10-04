@@ -414,7 +414,7 @@ class TaskLifecycleTests(GuildTestCase):
         )
         self.assertEqual(code, 0)
 
-    def test_cannot_add_task_to_epic_quest(self):
+    def _add_epic_quest(self):
         self.sync_sdd(
             self.repo_dir,
             "sess-1",
@@ -427,12 +427,58 @@ class TaskLifecycleTests(GuildTestCase):
             "sess-1",
             self.repo_dir,
         )
+
+    def test_add_task_to_epic_quest_prints_the_sdd_hint(self):
+        self._add_epic_quest()
         code, out, err = self.run_cli(
             ["task", "add", "epicq/T10", "--title", "Extra"], "sess-1", self.repo_dir
         )
+        self.assertEqual(code, 0, err)
+        self.assertIn("task 'epicq/T10' added", out)
+        self.assertIn("add T10 to compliance tasks.md in the SDD", out)
+
+    def test_add_task_to_no_epic_quest_prints_no_hint(self):
+        code, out, err = self.run_cli(
+            ["task", "add", "demo/T01", "--title", "First task"], "sess-1", self.repo_dir
+        )
+        self.assertNotIn("tasks.md", out)
+
+    def test_add_task_held_by_another_party_on_an_epic_quest_is_refused(self):
+        self.sync_sdd(
+            self.repo_dir,
+            "sess-1",
+            "acme",
+            "compliance",
+            "## T01 — First task\n\n**Deps:** —\n\n**Status:** [ ] pending\n\n"
+            "## T09 — Ninth task\n\n**Deps:** —\n\n**Status:** [ ] pending\n",
+        )
+        self.run_cli(
+            ["quest", "add", "alphaq", "--title", "A", "--epic", "compliance", "--tasks", "T09"],
+            "sess-1",
+            self.repo_dir,
+        )
+        self.run_cli(["party", "start", "beta"], "sess-2", self.repo_dir)
+        self.run_cli(
+            ["quest", "add", "betaq", "--title", "B", "--epic", "compliance", "--tasks", "T01"],
+            "sess-2",
+            self.repo_dir,
+        )
+        code, out, err = self.run_cli(
+            ["task", "add", "betaq/T09", "--title", "dup"], "sess-2", self.repo_dir
+        )
         self.assertEqual(code, 1)
-        self.assertIn("epic quest", err)
-        self.assertIn("--followups-of epicq", err)
+        self.assertIn("T09 is in quest alphaq of party alpha", err)
+
+    def test_done_on_an_epic_quest_prints_the_sdd_hint(self):
+        self._add_epic_quest()
+        code, out, err = self.run_cli(["task", "done", "epicq/T09"], "sess-1", self.repo_dir)
+        self.assertEqual(code, 0, err)
+        self.assertIn("mark T09 done in compliance tasks.md in the SDD", out)
+
+    def test_done_on_a_free_quest_prints_no_hint(self):
+        self.run_cli(["task", "add", "demo/T01", "--title", "First"], "sess-1", self.repo_dir)
+        code, out, err = self.run_cli(["task", "done", "demo/T01"], "sess-1", self.repo_dir)
+        self.assertNotIn("tasks.md", out)
 
     def test_cannot_add_task_to_done_quest(self):
         self.run_cli(["quest", "done", "demo", "--force"], "sess-1", self.repo_dir)

@@ -100,10 +100,10 @@ guild quest add <slug> --title "..." --followups-of <quest> [--tasks A,B [--titl
 guild quest done <slug> [--accept-drift] [--force]   # refuses while tasks are not done; --force overrides
 guild quest incomplete <slug> --reason "..."          # a done quest that was not really finished
 
-guild task add <quest>/<tid> --title "..."          # no-epic quests only
+guild task add <quest>/<tid> --title "..."          # open quests of your party, epic quests included
 guild task start <quest>/<tid> [--summary "..."]
 guild task block <quest>/<tid> --reason "..."
-guild task done  <quest>/<tid> [--summary "..."]
+guild task done  <quest>/<tid> [--summary "..."]   # epic quests: also mark it done in the epic's tasks.md
 
 guild pr track <owner/repo>#<n> (--task <quest>/<tid> | --card <KEY>) --what "..." --waits "..." [--needs-human-pr-review]
 guild pr set   <owner/repo>#<n> [--lifecycle draft|converging|ready] [--waits "..."]
@@ -548,7 +548,8 @@ sync filled.
 
 Without flags, the report is scoped to work in progress: every epic-scoped
 rule (`tracker and SDD disagree`, `SDD task without card`, `card not under
-its epic`, `epic done with open work`) runs only on epics referenced by an
+its epic`, `epic done with open work`, `quest task not in SDD`, `task done,
+SDD not done`) runs only on epics referenced by an
 `active` quest of the project, and every PR rule (`merged PR, task not
 done`, `PR open, card not started`, `PR closed unmerged`) runs only on PRs
 tracked by a party that is `active` or `awaiting-leader`. `party has no
@@ -572,6 +573,8 @@ naming the refs and what each source says:
 | `PR closed unmerged` | a tracked PR has lifecycle `closed` |
 | `party has no running leader` | an `active` party's `leader_session_id` is not the id of any session file under the Claude sessions dir (`awaiting-leader` parties are not findings) |
 | `epic done with open work` | the epic's `sdd_status == done` but it still has a non-done quest task, or an open tracked PR linked to it |
+| `quest task not in SDD` | a task of an epic quest has no synced task with that tid in the epic's `tasks.md` (typically added with `guild task add` and never written to the SDD) |
+| `task done, SDD not done` | a task of an epic quest is `done` in guild while the epic's synced `sdd_status` for that tid is not `done` |
 
 The last line is `N findings` or `no drift`. `guild drift` never writes to
 SDD or the tracker: fixing drift stays with humans and the normal skills.
@@ -899,11 +902,26 @@ builds this list and is reused everywhere a project lookup can fail.
 ### Follow-up quests
 
 `guild quest add <slug> --followups-of <quest> --title "..."` creates a
-no-epic quest for your party, for extra work that does not fit an epic quest
-(whose tasks cannot be added to). `<quest>` must exist and be owned by your
+no-epic quest for your party, for extra work that belongs in a separate quest
+rather than in the epic quest itself (extra tasks can also be added directly
+with `guild task add`, see below). `<quest>` must exist and be owned by your
 party; the link is recorded in the `quest.added` event payload
 (`followups_of`). `--tasks` and `--titles` work as with `--no-epic`. Combining
 it with `--epic` or `--no-epic` is rejected.
+
+### Tasks on epic quests
+
+`guild task add <quest>/<tid> --title "..."` works on any **active** quest of
+your own party, epic quests included; a done quest is refused (`quest '<q>' is
+done`). On an epic quest the same overlap check as `quest add` applies: if
+the tid is held by an active quest of another party, or task-claimed by
+another party, the command is refused. A tid that is not in the epic's
+`tasks.md` yet is accepted. Guild stays read-only towards the SDD, so for an
+epic quest `task add` prints `add <tid> to <epic> tasks.md in the SDD` and
+`task done` prints `mark <tid> done in <epic> tasks.md in the SDD`: the agent
+updates `tasks.md` through the normal skills. Two `guild drift` rules detect
+a missed update (`quest task not in SDD`, `task done, SDD not done`), and the
+epic `quest done` drift gate refuses on them.
 
 ### No overlapping task lists
 
@@ -1264,6 +1282,8 @@ command).
 ```
 
 The rules ship with the CLI, so they change in the same commit as the commands they describe.
+
+They also state the loose-work rules: a PR without a task is tracked with `--card`, a task can be added to any open quest of the party without asking, and the agent keeps the epic's `tasks.md` in sync after `task add` and `task done` on an epic quest.
 
 They also state the visibility rule: guild is optional and invisible outside the local CLI. `guild brief` (and so the session-start hook) and `guild ask` repeat it in one line.
 
