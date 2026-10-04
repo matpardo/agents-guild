@@ -1,3 +1,4 @@
+import os
 import sqlite3
 
 from tests.testutil import GuildTestCase
@@ -271,7 +272,7 @@ class BoardSessionStatusTests(GuildTestCase):
         super().setUp()
         self.repo_dir = self.register_project("acme", ["acme/app"])
         self.run_cli(["party", "start", "alpha"], "sess-1", self.repo_dir)
-        self.write_session(111, "sess-1", "alpha-g1")
+        self.write_session(os.getpid(), "sess-1", "alpha-g1")
 
     def _hook_payload(self, notification_type, message):
         return {
@@ -294,7 +295,7 @@ class BoardSessionStatusTests(GuildTestCase):
         self.assertIn("\n  status: unknown\n", out)
 
     def test_party_section_shows_idle_when_session_is_gone(self):
-        (self.sessions_dir / "111.json").unlink()
+        (self.sessions_dir / "{}.json".format(os.getpid())).unlink()
         code, out, err = self.run_cli(["board"], None, None)
         self.assertIn("\n  status: idle\n", out)
 

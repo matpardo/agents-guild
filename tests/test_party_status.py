@@ -1,3 +1,5 @@
+import os
+import subprocess
 from datetime import timedelta
 
 from guild import db, party_status, session_status
@@ -12,10 +14,10 @@ class PartyStatusTests(GuildTestCase):
         super().setUp()
         self.repo_dir = self.register_project("acme", ["acme/app"])
         self.run_cli(["party", "start", "alpha"], "sess-1", self.repo_dir)
-        self.write_session(111, "sess-1", "alpha-g1")
+        self.write_session(os.getpid(), "sess-1", "alpha-g1")
 
     def _kill_session(self):
-        (self.sessions_dir / "111.json").unlink()
+        (self.sessions_dir / "{}.json".format(os.getpid())).unlink()
 
     def _hand_off(self):
         self.run_cli(["handoff", "--in-flight", "x", "--learned", "y"], "sess-1", self.repo_dir)
@@ -109,6 +111,22 @@ class PartyStatusTests(GuildTestCase):
         self._waiting("permission", "run ls")
         self._kill_session()
         self.assertEqual(self._derive()["status"], "idle")
+
+    def test_registry_entry_with_dead_pid_is_not_live(self):
+        process = subprocess.Popen(["true"])
+        process.wait()
+        (self.sessions_dir / "{}.json".format(os.getpid())).unlink()
+        self.write_session(process.pid, "sess-1", "alpha-g1")
+        self._session("session.working", {})
+        self.assertEqual(self._derive()["status"], "idle")
+
+    def test_registry_entry_with_dead_pid_and_task_is_queued(self):
+        self._add_task()
+        process = subprocess.Popen(["true"])
+        process.wait()
+        (self.sessions_dir / "{}.json".format(os.getpid())).unlink()
+        self.write_session(process.pid, "sess-1", "alpha-g1")
+        self.assertEqual(self._derive()["status"], "queued")
 
     def test_session_without_leader_id_is_idle(self):
         ctx = self._ctx()

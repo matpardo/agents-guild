@@ -1,3 +1,4 @@
+import os
 import json
 import shlex
 from unittest import mock
@@ -175,7 +176,7 @@ class ListTests(ReviveBase):
         self.assertEqual(tmux.calls, [])
 
     def test_list_shows_status_line_after_quest_line(self):
-        self.write_session(111, "sess-a", "alpha-g1")
+        self.write_session(os.getpid(), "sess-a", "alpha-g1")
         self.run_hook(
             "notification",
             {
