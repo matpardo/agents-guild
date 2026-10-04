@@ -2,7 +2,7 @@
 epic: resource-footprint
 type: spec
 title: See what each project costs the machine
-status: active
+status: done
 owner: matpardo
 created: 2026-10-04
 updated: 2026-10-04
@@ -38,13 +38,13 @@ Three incidents filled the disk: abandoned Docker images, worktrees of merged ta
 
 ## Success criteria
 
-- [ ] A collect without Docker records the worktrees and a Docker unavailable marker and exits 0.
-- [ ] A merged worktree and orphaned compose objects are flagged.
-- [ ] Two collects give deltas and top growers, and an unmeasured item shows as unknown, never as 0.
-- [ ] A worktree nested inside another is not counted in its parent.
-- [ ] No write lock is held while measuring, and overlapping collects do not both run.
-- [ ] `guild rebuild` reproduces the projections from events.
-- [ ] `/api/resources` serves the same model as the CLI and every category and flag has a tooltip.
+- [x] A collect without Docker records the worktrees and a Docker unavailable marker and exits 0.
+- [x] A merged worktree and orphaned compose objects are flagged.
+- [x] Two collects give deltas and top growers, and an unmeasured item shows as unknown, never as 0.
+- [x] A worktree nested inside another is not counted in its parent.
+- [x] No write lock is held while measuring, and overlapping collects do not both run.
+- [x] `guild rebuild` reproduces the projections from events.
+- [x] `/api/resources` serves the same model as the CLI and every category and flag has a tooltip.
 
 ## Security and data
 
