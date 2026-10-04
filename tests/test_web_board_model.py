@@ -147,8 +147,12 @@ class BoardModelShapeTests(BoardModelTestCase):
         ask = model["asks"][0]
         self.assertEqual(
             set(ask),
-            {"id", "party", "question", "context", "options", "refs", "blocked", "total_refs", "created_at"},
+            {
+                "id", "party", "question", "context", "options", "refs", "blocked", "total_refs",
+                "created_at", "state", "answer", "answered_at",
+            },
         )
+        self.assertEqual((ask["state"], ask["answer"], ask["answered_at"]), ("open", None, None))
         self.assertEqual(ask["party"], "alpha")
         self.assertEqual(ask["question"], "Ship it?")
         self.assertEqual(ask["context"], "tests green")

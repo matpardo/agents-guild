@@ -351,8 +351,8 @@ def _ask_created(conn, event):
 def _ask_answered(conn, event):
     payload = event["payload"]
     conn.execute(
-        "UPDATE asks SET state = 'answered', answer = ? WHERE id = ?",
-        (payload["answer"], payload["id"]),
+        "UPDATE asks SET state = 'answered', answer = ?, answered_at = ? WHERE id = ?",
+        (payload["answer"], event["ts"], payload["id"]),
     )
 
 

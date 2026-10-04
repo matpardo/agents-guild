@@ -197,7 +197,19 @@ def _handle_dismiss(ctx, args):
 def _handle_asks(ctx, args):
     from guild.commands import board as board_commands
 
-    _print_lines(board_commands.render_asks(ctx, None, _stdout_is_colored(), _terminal_width(), True))
+    if not args.all:
+        if args.party is not None or args.since is not None:
+            raise GuildError("--party/--since need --all", 1)
+        _print_lines(board_commands.render_asks(ctx, None, _stdout_is_colored(), _terminal_width(), True))
+        return 0
+    since_cutoff = None
+    if args.since is not None:
+        since_cutoff = ctx.now - timeutil.parse_duration(args.since)
+    _print_lines(
+        board_commands.render_all_asks(
+            ctx, args.party, since_cutoff, _stdout_is_colored(), _terminal_width()
+        )
+    )
     return 0
 
 
@@ -708,6 +720,9 @@ def build_parser():
     dismiss.set_defaults(handler=_handle_dismiss)
 
     asks = subparsers.add_parser("asks")
+    asks.add_argument("--all", action="store_true")
+    asks.add_argument("--party")
+    asks.add_argument("--since")
     asks.set_defaults(handler=_handle_asks)
 
     _add_notice_parser(subparsers)
