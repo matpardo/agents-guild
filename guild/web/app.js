@@ -76,8 +76,9 @@
       "stopped-with-work": "The leader session stopped but the party still has unfinished work; resume it.",
       working: "The leader session is running.",
       done: "The leader session stopped and the party has no work left.",
-      unknown: "The leader session never reported its status, so guild cannot tell what it is doing.",
-      "awaiting-leader": "The party has no running leader; start or resume a session to lead it.",
+      unknown: "A running leader session never reported its status.",
+      idle: "The party has no live session and nothing to do.",
+      queued: "The party has no live session but has work waiting; start a fresh session from its brief.",
       closed: "The party is closed and its work is over.",
     },
     partyState: {

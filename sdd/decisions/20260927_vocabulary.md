@@ -1,7 +1,7 @@
 # ADR: Vocabulary (guild, party, quest, epic, task, raid)
 
 - **Date:** 2026-09-27
-- **Status:** accepted
+- **Status:** superseded by 20261004_vocabulary-short-sessions
 
 ## Context
 

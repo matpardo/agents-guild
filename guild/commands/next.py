@@ -337,6 +337,12 @@ def has_work(ctx, binding):
     return bool(tier1 or tier2 or tier3 or next_task is not None)
 
 
+def next_task_item(ctx, binding):
+    if raid_commands.paused_member_raids(ctx.conn, ctx.now, binding["party"]):
+        return None
+    return _collect(ctx, binding["party"], binding["project"])[3]
+
+
 def run(ctx, binding, show_all, acknowledge):
     party, project = binding["party"], binding["project"]
     paused_rows = raid_commands.paused_member_raids(ctx.conn, ctx.now, party)

@@ -19,7 +19,7 @@ def _base_warning_lines(ctx, project_name):
     return lines
 
 
-def _targeting_lines(rows, project, raid_member_of):
+def targeting_lines(rows, project, raid_member_of):
     matched = notice_commands.targeting(rows, project, True, raid_member_of)
     lines = [notice_commands.format_notice_line(row["id"], row["party"], row["created_at"], row["text"]) for row in matched]
     return inbox_commands.framed(lines)
@@ -33,7 +33,7 @@ def render_brief(ctx):
     if binding is None:
         project = _resolve_project(ctx)
         lines = [UNBOUND_HINT]
-        lines.extend(_targeting_lines(active, project, set()))
+        lines.extend(targeting_lines(active, project, set()))
         lines.extend(_base_warning_lines(ctx, project))
         lines.append(pii.LOCAL_ONLY_REMINDER)
         return lines
@@ -63,7 +63,7 @@ def render_brief(ctx):
 
     raids = raid_commands.member_raids(ctx.conn, ctx.now, binding["party"])
     raid_member_of = {row["raid"] for row in raids}
-    lines.extend(_targeting_lines(active, binding["project"], raid_member_of))
+    lines.extend(targeting_lines(active, binding["project"], raid_member_of))
     for raid_row in raids:
         lead_row = raid_commands.active_lead(ctx.conn, ctx.now, raid_row["raid"])
         if lead_row is not None:

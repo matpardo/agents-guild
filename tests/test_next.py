@@ -488,6 +488,36 @@ class HasWorkTests(NextTestCase):
         self.assertFalse(self._has_work())
 
 
+class NextTaskItemTests(NextTestCase):
+    def _item(self, project="acme"):
+        ctx = _build_context("sess-1", self.repo_dir)
+        item = next_commands.next_task_item(ctx, {"party": "alpha", "project": project})
+        ctx.conn.close()
+        return item
+
+    def _add_task(self):
+        self.run_cli(["quest", "add", "demo", "--title", "Demo", "--no-epic"], "sess-1", self.repo_dir)
+        self.run_cli(["task", "add", "demo/T01", "--title", "First"], "sess-1", self.repo_dir)
+
+    def test_returns_queued_task(self):
+        self._add_task()
+        item = self._item()
+        self.assertEqual((item["quest"], item["tid"], item["title"]), ("demo", "T01", "First"))
+
+    def test_none_without_tasks(self):
+        self.assertIsNone(self._item())
+
+    def test_none_without_project(self):
+        self._add_task()
+        self.assertIsNone(self._item(None))
+
+    def test_none_when_raid_paused(self):
+        self._add_task()
+        self.run_cli(["raid", "join", "ci", "--until-leave", "--lead"], "sess-1", self.repo_dir)
+        self.run_cli(["raid", "pause", "ci"], "sess-1", self.repo_dir)
+        self.assertIsNone(self._item())
+
+
 if __name__ == "__main__":
     import unittest
 

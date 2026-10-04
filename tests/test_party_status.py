@@ -1,3 +1,5 @@
+import os
+import subprocess
 from datetime import timedelta
 
 from guild import db, party_status, session_status
@@ -12,6 +14,13 @@ class PartyStatusTests(GuildTestCase):
         super().setUp()
         self.repo_dir = self.register_project("acme", ["acme/app"])
         self.run_cli(["party", "start", "alpha"], "sess-1", self.repo_dir)
+        self.write_session(os.getpid(), "sess-1", "alpha-g1")
+
+    def _kill_session(self):
+        (self.sessions_dir / "{}.json".format(os.getpid())).unlink()
+
+    def _hand_off(self):
+        self.run_cli(["handoff", "--in-flight", "x", "--learned", "y"], "sess-1", self.repo_dir)
 
     def _ctx(self):
         return _build_context("sess-1", self.repo_dir)
@@ -43,9 +52,94 @@ class PartyStatusTests(GuildTestCase):
         self.run_cli(["party", "close"], "sess-1", self.repo_dir)
         self.assertEqual(self._derive(), {"status": "closed", "since": None, "detail": None})
 
-    def test_awaiting_leader(self):
-        self.run_cli(["handoff", "--in-flight", "x", "--learned", "y"], "sess-1", self.repo_dir)
-        self.assertEqual(self._derive(), {"status": "awaiting-leader", "since": None, "detail": None})
+    def test_awaiting_leader_without_work_is_idle(self):
+        self._kill_session()
+        self._hand_off()
+        self.assertEqual(self._derive(), {"status": "idle", "since": None, "detail": None})
+
+    def test_awaiting_leader_with_queued_task_is_queued(self):
+        self._add_task()
+        self._kill_session()
+        self._hand_off()
+        self.assertEqual(self._derive(), {"status": "queued", "since": None, "detail": None})
+
+    def test_awaiting_leader_with_live_old_session_is_idle(self):
+        self._hand_off()
+        self.assertEqual(self._derive()["status"], "idle")
+
+    def test_awaiting_leader_with_live_old_session_and_task_is_queued(self):
+        self._add_task()
+        self._hand_off()
+        self.assertEqual(self._derive()["status"], "queued")
+
+    def test_awaiting_leader_with_open_ask_is_waiting_ask(self):
+        self._ask()
+        self._kill_session()
+        self._hand_off()
+        result = self._derive()
+        self.assertEqual(result["status"], "waiting-ask")
+        self.assertIsNotNone(result["since"])
+
+    def test_answered_pr_ask_without_live_session_is_queued(self):
+        self._add_task()
+        self.run_cli(["task", "start", "demo/T01"], "sess-1", self.repo_dir)
+        self.write_gh_fixture(
+            "view_acme-app_1", {"state": "OPEN", "isDraft": True, "headRefName": "feature/x", "title": "t"}
+        )
+        self.run_cli(
+            ["pr", "track", "acme/app#1", "--task", "demo/T01", "--what", "x", "--waits", "y"],
+            "sess-1", self.repo_dir,
+        )
+        self.run_cli(["pr", "set", "acme/app#1", "--needs-ask-answer"], "sess-1", self.repo_dir)
+        self.run_cli(["ask", "more?", "--context", "c", "--ref", "pr:acme/app#1"], "sess-1", self.repo_dir)
+        self.run_cli(["answer", "1", "go"], None, None)
+        self._kill_session()
+        self.assertEqual(self._derive()["status"], "queued")
+
+    def test_dead_session_with_stale_working_row_is_idle(self):
+        self._session("session.working", {})
+        self._kill_session()
+        self.assertEqual(self._derive()["status"], "idle")
+
+    def test_dead_session_with_stale_working_row_and_task_is_queued(self):
+        self._add_task()
+        self._session("session.working", {})
+        self._kill_session()
+        self.assertEqual(self._derive()["status"], "queued")
+
+    def test_dead_session_with_stale_permission_row_is_ignored(self):
+        self._waiting("permission", "run ls")
+        self._kill_session()
+        self.assertEqual(self._derive()["status"], "idle")
+
+    def test_registry_entry_with_dead_pid_is_not_live(self):
+        process = subprocess.Popen(["true"])
+        process.wait()
+        (self.sessions_dir / "{}.json".format(os.getpid())).unlink()
+        self.write_session(process.pid, "sess-1", "alpha-g1")
+        self._session("session.working", {})
+        self.assertEqual(self._derive()["status"], "idle")
+
+    def test_registry_entry_with_dead_pid_and_task_is_queued(self):
+        self._add_task()
+        process = subprocess.Popen(["true"])
+        process.wait()
+        (self.sessions_dir / "{}.json".format(os.getpid())).unlink()
+        self.write_session(process.pid, "sess-1", "alpha-g1")
+        self.assertEqual(self._derive()["status"], "queued")
+
+    def test_session_without_leader_id_is_idle(self):
+        ctx = self._ctx()
+        with db.writing(ctx.conn):
+            ctx.conn.execute("UPDATE parties SET leader_session_id = NULL WHERE name = 'alpha'")
+        self.assertEqual(self._derive()["status"], "idle")
+
+    def test_dead_session_with_paused_raid_is_idle(self):
+        self._add_task()
+        self.run_cli(["raid", "join", "ci", "--until-leave", "--lead"], "sess-1", self.repo_dir)
+        self.run_cli(["raid", "pause", "ci"], "sess-1", self.repo_dir)
+        self._kill_session()
+        self.assertEqual(self._derive()["status"], "idle")
 
     def test_permission_beats_ask(self):
         self._ask()
@@ -65,6 +159,12 @@ class PartyStatusTests(GuildTestCase):
 
     def test_ask_with_no_session_row(self):
         self._ask()
+        self.assertEqual(self._derive()["status"], "waiting-ask")
+
+    def test_ask_with_dead_session_is_waiting_ask(self):
+        self._ask()
+        self._session("session.working", {})
+        self._kill_session()
         self.assertEqual(self._derive()["status"], "waiting-ask")
 
     def test_ask_while_working_is_working(self):
@@ -87,7 +187,7 @@ class PartyStatusTests(GuildTestCase):
         self._session("session.stopped", {})
         self.assertEqual(self._derive()["status"], "done")
 
-    def test_no_row_is_unknown(self):
+    def test_live_session_without_row_is_unknown(self):
         self.assertEqual(self._derive(), {"status": "unknown", "since": None, "detail": None})
 
     def test_stopped_with_paused_raid_is_done(self):

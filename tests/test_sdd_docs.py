@@ -6,6 +6,10 @@ from guild.adapters import sdd
 
 _SDD_ROOT = Path(__file__).resolve().parent.parent / "sdd"
 _EPICS_DIR = _SDD_ROOT / "epics"
+_DECISIONS_DIR = _SDD_ROOT / "decisions"
+_README = (_SDD_ROOT.parent / "README.md").read_text()
+_GUILD_MD = (_SDD_ROOT.parent / "GUILD.md").read_text()
+_NEW_VOCABULARY = "20261004_vocabulary-short-sessions"
 _STATUSES = {"draft", "active", "done", "archived"}
 _SPEC_KEYS = {"epic", "type", "title", "status", "owner", "created", "updated"}
 _CHILD_KEYS = {"epic", "type", "title", "status", "updated"}
@@ -79,6 +83,52 @@ class SddDocsTests(unittest.TestCase):
                 if status == "done":
                     pending = [task["tid"] for task in tasks if task["sdd_status"] != "done"]
                     self.assertEqual(pending, [])
+
+
+class VocabularyDecisionTests(unittest.TestCase):
+    def test_old_vocabulary_points_at_the_new_one(self):
+        old = (_DECISIONS_DIR / "20260927_vocabulary.md").read_text()
+        self.assertIn("- **Status:** superseded by {}".format(_NEW_VOCABULARY), old)
+
+    def test_new_vocabulary_is_accepted_and_names_every_term(self):
+        new = (_DECISIONS_DIR / "{}.md".format(_NEW_VOCABULARY)).read_text()
+        self.assertIn("- **Status:** accepted", new)
+        self.assertIn("Supersedes `20260927_vocabulary`", new)
+        for term in ("guild", "party", "leader", "generation", "keeper", "quest", "raid lead", "brief"):
+            self.assertIn("| {} |".format(term), new)
+
+    def test_readme_glossary_matches(self):
+        glossary = _README.split("## Glossary")[1].split("## Install")[0]
+        self.assertIn("the live session of a party: zero or one", glossary)
+        for term in ("generation", "keeper", "raid lead", "brief"):
+            self.assertIn("- **{}**".format(term), glossary)
+
+
+class EphemeralBriefDocsTests(unittest.TestCase):
+    def test_epic_is_active_with_tasks(self):
+        epic_dir = _EPICS_DIR / "ephemeral-brief"
+        self.assertEqual(_frontmatter(epic_dir / "spec.md")["status"], "active")
+        tasks = sdd.parse_tasks_file(epic_dir / "tasks.md", _PATTERNS)
+        self.assertEqual([task["tid"] for task in tasks], ["T01", "T02", "T03", "T04", "T05", "T06"])
+
+    def test_readme_documents_the_task_brief(self):
+        self.assertIn(
+            "guild brief [<party>/<quest>/<tid>]   # no argument: per-session view;"
+            " with a task: read-only, budgeted brief for a fresh session",
+            _README,
+        )
+        self.assertIn("### Task brief", _README)
+        self.assertIn("'Continue the work described in the guild brief.'", _README)
+        self.assertNotIn("described in the guild handoff", _README)
+        self.assertIn("Recommended: 40, so sessions stay short and each fresh generation starts from the brief.", _README)
+        self.assertIn('"handoff_threshold": 40,', _README)
+
+    def test_guild_md_says_sessions_are_short(self):
+        self.assertIn(
+            "Sessions are meant to be short: the new session starts from"
+            " `guild brief <party>/<quest>/<tid>`, injected for you at session start.",
+            _GUILD_MD,
+        )
 
 
 if __name__ == "__main__":

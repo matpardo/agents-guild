@@ -37,6 +37,10 @@ class TooltipCoverageTests(unittest.TestCase):
     def test_party_statuses(self):
         self.assertCovers("partyStatus", board._STATUS_STYLES)
 
+    def test_party_statuses_have_no_awaiting_leader(self):
+        self.assertNotIn("awaiting-leader", self.groups["partyStatus"])
+        self.assertCovers("partyStatus", ["idle", "queued", "unknown"])
+
     def test_pr_lifecycles(self):
         self.assertCovers("lifecycle", board._LIFECYCLE_STYLES)
 

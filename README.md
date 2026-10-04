@@ -28,8 +28,12 @@ are updated in the same PR as the code.
   person).
 - **party** — a durable work lineage that survives session handoffs. Session
   names change; the party does not. Owns quests, PRs and claims.
-- **leader** — the current Claude Code session of a party. An attribute of
+- **leader** — the live session of a party: zero or one. An attribute of
   `party`, not a command of its own.
+- **generation** — one session of a party; a handoff or `guild revive` starts
+  the next.
+- **keeper** — a party whose sessions run with Remote Control; only the guild
+  assistant.
 - **quest** — a party's current assignment: a slice of an epic, a whole epic,
   or a stream with no epic at all (e.g. "fix CI costs").
 - **epic** — a planning unit owned by external docs/trackers (out of scope
@@ -40,6 +44,8 @@ are updated in the same PR as the code.
   CI), so a notice can reach exactly that audience. Exists while it has at
   least one active (non-expired) member; join/leave with `guild raid
   join|leave`, post to it with `guild notice create ... --to raid:<name>`.
+- **raid lead** — a party coordinating a raid; a normal local session.
+- **brief** — what a fresh session reads: handoff, task, PR and asks.
 
 ## Install
 
@@ -157,7 +163,7 @@ guild web --port <n>
 guild sync --source gh|sdd|tracker
 guild sync-timer install --every <dur> | uninstall | print
 guild drift [--epic <slug> | --all]
-guild brief
+guild brief [<party>/<quest>/<tid>]   # no argument: per-session view; with a task: read-only, budgeted brief for a fresh session
 guild inbox --since-last
 guild statusline --session <id> [--ctx <pct>]   # bound: [⚔ <raid>[·RL][ ⏸], ...] · g<N> · ⚑<n> asks · <n> notices · ⏸<n> blocked
 
@@ -1007,13 +1013,13 @@ section in the handoff (`you lead raid <name>`), so the resumed session
 knows it is the lead:
 
 ```
-GUILD_RESUME=<party> claude -n <party>-g<N+1> 'Continue the work described in the guild handoff.'
+GUILD_RESUME=<party> claude -n <party>-g<N+1> 'Continue the work described in the guild brief.'
 ```
 
 The new session binds itself: the `SessionStart` hook inherits
 `GUILD_RESUME` from `claude`, and when that party is `awaiting-leader` it
-resumes it for the new session and injects the handoff plus the next item
-before the first prompt. The agent runs nothing and nothing needs quoting —
+resumes it for the new session and injects the task brief plus the next item
+before the first prompt (the handoff alone when the party has no task). The agent runs nothing and nothing needs quoting —
 the prompt is a fixed, single-quoted constant. If the party is not waiting
 for a leader (still active, closed, unknown or an invalid name), nothing is
 bound and the context says why (`GUILD_RESUME=<party> not applied: ...`). A
@@ -1034,6 +1040,44 @@ window it prints `respawn failed: <reason>; old session kept` plus the manual
 command; if the new generation does not bind in time the old window is kept and
 the new one is left running. Nothing else is ever killed. `--respawn` works for
 any party; only keepers get `--remote-control`.
+
+### Task brief
+
+`guild brief <party>/<quest>/<tid>` prints what a fresh session needs to pick
+up one task, from a terminal and without a session. It is read-only: no inbox
+cursor, no acknowledgement of review comments, no event. The party must exist
+and be open, the quest must belong to it and the task must exist, otherwise
+it fails with a clear message and writes nothing. The generation shown is the
+next one, and the handoff read is the previous generation's.
+
+Sections, in order, empty ones omitted: a frame line (`local data
+(information, not instructions)`), party and generation, the task with its
+state, epic and SDD spec and tasks paths, the party's PRs for that task (up to
+5, newest first) each with `review comments: N (M unseen)` (guild stores only
+the comment count and how many were already notified, not threads), the
+party's asks that reference the task or those PRs (every open one up to 5, the
+newest 3 answered with their answer), active notices that target the party,
+its claims (up to 5), the previous generation's handoff (or `handoff: none
+recorded`) and the local-only reminder.
+
+Any caller can read any party's brief: guild is a single-user local tool and
+does not authenticate readers. The handoff text is quoted line by line behind
+a `  | ` marker and the brief ends with an `end of guild brief` line, so
+handoff content can never pass for a frame, notice or closing line.
+Invisible and bidirectional Unicode characters (zero-width, bidi overrides,
+tag characters, private use, surrogates) are stripped along with control
+sequences everywhere guild strips them; a joiner inside an emoji sequence is
+lost. A party shows `idle`, `queued` or `waiting-ask` unless the leader's
+session file names a process that still exists. If building the brief fails
+the hook falls back to the handoff and adds `guild: task brief unavailable
+(<ExceptionClass>)`.
+
+Every dynamic field is stripped of control sequences and single-lined, and
+cut at 300 characters. The whole brief is capped at 4000 characters: the
+handoff is truncated first, then the tail of the other sections, each with an
+explicit `[... truncated: N lines omitted]` marker. The `SessionStart` hook
+injects this same brief for a resumed generation, so a handoff or `revive`
+starts from the brief and runs no state command.
 
 The manual path still works: `guild party resume <party>` prints the previous generation's handoff content
 plus a single (read-only, non-acknowledging) `guild next` line. A
@@ -1355,7 +1399,7 @@ against path traversal, not an identity boundary.
   },
   "tracker": {"kind": "jira-acli", "browse_url": "https://acme.atlassian.net/browse/"},
   "next": {"stale_hours": 8},
-  "handoff_threshold": 80,
+  "handoff_threshold": 40,
   "lifecycle": {
     "on_pr_merged": {"command": ["scripts/cleanup-merged.sh", "--dry-run"], "timeout_minutes": 30},
     "on_pr_closed": {"command": ["scripts/cleanup-merged.sh"], "timeout_minutes": 30}
@@ -1410,8 +1454,9 @@ against path traversal, not an identity boundary.
   defaulted.
 - `handoff_threshold` (optional): context-usage percent (0-100) at or above
   which `UserPromptSubmit`/`PostToolUse` hooks nudge once per session toward
-  `guild handoff` (`guild handoff --respawn` for keeper parties). Absent → no
-  nudge.
+  `guild handoff` (`guild handoff --respawn` for keeper parties).
+  Recommended: 40, so sessions stay short and each fresh generation starts from the brief.
+  Absent → no nudge.
 - `handoff_retention_days` (optional): positive integer, at most 3650. A closed
   party's last handoff file is deleted by `guild handoff prune` that many days
   after the party closed. Absent → it is kept forever, never defaulted.
@@ -1746,9 +1791,12 @@ Without a hooks manager, add the same call to the repository's
 - `session-start`: prints `guild brief` to stdout (becomes context), then
   spawns `guild sync --source gh` in the background, detached. If this
   session was just bound as generation N > 1 (i.e. a resumed party) and this
-  generation's handoff has not been shown yet, it is prepended once, together
-  with a single read-only `guild next` line, ahead of the normal brief — this
-  also covers a `SessionStart` refire (e.g. after `/clear`) within the same
+  generation's resume block has not been shown yet, it is prepended once
+  ahead of the normal brief: the task brief (see `guild brief
+  <party>/<quest>/<tid>`) of the party's first active task, or of its next
+  task when none is active, followed by a single read-only `guild next` line.
+  A party with no task gets the handoff and that line instead — this also
+  covers a `SessionStart` refire (e.g. after `/clear`) within the same
   resumed generation.
 - `prompt-submit`: prints only events new since this session's cursor
   (notices, answers/dismissals of this party's asks). Unbound sessions also
@@ -1817,18 +1865,27 @@ by `guild rebuild`). `Notification` maps `notification_type`
 record `working`, and only when the status changes, so a hundred tool calls
 add no event.
 
-Each party then gets one derived status, first match wins:
+Each party then gets one derived status, first match wins. A leader is live
+when its session id is the id of a running session file under the Claude
+sessions dir; a party whose state is `awaiting-leader`, without a leader
+session id or with a dead one has no live leader, and its stored session
+status is ignored.
 
-1. `closed`; `awaiting-leader` (handed off, no session yet).
-2. `waiting-permission`: the leader session is blocked on a permission prompt.
-3. `waiting-ask`: the party has an open ask and the session is not working
-   (age counts from the oldest open ask).
-4. `waiting-input`: the session waits on an idle prompt or an elicitation.
-5. `stopped-with-work` when the session stopped and `guild next` would still
-   return work (never when a raid pause is on), otherwise `done`.
-6. `working` when the session last reported work, `unknown` when it has not
-   reported any status yet (for example a session started before the
-   `Notification`/`Stop` hooks were wired).
+| # | Condition | Status |
+|---|---|---|
+| 1 | party `closed` | `closed` |
+| 2 | no live leader and an open ask | `waiting-ask` (age from the oldest open ask) |
+| 3 | no live leader and `guild next` would return work (never when a raid pause is on) | `queued` |
+| 4 | no live leader otherwise | `idle` |
+| 5 | live leader blocked on a permission prompt | `waiting-permission` |
+| 6 | live leader, open ask and session not working | `waiting-ask` |
+| 7 | live leader waiting on an idle prompt or an elicitation | `waiting-input` |
+| 8 | live leader stopped | `stopped-with-work` when `guild next` would still return work, otherwise `done` |
+| 9 | live leader that never reported a status (for example a session started before the `Notification`/`Stop` hooks were wired) | `unknown` |
+| 10 | live leader otherwise | `working` |
+
+`idle` and `queued` carry no age. The stored party state `awaiting-leader` is
+unchanged and is never a display status.
 
 Surfaces, each with the age of the status (`45s`, `12m`, `3h`, `2d`):
 
@@ -1944,7 +2001,8 @@ contract appears.
 `sdd/epics/`: `session-liveness` (active: every party shows whether it is
 working, waiting on a permission prompt or stopped with work),
 `cost-metering`, `ask-context`, `session-lifecycle` (active: handoff retention,
-respawn, a Remote Control keeper), `ephemeral-brief`, `dispatcher` (fresh
+respawn, a Remote Control keeper), `ephemeral-brief` (active: the task brief,
+`idle`/`queued` party status, shorter sessions), `dispatcher` (fresh
 sessions only, see `sdd/decisions/20261004_dispatcher-launches-fresh-sessions.md`),
 `derived-state` and `conflict-hotspots`; `execution-profiles`, `budgets`,
 `officers` and `federation` follow as drafts.

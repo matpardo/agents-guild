@@ -5,7 +5,7 @@ from guild.commands import party as party_commands
 from guild.commands import statusline as statusline_commands
 from tests.testutil import GuildTestCase
 
-_PROMPT = "'Continue the work described in the guild handoff.'"
+_PROMPT = "'Continue the work described in the guild brief.'"
 
 
 class KeeperPartyTests(GuildTestCase):
