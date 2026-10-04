@@ -56,3 +56,10 @@ updated: 2026-10-04
 **Status:** [x] done — #64
 
 **What:** doctor checks the `Notification` and `Stop` hooks and warns on guild state commands that are not allow-listed; README hook section and `GUILD.md` updated.
+
+## T07 — Unknown status for a silent session
+
+**Depends on:** T03
+**Status:** [x] done — #66
+
+**What:** a party whose leader session never reported a status shows `unknown`, not `working`.
