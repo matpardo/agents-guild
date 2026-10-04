@@ -472,6 +472,34 @@ def _main_marked(conn, event):
     _record_main_status(conn, event, "manual")
 
 
+_WAIT_STATUS = {
+    "permission": "waiting-permission",
+    "elicitation": "waiting-input",
+    "idle": "waiting-input",
+}
+
+
+def _set_session_status(conn, event, status, detail):
+    conn.execute(
+        "INSERT OR REPLACE INTO session_status (session_id, party, status, detail, since)"
+        " VALUES (?, ?, ?, ?, ?)",
+        (event["session_id"], event["party"], status, detail, event["ts"]),
+    )
+
+
+def _session_waiting(conn, event):
+    payload = event["payload"]
+    _set_session_status(conn, event, _WAIT_STATUS[payload["wait"]], payload["message"])
+
+
+def _session_stopped(conn, event):
+    _set_session_status(conn, event, "stopped", None)
+
+
+def _session_working(conn, event):
+    _set_session_status(conn, event, "working", None)
+
+
 def _dump(value):
     return json.dumps(value)
 
@@ -512,6 +540,9 @@ _REDUCERS = {
     "merge_queue.unpinned": _merge_queue_unpinned,
     "main.status_synced": _main_status_synced,
     "main.marked": _main_marked,
+    "session.waiting": _session_waiting,
+    "session.stopped": _session_stopped,
+    "session.working": _session_working,
 }
 
 

@@ -15,6 +15,7 @@ PROJECTION_TABLES = (
     "pr_shared_areas",
     "merge_queue_pins",
     "main_status",
+    "session_status",
 )
 
 _RAID_MEMBERS_TABLE = """
@@ -209,6 +210,15 @@ _CREATE_STATEMENTS = (
         reason TEXT,
         updated_at TEXT NOT NULL,
         PRIMARY KEY (repo, source)
+    )
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS session_status (
+        session_id TEXT PRIMARY KEY,
+        party TEXT NOT NULL,
+        status TEXT NOT NULL,
+        detail TEXT,
+        since TEXT NOT NULL
     )
     """,
     """
