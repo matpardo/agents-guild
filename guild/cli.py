@@ -422,13 +422,13 @@ def _handle_handoff(ctx, args):
     if args.learned is None:
         raise GuildError("--learned is required", 1)
     tmux = tmux_windows.Tmux()
-    text, window_to_close = handoff_commands.run(
+    text, pane_to_close = handoff_commands.run(
         ctx, args.in_flight, args.learned, args.model, args.respawn, tmux, os.environ.get("TMUX_PANE"), time.sleep
     )
     _print(text)
     sys.stdout.flush()
-    if window_to_close is not None:
-        tmux_windows.kill_window(tmux, window_to_close)
+    if pane_to_close is not None:
+        tmux_windows.kill_pane(tmux, pane_to_close)
     return 0
 
 

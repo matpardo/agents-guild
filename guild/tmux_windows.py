@@ -65,5 +65,5 @@ def window_in_session(tmux, window_id):
     return window_id in output.splitlines()
 
 
-def kill_window(tmux, window_id):
-    return _ok(tmux, ["kill-window", "-t", window_id])
+def kill_pane(tmux, pane):
+    return _ok(tmux, ["kill-pane", "-t", pane])

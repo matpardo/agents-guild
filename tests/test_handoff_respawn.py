@@ -41,7 +41,7 @@ class FakeTmux:
             if pane not in self.pane_windows:
                 return 1, ""
             return 0, self.pane_windows[pane] + "\n"
-        if verb == "kill-window":
+        if verb in ("kill-window", "kill-pane"):
             return 0, ""
         return 0, ""
 
@@ -59,6 +59,7 @@ class RespawnBase(GuildTestCase):
         self.ctx = _build_context("sess-1", self.repo_dir)
         self.sleeps = 0
         self.bind_after = None
+        self.on_sleep = {}
 
     def tearDown(self):
         self.ctx.conn.close()
@@ -75,6 +76,8 @@ class RespawnBase(GuildTestCase):
         self.sleeps += 1
         if self.bind_after is not None and self.sleeps == self.bind_after:
             self.run_cli(["party", "resume", "alpha"], "sess-2", self.repo_dir)
+        if self.sleeps in self.on_sleep:
+            self.on_sleep[self.sleeps]()
 
     def _fake(self, installed=True, windows=None, pane_windows=None, session_up=True, create_returncode=0):
         windows = {"@1": "alpha"} if windows is None else windows
@@ -97,9 +100,9 @@ class RespawnSuccessTests(RespawnBase):
         self._record_window(1, "@1")
         self.bind_after = 2
         tmux = self._fake()
-        text, window_to_close = self._respawn(tmux, "%5")
-        self.assertEqual(window_to_close, "@1")
-        self.assertIn("respawned: alpha-g2 bound in window @1; closing this window", text)
+        text, pane_to_close = self._respawn(tmux, "%5")
+        self.assertEqual(pane_to_close, "%5")
+        self.assertIn("respawned: alpha-g2 bound in window @1; closing this pane", text)
         self.assertIn("note: this text is broadcast to every session", text)
         launch = tmux.launch_calls()[0]
         self.assertEqual(launch[0], "new-window")
@@ -126,8 +129,8 @@ class RespawnSuccessTests(RespawnBase):
 
 class RespawnManualCloseTests(RespawnBase):
     def _assert_manual(self, tmux, pane):
-        text, window_to_close = self._respawn(tmux, pane)
-        self.assertIsNone(window_to_close)
+        text, pane_to_close = self._respawn(tmux, pane)
+        self.assertIsNone(pane_to_close)
         self.assertIn("respawned: alpha-g2 bound; close this window yourself (not a window guild launched)", text)
         self.assertNotIn("kill-window", [call[0] for call in tmux.calls])
 
@@ -157,8 +160,8 @@ class RespawnManualCloseTests(RespawnBase):
 
 
 class RespawnFailureTests(RespawnBase):
-    def _assert_kept(self, text, window_to_close, reason):
-        self.assertIsNone(window_to_close)
+    def _assert_kept(self, text, pane_to_close, reason):
+        self.assertIsNone(pane_to_close)
         self.assertIn("respawn failed: {}; old session kept".format(reason), text)
         self.assertIn("GUILD_RESUME=alpha claude -n alpha-g2", text)
         self.assertIn("note: this text is broadcast to every session", text)
@@ -167,15 +170,15 @@ class RespawnFailureTests(RespawnBase):
 
     def test_tmux_not_installed(self):
         tmux = self._fake(installed=False)
-        text, window_to_close = self._respawn(tmux, "%5")
-        self._assert_kept(text, window_to_close, "tmux not found")
+        text, pane_to_close = self._respawn(tmux, "%5")
+        self._assert_kept(text, pane_to_close, "tmux not found")
         self.assertEqual(tmux.calls, [])
 
     def test_window_creation_failure(self):
         self._record_window(1, "@1")
         tmux = self._fake(create_returncode=1)
-        text, window_to_close = self._respawn(tmux, "%5")
-        self._assert_kept(text, window_to_close, "tmux could not create the window")
+        text, pane_to_close = self._respawn(tmux, "%5")
+        self._assert_kept(text, pane_to_close, "tmux could not create the window")
         self.assertNotIn("kill-window", [call[0] for call in tmux.calls])
         self.assertEqual(self.sleeps, 0)
 
@@ -183,26 +186,68 @@ class RespawnFailureTests(RespawnBase):
         gone = self.root / "gone"
         self.ctx.conn.execute("UPDATE leaders SET cwd = ? WHERE party = 'alpha'", (str(gone),))
         tmux = self._fake()
-        text, window_to_close = self._respawn(tmux, "%5")
-        self._assert_kept(text, window_to_close, "cwd missing ({})".format(gone))
+        text, pane_to_close = self._respawn(tmux, "%5")
+        self._assert_kept(text, pane_to_close, "cwd missing ({})".format(gone))
         self.assertEqual(tmux.launch_calls(), [])
 
     def test_unknown_cwd(self):
         self.ctx.conn.execute("UPDATE leaders SET cwd = NULL WHERE party = 'alpha'")
-        text, window_to_close = self._respawn(self._fake(), "%5")
-        self._assert_kept(text, window_to_close, "cwd unknown")
+        text, pane_to_close = self._respawn(self._fake(), "%5")
+        self._assert_kept(text, pane_to_close, "cwd unknown")
 
     def test_bind_timeout_keeps_old_window_and_leaves_new_one_running(self):
         self._record_window(1, "@1")
         tmux = self._fake()
-        text, window_to_close = self._respawn(tmux, "%5")
-        self.assertIsNone(window_to_close)
+        text, pane_to_close = self._respawn(tmux, "%5")
+        self.assertIsNone(pane_to_close)
         self.assertIn(
             "respawn: next generation did not bind within 90s; old window kept; new window @2 left running", text
         )
         self.assertEqual(self.sleeps, 90)
         self.assertNotIn("kill-window", [call[0] for call in tmux.calls])
         self.assertEqual(self._state(), "awaiting-leader")
+
+
+class RespawnBindCheckTests(RespawnBase):
+    def _no_kill(self, tmux):
+        self.assertNotIn("kill-window", [call[0] for call in tmux.calls])
+        self.assertNotIn("kill-pane", [call[0] for call in tmux.calls])
+
+    def test_new_window_exiting_aborts_early_and_kills_nothing(self):
+        self._record_window(1, "@1")
+        tmux = self._fake()
+        self.on_sleep[1] = lambda: tmux.windows.pop("@2")
+        text, pane_to_close = self._respawn(tmux, "%5")
+        self.assertIsNone(pane_to_close)
+        self.assertIn("respawn: new window exited before binding; old session kept", text)
+        self.assertEqual(self.sleeps, 1)
+        self._no_kill(tmux)
+
+    def test_generation_bump_by_the_old_session_is_not_a_bind(self):
+        self._record_window(1, "@1")
+        tmux = self._fake()
+        self.on_sleep[1] = lambda: self.ctx.conn.execute("UPDATE parties SET generation = 2 WHERE name = 'alpha'")
+        text, pane_to_close = self._respawn(tmux, "%5")
+        self.assertIsNone(pane_to_close)
+        self.assertIn("did not bind within 90s", text)
+        self._no_kill(tmux)
+
+    def test_missing_party_row_aborts_without_error(self):
+        self._record_window(1, "@1")
+        tmux = self._fake()
+        self.on_sleep[1] = lambda: self.ctx.conn.execute("DELETE FROM parties WHERE name = 'alpha'")
+        text, pane_to_close = self._respawn(tmux, "%5")
+        self.assertIsNone(pane_to_close)
+        self.assertIn("respawn: party 'alpha' is gone or closed; old session kept", text)
+        self._no_kill(tmux)
+
+    def test_closed_party_aborts(self):
+        self._record_window(1, "@1")
+        tmux = self._fake()
+        self.on_sleep[1] = lambda: self.ctx.conn.execute("UPDATE parties SET state = 'closed' WHERE name = 'alpha'")
+        text, pane_to_close = self._respawn(tmux, "%5")
+        self.assertIsNone(pane_to_close)
+        self.assertIn("is gone or closed", text)
 
 
 class RespawnNonKeeperTests(RespawnBase):
@@ -212,32 +257,42 @@ class RespawnNonKeeperTests(RespawnBase):
         self._record_window(1, "@1")
         self.bind_after = 1
         tmux = self._fake()
-        text, window_to_close = self._respawn(tmux, "%5")
-        self.assertEqual(window_to_close, "@1")
+        text, pane_to_close = self._respawn(tmux, "%5")
+        self.assertEqual(pane_to_close, "%5")
         self.assertNotIn("--remote-control", tmux.launch_calls()[0][-1])
 
 
 class RespawnCliTests(RespawnBase):
-    def test_handler_prints_before_killing_the_window(self):
+    def test_handler_prints_before_killing_the_pane(self):
         order = []
 
-        def fake_kill(tmux, window_id):
-            order.append(("kill", window_id, sys.stdout.getvalue()))
+        def fake_kill(tmux, pane):
+            order.append(("kill", pane, sys.stdout.getvalue()))
 
-        with mock.patch("guild.commands.handoff.run", return_value=("respawned: ok", "@1")), mock.patch(
-            "guild.tmux_windows.kill_window", side_effect=fake_kill
+        with mock.patch("guild.commands.handoff.run", return_value=("respawned: ok", "%5")), mock.patch(
+            "guild.tmux_windows.kill_pane", side_effect=fake_kill
         ), mock.patch.dict("os.environ", {"TMUX_PANE": "%5"}):
             code, out, err = self.run_cli(
                 ["handoff", "--respawn", "--in-flight", "x", "--learned", "y"], "sess-1", self.repo_dir
             )
         self.assertEqual(code, 0, err)
         self.assertEqual(len(order), 1)
-        self.assertEqual(order[0][1], "@1")
+        self.assertEqual(order[0][1], "%5")
         self.assertIn("respawned: ok", order[0][2])
+
+    def test_handler_kills_only_the_pane_never_the_window(self):
+        fake = self._fake()
+        with mock.patch("guild.commands.handoff.run", return_value=("respawned: ok", "%5")), mock.patch(
+            "guild.tmux_windows.Tmux", return_value=fake
+        ):
+            self.run_cli(["handoff", "--respawn", "--in-flight", "x", "--learned", "y"], "sess-1", self.repo_dir)
+        verbs = [call[0] for call in fake.calls]
+        self.assertEqual(fake.calls, [["kill-pane", "-t", "%5"]])
+        self.assertNotIn("kill-window", verbs)
 
     def test_handler_does_not_kill_when_nothing_to_close(self):
         with mock.patch("guild.commands.handoff.run", return_value=("respawn failed", None)), mock.patch(
-            "guild.tmux_windows.kill_window"
+            "guild.tmux_windows.kill_pane"
         ) as kill:
             self.run_cli(["handoff", "--respawn", "--in-flight", "x", "--learned", "y"], "sess-1", self.repo_dir)
         kill.assert_not_called()

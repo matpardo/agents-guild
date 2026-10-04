@@ -10,6 +10,10 @@ from guild.errors import GuildError
 
 _BIND_POLLS = 90
 _BIND_POLL_SECONDS = 1
+_BOUND = "bound"
+_PARTY_GONE = "party-gone"
+_WINDOW_GONE = "window-gone"
+_TIMED_OUT = "timed-out"
 
 
 def _section(title, lines):
@@ -134,16 +138,29 @@ def _record_launch(ctx, binding, window_id):
         )
 
 
-def _awaiting_bind(conn, party, generation, sleep):
+def _bind_status(conn, tmux, party, generation, old_session_id, new_window_id):
+    row = conn.execute(
+        "SELECT generation, leader_session_id, state FROM parties WHERE name = ?", (party,)
+    ).fetchone()
+    if row is None or row["state"] == "closed":
+        return _PARTY_GONE
+    if row["generation"] >= generation and row["leader_session_id"] != old_session_id:
+        return _BOUND
+    if not tmux_windows.window_in_session(tmux, new_window_id):
+        return _WINDOW_GONE
+    return None
+
+
+def _awaiting_bind(conn, tmux, party, generation, old_session_id, new_window_id, sleep):
     for _ in range(_BIND_POLLS):
-        row = conn.execute("SELECT generation FROM parties WHERE name = ?", (party,)).fetchone()
-        if row["generation"] >= generation:
-            return True
+        status = _bind_status(conn, tmux, party, generation, old_session_id, new_window_id)
+        if status is not None:
+            return status
         sleep(_BIND_POLL_SECONDS)
-    return False
+    return _TIMED_OUT
 
 
-def _closable_window(tmux, tmux_pane, recorded_window):
+def _closable_pane(tmux, tmux_pane, recorded_window):
     if tmux_pane is None or recorded_window is None:
         return None
     own_window = tmux_windows.window_id_of_pane(tmux, tmux_pane)
@@ -151,7 +168,7 @@ def _closable_window(tmux, tmux_pane, recorded_window):
         return None
     if not tmux_windows.window_in_session(tmux, own_window):
         return None
-    return own_window
+    return tmux_pane
 
 
 def _launch_next_generation(ctx, binding, command, cwd, tmux):
@@ -180,19 +197,28 @@ def _respawn(ctx, binding, model, tmux, tmux_pane, sleep):
         blocker = "tmux could not create the window" if window_id is None else None
     if blocker is not None:
         return _with_reminder("respawn failed: {}; old session kept\n{}".format(blocker, command)), None
-    if not _awaiting_bind(ctx.conn, party, generation + 1, sleep):
+    status = _awaiting_bind(
+        ctx.conn, tmux, party, generation + 1, ctx.session_id, window_id, sleep
+    )
+    if status == _PARTY_GONE:
+        return _with_reminder("respawn: party '{}' is gone or closed; old session kept".format(party)), None
+    if status == _WINDOW_GONE:
+        return _with_reminder("respawn: new window exited before binding; old session kept"), None
+    if status == _TIMED_OUT:
         return _with_reminder(
             "respawn: next generation did not bind within {}s; old window kept; new window {} left running".format(
                 _BIND_POLLS * _BIND_POLL_SECONDS, window_id
             )
         ), None
     label = "{}-g{}".format(party, generation + 1)
-    closable = _closable_window(tmux, tmux_pane, recorded_window)
-    if closable is None:
+    pane = _closable_pane(tmux, tmux_pane, recorded_window)
+    if pane is None:
         return _with_reminder(
             "respawned: {} bound; close this window yourself (not a window guild launched)".format(label)
         ), None
-    return _with_reminder("respawned: {} bound in window {}; closing this window".format(label, closable)), closable
+    return _with_reminder(
+        "respawned: {} bound in window {}; closing this pane".format(label, recorded_window)
+    ), pane
 
 
 def run(ctx, in_flight, learned, model, respawn, tmux, tmux_pane, sleep):

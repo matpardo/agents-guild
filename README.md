@@ -1024,7 +1024,9 @@ the human: it launches that same fresh command itself in a window of the `guild`
 tmux session (created when absent, named after the party, name pinned like
 `revive`), records the window (`leader.window_launched`, table `leader_windows`
 per party and generation) and waits up to 90 seconds for the new generation to
-bind. Once bound it closes its own window, only when the tmux pane it runs in
+bind (aborting early if the new window disappears or the party is gone). Once the new
+generation itself is bound it closes its own pane with `tmux kill-pane` (never the
+window, so panes you split into it survive), only when the tmux pane it runs in
 (`$TMUX_PANE`) is the window guild recorded as launching this generation and
 that window is still in the `guild` session; otherwise it prints `close this
 window yourself`. If tmux is missing, the cwd is gone or tmux cannot create the
