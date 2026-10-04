@@ -30,6 +30,7 @@ _STATUS_STYLES = {
     "stopped-with-work": "cyan",
     "working": "green",
     "done": "dim",
+    "unknown": "dim",
     "awaiting-leader": "dim",
     "closed": "dim",
 }

@@ -1532,7 +1532,9 @@ Each party then gets one derived status, first match wins:
 4. `waiting-input`: the session waits on an idle prompt or an elicitation.
 5. `stopped-with-work` when the session stopped and `guild next` would still
    return work (never when a raid pause is on), otherwise `done`.
-6. `working` (also when the session has no row yet).
+6. `working` when the session last reported work, `unknown` when it has not
+   reported any status yet (for example a session started before the
+   `Notification`/`Stop` hooks were wired).
 
 Surfaces, each with the age of the status (`45s`, `12m`, `3h`, `2d`):
 

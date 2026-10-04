@@ -41,8 +41,9 @@ def derive(ctx, party_row):
         return _result("waiting-input", session_row["since"], session_row["detail"])
     if session_state == "stopped":
         return _stopped_result(ctx, party_row, session_row)
-    since = None if session_row is None else session_row["since"]
-    return _result("working", since, None)
+    if session_row is None:
+        return _result("unknown", None, None)
+    return _result("working", session_row["since"], None)
 
 
 def label(ctx, status):
