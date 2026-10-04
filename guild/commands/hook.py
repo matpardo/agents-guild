@@ -159,11 +159,10 @@ def stop(ctx):
 
 
 _BLOCKING_WAITS = ("permission", "elicitation")
-_WAITING_STATUSES = ("waiting-permission", "waiting-input")
 
 
-def _is_new_waiting_episode(previous_row):
-    return previous_row is None or previous_row["status"] not in _WAITING_STATUSES
+def _hides_pending_permission(wait, previous_row):
+    return wait == "idle" and previous_row is not None and previous_row["status"] == "waiting-permission"
 
 
 def _run_push(ctx, binding, wait, push_runner):
@@ -188,12 +187,14 @@ def notification(ctx, notification_type, message, push_runner):
     wait, status = mapped
     with db.writing(ctx.conn):
         previous_row = session_status.current(ctx.conn, ctx.session_id)
+        if _hides_pending_permission(wait, previous_row):
+            return
         if not session_status.is_change(ctx.conn, ctx.session_id, status):
             return
         session_status.record_change(
             ctx, binding, "session.waiting", session_status.waiting_payload(wait, message)
         )
-    if wait not in _BLOCKING_WAITS or not _is_new_waiting_episode(previous_row):
+    if wait not in _BLOCKING_WAITS:
         return
     _run_push(ctx, binding, wait, push_runner)
 

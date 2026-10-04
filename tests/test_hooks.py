@@ -949,6 +949,13 @@ class SessionLivenessHookTests(GuildTestCase):
         self._notify(repo_dir, "elicitation_dialog", "pick one")
         self.assertEqual(self._status(), ("waiting-input", "pick one"))
 
+    def test_idle_prompt_keeps_a_pending_permission_wait(self):
+        repo_dir = self._bound()
+        self._notify(repo_dir, "permission_prompt", "Claude needs permission to run ls")
+        self._notify(repo_dir, "idle_prompt", "Claude is waiting for your input")
+        self.assertEqual(self._status(), ("waiting-permission", "Claude needs permission to run ls"))
+        self.assertEqual(self._count("session.waiting"), 1)
+
     def test_unmapped_notification_does_nothing(self):
         repo_dir = self._bound()
         code, out, err = self._notify(repo_dir, "auth_success", "ok")
@@ -1078,11 +1085,17 @@ class NotificationPushTests(GuildTestCase):
         self._notify("idle_prompt")
         self.runner.assert_not_called()
 
-    def test_permission_after_idle_wait_does_not_run_command(self):
+    def test_permission_after_idle_wait_runs_command(self):
         self._configure(["notify-send", "guild"])
         self._notify("idle_prompt")
         self._notify("permission_prompt")
-        self.runner.assert_not_called()
+        self.runner.assert_called_once_with(["notify-send", "guild", "alpha", "permission"])
+
+    def test_idle_after_permission_does_not_run_command_again(self):
+        self._configure(["notify-send", "guild"])
+        self._notify("permission_prompt")
+        self._notify("idle_prompt")
+        self.assertEqual(self.runner.call_count, 1)
 
     def test_no_notify_config_does_not_run_command(self):
         self._notify("permission_prompt")

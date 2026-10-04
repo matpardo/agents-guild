@@ -1500,7 +1500,9 @@ It is called as `notify-send guild <party> <wait>` with `<wait>` being
 non-empty strings, never a shell string) and it is the only allowed key. It
 runs detached; if it cannot start, the hook prints
 `guild: notify command failed: <error>` to stderr and still exits 0. A new
-episode starts after the session works again.
+episode starts whenever the session enters a different blocking wait, or after
+it works again. An idle prompt that arrives while a permission prompt is
+pending is ignored, so the party stays `waiting-permission`.
 
 **Security.** The notification message is text from Claude Code and may quote a
 command. It is sanitized, collapsed to one line, truncated to 200 characters
