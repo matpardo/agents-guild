@@ -106,6 +106,54 @@ class SyncTests(GuildTestCase):
         ]
         self.assertEqual(self._sync_rollup(rollup), (0, 1, 4))
 
+    def _synced_payloads(self):
+        conn = db.connect(paths.db_path())
+        rows = conn.execute("SELECT payload FROM events WHERE kind = 'pr.synced' ORDER BY seq").fetchall()
+        conn.close()
+        return [json.loads(row["payload"]) for row in rows]
+
+    def test_synced_event_records_the_head_commit(self):
+        self.write_gh_fixture(
+            "view_acme-app_1",
+            {
+                "state": "OPEN", "isDraft": True, "headRefName": "feature/x", "title": "t",
+                "headRefOid": "abc123def456",
+            },
+        )
+        code, out, err = self.run_cli(["sync", "--source", "gh"], "sess-1", self.repo_dir)
+        self.assertEqual(code, 0, err)
+        self.assertEqual(self._synced_payloads()[-1]["head_sha"], "abc123def456")
+
+    def test_synced_event_without_head_commit_records_none(self):
+        code, out, err = self.run_cli(["sync", "--source", "gh"], "sess-1", self.repo_dir)
+        self.assertEqual(code, 0, err)
+        self.assertIsNone(self._synced_payloads()[-1]["head_sha"])
+
+    def test_synced_event_records_whether_the_pr_comes_from_a_fork(self):
+        self.write_gh_fixture(
+            "view_acme-app_1",
+            {
+                "state": "OPEN", "isDraft": True, "headRefName": "feature/x", "title": "t",
+                "isCrossRepository": True,
+            },
+        )
+        self.run_cli(["sync", "--source", "gh"], "sess-1", self.repo_dir)
+        self.assertIs(self._synced_payloads()[-1]["cross_repository"], True)
+
+    def test_synced_event_without_fork_info_records_none(self):
+        self.run_cli(["sync", "--source", "gh"], "sess-1", self.repo_dir)
+        self.assertIsNone(self._synced_payloads()[-1]["cross_repository"])
+
+    def test_pr_view_asks_gh_whether_the_pr_is_cross_repository(self):
+        with mock.patch("guild.adapters.github.pr_view", return_value={"state": "OPEN", "isDraft": True}) as view:
+            self.run_cli(["sync", "--source", "gh"], "sess-1", self.repo_dir)
+        self.assertIn("isCrossRepository", view.call_args[0][3])
+
+    def test_pr_view_asks_gh_for_the_head_commit(self):
+        with mock.patch("guild.adapters.github.pr_view", return_value={"state": "OPEN", "isDraft": True}) as view:
+            self.run_cli(["sync", "--source", "gh"], "sess-1", self.repo_dir)
+        self.assertIn("headRefOid", view.call_args[0][3])
+
     def test_board_shows_pending_checks_glyph(self):
         self._sync_rollup([{"__typename": "StatusContext", "state": "PENDING"}])
         code, out, err = self.run_cli(["board"], "sess-1", self.repo_dir)

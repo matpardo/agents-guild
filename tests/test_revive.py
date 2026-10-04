@@ -61,13 +61,13 @@ class ResumeHelperTests(GuildTestCase):
         )
 
     def test_fresh_command_keeps_generation_name_and_adds_mode(self):
-        command = resume.fresh_command("alpha", 3, None, "plan", False)
+        command = resume.fresh_command("alpha", 3, None, "plan", False, resume.RESUME_PROMPT)
         self.assertTrue(
             command.startswith("GUILD_RESUME=alpha claude -n alpha-g3 --permission-mode plan ")
         )
 
     def test_fresh_command_without_mode_or_model(self):
-        command = resume.fresh_command("alpha", 2, None, None, False)
+        command = resume.fresh_command("alpha", 2, None, None, False, resume.RESUME_PROMPT)
         self.assertNotIn("--permission-mode", command)
         self.assertNotIn("--model", command)
 
@@ -341,6 +341,7 @@ class LaunchTests(ReviveBase):
         self.assertNotIn("new-session", tmux.verbs())
         new_window = [call for call in tmux.calls if call[0] == "new-window"][0]
         self.assertEqual(new_window[:6], ["new-window", "-t", "guild:", "-n", "alpha", "-c"])
+        self.assertIn("-d", new_window[:-1])
 
     def test_existing_window_for_party_is_skipped(self):
         tmux = self._tmux(sessions=["guild"], windows=["alpha"])

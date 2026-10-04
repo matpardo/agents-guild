@@ -188,7 +188,12 @@ def _respawn(ctx, binding, model, tmux, tmux_pane, sleep):
         "SELECT cwd, permission_mode FROM leaders WHERE party = ? AND generation = ?", (party, generation)
     ).fetchone()
     command = resume.fresh_command(
-        party, generation + 1, model, leader["permission_mode"], party_commands.is_keeper(ctx.conn, party)
+        party,
+        generation + 1,
+        model,
+        leader["permission_mode"],
+        party_commands.is_keeper(ctx.conn, party),
+        resume.RESUME_PROMPT,
     )
     blocker = _launch_blocker(tmux, leader["cwd"])
     if blocker is None:
@@ -239,6 +244,7 @@ def run(ctx, in_flight, learned, model, respawn, tmux, tmux_pane, sleep):
         model,
         None,
         party_commands.is_keeper(ctx.conn, binding["party"]),
+        resume.RESUME_PROMPT,
     )
     return _with_reminder(command), None
 

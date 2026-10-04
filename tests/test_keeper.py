@@ -78,14 +78,14 @@ class RemoteControlCommandTests(GuildTestCase):
 
     def test_fresh_command_for_keeper_puts_remote_control_right_before_prompt(self):
         self.assertEqual(
-            resume.fresh_command("alpha", 4, "opus", "plan", True),
+            resume.fresh_command("alpha", 4, "opus", "plan", True, resume.RESUME_PROMPT),
             "GUILD_RESUME=alpha claude -n alpha-g4 --model opus --permission-mode plan"
             " --remote-control alpha-g4 " + _PROMPT,
         )
 
     def test_fresh_command_for_non_keeper_is_unchanged(self):
         self.assertEqual(
-            resume.fresh_command("alpha", 4, None, None, False),
+            resume.fresh_command("alpha", 4, None, None, False, resume.RESUME_PROMPT),
             "GUILD_RESUME=alpha claude -n alpha-g4 " + _PROMPT,
         )
 
@@ -99,13 +99,13 @@ class PartyNameQuotingTests(GuildTestCase):
 
     def test_fresh_command_quotes_party_everywhere(self):
         self.assertEqual(
-            resume.fresh_command("a b", 4, None, None, True),
+            resume.fresh_command("a b", 4, None, None, True, resume.RESUME_PROMPT),
             "GUILD_RESUME='a b' claude -n 'a b-g4' --remote-control 'a b-g4' " + _PROMPT,
         )
 
     def test_fresh_command_without_remote_control_quotes_party(self):
         self.assertTrue(
-            resume.fresh_command("a;b", 2, None, None, False).startswith("GUILD_RESUME='a;b' claude -n 'a;b-g2' ")
+            resume.fresh_command("a;b", 2, None, None, False, resume.RESUME_PROMPT).startswith("GUILD_RESUME='a;b' claude -n 'a;b-g2' ")
         )
 
 

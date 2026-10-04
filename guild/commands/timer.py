@@ -50,7 +50,15 @@ RESOURCES_COLLECT = _UnitSpec(
     "resources-timer",
     "Nice=19\nIOSchedulingClass=idle\n",
 )
-UNITS = {"sync-gh": SYNC_GH, "resources-collect": RESOURCES_COLLECT}
+DISPATCH = _UnitSpec(
+    "guild-dispatch.service",
+    "guild-dispatch.timer",
+    "guild dispatch run",
+    "dispatch run",
+    "dispatch-timer",
+    "NoNewPrivileges=yes\nNice=10\n",
+)
+UNITS = {"sync-gh": SYNC_GH, "resources-collect": RESOURCES_COLLECT, "dispatch": DISPATCH}
 
 
 def run_systemctl(argv):

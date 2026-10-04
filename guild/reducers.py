@@ -593,6 +593,56 @@ def _resources_sampled(conn, event):
     )
 
 
+def _dispatch_decided(conn, event):
+    payload = event["payload"]
+    state = "launching" if payload["outcome"] == "launching" else None
+    conn.execute(
+        "INSERT OR REPLACE INTO dispatch_decisions (project, key, mode, rule, outcome, party, generation,"
+        " permission_mode, subject, reason, decided_at, window_id, state)"
+        " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?)",
+        (
+            payload["project"],
+            payload["key"],
+            payload["mode"],
+            payload["rule"],
+            payload["outcome"],
+            payload["party"],
+            payload["generation"],
+            payload["permission_mode"],
+            payload["subject"],
+            payload["reason"],
+            event["ts"],
+            state,
+        ),
+    )
+
+
+def _dispatch_launched(conn, event):
+    payload = event["payload"]
+    conn.execute(
+        "UPDATE dispatch_decisions SET state = 'launched', window_id = ?"
+        " WHERE project = ? AND key = ? AND mode = 'on'",
+        (payload["window_id"], payload["project"], payload["key"]),
+    )
+
+
+def _dispatch_launch_failed(conn, event):
+    payload = event["payload"]
+    conn.execute(
+        "UPDATE dispatch_decisions SET state = 'failed', reason = ?, window_id = ?"
+        " WHERE project = ? AND key = ? AND mode = 'on'",
+        (payload["reason"], payload["window_id"], payload["project"], payload["key"]),
+    )
+
+
+def _dispatch_bound(conn, event):
+    payload = event["payload"]
+    conn.execute(
+        "UPDATE dispatch_decisions SET state = 'bound' WHERE project = ? AND key = ? AND mode = 'on'",
+        (payload["project"], payload["key"]),
+    )
+
+
 def _dump(value):
     return json.dumps(value)
 
@@ -641,6 +691,10 @@ _REDUCERS = {
     "cost.sampled": _cost_sampled,
     "lifecycle.ran": _lifecycle_ran,
     "resources.sampled": _resources_sampled,
+    "dispatch.decided": _dispatch_decided,
+    "dispatch.launched": _dispatch_launched,
+    "dispatch.launch_failed": _dispatch_launch_failed,
+    "dispatch.bound": _dispatch_bound,
 }
 
 
