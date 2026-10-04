@@ -33,9 +33,29 @@ class AskRefTests(unittest.TestCase):
     def test_parses_task_ref(self):
         self.assertEqual(refs.parse_ask_ref("task:demo/T01"), "task:demo/T01")
 
+    def test_parses_card_ref(self):
+        self.assertEqual(refs.parse_ask_ref("card:PROJ-12"), "card:PROJ-12")
+
+    def test_rejects_blank_card_ref(self):
+        with self.assertRaises(GuildError):
+            refs.parse_ask_ref("card:")
+
+    def test_rejects_card_ref_with_space_or_slash(self):
+        for text in ("card:PROJ 12", "card:PROJ/12"):
+            with self.assertRaises(GuildError):
+                refs.parse_ask_ref(text)
+
     def test_rejects_unknown_prefix(self):
         with self.assertRaises(GuildError):
             refs.parse_ask_ref("weird:demo/T01")
+
+    def test_error_lists_the_three_forms(self):
+        with self.assertRaises(GuildError) as raised:
+            refs.parse_ask_ref("weird:demo/T01")
+        message = str(raised.exception)
+        self.assertIn("pr:owner/repo#number", message)
+        self.assertIn("task:quest/tid", message)
+        self.assertIn("card:KEY", message)
 
 
 class UntilTests(unittest.TestCase):

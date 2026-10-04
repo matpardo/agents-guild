@@ -1,7 +1,7 @@
 import json
 import textwrap
 
-from guild import config, party_status, sanitize, session_status, timeutil
+from guild import config, links, party_status, sanitize, session_status, timeutil
 from guild.commands import claim as claim_commands
 from guild.commands import drift as drift_commands
 from guild.commands import merge_queue as merge_queue_commands
@@ -167,6 +167,8 @@ def _task_ref_blocked(conn, ref):
 def _blocked_ref_count(conn, ref_list):
     count = 0
     for ref in ref_list:
+        if ref.startswith("card:"):
+            continue
         blocked = _pr_ref_blocked(conn, ref) if ref.startswith("pr:") else _task_ref_blocked(conn, ref)
         if blocked:
             count += 1
@@ -528,8 +530,8 @@ def _pr_model(pr_row, project_config):
         "what": sanitize.strip_control_sequences(pr_row["what"]),
         "waits": _optional_text(_visible_waits(pr_row)),
         "card": card,
-        "card_url": _card_url(project_config, card),
-        "url": "https://github.com/{}/pull/{}".format(pr_row["repo"], pr_row["number"]),
+        "card_url": links.card_url(project_config, card),
+        "url": links.pr_url(pr_row["repo"], pr_row["number"]),
     }
 
 
@@ -543,18 +545,6 @@ def _task_card_key(conn, project, epic, tid):
     if row is None:
         return None
     return row["jira_key"]
-
-
-def _card_url(project_config, key):
-    if key is None or project_config is None:
-        return None
-    tracker_config = project_config.get("tracker")
-    if tracker_config is None:
-        return None
-    browse_url = tracker_config.get("browse_url")
-    if browse_url is None:
-        return None
-    return browse_url + key
 
 
 def _ask_model(conn, row):
@@ -594,7 +584,7 @@ def _task_model(conn, project, epic, task_row, task_prs, project_config):
         "state": task_row["state"],
         "summary": _optional_text(task_row["summary"]),
         "blocked_reason": _optional_text(task_row["blocked_reason"]),
-        "card_url": _card_url(project_config, key),
+        "card_url": links.card_url(project_config, key),
         "prs": [_pr_model(pr_row, project_config) for pr_row in task_prs],
     }
 

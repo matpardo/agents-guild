@@ -69,6 +69,69 @@ class AskTests(GuildTestCase):
         self.assertEqual(code, 1)
         self.assertIn("does not match a known task", err)
 
+    def _insert_card(self, key):
+        with db.writing(self.conn):
+            self.conn.execute(
+                "INSERT INTO cards (project, key, status, status_category, issue_type)"
+                " VALUES ('acme', ?, 'In Progress', 'indeterminate', 'Task')",
+                (key,),
+            )
+
+    def _set_key_ref(self):
+        config_file = self.config_home / "guild" / "projects" / "acme.json"
+        data = json.loads(config_file.read_text())
+        data["sdd"] = {"root": str(self.root / "sdd"), "epics_dir": "epics", "key_ref": r"[A-Z]{2,10}-\d+"}
+        config_file.write_text(json.dumps(data))
+
+    def test_create_accepts_card_ref_from_cards_table(self):
+        self._insert_card("PROJ-12")
+        code, out, err = self.run_cli(
+            ["ask", "ready?", "--context", "x", "--ref", "card:PROJ-12"], "sess-1", self.repo_dir
+        )
+        self.assertEqual(code, 0, err)
+
+    def test_create_accepts_card_ref_matching_key_ref(self):
+        self._set_key_ref()
+        code, out, err = self.run_cli(
+            ["ask", "ready?", "--context", "x", "--ref", "card:PROJ-12"], "sess-1", self.repo_dir
+        )
+        self.assertEqual(code, 0, err)
+
+    def test_create_rejects_unknown_card_ref(self):
+        self._set_key_ref()
+        code, out, err = self.run_cli(
+            ["ask", "ready?", "--context", "x", "--ref", "card:nope"], "sess-1", self.repo_dir
+        )
+        self.assertEqual(code, 1)
+        self.assertIn("ask ref 'card:nope' does not match a known card", err)
+
+    def test_create_rejects_card_ref_without_cards_or_key_ref(self):
+        code, out, err = self.run_cli(
+            ["ask", "ready?", "--context", "x", "--ref", "card:PROJ-12"], "sess-1", self.repo_dir
+        )
+        self.assertEqual(code, 1)
+        self.assertIn("does not match a known card", err)
+
+    def test_card_ref_satisfies_at_least_one_ref_rule(self):
+        self._insert_card("PROJ-12")
+        code, out, err = self.run_cli(
+            ["ask", "ready?", "--context", "x", "--ref", "card:PROJ-12"], "sess-1", self.repo_dir
+        )
+        self.assertEqual(code, 0, err)
+        self.assertIn("ask #1 created", out)
+
+    def test_card_ref_never_counts_as_blocking(self):
+        self._insert_card("PROJ-12")
+        self.run_cli(
+            ["ask", "ready?", "--context", "x", "--ref", "card:PROJ-12", "--ref", "task:demo/T01"],
+            "sess-1", self.repo_dir,
+        )
+        code, out, err = self.run_cli(["asks"], None, None)
+        self.assertIn("blocks: 1 of 2 refs still open", out)
+        self.run_cli(["task", "done", "demo/T01"], "sess-1", self.repo_dir)
+        code, out, err = self.run_cli(["asks"], None, None)
+        self.assertIn("blocks: 0 of 2 refs still open", out)
+
     def test_create_and_list(self):
         code, out, err = self.run_cli(
             [

@@ -1,9 +1,26 @@
+import re
+
 from guild import config, db, events, identity, pii, refs
 from guild.ids import next_id
 from guild.errors import GuildError
 
 
-def _validate_refs(ctx, ref_list):
+def _card_known(ctx, project, project_config, key):
+    if project is not None:
+        row = ctx.conn.execute(
+            "SELECT key FROM cards WHERE project = ? AND key = ?", (project, key)
+        ).fetchone()
+        if row is not None:
+            return True
+    if project_config is None:
+        return False
+    key_ref = (project_config.get("sdd") or {}).get("key_ref")
+    if key_ref is None:
+        return False
+    return re.fullmatch(key_ref, key) is not None
+
+
+def _validate_refs(ctx, project, project_config, ref_list):
     normalized = []
     for raw in ref_list:
         parsed = refs.parse_ask_ref(raw)
@@ -16,6 +33,9 @@ def _validate_refs(ctx, ref_list):
             ).fetchone()
             if row is None:
                 raise GuildError("ask ref '{}' does not match a tracked PR".format(raw), 1)
+        elif parsed.startswith("card:"):
+            if not _card_known(ctx, project, project_config, parsed[len("card:"):]):
+                raise GuildError("ask ref '{}' does not match a known card".format(raw), 1)
         else:
             quest, tid = parsed[len("task:"):].split("/", 1)
             row = ctx.conn.execute(
@@ -34,7 +54,8 @@ def create(ctx, question, context_text, ref_list, option_list):
     patterns = pii.project_patterns(ctx.projects_dir, project)
     pii.validate_field(question, "ask question", pii.ASK_QUESTION_MAX_LENGTH, patterns)
     pii.validate_field(context_text, "ask context", pii.ASK_CONTEXT_MAX_LENGTH, patterns)
-    normalized_refs = _validate_refs(ctx, ref_list)
+    project_config = None if project is None else config.load_project(ctx.projects_dir, project)
+    normalized_refs = _validate_refs(ctx, project, project_config, ref_list)
     ask_id = next_id(ctx.conn, "asks")
     with db.writing(ctx.conn):
         events.record(
