@@ -27,7 +27,7 @@ _DRAFT_SUB_LIFECYCLES = ("converging",)
 
 _MERGED_GH_STATE = "MERGED"
 _MERGE_NOTICE_TTL = "12h"
-_MERGE_NOTICE_TEMPLATE = "{}#{} merged in main ({}/{}: {}). Parties with open branches: rebase."
+_MERGE_NOTICE_TEMPLATE = "{}#{} merged in main ({}). Parties with open branches: rebase."
 _MERGE_NOTICE_SHARED_AREAS_SUFFIX = " Shared areas touched: {}"
 _MERGE_NOTICE_RELEASED_SUFFIX = " Released: {}."
 _AREA_PREFIX = "area:"
@@ -205,10 +205,16 @@ def _released_line(released):
     return _MERGE_NOTICE_RELEASED_SUFFIX.format(", ".join(released))
 
 
+def _merge_notice_label(row):
+    if row["task_quest"] is not None:
+        return "{}/{}: {}".format(row["task_quest"], row["task_tid"], row["what"])
+    if row["card"] is not None:
+        return "{}: {}".format(row["card"], row["what"])
+    return row["what"]
+
+
 def _merge_notice_text(row, shared_line, released_line):
-    base = _MERGE_NOTICE_TEMPLATE.format(
-        row["repo"], row["number"], row["task_quest"], row["task_tid"], row["what"]
-    )
+    base = _MERGE_NOTICE_TEMPLATE.format(row["repo"], row["number"], _merge_notice_label(row))
     return base + shared_line + released_line
 
 

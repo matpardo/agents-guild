@@ -99,16 +99,23 @@ def _visible_waits(pr_row):
     return pr_row["waits"]
 
 
+def _card_prefix(pr_row):
+    if pr_row["card"] is None:
+        return ""
+    return "{}  ".format(sanitize.strip_control_sequences(pr_row["card"]))
+
+
 def _pr_lines(painter, pr_row, indent):
     badges = _badges(pr_row)
     status_plain = "{}  {}".format(" ".join(label for label, _ in badges), _checks_plain(pr_row))
     status_painted = "{}  {}".format(
         " ".join(painter.paint(label, style) for label, style in badges), _checks_painted(painter, pr_row)
     )
-    plain_head = "● {}#{}  {}  {}".format(
+    plain_head = "● {}#{}  {}  {}{}".format(
         pr_row["repo"].split("/")[-1],
         pr_row["number"],
         status_plain,
+        _card_prefix(pr_row),
         sanitize.strip_control_sequences(pr_row["what"]),
     )
     head_lines = textwrap.wrap(
@@ -465,7 +472,8 @@ def _optional_text(value):
     return sanitize.strip_control_sequences(value)
 
 
-def _pr_model(pr_row):
+def _pr_model(pr_row, project_config):
+    card = _optional_text(pr_row["card"])
     return {
         "repo": pr_row["repo"],
         "number": pr_row["number"],
@@ -477,6 +485,8 @@ def _pr_model(pr_row):
         "checks_pending": pr_row["checks_pending"] or 0,
         "what": sanitize.strip_control_sequences(pr_row["what"]),
         "waits": _optional_text(_visible_waits(pr_row)),
+        "card": card,
+        "card_url": _card_url(project_config, card),
         "url": "https://github.com/{}/pull/{}".format(pr_row["repo"], pr_row["number"]),
     }
 
@@ -541,7 +551,7 @@ def _task_model(conn, project, epic, task_row, task_prs, project_config):
         "summary": _optional_text(task_row["summary"]),
         "blocked_reason": _optional_text(task_row["blocked_reason"]),
         "card_url": _card_url(project_config, key),
-        "prs": [_pr_model(pr_row) for pr_row in task_prs],
+        "prs": [_pr_model(pr_row, project_config) for pr_row in task_prs],
     }
 
 
@@ -582,7 +592,7 @@ def _party_model(ctx, party_row, project_config):
         "generation": party_row["generation"],
         "leader_session_name": _leader_session_name(ctx.conn, party_row["name"]),
         "quests": quest_models,
-        "prs": [_pr_model(pr_row) for pr_row in orphan_prs],
+        "prs": [_pr_model(pr_row, project_config) for pr_row in orphan_prs],
         "raids": [
             {
                 "raid": row["raid"],

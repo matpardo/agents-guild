@@ -76,6 +76,7 @@ def _seed_pr(ctx, pr):
             "party": pr["party"],
             "task_quest": pr.get("task_quest"),
             "task_tid": pr.get("task_tid"),
+            "card": pr.get("card"),
             "what": pr["what"],
             "waits": pr.get("waits"),
             "lifecycle": pr.get("lifecycle", "draft"),

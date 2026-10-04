@@ -513,6 +513,11 @@
       row.appendChild(review);
     }
     row.appendChild(renderChecks(pr));
+    if (pr.card_url) {
+      row.appendChild(link(pr.card_url, pr.card));
+    } else if (pr.card) {
+      row.appendChild(textEl("span", pr.card));
+    }
     row.appendChild(textEl("span", pr.what));
     if (pr.waits) {
       row.appendChild(textEl("span", "waits: " + pr.waits));

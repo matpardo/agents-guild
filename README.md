@@ -105,7 +105,7 @@ guild task start <quest>/<tid> [--summary "..."]
 guild task block <quest>/<tid> --reason "..."
 guild task done  <quest>/<tid> [--summary "..."]
 
-guild pr track <owner/repo>#<n> --task <quest>/<tid> --what "..." --waits "..." [--needs-human-pr-review]
+guild pr track <owner/repo>#<n> (--task <quest>/<tid> | --card <KEY>) --what "..." --waits "..." [--needs-human-pr-review]
 guild pr set   <owner/repo>#<n> [--lifecycle draft|converging|ready] [--waits "..."]
                                [--needs-ask-answer | --no-needs-ask-answer]
                                [--needs-human-pr-review | --no-needs-human-pr-review]
@@ -284,6 +284,9 @@ as every other notice). The notice's TTL is a fixed 12h and its text is:
 ```
 <repo>#<n> merged in main (<quest>/<tid>: <what>). Parties with open branches: rebase.
 ```
+
+A PR tracked with `--card` shows `<card>: <what>` in place of `<quest>/<tid>: <what>`;
+a PR with neither (seeded) shows just `<what>`.
 
 If the project config has a `shared_areas` key (globs relative to the repo
 root, matched with `fnmatch`) and the owning party is in at least one raid,

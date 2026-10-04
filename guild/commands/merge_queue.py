@@ -63,6 +63,7 @@ def _pr_record(conn, row):
         "party": row["party"],
         "quest": row["task_quest"],
         "tid": row["task_tid"],
+        "card": row["card"],
         "lifecycle": row["lifecycle"],
         "checks_failing": row["checks_failing"] or 0,
         "checks_passing": row["checks_passing"] or 0,

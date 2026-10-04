@@ -55,7 +55,7 @@ def _labels(pr):
 
 
 def _entry(pr):
-    task = None
+    task = pr["card"]
     if pr["quest"] is not None:
         task = "{}/{}".format(pr["quest"], pr["tid"])
     return {

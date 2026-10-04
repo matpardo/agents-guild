@@ -17,7 +17,19 @@ def _load_pr(ctx, repo, number):
     return row
 
 
-def track(ctx, ref, task_ref, what, waits, needs_human_pr_review):
+def _task_fields(ctx, task_ref):
+    if task_ref is None:
+        return None, None
+    quest, tid = refs.parse_task_ref(task_ref)
+    task_row = ctx.conn.execute(
+        "SELECT quest FROM quest_tasks WHERE quest = ? AND tid = ?", (quest, tid)
+    ).fetchone()
+    if task_row is None:
+        raise GuildError("unknown task '{}/{}'".format(quest, tid), 1)
+    return quest, tid
+
+
+def track(ctx, ref, task_ref, card, what, waits, needs_human_pr_review):
     repo, number = refs.parse_pr_ref(ref)
     binding = identity.require_binding(ctx.conn, ctx.session_id)
     project = config.require_project(ctx.cwd, ctx.projects_dir)
@@ -26,12 +38,7 @@ def track(ctx, ref, task_ref, what, waits, needs_human_pr_review):
         raise GuildError(
             "repo '{}' is not in project '{}' github.repos".format(repo, project), 1
         )
-    quest, tid = refs.parse_task_ref(task_ref)
-    task_row = ctx.conn.execute(
-        "SELECT quest FROM quest_tasks WHERE quest = ? AND tid = ?", (quest, tid)
-    ).fetchone()
-    if task_row is None:
-        raise GuildError("unknown task '{}/{}'".format(quest, tid), 1)
+    quest, tid = _task_fields(ctx, task_ref)
     existing = ctx.conn.execute(
         "SELECT repo FROM prs WHERE repo = ? AND number = ?", (repo, number)
     ).fetchone()
@@ -57,6 +64,7 @@ def track(ctx, ref, task_ref, what, waits, needs_human_pr_review):
                 "party": binding["party"],
                 "task_quest": quest,
                 "task_tid": tid,
+                "card": card,
                 "what": what,
                 "waits": waits,
                 "lifecycle": _TRACK_INITIAL_LIFECYCLE,

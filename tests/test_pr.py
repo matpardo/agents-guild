@@ -98,6 +98,52 @@ class PrTrackTests(GuildTestCase):
         self.assertIn("gh pr view failed", err)
 
 
+class PrTrackCardTests(GuildTestCase):
+    def setUp(self):
+        super().setUp()
+        self.repo_dir = self.register_project("acme", ["acme/app"])
+        self.write_gh_fixture(
+            "view_acme-app_1",
+            {"state": "OPEN", "isDraft": True, "headRefName": "feature/x", "title": "t"},
+        )
+
+    def _track(self, session_id, extra):
+        return self.run_cli(
+            ["pr", "track", "acme/app#1", "--what", "x", "--waits", "y"] + extra,
+            session_id, self.repo_dir,
+        )
+
+    def test_card_without_task_stores_null_task_fields_and_the_card(self):
+        self.run_cli(["party", "start", "alpha"], "sess-1", self.repo_dir)
+        code, out, err = self._track("sess-1", ["--card", "ABC-123"])
+        self.assertEqual(code, 0, err)
+        conn = sqlite3.connect(str(self.data_home / "guild" / "guild.db"))
+        conn.row_factory = sqlite3.Row
+        row = conn.execute("SELECT task_quest, task_tid, card, party FROM prs").fetchone()
+        conn.close()
+        self.assertEqual(
+            (row["task_quest"], row["task_tid"], row["card"], row["party"]),
+            (None, None, "ABC-123", "alpha"),
+        )
+
+    def test_task_together_with_card_is_rejected(self):
+        self.run_cli(["party", "start", "alpha"], "sess-1", self.repo_dir)
+        code, out, err = self._track("sess-1", ["--task", "demo/T01", "--card", "ABC-123"])
+        self.assertEqual(code, 2)
+        self.assertIn("not allowed with argument", err)
+
+    def test_neither_task_nor_card_is_rejected(self):
+        self.run_cli(["party", "start", "alpha"], "sess-1", self.repo_dir)
+        code, out, err = self._track("sess-1", [])
+        self.assertEqual(code, 2)
+        self.assertIn("one of the arguments --task --card is required", err)
+
+    def test_unbound_session_is_rejected(self):
+        code, out, err = self._track("sess-1", ["--card", "ABC-123"])
+        self.assertEqual(code, 1)
+        self.assertIn("session not bound", err)
+
+
 class PrSetTests(GuildTestCase):
     def setUp(self):
         super().setUp()
