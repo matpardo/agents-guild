@@ -360,9 +360,9 @@ class BoardModelSessionStatusTests(BoardModelTestCase):
             },
         )
 
-    def test_party_status_defaults_to_working(self):
+    def test_party_status_without_session_row_is_unknown(self):
         status = self._model()["parties"][0]["status"]
-        self.assertEqual(status, {"name": "working", "since": None, "detail": None, "label": "working"})
+        self.assertEqual(status, {"name": "unknown", "since": None, "detail": None, "label": "unknown"})
 
     def test_party_status_waiting_permission_and_blocked_list(self):
         self._notify("permission_prompt", "run ls")

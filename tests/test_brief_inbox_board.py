@@ -288,9 +288,9 @@ class BoardSessionStatusTests(GuildTestCase):
         self.run_cli(["task", "add", "demo/T01", "--title", "First"], "sess-1", self.repo_dir)
         self.run_cli(["ask", "Ship it?", "--context", "x", "--ref", "task:demo/T01"], "sess-1", self.repo_dir)
 
-    def test_party_section_shows_working_status_without_session_row(self):
+    def test_party_section_shows_unknown_status_without_session_row(self):
         code, out, err = self.run_cli(["board"], None, None)
-        self.assertIn("\n  status: working\n", out)
+        self.assertIn("\n  status: unknown\n", out)
 
     def test_party_section_shows_waiting_permission_with_age(self):
         self._block()

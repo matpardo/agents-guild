@@ -87,8 +87,8 @@ class PartyStatusTests(GuildTestCase):
         self._session("session.stopped", {})
         self.assertEqual(self._derive()["status"], "done")
 
-    def test_no_row_is_working(self):
-        self.assertEqual(self._derive(), {"status": "working", "since": None, "detail": None})
+    def test_no_row_is_unknown(self):
+        self.assertEqual(self._derive(), {"status": "unknown", "since": None, "detail": None})
 
     def test_stopped_with_paused_raid_is_done(self):
         self._add_task()
