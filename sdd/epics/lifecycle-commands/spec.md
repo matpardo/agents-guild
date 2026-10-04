@@ -2,7 +2,7 @@
 epic: lifecycle-commands
 type: spec
 title: Run project commands on PR lifecycle events
-status: active
+status: done
 owner: matpardo
 created: 2026-10-04
 updated: 2026-10-04
@@ -38,10 +38,10 @@ In a real run the disk reached 91% because every worktree with its own stack lef
 
 ## Success criteria
 
-- [ ] A merge runs `on_pr_merged` once from the main checkout and records `lifecycle.ran` with exit code and duration.
-- [ ] Several merges in one pass run the command once, and a held lock records a skipped run.
-- [ ] A failing command posts a notice without its output and does not fail sync.
-- [ ] Seeded and already-merged PRs never trigger a command.
+- [x] A merge runs `on_pr_merged` once from the main checkout and records `lifecycle.ran` with exit code and duration.
+- [x] Several merges in one pass run the command once, and a held lock records a skipped run.
+- [x] A failing command posts a notice without its output and does not fail sync.
+- [x] Seeded and already-merged PRs never trigger a command.
 
 ## Security and data
 
