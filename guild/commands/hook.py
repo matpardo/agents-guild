@@ -62,7 +62,12 @@ def _resume_lines(ctx, binding):
     marker = _resume_marker_path(ctx, binding["generation"])
     if marker.exists():
         return []
-    brief_lines = task_brief.render_for_binding(ctx, binding)
+    failure_lines = []
+    try:
+        brief_lines = task_brief.render_for_binding(ctx, binding)
+    except Exception as error:
+        brief_lines = []
+        failure_lines = ["guild: task brief unavailable ({})".format(type(error).__name__)]
     if brief_lines:
         _touch_marker(marker)
         return brief_lines + [""] + next_commands.run(ctx, binding, False, False)
@@ -70,9 +75,9 @@ def _resume_lines(ctx, binding):
         ctx.conn, binding["party"], binding["generation"]
     )
     if handoff_content is None:
-        return []
+        return failure_lines
     _touch_marker(marker)
-    return [handoff_content, ""] + next_commands.run(ctx, binding, False, False)
+    return [handoff_content, ""] + next_commands.run(ctx, binding, False, False) + failure_lines
 
 
 def _auto_resume_lines(ctx, resume_party, permission_mode):

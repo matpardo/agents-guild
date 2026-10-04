@@ -102,6 +102,27 @@ class SessionStartHookTests(GuildTestCase):
         conn.close()
         self.assertEqual(kinds - {"session.working", "leader.located"}, set())
 
+    def test_broken_task_brief_falls_back_to_handoff_with_notice(self):
+        repo_dir = self.register_project("acme", ["acme/app"])
+        self.run_cli(["party", "start", "alpha"], "sess-1", repo_dir)
+        self.run_cli(["quest", "add", "demo", "--title", "Demo", "--no-epic"], "sess-1", repo_dir)
+        self.run_cli(["task", "add", "demo/T01", "--title", "First"], "sess-1", repo_dir)
+        self.run_cli(["task", "start", "demo/T01"], "sess-1", repo_dir)
+        self.run_cli(["ask", "ok?", "--context", "c", "--ref", "task:demo/T01"], "sess-1", repo_dir)
+        self.run_cli(
+            ["handoff", "--in-flight", "shipping T01", "--learned", "watch ci flakes"], "sess-1", repo_dir
+        )
+        self.run_cli(["party", "resume", "alpha"], "sess-2", repo_dir)
+        conn = sqlite3.connect(str(self.data_home / "guild" / "guild.db"))
+        conn.execute("UPDATE asks SET refs = 'not json'")
+        conn.commit()
+        conn.close()
+        code, out, err = self.run_hook("session-start", {"session_id": "sess-2", "cwd": str(repo_dir)})
+        self.assertEqual(code, 0)
+        self.assertNotIn("guild brief alpha/", out)
+        self.assertIn("shipping T01", out)
+        self.assertIn("guild: task brief unavailable (JSONDecodeError)", out)
+
     def _last_event_seq(self):
         conn = sqlite3.connect(str(self.data_home / "guild" / "guild.db"))
         seq = conn.execute("SELECT MAX(seq) FROM events").fetchone()[0]
