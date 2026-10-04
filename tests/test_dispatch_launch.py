@@ -1,132 +1,10 @@
-import json
 import os
 import shlex
 from datetime import timedelta
 
-from guild import db, dispatch_launch, dispatch_rules, events, resume, timeutil
-from guild.cli import _build_context
+from guild import dispatch_launch, timeutil
+from tests.dispatch_fixtures import PROMPT, LaunchBase
 from tests.fake_tmux import FakeTmux
-from tests.testutil import GuildTestCase
-
-_PROMPT = "Continue the work described in the guild brief. Dispatched: ask #12 was answered; read guild asks 12."
-
-
-class LaunchBase(GuildTestCase):
-    notify = {"command": ["notify-send", "guild"]}
-
-    def setUp(self):
-        super().setUp()
-        self.repo_dir = self.register_project("acme", ["acme/app"])
-        self.other_dir = self.root / "elsewhere"
-        self.other_dir.mkdir()
-        self.write_block("acceptEdits", 3)
-        self.run_cli(["party", "start", "alpha"], "sess-1", self.repo_dir)
-        self.run_cli(["handoff", "--in-flight", "x", "--learned", "y"], "sess-1", self.repo_dir)
-        self.tmux = FakeTmux(True, True, {}, 0)
-        self.pushes = []
-
-    def write_block(self, permission_mode, limit):
-        path = self.config_home / "guild" / "projects" / "acme.json"
-        data = json.loads(path.read_text())
-        data["dispatcher"] = {
-            "permission_mode": permission_mode,
-            "max_launches_per_hour": limit,
-            "rules": {"ask_answered": "on"},
-        }
-        data["notify"] = self.notify
-        path.write_text(json.dumps(data))
-
-    def ctx(self):
-        ctx = _build_context(None, self.repo_dir)
-        self.addCleanup(ctx.conn.close)
-        return ctx
-
-    def project_config(self):
-        return json.loads((self.config_home / "guild" / "projects" / "acme.json").read_text())
-
-    def trigger(self, number, party):
-        return dispatch_rules.Trigger(
-            "acme",
-            "ask_answered",
-            "ask_answered:{}".format(number),
-            party,
-            "ask #{}".format(number),
-            _PROMPT,
-        )
-
-    def decide(self, trigger, mode):
-        ctx = self.ctx()
-        launcher = dispatch_launch.Launcher(ctx, self.tmux, self.pushes.append)
-        return launcher.decide(self.project_config(), trigger, mode)
-
-    def preview(self, trigger, mode):
-        ctx = self.ctx()
-        launcher = dispatch_launch.Launcher(ctx, self.tmux, self.pushes.append)
-        return launcher.preview(self.project_config(), trigger, mode)
-
-    def record(self, kind, party, payload, now):
-        ctx = self.ctx()
-        with db.writing(ctx.conn):
-            events.record(ctx.conn, now, ctx.origin, party, None, "acme", kind, "local", payload)
-
-    def locate(self, party, generation, cwd, permission_mode):
-        self.record(
-            "leader.located",
-            party,
-            {
-                "party": party,
-                "generation": generation,
-                "session_id": "sess-1",
-                "cwd": str(cwd),
-                "permission_mode": permission_mode,
-            },
-            self.ctx().now,
-        )
-
-    def seed_decision(self, key, party, generation, outcome, state, age):
-        now = self.ctx().now - age
-        self.record(
-            "dispatch.decided",
-            party,
-            {
-                "project": "acme", "rule": "ask_answered", "key": key, "mode": "on", "outcome": outcome,
-                "party": party, "generation": generation, "permission_mode": "acceptEdits",
-                "subject": "ask #0", "reason": None,
-            },
-            now,
-        )
-        if state == "failed":
-            self.record(
-                "dispatch.launch_failed", party,
-                {"project": "acme", "key": key, "party": party, "generation": generation,
-                 "reason": "window exited before binding", "window_id": "@1"},
-                now,
-            )
-        if state == "bound":
-            self.record(
-                "dispatch.bound", party,
-                {"project": "acme", "key": key, "party": party, "generation": generation}, now
-            )
-        if state == "launched":
-            self.record(
-                "dispatch.launched", party,
-                {"project": "acme", "key": key, "party": party, "generation": generation, "window_id": "@1"},
-                now,
-            )
-
-    def kinds(self):
-        rows = self.ctx().conn.execute(
-            "SELECT kind FROM events WHERE kind LIKE 'dispatch.%' OR kind = 'leader.window_launched' ORDER BY seq"
-        ).fetchall()
-        return [row["kind"] for row in rows]
-
-    def decisions(self):
-        rows = self.ctx().conn.execute("SELECT * FROM dispatch_decisions ORDER BY key, mode").fetchall()
-        return [dict(row) for row in rows]
-
-    def notices(self):
-        rows = self.ctx().conn.execute("SELECT * FROM notices ORDER BY id").fetchall()
-        return [dict(row) for row in rows]
 
 
 class HappyPathTests(LaunchBase):
@@ -139,7 +17,7 @@ class HappyPathTests(LaunchBase):
         self.assertEqual(launch[:7], ["new-window", "-t", "guild:", "-n", "alpha", "-c", str(self.repo_dir.resolve())])
         command = launch[-1]
         self.assertTrue(command.startswith("GUILD_RESUME=alpha claude -n alpha-g2 --permission-mode acceptEdits "))
-        self.assertTrue(command.endswith(shlex.quote(_PROMPT)))
+        self.assertTrue(command.endswith(shlex.quote(PROMPT)))
         self.assertNotIn("--remote-control", command)
 
     def test_event_order_is_intent_then_window_then_launched(self):

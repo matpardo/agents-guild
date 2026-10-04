@@ -23,6 +23,7 @@ _NOTICE_TTL = "12h"
 _WINDOW_FAILURE = "tmux could not create the window"
 _FAILURE_WAIT = "dispatch-failed"
 _HOUR_FORMAT = "%Y-%m-%dT%H"
+_BIND_DEADLINE = timedelta(minutes=10)
 
 
 class _Notice:
@@ -108,6 +109,54 @@ class Launcher:
         party_mode = None if leader is None else leader["permission_mode"]
         permission_mode = effective_mode(project_config["dispatcher"]["permission_mode"], party_mode)
         return Verdict(kind, None, None, generation, permission_mode, leader["cwd"])
+
+    def reconcile(self, projects):
+        rows = self._ctx.conn.execute(
+            "SELECT * FROM dispatch_decisions WHERE mode = 'on' AND state IN ('launching', 'launched')"
+            " ORDER BY decided_at ASC, rowid ASC"
+        ).fetchall()
+        lines = []
+        for row in rows:
+            project_config = projects.get(row["project"])
+            if project_config is None:
+                continue
+            line = self._reconcile_row(project_config, row)
+            if line is not None:
+                lines.append(line)
+        return lines
+
+    def _reconcile_row(self, project_config, row):
+        label = "{} g{}".format(row["party"], row["generation"])
+        party = self._ctx.conn.execute(
+            "SELECT generation FROM parties WHERE name = ?", (row["party"],)
+        ).fetchone()
+        if party is not None and party["generation"] >= row["generation"]:
+            self._record(
+                row["party"],
+                row["project"],
+                "dispatch.bound",
+                {
+                    "project": row["project"],
+                    "key": row["key"],
+                    "party": row["party"],
+                    "generation": row["generation"],
+                },
+            )
+            return "{} bound".format(label)
+        reason = self._unbound_reason(row)
+        if reason is None:
+            return None
+        self._fail_launch(project_config, row["key"], row["party"], row["generation"], reason, row["window_id"])
+        return "{} launch failed: {}".format(label, reason)
+
+    def _unbound_reason(self, row):
+        if row["state"] == "launching":
+            return "launch interrupted"
+        if not self._tmux.installed() or not tmux_windows.window_in_session(self._tmux, row["window_id"]):
+            return "window exited before binding"
+        if self._ctx.now - timeutil.from_iso(row["decided_at"]) > _BIND_DEADLINE:
+            return "did not bind within 10m; window {} left running".format(row["window_id"])
+        return None
 
     def _report_failure(self, project_config, party, generation, key, reason):
         project = project_config["name"]

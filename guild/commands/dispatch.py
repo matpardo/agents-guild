@@ -86,6 +86,8 @@ def _pass(ctx, launcher, dry_run):
         _drop_cursors_of_disabled(ctx.conn, known, enabled)
     fresh = sorted(name for name in enabled if name not in known)
     lines = _initialize_cursors(ctx, fresh, dry_run) if fresh else []
+    if not dry_run:
+        lines.extend(launcher.reconcile(projects))
     active = {name: known[name] for name in enabled if name in known}
     if not active:
         return lines or [_NOTHING_LINE]
