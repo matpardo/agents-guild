@@ -162,6 +162,9 @@ guild board [--party <name> | --raid <name>]
 guild web --port <n>
 guild sync --source gh|sdd|tracker
 guild sync-timer install --every <dur> | uninstall | print
+guild dispatch run [--dry-run]                # react to new events: launch fresh sessions where a project enabled the dispatcher
+guild dispatch status                         # per project: cursor, launches last hour, rules, launches in flight, recent decisions
+guild dispatch-timer install --every <dur> | uninstall | print
 guild drift [--epic <slug> | --all]
 guild brief [<party>/<quest>/<tid>]   # no argument: per-session view; with a task: read-only, budgeted brief for a fresh session
 guild inbox --since-last
@@ -1167,6 +1170,84 @@ guild revive --list            # no tmux needed: one copy-paste command per part
 - Without tmux installed, launching fails with an install hint; `--list`
   still works.
 
+### Dispatcher
+
+`guild dispatch run` reads the events recorded since its last pass and, for
+the rules a project enabled, launches a fresh session instead of waiting for
+someone to give a party a turn. It never wakes or writes to an existing
+session (see decision `20260928_idle-wake-no-go`); it only starts new `claude`
+sessions, the way `guild revive` does.
+
+Rules, each `dry-run` (records what it would do) or `on`:
+
+| Rule | Trigger | Launches |
+|---|---|---|
+| `ask_answered` | `ask.answered` on an ask that is still answered | the party that asked |
+| `checks_failing` | `pr.synced` of a draft, converging or ready PR with failing checks, none pending, a known head commit, not seeded, in a repo of the project | the party that owns the PR |
+
+Only a party that handed off (state `awaiting-leader`, see `guild handoff`)
+is launched, as its next generation, in a window named after the party in the
+`guild` tmux session, with `GUILD_RESUME=<party> claude -n <party>-g<N+1>` and
+a prompt that names the trigger by id only: `Continue the work described in
+the guild brief. Dispatched: ask #<id> was answered; read guild asks <id>.` or
+`Continue the work described in the guild brief. Dispatched: checks fail on
+<repo>#<n>; run gh pr checks <n> --repo <repo>.` Answer text and CI output
+never reach the command line.
+
+Nothing is launched for a party that has a live session, an open window in the
+`guild` session, a launch in flight or a paused raid: those passes are silent
+and the trigger is decided on a later pass. A trigger is skipped once, with
+the reason recorded (`guild dispatch status`), when the party did not hand off
+(a notice asks the human to run `guild revive --party <party>`), is a keeper
+or is closed, when its recorded cwd is unknown, missing or outside the
+project, when the `guild` tmux session is not running, when the project
+already launched `max_launches_per_hour` sessions in the last hour, or when a
+previous launch of that party never bound. Skips post a project notice,
+except keeper, closed and the previous-launch block.
+
+- Cursor: a project starts at the newest event the first time a pass sees its
+  `dispatcher` block, so earlier events decide nothing; removing the block
+  drops the cursor. Events older than one hour are ignored and counted.
+- Each trigger is decided once (`ask_answered:<id>`,
+  `checks_failing:<repo>#<n>:<head commit>`): the decision is recorded as a
+  local `dispatch.decided` event before the launch, so a crash never launches
+  twice. A `dry-run` decision does not block the real one. `sync --source gh`
+  records the head commit of each PR (`head_sha` in `pr.synced`).
+- Permission mode: the launched session never gets a mode more permissive than
+  `permission_mode`. A party last seen in `plan` or `manual` keeps that mode;
+  every other case uses the configured one.
+- Each pass first confirms earlier launches: a party whose generation reached
+  the launched one is `bound`. A launch whose window vanished, that was
+  interrupted before tmux, or that did not bind within 10 minutes is marked
+  failed, posts one project notice and runs `notify.command` with
+  the party and the wait `dispatch-failed` appended (the same argv shape as
+  the waits in "Session status"). A window that did not bind is left running, never
+  killed, and its party launches again only after a manual
+  `guild party resume`.
+- `guild dispatch run --dry-run` takes no lock and writes nothing, not even
+  the cursor: it prints the same lines with `would ...` and shows the busy
+  reasons. `guild dispatch status` prints, per project, the cursor, launches
+  in the last hour, the rules, launches in flight and the ten latest
+  decisions.
+- A session that ends idle keeps its party out of dispatch until it is closed.
+  Lifecycle commands (`guild lifecycle`) stay in `sync`.
+
+```
+acme: cursor initialized at seq 1234
+acme: ask_answered ask #12 -> launched alpha g5 (window @12, mode acceptEdits)
+acme: checks_failing acme/app#7 -> planned: launch beta g3 (dry-run, mode manual)
+acme: checks_failing acme/app#9 -> skipped beta: party not handed off
+alpha g5 bound
+beta g3 launch failed: did not bind within 10m; window @9 left running
+acme: 2 events older than 1h ignored
+```
+
+Run it on a timer: `guild dispatch-timer install --every 5m` (same rules as
+`guild sync-timer`; `print` only prints the units). The dispatcher never
+creates the tmux session, so start it first with `tmux new -s guild` or run
+`guild revive`. To stop it, remove a rule or the whole `dispatcher` block
+from the project config, or run `guild dispatch-timer uninstall`.
+
 ### `guild raid`
 
 A raid is a named channel parties join so a shared concern (CI, a shared
@@ -1400,6 +1481,8 @@ against path traversal, not an identity boundary.
   "tracker": {"kind": "jira-acli", "browse_url": "https://acme.atlassian.net/browse/"},
   "next": {"stale_hours": 8},
   "handoff_threshold": 40,
+  "dispatcher": {"permission_mode": "acceptEdits", "max_launches_per_hour": 3,
+                 "rules": {"ask_answered": "on", "checks_failing": "dry-run"}},
   "lifecycle": {
     "on_pr_merged": {"command": ["scripts/cleanup-merged.sh", "--dry-run"], "timeout_minutes": 30},
     "on_pr_closed": {"command": ["scripts/cleanup-merged.sh"], "timeout_minutes": 30}
@@ -1489,6 +1572,14 @@ against path traversal, not an identity boundary.
   (non-empty list of non-empty strings, never a shell string) and
   `timeout_minutes` (integer from 1 to 1440, required: no default). Absent → no
   command ever runs.
+- `dispatcher` (optional): opts the project in to `guild dispatch` (see
+  "Dispatcher"). An object with exactly three keys, all required, no
+  defaults: `permission_mode` (`manual`, `acceptEdits` or `auto`;
+  `bypassPermissions`, `dontAsk`, `plan` and anything else fail to load),
+  `max_launches_per_hour` (integer from 1 to 20) and `rules` (an object whose
+  keys are `ask_answered` and `checks_failing` and whose values are `dry-run`
+  or `on`; `off` is rejected, remove the rule to disable it). Absent → the
+  project is never dispatched.
 - Unknown top-level keys are allowed.
 
 ### SDD parsing rules
@@ -1555,11 +1646,11 @@ in `BEGIN IMMEDIATE`) plus projection tables kept in sync in the same
 transaction: `parties`, `leaders`, `quests`, `quest_tasks`, `epics`, `tasks`,
 `prs`, `cards`, `asks`, `notices`, `claims`, `raid_members`, `pr_shared_areas`,
 `merge_queue_pins`, `cost_samples`, `resource_samples`, `resource_machine`,
-`leader_windows`, `cursors`, `transcript_cursors`. `guild
-rebuild` drops every projection and replays all events from scratch — the only
-exceptions are `cursors` and `transcript_cursors`, which are read positions
-(per session and per transcript), not domain state, and are left untouched by
-rebuild.
+`leader_windows`, `dispatch_decisions`, `cursors`, `transcript_cursors`,
+`dispatch_cursors`. `guild rebuild` drops every projection and replays all
+events from scratch — the only exceptions are `cursors`, `transcript_cursors`
+and `dispatch_cursors`, which are read positions (per session, per transcript
+and per project), not domain state, and are left untouched by rebuild.
 
 `epics`/`tasks` are observed-only (never written by a guild command): they
 hold whatever `guild sync --source sdd` last read, keyed by
@@ -2002,7 +2093,7 @@ contract appears.
 working, waiting on a permission prompt or stopped with work),
 `cost-metering`, `ask-context`, `session-lifecycle` (active: handoff retention,
 respawn, a Remote Control keeper), `ephemeral-brief` (active: the task brief,
-`idle`/`queued` party status, shorter sessions), `dispatcher` (fresh
+`idle`/`queued` party status, shorter sessions), `dispatcher` (active: fresh
 sessions only, see `sdd/decisions/20261004_dispatcher-launches-fresh-sessions.md`),
 `derived-state` and `conflict-hotspots`; `execution-profiles`, `budgets`,
 `officers` and `federation` follow as drafts.
