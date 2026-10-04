@@ -3,7 +3,7 @@ epic: web-board
 type: tasks
 title: Web view of the guild board
 status: done
-updated: 2026-09-29
+updated: 2026-10-04
 ---
 
 # Tasks: Web view of the guild board
@@ -56,3 +56,10 @@ updated: 2026-09-29
 **Status:** [x] done — #28
 
 **What:** a seen mark lets the human tell new notices from read ones without changing what is shown or delivered: every active notice stays listed everywhere and delivery, the brief and the notice's state are untouched. `guild notice seen <id>|--all` and `guild notice unseen <id>` (events `notice.seen` / `notice.unseen`, column `notices.seen_at`); `guild notices` and the board prefix unseen notices with `new` and count them, with time left on every notice. The web model adds `seen` per notice, `time_left` and `new_notice_count`; unseen cards get a `new` badge and `Mark seen`, seen cards `Mark unseen`, and the heading has `Mark all seen`; `POST /api/notices/<id>/seen`, `/unseen` and `POST /api/notices/seen-all` reuse the ask routes' checks.
+
+## T08 — Notice issue time, newest first
+
+**Depends on:** T07
+**Status:** [x] done — #63
+
+**What:** active notices are ordered newest first everywhere (`guild notices`, board, brief, handoff, web); each shows its issue time in local time (`YYYY-MM-DD HH:MM`), inbox lines read `- notice #N from X at <time>: "..."`, and the web model adds `issued_at` and `issued`.

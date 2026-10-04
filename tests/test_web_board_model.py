@@ -173,7 +173,7 @@ class BoardModelShapeTests(BoardModelTestCase):
         ctx.conn.close()
         self.assertEqual(len(model["notices"]), 1)
         notice = model["notices"][0]
-        self.assertEqual(set(notice), {"id", "party", "scope", "text", "expires_at", "time_left", "seen"})
+        self.assertEqual(set(notice), {"id", "party", "scope", "text", "issued_at", "issued", "expires_at", "time_left", "seen"})
         self.assertEqual(notice["time_left"], "1h left")
         self.assertIs(notice["seen"], False)
         self.assertEqual(notice["text"], "pipeline down")
@@ -318,7 +318,7 @@ class BoardModelSeenNoticeTests(BoardModelTestCase):
     def test_new_notice_count_and_seen_flags_reflect_the_mark(self):
         self.run_cli(["notice", "seen", "1"], None, None)
         model = self._model()
-        self.assertEqual([(n["id"], n["seen"]) for n in model["notices"]], [(1, True), (2, False)])
+        self.assertEqual([(n["id"], n["seen"]) for n in model["notices"]], [(2, False), (1, True)])
         self.assertEqual(model["new_notice_count"], 1)
 
     def test_every_notice_stays_listed_when_seen(self):

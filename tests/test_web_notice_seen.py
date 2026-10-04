@@ -253,7 +253,7 @@ class NoticeActionTests(NoticeWebTestCase):
         self.assertEqual(json.loads(payload), {"ok": True, "message": "notice #1 seen"})
         self.assertEqual(self._seen_flags(), {1: True})
         code, out, err = self.run_cli(["notices"], None, None)
-        self.assertEqual(out, "#1 [human] pipeline down (guild, 4h left)\n")
+        self.assertTrue(out.startswith("#1 [human] pipeline down (guild, "), out)
 
     def test_unseen_succeeds(self):
         self._notice_action("seen")

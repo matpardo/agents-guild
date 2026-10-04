@@ -251,7 +251,14 @@ def _notices_section(ctx, painter, rows):
                 marker,
                 painter.paint("#{}".format(row["id"]), "yellow"),
                 painter.paint(row["party"] or "human", "cyan"),
-                painter.paint("{} · {}".format(row["scope"], timeutil.time_left_label(ctx.now, row["expires_at"])), "dim"),
+                painter.paint(
+                    "{} · {} · {}".format(
+                        timeutil.issued_label(row["created_at"]),
+                        row["scope"],
+                        timeutil.time_left_label(ctx.now, row["expires_at"]),
+                    ),
+                    "dim",
+                ),
             )
         )
         lines.extend(painter.wrap(row["text"], "     "))
@@ -536,6 +543,8 @@ def _notice_model(ctx, row):
         "party": row["party"],
         "scope": row["scope"],
         "text": sanitize.strip_control_sequences(row["text"]),
+        "issued_at": row["created_at"],
+        "issued": timeutil.issued_label(row["created_at"]),
         "expires_at": row["expires_at"],
         "time_left": timeutil.time_left_label(ctx.now, row["expires_at"]),
         "seen": not notice_commands.is_new(row),

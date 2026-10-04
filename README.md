@@ -592,9 +592,12 @@ bound sessions, and fail for an unknown id, a notice that is already seen (or,
 for `unseen`, not seen) and a notice that is not active (closed or expired).
 Guild is single-user, so the mark is per guild, not per reader.
 
-`guild notices` lists every active notice with its time left, unseen ones
-prefixed with `new` (`new #13 [party] text (scope, 5h left)`), and ends with
-`N new` when N > 0. The NOTICES section of `guild board` (also `--party` and
+`guild notices` lists every active notice, newest first, with its issue time
+(local, `YYYY-MM-DD HH:MM`) and time left, unseen ones prefixed with `new`
+(`new #13 [party] text (scope, 2026-10-04 14:30, 5h left)`), and ends with
+`N new` when N > 0. `guild board`, `guild brief`, `guild web` and the inbox
+lines (`- notice #13 from party at 2026-10-04 14:30: "text"`) show the same
+issue time and order. The NOTICES section of `guild board` (also `--party` and
 `--raid`) lists the same notices, marks unseen ones with `new` (colored on a
 terminal only) and its header reads `NOTICES · N active (M new)`, the count
 only when M > 0.
