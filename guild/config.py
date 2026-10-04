@@ -24,6 +24,18 @@ def _validate_tracker_config(tracker_config):
         )
 
 
+def _validate_notify_config(notify_config):
+    if not isinstance(notify_config, dict):
+        raise GuildError("project config 'notify' must be an object", 1)
+    if set(notify_config) != {"command"}:
+        raise GuildError("project config 'notify' must have exactly the key 'command'", 1)
+    command = notify_config["command"]
+    if not isinstance(command, list) or not command:
+        raise GuildError("project config 'notify.command' must be a non-empty list of strings", 1)
+    if not all(isinstance(item, str) and item for item in command):
+        raise GuildError("project config 'notify.command' must be a non-empty list of strings", 1)
+
+
 def _validate_shared_areas_config(data):
     shared_areas = data.get("shared_areas")
     if shared_areas is None:
@@ -67,6 +79,9 @@ def validate_project_config(data):
     tracker_config = data.get("tracker")
     if tracker_config is not None:
         _validate_tracker_config(tracker_config)
+    notify_config = data.get("notify")
+    if notify_config is not None:
+        _validate_notify_config(notify_config)
     _validate_shared_areas_config(data)
     _validate_migration_paths_config(data)
     _validate_fast_forward_base_config(data)

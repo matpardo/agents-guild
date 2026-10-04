@@ -5,7 +5,7 @@ import shutil
 import sys
 from pathlib import Path
 
-from guild import db, origin, paths, session_info, timeutil
+from guild import db, notify, origin, paths, session_info, timeutil
 from guild.commands import hook as hook_commands
 from guild.context import RunContext
 from guild.errors import GuildError
@@ -886,7 +886,9 @@ def _run_stateful_hook(hook_name, stdin_data):
         elif hook_name == "post-tool-use":
             text = hook_commands.post_tool_use(ctx)
         elif hook_name == "notification":
-            hook_commands.notification(ctx, stdin_data.get("notification_type"), stdin_data.get("message"))
+            hook_commands.notification(
+                ctx, stdin_data.get("notification_type"), stdin_data.get("message"), notify.spawn_detached
+            )
             text = None
         elif hook_name == "stop":
             hook_commands.stop(ctx)

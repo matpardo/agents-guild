@@ -6,6 +6,7 @@ import time
 from unittest import mock
 
 from guild import paths
+from guild import notify
 from guild.commands import statusline as statusline_commands
 from tests.testutil import GuildTestCase
 
@@ -1004,3 +1005,96 @@ class SessionLivenessHookTests(GuildTestCase):
         for _ in range(100):
             self.run_hook("post-tool-use", self._payload(repo_dir))
         self.assertEqual(self._count("session.working"), 1)
+
+
+class SpawnDetachedTests(GuildTestCase):
+    def test_spawns_detached_without_waiting(self):
+        with mock.patch("guild.notify.subprocess.Popen") as popen:
+            result = notify.spawn_detached(["notify-send", "guild", "alpha", "permission"])
+        self.assertIsNone(result)
+        popen.assert_called_once_with(
+            ["notify-send", "guild", "alpha", "permission"],
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            start_new_session=True,
+        )
+
+    def test_os_error_propagates(self):
+        with mock.patch("guild.notify.subprocess.Popen", side_effect=FileNotFoundError("nope")):
+            with self.assertRaises(OSError):
+                notify.spawn_detached(["missing-binary"])
+
+
+class NotificationPushTests(GuildTestCase):
+    def setUp(self):
+        super().setUp()
+        self.repo_dir = self.register_project("acme", ["acme/app"])
+        self.run_cli(["party", "start", "alpha"], "sess-1", self.repo_dir)
+        self.runner = mock.Mock()
+        patcher = mock.patch("guild.notify.spawn_detached", self.runner)
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
+    def _configure(self, command):
+        config_file = self.config_home / "guild" / "projects" / "acme.json"
+        data = json.loads(config_file.read_text())
+        data["notify"] = {"command": command}
+        config_file.write_text(json.dumps(data))
+
+    def _hook(self, hook_name, **extra):
+        payload = {"session_id": "sess-1", "cwd": str(self.repo_dir)}
+        payload.update(extra)
+        return self.run_hook(hook_name, payload)
+
+    def _notify(self, notification_type):
+        return self._hook("notification", notification_type=notification_type, message="m")
+
+    def test_permission_wait_runs_command_with_party_and_wait(self):
+        self._configure(["notify-send", "guild"])
+        self._notify("permission_prompt")
+        self.runner.assert_called_once_with(["notify-send", "guild", "alpha", "permission"])
+
+    def test_elicitation_wait_runs_command(self):
+        self._configure(["notify-send", "guild"])
+        self._notify("elicitation_dialog")
+        self.runner.assert_called_once_with(["notify-send", "guild", "alpha", "elicitation"])
+
+    def test_repeat_in_same_episode_does_not_run_again(self):
+        self._configure(["notify-send", "guild"])
+        self._notify("permission_prompt")
+        self._notify("permission_prompt")
+        self.assertEqual(self.runner.call_count, 1)
+
+    def test_new_episode_after_working_runs_again(self):
+        self._configure(["notify-send", "guild"])
+        self._notify("permission_prompt")
+        self._hook("prompt-submit")
+        self._notify("permission_prompt")
+        self.assertEqual(self.runner.call_count, 2)
+
+    def test_idle_does_not_run_command(self):
+        self._configure(["notify-send", "guild"])
+        self._notify("idle_prompt")
+        self.runner.assert_not_called()
+
+    def test_permission_after_idle_wait_does_not_run_command(self):
+        self._configure(["notify-send", "guild"])
+        self._notify("idle_prompt")
+        self._notify("permission_prompt")
+        self.runner.assert_not_called()
+
+    def test_no_notify_config_does_not_run_command(self):
+        self._notify("permission_prompt")
+        self.runner.assert_not_called()
+
+    def test_os_error_is_reported_on_stderr_and_event_still_recorded(self):
+        self._configure(["missing-binary"])
+        self.runner.side_effect = FileNotFoundError("no such file")
+        code, out, err = self._notify("permission_prompt")
+        self.assertEqual((code, out), (0, ""))
+        self.assertIn("guild: notify command failed: no such file", err)
+        conn = sqlite3.connect(str(paths.db_path()))
+        count = conn.execute("SELECT COUNT(*) FROM events WHERE kind = 'session.waiting'").fetchone()[0]
+        conn.close()
+        self.assertEqual(count, 1)

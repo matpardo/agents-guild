@@ -158,7 +158,27 @@ def stop(ctx):
         session_status.record_change(ctx, binding, "session.stopped", {})
 
 
-def notification(ctx, notification_type, message):
+_BLOCKING_WAITS = ("permission", "elicitation")
+_WAITING_STATUSES = ("waiting-permission", "waiting-input")
+
+
+def _is_new_waiting_episode(previous_row):
+    return previous_row is None or previous_row["status"] not in _WAITING_STATUSES
+
+
+def _run_push(ctx, binding, wait, push_runner):
+    if binding["project"] is None:
+        return
+    notify_config = config.load_project(ctx.projects_dir, binding["project"]).get("notify")
+    if notify_config is None:
+        return
+    try:
+        push_runner(notify_config["command"] + [binding["party"], wait])
+    except OSError as error:
+        sys.stderr.write("guild: notify command failed: {}\n".format(error))
+
+
+def notification(ctx, notification_type, message, push_runner):
     binding = identity.resolve_binding(ctx.conn, ctx.session_id)
     if binding is None:
         return
@@ -167,11 +187,15 @@ def notification(ctx, notification_type, message):
         return
     wait, status = mapped
     with db.writing(ctx.conn):
+        previous_row = session_status.current(ctx.conn, ctx.session_id)
         if not session_status.is_change(ctx.conn, ctx.session_id, status):
             return
         session_status.record_change(
             ctx, binding, "session.waiting", session_status.waiting_payload(wait, message)
         )
+    if wait not in _BLOCKING_WAITS or not _is_new_waiting_episode(previous_row):
+        return
+    _run_push(ctx, binding, wait, push_runner)
 
 
 def session_start(ctx, resume_party, permission_mode):
