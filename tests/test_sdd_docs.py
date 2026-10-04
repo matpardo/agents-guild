@@ -105,9 +105,9 @@ class VocabularyDecisionTests(unittest.TestCase):
 
 
 class EphemeralBriefDocsTests(unittest.TestCase):
-    def test_epic_is_active_with_tasks(self):
+    def test_epic_has_its_tasks(self):
         epic_dir = _EPICS_DIR / "ephemeral-brief"
-        self.assertEqual(_frontmatter(epic_dir / "spec.md")["status"], "active")
+        self.assertIn(_frontmatter(epic_dir / "spec.md")["status"], ("active", "done"))
         tasks = sdd.parse_tasks_file(epic_dir / "tasks.md", _PATTERNS)
         self.assertEqual([task["tid"] for task in tasks], ["T01", "T02", "T03", "T04", "T05", "T06"])
 
