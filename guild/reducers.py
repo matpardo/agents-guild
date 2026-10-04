@@ -532,6 +532,10 @@ def _cost_sampled(conn, event):
     )
 
 
+def _lifecycle_ran(conn, event):
+    return
+
+
 def _dump(value):
     return json.dumps(value)
 
@@ -576,6 +580,7 @@ _REDUCERS = {
     "session.stopped": _session_stopped,
     "session.working": _session_working,
     "cost.sampled": _cost_sampled,
+    "lifecycle.ran": _lifecycle_ran,
 }
 
 
