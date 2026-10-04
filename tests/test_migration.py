@@ -125,6 +125,29 @@ class MigrationTests(GuildTestCase):
         self.assertEqual((pr_row["lifecycle"], pr_row["needs_ask_answer"]), ("draft", 1))
         again.close()
 
+    def test_old_schema_db_gains_asks_snapshot_and_answered_at_columns(self):
+        db_path = self.data_home / "guild.db"
+        raw = sqlite3.connect(str(db_path))
+        raw.execute(
+            "CREATE TABLE asks (id INTEGER PRIMARY KEY, party TEXT NOT NULL, question TEXT NOT NULL,"
+            " context TEXT NOT NULL, refs TEXT NOT NULL, options TEXT NOT NULL, state TEXT NOT NULL,"
+            " answer TEXT, created_at TEXT NOT NULL)"
+        )
+        raw.execute(
+            "INSERT INTO asks VALUES (1, 'alpha', 'q', 'c', '[]', '[]', 'open', NULL, '2026-01-01T00:00:00+00:00')"
+        )
+        raw.commit()
+        raw.close()
+
+        conn = db.connect(db_path)
+        conn.close()
+        again = db.connect(db_path)
+
+        row = again.execute("SELECT * FROM asks WHERE id = 1").fetchone()
+        self.assertIsNone(row["snapshot"])
+        self.assertIsNone(row["answered_at"])
+        self.assertEqual(row["question"], "q")
+
     def test_old_schema_db_gains_prs_card_column(self):
         db_path = self.data_home / "guild.db"
         _make_old_schema_db(db_path)
