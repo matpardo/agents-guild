@@ -9,6 +9,7 @@ _REQUIRED_KEYS = ("name", "paths", "github")
 _TRACKER_BROWSE_URL_PREFIX = "https://"
 _LIFECYCLE_EVENTS = ("on_pr_merged", "on_pr_closed")
 _LIFECYCLE_ENTRY_KEYS = {"command", "timeout_minutes"}
+_LIFECYCLE_MAX_TIMEOUT_MINUTES = 1440
 
 
 def _validate_tracker_config(tracker_config):
@@ -81,6 +82,13 @@ def _validate_lifecycle_timeout(event, timeout):
         raise GuildError(
             "project config 'lifecycle.{}.timeout_minutes' must be a positive integer".format(event), 1
         )
+    if timeout > _LIFECYCLE_MAX_TIMEOUT_MINUTES:
+        raise GuildError(
+            "project config 'lifecycle.{}.timeout_minutes' must be at most {}".format(
+                event, _LIFECYCLE_MAX_TIMEOUT_MINUTES
+            ),
+            1,
+        )
 
 
 def _validate_lifecycle_entry(event, entry):
@@ -126,6 +134,7 @@ def validate_project_config(data):
             raise GuildError("project config missing required key '{}'".format(key), 1)
     if not isinstance(data["name"], str) or not data["name"]:
         raise GuildError("project config 'name' must be a non-empty string", 1)
+    names.validate_name(data["name"], "project name")
     if not isinstance(data["paths"], list) or not data["paths"]:
         raise GuildError("project config 'paths' must be a non-empty list", 1)
     if not isinstance(data["github"], dict) or not isinstance(data["github"].get("repos"), list):

@@ -1,4 +1,5 @@
 import os
+import signal
 import sys
 import tempfile
 import time
@@ -87,6 +88,58 @@ class RunProcessTests(unittest.TestCase):
         while time.monotonic() < deadline and _alive(grandchild):
             time.sleep(0.05)
         self.assertFalse(_alive(grandchild))
+
+    def _spawn_detached_grandchild_code(self, parent_tail):
+        pid_file = Path(self.cwd) / "detached.pid"
+        child_code = "import os, time; open({!r}, 'w').write(str(os.getpid())); time.sleep(15)".format(
+            str(pid_file)
+        )
+        code = (
+            "import subprocess, sys, time\n"
+            "subprocess.Popen([sys.executable, '-c', {!r}], start_new_session=True)\n"
+            "time.sleep(1)\n{}"
+        ).format(child_code, parent_tail)
+        return code, pid_file
+
+    def _reap_detached(self, pid_file):
+        if not pid_file.exists():
+            return
+        try:
+            os.kill(int(pid_file.read_text()), signal.SIGKILL)
+        except ProcessLookupError:
+            return
+
+    def test_timeout_returns_when_a_detached_descendant_holds_stdout(self):
+        code, pid_file = self._spawn_detached_grandchild_code("time.sleep(60)\n")
+        self.addCleanup(self._reap_detached, pid_file)
+        started = time.monotonic()
+        result = _run(_python(code), self.cwd, 2)
+        self.assertLess(time.monotonic() - started, 8)
+        self.assertTrue(result["timed_out"])
+
+    def test_success_returns_when_a_detached_descendant_outlives_the_command(self):
+        code, pid_file = self._spawn_detached_grandchild_code("")
+        self.addCleanup(self._reap_detached, pid_file)
+        started = time.monotonic()
+        result = _run(_python(code), self.cwd, _TIMEOUT_SECONDS)
+        self.assertLess(time.monotonic() - started, 8)
+        self.assertEqual(result["exit_code"], 0)
+
+    def test_huge_output_returns_only_the_tail(self):
+        result = _run(
+            _python("import sys\nfor _ in range(50):\n    sys.stdout.write('x' * 1000000)\nprint('the-end')"),
+            self.cwd,
+            _TIMEOUT_SECONDS,
+        )
+        self.assertEqual(len(result["output"]), 2000)
+        self.assertTrue(result["output"].endswith("the-end\n"))
+
+    def test_stdin_is_closed(self):
+        result = _run(
+            _python("import sys; print(repr(sys.stdin.read()))"), self.cwd, _TIMEOUT_SECONDS
+        )
+        self.assertEqual(result["output"], "''\n")
+        self.assertEqual(result["exit_code"], 0)
 
     def test_missing_executable_is_an_error(self):
         result = _run(["/nonexistent/guild-test-binary"], self.cwd, _TIMEOUT_SECONDS)

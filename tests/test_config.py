@@ -157,6 +157,22 @@ class ValidateProjectConfigTests(unittest.TestCase):
                     "project config 'lifecycle.on_pr_merged.timeout_minutes' must be a positive integer",
                 )
 
+    def test_rejects_timeout_above_one_day(self):
+        self._assert_lifecycle_rejected(
+            {"on_pr_merged": {"command": ["x"], "timeout_minutes": 1441}}, "at most 1440"
+        )
+
+    def test_accepts_timeout_of_one_day(self):
+        config.validate_project_config(
+            self._with_lifecycle({"on_pr_merged": {"command": ["x"], "timeout_minutes": 1440}})
+        )
+
+    def test_rejects_project_names_that_traverse_paths(self):
+        for name in ("../evil", "a/b", ".hidden", "a..b"):
+            with self.subTest(name=name):
+                with self.assertRaises(GuildError):
+                    config.validate_project_config({"name": name, "paths": ["/tmp/*"], "github": {"repos": []}})
+
     def test_rejects_extra_lifecycle_event_key(self):
         self._assert_lifecycle_rejected(
             {"on_pr_merged": {"command": ["x"], "timeout_minutes": 1, "shell": True}},
