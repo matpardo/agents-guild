@@ -27,8 +27,8 @@ class AskDetailEndpointTests(WebServerTestCase):
         self.assertEqual(
             set(model),
             {
-                "id", "party", "state", "question", "context", "options", "created_at", "answer",
-                "answered_at", "refs", "origin", "resume", "events",
+                "id", "party", "state", "question", "context", "options", "created_at", "created",
+                "answer", "answered_at", "answered", "refs", "origin", "resume", "events",
             },
         )
         self.assertEqual((model["id"], model["party"], model["state"]), (1, "alpha", "open"))

@@ -525,7 +525,7 @@
     }
     wrapper.appendChild(detailLine([detailText("strong", "recent events", "Latest events of the asking party")]));
     model.events.forEach(function (event) {
-      wrapper.appendChild(detailLine([detailText("code", event.ts + " " + event.kind + " " + event.summary, "Event timestamp, kind and subject")]));
+      wrapper.appendChild(detailLine([detailText("code", event.time + " " + event.kind + " " + event.summary, "Event timestamp, kind and subject")]));
     });
     return wrapper;
   }

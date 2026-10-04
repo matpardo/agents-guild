@@ -1,7 +1,7 @@
 import json
 from pathlib import Path
 
-from guild import config, links, paths, resume, sanitize
+from guild import config, links, paths, resume, sanitize, timeutil
 from guild.commands import ask as ask_commands
 from guild.commands import revive
 from guild.errors import GuildError
@@ -171,9 +171,20 @@ def _recent_events(ctx, party):
         (party, *_EVENT_KINDS, _EVENT_LIMIT),
     ).fetchall()
     return [
-        {"ts": row["ts"], "kind": row["kind"], "summary": _event_summary(row["kind"], json.loads(row["payload"]))}
+        {
+            "ts": row["ts"],
+            "time": timeutil.issued_label(row["ts"]),
+            "kind": row["kind"],
+            "summary": _event_summary(row["kind"], json.loads(row["payload"])),
+        }
         for row in rows
     ]
+
+
+def _optional_label(iso_text):
+    if iso_text is None:
+        return None
+    return timeutil.issued_label(iso_text)
 
 
 def build(ctx, ask_row):
@@ -187,8 +198,10 @@ def build(ctx, ask_row):
         "context": ask_row["context"],
         "options": json.loads(ask_row["options"]),
         "created_at": ask_row["created_at"],
+        "created": timeutil.issued_label(ask_row["created_at"]),
         "answer": ask_row["answer"],
         "answered_at": ask_row["answered_at"],
+        "answered": _optional_label(ask_row["answered_at"]),
         "refs": [
             _expand_ref(ctx, project, project_config, ref) for ref in json.loads(ask_row["refs"])
         ],
@@ -281,15 +294,15 @@ def _closing_lines(model):
     if model["state"] != "answered":
         return []
     lines = ["  answer: {}".format(model["answer"])]
-    if model["answered_at"] is not None:
-        lines.append("  answered_at: {}".format(model["answered_at"]))
+    if model["answered"] is not None:
+        lines.append("  answered: {}".format(model["answered"]))
     return lines
 
 
 def render_lines(model):
     lines = [
         "ask #{} · {} · {} · created {}".format(
-            model["id"], model["party"], model["state"], model["created_at"]
+            model["id"], model["party"], model["state"], model["created"]
         ),
         "  {}".format(model["question"]),
         "  context: {}".format(model["context"]),
@@ -303,6 +316,6 @@ def render_lines(model):
         lines.append("resume: {}".format(model["resume"]))
     lines.append("recent events ({}, last {})".format(model["party"], _EVENT_LIMIT))
     for event in model["events"]:
-        lines.append(_joined(["  {}".format(event["ts"]), event["kind"], event["summary"]]))
+        lines.append(_joined(["  {}".format(event["time"]), event["kind"], event["summary"]]))
     lines.extend(_closing_lines(model))
     return lines
