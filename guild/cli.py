@@ -413,9 +413,10 @@ def _handle_next(ctx, args):
 
 
 def _handle_sync(ctx, args):
+    from guild import lifecycle
     from guild.commands import sync as sync_commands
 
-    failures = sync_commands.run(ctx, args.source)
+    failures = sync_commands.run(ctx, args.source, lifecycle.run_process)
     for failure in failures:
         sys.stderr.write("guild: sync failed for {}\n".format(failure))
     return 1 if failures else 0
