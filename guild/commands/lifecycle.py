@@ -1,7 +1,7 @@
 import contextlib
 import fcntl
 
-from guild import config, db, events, localbase, paths
+from guild import config, db, events, localbase, names, paths
 from guild.commands import notice as notice_commands
 from guild.errors import GuildError
 
@@ -48,7 +48,8 @@ def _checkout_for(project, repo):
 @contextlib.contextmanager
 def _lock(state_dir, project, event_kind):
     lock_dir = paths.ensure_private_dir(state_dir / _LOCK_DIR_NAME)
-    with open(lock_dir / "{}-{}.lock".format(project, event_kind), "a") as handle:
+    lock_path = names.ensure_within(lock_dir / "{}-{}.lock".format(project, event_kind), lock_dir)
+    with open(lock_path, "a") as handle:
         try:
             fcntl.flock(handle, fcntl.LOCK_EX | fcntl.LOCK_NB)
         except BlockingIOError:
@@ -150,10 +151,25 @@ def run_group(ctx, project, event_kind, repo, trigger_refs, runner):
     return _finish(ctx, payload)
 
 
+def _record_crash(ctx, project, event_kind, repo, trigger_refs, error):
+    payload = _base_payload(project, event_kind, repo, trigger_refs, _checkout_for(project, repo))
+    payload["status"] = "error"
+    payload["reason"] = "{}: {}".format(type(error).__name__, error)
+    _finish(ctx, payload)
+
+
+def _run_group_guarded(ctx, group, runner):
+    repo = group["triggers"][0][0]
+    refs = ["{}#{}".format(trigger_repo, number) for trigger_repo, number in group["triggers"]]
+    try:
+        run_group(ctx, group["project"], group["event"], repo, refs, runner)
+    except Exception as error:
+        _record_crash(ctx, group["project"], group["event"], repo, refs, error)
+
+
 def run_sync_triggers(ctx, projects, triggers, runner):
     for group in triggers_by_project(projects, triggers):
-        refs = ["{}#{}".format(repo, number) for repo, number in group["triggers"]]
-        run_group(ctx, group["project"], group["event"], group["triggers"][0][0], refs, runner)
+        _run_group_guarded(ctx, group, runner)
 
 
 def _resolve_repo(project, repo):

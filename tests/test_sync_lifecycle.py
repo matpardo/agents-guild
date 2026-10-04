@@ -63,6 +63,14 @@ class SyncLifecycleTests(LifecycleFixture):
         self._sync(runner)
         self.assertEqual(runner.calls, [])
 
+    def test_pr_merged_on_github_before_tracking_does_not_fire_on_next_sync(self):
+        self._track(1, _MERGED)
+        runner = FakeRunner([])
+        code, out, err = self._sync(runner)
+        self.assertEqual(code, 0, err)
+        self.assertEqual(runner.calls, [])
+        self.assertEqual(self.ran_payloads(), [])
+
     def test_pr_already_closed_when_tracked_does_not_fire(self):
         self._track(1, _CLOSED)
         runner = FakeRunner([])

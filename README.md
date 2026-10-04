@@ -494,6 +494,19 @@ does.
   `manual`, prints `lifecycle on_pr_merged: ok (exit 0, 3.2s)` and exits 1 on
   failure, timeout or error.
 
+Trust boundary: the command runs unattended with your privileges, right
+after the main checkout is fast-forwarded. A merged PR that edits a
+repo-relative script therefore makes the next run execute that new code. Point
+`command` at an absolute path outside the repo, or at a script you review.
+
+Output: the stored tail can contain secrets the command prints. It lives only
+in the local database (never exported, never in a notice). The command runs
+with stdin closed and `timeout_minutes` is capped at 1440. Output goes to a
+temporary file, so a descendant that detaches from the process group cannot
+hold a run (or its lock) open past the timeout. Any error while handling a
+group is recorded as `lifecycle.ran` with status `error` and does not stop
+the other groups or the sync.
+
 Out of scope: `on_main_red` (sync cannot tell a first red observation from a
 new failure), `on_worktree_created`, a resource officer (see the `officers`
 epic), detached runs, retries, re-running lock-skipped triggers, and moving
@@ -1245,7 +1258,7 @@ against path traversal, not an identity boundary.
   "Lifecycle commands"). Keys are `on_pr_merged` and `on_pr_closed`, any
   other key fails to load. Each value is an object with exactly `command`
   (non-empty list of non-empty strings, never a shell string) and
-  `timeout_minutes` (positive integer, required: no default). Absent → no
+  `timeout_minutes` (integer from 1 to 1440, required: no default). Absent → no
   command ever runs.
 - Unknown top-level keys are allowed.
 

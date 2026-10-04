@@ -1,5 +1,6 @@
 import fcntl
 import json
+from unittest import mock
 
 from guild import paths
 from guild.commands import lifecycle as lifecycle_commands
@@ -164,3 +165,29 @@ class RunSyncTriggersTests(LifecycleFixture):
     def test_payload_survives_json_round_trip(self):
         self._run([("on_pr_merged", "acme/app", 1)], FakeRunner([ok_result()]))
         json.dumps(self.ran_payloads())
+
+    def test_raising_runner_is_recorded_and_next_group_still_runs(self):
+        calls = []
+
+        def runner(argv, cwd, timeout_seconds):
+            calls.append(argv)
+            if len(calls) == 1:
+                raise RuntimeError("boom")
+            return ok_result()
+
+        self._run([("on_pr_closed", "acme/app", 2), ("on_pr_merged", "acme/app", 1)], runner)
+        self.assertEqual(len(calls), 2)
+        payloads = {payload["event"]: payload for payload in self.ran_payloads()}
+        self.assertEqual(payloads["on_pr_closed"]["status"], "error")
+        self.assertEqual(payloads["on_pr_closed"]["reason"], "RuntimeError: boom")
+        self.assertEqual(payloads["on_pr_merged"]["status"], "ok")
+        self.assertEqual(
+            self.notice_texts(), ["lifecycle on_pr_closed failed for acme (error): see guild history"]
+        )
+
+    def test_lock_failure_is_recorded_as_error(self):
+        with mock.patch("guild.commands.lifecycle.paths.ensure_private_dir", side_effect=OSError("disk full")):
+            self._run([("on_pr_merged", "acme/app", 1)], FakeRunner([]))
+        payload = self.ran_payloads()[0]
+        self.assertEqual((payload["status"], payload["reason"]), ("error", "OSError: disk full"))
+        self.assertEqual(len(self.notice_texts()), 1)
