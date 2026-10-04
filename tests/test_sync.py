@@ -129,6 +129,26 @@ class SyncTests(GuildTestCase):
         self.assertEqual(code, 0, err)
         self.assertIsNone(self._synced_payloads()[-1]["head_sha"])
 
+    def test_synced_event_records_whether_the_pr_comes_from_a_fork(self):
+        self.write_gh_fixture(
+            "view_acme-app_1",
+            {
+                "state": "OPEN", "isDraft": True, "headRefName": "feature/x", "title": "t",
+                "isCrossRepository": True,
+            },
+        )
+        self.run_cli(["sync", "--source", "gh"], "sess-1", self.repo_dir)
+        self.assertIs(self._synced_payloads()[-1]["cross_repository"], True)
+
+    def test_synced_event_without_fork_info_records_none(self):
+        self.run_cli(["sync", "--source", "gh"], "sess-1", self.repo_dir)
+        self.assertIsNone(self._synced_payloads()[-1]["cross_repository"])
+
+    def test_pr_view_asks_gh_whether_the_pr_is_cross_repository(self):
+        with mock.patch("guild.adapters.github.pr_view", return_value={"state": "OPEN", "isDraft": True}) as view:
+            self.run_cli(["sync", "--source", "gh"], "sess-1", self.repo_dir)
+        self.assertIn("isCrossRepository", view.call_args[0][3])
+
     def test_pr_view_asks_gh_for_the_head_commit(self):
         with mock.patch("guild.adapters.github.pr_view", return_value={"state": "OPEN", "isDraft": True}) as view:
             self.run_cli(["sync", "--source", "gh"], "sess-1", self.repo_dir)

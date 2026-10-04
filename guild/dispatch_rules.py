@@ -41,6 +41,8 @@ def _checks_failing(conn, projects, event):
         return None
     if payload["checks_failing"] <= 0 or payload.get("checks_pending") != 0 or not payload.get("head_sha"):
         return None
+    if payload.get("cross_repository") is True:
+        return None
     repo, number = payload["repo"], payload["number"]
     owner = conn.execute(
         "SELECT prs.party AS party, parties.project AS project FROM prs"

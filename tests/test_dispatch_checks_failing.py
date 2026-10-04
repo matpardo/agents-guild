@@ -60,6 +60,17 @@ class ChecksFailingBase(GuildTestCase):
     def sync_open(self, rollup, head_sha):
         self.sync(rollup, head_sha, True, "OPEN", None)
 
+    def sync_cross_repository(self, cross_repository):
+        self.write_gh_fixture(
+            "view_acme-app_1",
+            {
+                "state": "OPEN", "isDraft": True, "headRefName": "feature/x", "title": "t",
+                "statusCheckRollup": _FAILING, "headRefOid": "abc123", "isCrossRepository": cross_repository,
+            },
+        )
+        code, out, err = self.run_cli(["sync", "--source", "gh"], None, self.repo_dir)
+        self.assertEqual(code, 0, err)
+
     def run_pass(self):
         ctx = _build_context(None, self.repo_dir)
         try:
@@ -151,6 +162,15 @@ class FailingChecksTests(ChecksFailingBase):
         self.set_repos(["acme/other"])
         self.sync_open(_FAILING, "abc123")
         self.assertEqual(self.run_pass(), ["nothing to dispatch"])
+
+    def test_pr_from_a_fork_launches_nothing(self):
+        self.sync_cross_repository(True)
+        self.assertEqual(self.run_pass(), ["nothing to dispatch"])
+        self.assertEqual(self.tmux.launch_calls(), [])
+
+    def test_pr_from_the_base_repository_launches(self):
+        self.sync_cross_repository(False)
+        self.assertEqual(len(self.run_pass()), 1)
 
     def test_missing_head_commit_launches_nothing(self):
         self.sync_open(_FAILING, None)
