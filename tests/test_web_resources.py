@@ -139,6 +139,14 @@ class ResourcesRouteTests(WebServerTestCase):
         response, script = self._get("/app.js", self._host())
         self.assertIn(b'"/api/resources"', script)
 
+    def test_machine_lines_stay_visible_and_only_projects_collapse(self):
+        response, body = self._get("/app.js", self._host())
+        script = body.decode()
+        render = script[script.index("function renderResources(model)"):script.index("function fetchResources()")]
+        self.assertNotIn('el("details")', render)
+        self.assertIn("renderResourceProjects(model)", render)
+        self.assertIn('textEl("summary", "projects")', script)
+
 
 if __name__ == "__main__":
     unittest.main()
