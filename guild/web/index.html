@@ -8,34 +8,39 @@
 </head>
 <body>
 <header>
-  <h1>guild board</h1>
-  <nav class="page-nav"><a href="/" aria-current="page">board</a> · <a href="/progress">in progress</a> · <a href="/history">achievements</a></nav>
-  <p id="generated-at" class="muted"></p>
-  <div id="filters" class="filters">
-    <label title="Show only this party.">
-      party
-      <select id="party-filter">
-        <option value="all">all</option>
-      </select>
-    </label>
-    <label title="Show only PRs in this lifecycle or needing a human.">
-      state
-      <select id="state-filter">
-        <option value="all">all</option>
-        <option value="needs-ask-answer">needs-ask-answer</option>
-        <option value="needs-human-pr-review">needs-human-pr-review</option>
-        <option value="converging">converging</option>
-        <option value="ready">ready</option>
-        <option value="draft">draft</option>
-        <option value="merged">merged</option>
-      </select>
-    </label>
-    <label title="Show only this raid and its members.">
-      raid
-      <select id="raid-filter">
-        <option value="all">all</option>
-      </select>
-    </label>
+  <div class="header-row">
+    <div class="header-main">
+      <h1>guild board</h1>
+      <nav class="page-nav"><a href="/" aria-current="page">board</a> · <a href="/progress">in progress</a> · <a href="/history">achievements</a></nav>
+      <p id="generated-at" class="muted"></p>
+      <div id="filters" class="filters">
+        <label title="Show only this party.">
+          party
+          <select id="party-filter">
+            <option value="all">all</option>
+          </select>
+        </label>
+        <label title="Show only PRs in this lifecycle or needing a human.">
+          state
+          <select id="state-filter">
+            <option value="all">all</option>
+            <option value="needs-ask-answer">needs-ask-answer</option>
+            <option value="needs-human-pr-review">needs-human-pr-review</option>
+            <option value="converging">converging</option>
+            <option value="ready">ready</option>
+            <option value="draft">draft</option>
+            <option value="merged">merged</option>
+          </select>
+        </label>
+        <label title="Show only this raid and its members.">
+          raid
+          <select id="raid-filter">
+            <option value="all">all</option>
+          </select>
+        </label>
+      </div>
+    </div>
+    <section id="resources" class="header-resources" aria-label="resources"></section>
   </div>
 </header>
 <main>
@@ -43,7 +48,6 @@
     <section id="asks" aria-label="asks"></section>
     <section id="notices" aria-label="notices"></section>
     <section id="drift" aria-label="drift"></section>
-    <section id="resources" aria-label="resources"></section>
   </div>
   <div class="column column-right">
     <section id="merge-queues" aria-label="merge queue"></section>
