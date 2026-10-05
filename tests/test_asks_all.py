@@ -118,12 +118,12 @@ class AsksAllCliTests(AsksAllTests):
     def test_since_without_all_is_an_error(self):
         code, out, err = self.run_cli(["asks", "--since", "3d"], None, None)
         self.assertEqual(code, 1)
-        self.assertIn("--party/--since need --all", err)
+        self.assertIn("--party/--since need --all or --answered", err)
 
     def test_party_without_all_is_an_error(self):
         code, out, err = self.run_cli(["asks", "--party", "alpha"], None, None)
         self.assertEqual(code, 1)
-        self.assertIn("--party/--since need --all", err)
+        self.assertIn("--party/--since need --all or --answered", err)
 
     def test_unknown_party_is_an_error(self):
         code, out, err = self.run_cli(["asks", "--all", "--party", "nope"], None, None)
@@ -140,6 +140,76 @@ class AsksAllCliTests(AsksAllTests):
         self._answer(1, "ok\x1b[31mred", _NOW)
         code, out, err = self.run_cli(["asks", "--all"], None, None)
         self.assertNotIn("\x1b", out)
+
+
+class AsksAnsweredCliTests(AsksAllTests):
+    def _seed_answered(self, count):
+        for ask_id in range(1, count + 1):
+            self._create(ask_id, "alpha", "q{}?".format(ask_id), _NOW - timedelta(days=30))
+            self._answer(ask_id, "a{}".format(ask_id), _NOW - timedelta(hours=count - ask_id))
+
+    def test_lists_only_answered_with_party_and_date(self):
+        self._seed_three()
+        code, out, err = self.run_cli(["asks", "--answered"], None, None)
+        self.assertEqual(code, 0, err)
+        self.assertEqual(
+            out.splitlines(),
+            [
+                "ANSWERED · 1 · page 1/1",
+                "  #5 alpha · answered · Which base branch?",
+                "     answer: main",
+                "     answered: {}".format(timeutil.issued_label("2026-10-03T09:12:40+00:00")),
+                "",
+            ],
+        )
+
+    def test_first_page_has_the_ten_newest_answers(self):
+        self._seed_answered(12)
+        code, out, err = self.run_cli(["asks", "--answered"], None, None)
+        self.assertIn("ANSWERED · 12 · page 1/2", out)
+        self.assertLess(out.index("#12 alpha"), out.index("#11 alpha"))
+        self.assertIn("#3 alpha", out)
+        self.assertNotIn("#2 alpha", out)
+        self.assertIn("guild asks --answered --page 2", out)
+
+    def test_last_page_has_the_oldest_and_no_next_hint(self):
+        self._seed_answered(12)
+        code, out, err = self.run_cli(["asks", "--answered", "--page", "2"], None, None)
+        self.assertIn("ANSWERED · 12 · page 2/2", out)
+        self.assertLess(out.index("#2 alpha"), out.index("#1 alpha"))
+        self.assertNotIn("#3 alpha", out)
+        self.assertNotIn("--page", out)
+
+    def test_party_without_answers_is_empty(self):
+        self._seed_three()
+        code, out, err = self.run_cli(["asks", "--answered", "--party", "beta"], None, None)
+        self.assertEqual(out.splitlines()[0], "ANSWERED · nothing")
+
+    def test_nothing_answered(self):
+        code, out, err = self.run_cli(["asks", "--answered"], None, None)
+        self.assertEqual(out.splitlines()[0], "ANSWERED · nothing")
+
+    def test_page_out_of_range_is_an_error(self):
+        self._seed_answered(3)
+        code, out, err = self.run_cli(["asks", "--answered", "--page", "2"], None, None)
+        self.assertEqual(code, 1)
+        self.assertIn("page 2 out of range, 1-1", err)
+
+    def test_page_without_answered_is_an_error(self):
+        code, out, err = self.run_cli(["asks", "--page", "1"], None, None)
+        self.assertEqual(code, 1)
+        self.assertIn("--page needs --answered", err)
+
+    def test_all_and_answered_are_exclusive(self):
+        code, out, err = self.run_cli(["asks", "--all", "--answered"], None, None)
+        self.assertEqual(code, 1)
+        self.assertIn("--all and --answered are exclusive", err)
+
+    def test_id_takes_no_answered_filter(self):
+        self._create(1, "alpha", "q?", _NOW)
+        code, out, err = self.run_cli(["asks", "1", "--answered"], None, None)
+        self.assertEqual(code, 1)
+        self.assertIn("takes no filters", err)
 
 
 class AskModelTests(AsksAllTests):

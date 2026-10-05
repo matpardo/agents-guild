@@ -122,7 +122,7 @@ guild pr set   <owner/repo>#<n> [--lifecycle draft|converging|ready] [--waits ".
 guild ask "<question>" --context "..." [--ref <ref> ...] [--option "..."]   # refs: pr:<owner/repo>#<n>, task:<quest>/<tid>, card:<KEY>; with exactly one task in progress and no task:/card: ref it is added for you
 guild answer <id> "<text>"
 guild dismiss <id>
-guild asks [<id> | --all [--party <name>] [--since <dur>]]   # open asks; <id> shows task, card, PR, SDD paths, resume command and recent events; --all adds answered and dismissed with answers
+guild asks [<id> | --all [--party <name>] [--since <dur>] | --answered [--page <n>] [--party <name>] [--since <dur>]]   # open asks; <id> shows task, card, PR, SDD paths, resume command and recent events; --all adds answered and dismissed with answers
 
 guild notice create "<text>" --to project:<name>|guild|raid:<name> --ttl <dur> [--until pr:<owner/repo>#<n>:merged|closed]
 guild notice close <id>
@@ -222,7 +222,10 @@ each ask on the web board.
 
 `guild asks --all` lists open, answered and dismissed asks in id order, with the
 answer and answer time (local `YYYY-MM-DD HH:MM`) of answered ones; `guild asks <id>` shows creation, answer and event times in local time too. `--party` and `--since` (on
-`created_at`) narrow it and need `--all`; `<id>` takes no filters.
+`created_at`) narrow it and need `--all` or `--answered`; `<id>` takes no filters.
+
+`guild asks --answered` lists only answered asks, newest answer first, 10 per page
+(`--page <n>`), each with its party, answer and answer time.
 
 ### `guild next`
 
