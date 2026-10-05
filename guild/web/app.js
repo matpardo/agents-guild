@@ -1315,30 +1315,35 @@
     return lines;
   }
 
-  function renderResources(model) {
-    var section = document.getElementById("resources");
-    clear(section);
+  function renderResourceProjects(model) {
     var details = el("details");
     details.open = state.resourcesOpen;
     details.addEventListener("toggle", function () {
       state.resourcesOpen = details.open;
     });
-    details.appendChild(textEl("summary", "resources"));
-    section.appendChild(details);
-    if (model.machine === null) {
-      details.appendChild(textEl("p", NO_RESOURCES_MESSAGE));
-      return;
-    }
-    resourceMachineLines(model.machine, model.since).forEach(function (line) {
-      details.appendChild(textEl("p", line));
-    });
-    details.appendChild(classedText("p", "sampled at " + model.machine.sampled_at, "muted"));
+    details.appendChild(textEl("summary", "projects"));
     model.projects.forEach(function (project) {
       details.appendChild(renderResourceProject(project.name, project));
     });
     if (model.unattributed !== null) {
       details.appendChild(renderResourceProject("unattributed", model.unattributed));
     }
+    return details;
+  }
+
+  function renderResources(model) {
+    var section = document.getElementById("resources");
+    clear(section);
+    section.appendChild(textEl("h2", "resources"));
+    if (model.machine === null) {
+      section.appendChild(textEl("p", NO_RESOURCES_MESSAGE));
+      return;
+    }
+    resourceMachineLines(model.machine, model.since).forEach(function (line) {
+      section.appendChild(textEl("p", line));
+    });
+    section.appendChild(classedText("p", "sampled at " + model.machine.sampled_at, "muted"));
+    section.appendChild(renderResourceProjects(model));
   }
 
   function fetchResources() {
