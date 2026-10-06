@@ -352,6 +352,36 @@ class PrePushHookTests(GuildTestCase):
         self.assertEqual(code, 2)
         self.assertIn("belongs to merged/closed PR #2", err)
 
+    def test_delete_flag_push_of_merged_branch_allowed(self):
+        repo_dir = self._init_repo("repo-del", "main")
+        self.write_gh_fixture("list_feature-merged", [{"number": 2, "state": "MERGED", "url": "x"}])
+        code, out, err = self.run_hook(
+            "pre-push",
+            {"tool_input": {"command": "git push origin --delete feature/merged"}, "cwd": str(repo_dir)},
+        )
+        self.assertEqual(code, 0, err)
+        self.assertEqual(out, "")
+
+    def test_short_delete_flag_push_of_merged_branch_allowed(self):
+        repo_dir = self._init_repo("repo-del-short", "main")
+        self.write_gh_fixture("list_feature-merged", [{"number": 2, "state": "MERGED", "url": "x"}])
+        code, out, err = self.run_hook(
+            "pre-push",
+            {"tool_input": {"command": "git push -d origin feature/merged"}, "cwd": str(repo_dir)},
+        )
+        self.assertEqual(code, 0, err)
+        self.assertEqual(out, "")
+
+    def test_empty_source_refspec_push_of_merged_branch_allowed(self):
+        repo_dir = self._init_repo("repo-del-refspec", "main")
+        self.write_gh_fixture("list_feature-merged", [{"number": 2, "state": "MERGED", "url": "x"}])
+        code, out, err = self.run_hook(
+            "pre-push",
+            {"tool_input": {"command": "git push origin :feature/merged"}, "cwd": str(repo_dir)},
+        )
+        self.assertEqual(code, 0, err)
+        self.assertEqual(out, "")
+
     def test_push_allowed_when_no_prs(self):
         repo_dir = self._init_repo("repo3", "feature/fresh")
         self.write_gh_fixture("list_feature-fresh", [])

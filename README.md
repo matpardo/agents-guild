@@ -1943,7 +1943,8 @@ Without a hooks manager, add the same call to the repository's
 - `pre-push`: inspects `git push` commands before they run (including
   `env`/`command`/`sudo`-wrapped, `VAR=val`-prefixed, `bash -c`/`sh -c`
   nested, and `&&`/`;`/`||`-chained forms); blocks pushes to a branch whose
-  only PRs are merged/closed. When a push is detected but its branch or
+  only PRs are merged/closed. Branch deletions (`--delete`, `-d`, or a
+  `:<branch>` refspec) push no commits and pass unchecked. When a push is detected but its branch or
   directory cannot be determined (bad `-C` dir, detached HEAD, unparseable
   command), it warns via `systemMessage` instead of allowing the push
   unverified. For a bound session in a project with `shared_areas`, it also
