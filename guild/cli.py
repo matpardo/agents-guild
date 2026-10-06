@@ -37,6 +37,13 @@ def _handle_doctor(ctx, args):
     return exit_code
 
 
+def _handle_wire_settings(ctx, args):
+    from guild.commands import wire_settings as wire_settings_commands
+
+    _print(wire_settings_commands.run())
+    return 0
+
+
 def _handle_revive(ctx, args):
     from guild import tmux_windows
     from guild.commands import revive as revive_commands
@@ -795,6 +802,9 @@ def build_parser():
     doctor = subparsers.add_parser("doctor")
     doctor.add_argument("--scan-prs", action="store_true")
     doctor.set_defaults(handler=_handle_doctor)
+
+    wire_settings = subparsers.add_parser("wire-settings")
+    wire_settings.set_defaults(handler=_handle_wire_settings)
 
     init_project = subparsers.add_parser("init-project")
     init_project.add_argument("name")

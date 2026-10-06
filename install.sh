@@ -36,4 +36,5 @@ echo "make sure $TARGET_DIR is on your PATH"
 CLAUDE_DIR="$HOME/.claude"
 mkdir -p "$CLAUDE_DIR"
 link_or_warn "$REPO_ROOT/GUILD.md" "$CLAUDE_DIR/GUILD.md"
+"$REPO_ROOT/bin/guild" wire-settings
 echo "add the line @~/.claude/GUILD.md to $CLAUDE_DIR/CLAUDE.md so every session loads the agent rules"

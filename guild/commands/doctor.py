@@ -1,37 +1,9 @@
-import json
 import re
 from pathlib import Path
 
-from guild import config, localbase
+from guild import claude_settings, config, localbase
 from guild.adapters import github
 from guild.errors import GuildError
-
-_EXPECTED_HOOKS = (
-    ("SessionStart", "guild hook session-start"),
-    ("UserPromptSubmit", "guild hook prompt-submit"),
-    ("PostToolUse", "guild hook post-tool-use"),
-    ("PreToolUse", "guild hook pre-push"),
-    ("PreToolUse", "guild hook pre-edit"),
-    ("Notification", "guild hook notification"),
-    ("Stop", "guild hook stop"),
-)
-
-_EXPECTED_ASK_RULES = ("Bash(guild party start:*)", "Bash(guild quest add:*)")
-
-_EXPECTED_ALLOW_RULES = (
-    "Bash(guild task:*)",
-    "Bash(guild pr:*)",
-    "Bash(guild notice:*)",
-    "Bash(guild ask:*)",
-    "Bash(guild next:*)",
-    "Bash(guild claim:*)",
-    "Bash(guild release:*)",
-    "Bash(guild raid:*)",
-    "Bash(guild handoff:*)",
-    "Bash(guild sync:*)",
-)
-_BLANKET_ALLOW_RULES = ("Bash(guild:*)", "Bash(guild *)")
-
 
 _TRACE_RE = re.compile(r"guild|ask #[0-9]|notice #[0-9]", re.IGNORECASE)
 _PR_SCAN_FIELDS = ("number", "title", "body", "comments", "commits")
@@ -41,29 +13,11 @@ def _claude_dir():
     return Path.home() / ".claude"
 
 
-def _load_settings(settings_path):
-    if not settings_path.is_file():
-        return {}
-    try:
-        return json.loads(settings_path.read_text())
-    except json.JSONDecodeError as error:
-        raise GuildError("invalid JSON in {}: {}".format(settings_path, error), 1)
-
-
-def _configured_commands(settings):
-    commands = {}
-    for event, entries in settings.get("hooks", {}).items():
-        for entry in entries:
-            for hook in entry.get("hooks", []):
-                commands.setdefault(event, []).append(hook.get("command", ""))
-    return commands
-
-
 def _hook_lines(settings):
-    commands = _configured_commands(settings)
+    commands = claude_settings.configured_commands(settings)
     lines = []
-    for event, expected in _EXPECTED_HOOKS:
-        wired = any(command.endswith(expected) for command in commands.get(event, []))
+    for event, _, expected in claude_settings.EXPECTED_HOOKS:
+        wired = claude_settings.hook_is_wired(commands, event, expected)
         status = "ok     " if wired else "missing"
         lines.append((wired, "{} hook {}: {}".format(status, event, expected)))
     return lines
@@ -72,7 +26,7 @@ def _hook_lines(settings):
 def _ask_rule_lines(settings):
     configured = settings.get("permissions", {}).get("ask", [])
     lines = []
-    for rule in _EXPECTED_ASK_RULES:
+    for rule in claude_settings.EXPECTED_ASK_RULES:
         present = rule in configured
         status = "ok     " if present else "missing"
         lines.append((present, "{} ask rule {}".format(status, rule)))
@@ -81,9 +35,9 @@ def _ask_rule_lines(settings):
 
 def _allow_rule_lines(settings):
     configured = settings.get("permissions", {}).get("allow", [])
-    blanket = any(rule in configured for rule in _BLANKET_ALLOW_RULES)
+    blanket = any(rule in configured for rule in claude_settings.BLANKET_ALLOW_RULES)
     lines = []
-    for rule in _EXPECTED_ALLOW_RULES:
+    for rule in claude_settings.EXPECTED_ALLOW_RULES:
         if blanket or rule in configured:
             lines.append((True, "ok      allow rule {}".format(rule)))
             continue
@@ -153,7 +107,7 @@ def _scan_lines(ctx):
 
 
 def run(ctx, scan_prs):
-    settings = _load_settings(_claude_dir() / "settings.json")
+    settings = claude_settings.load_settings(_claude_dir() / "settings.json")
     checks = _hook_lines(settings)
     checks.extend(_ask_rule_lines(settings))
     checks.extend(_allow_rule_lines(settings))
