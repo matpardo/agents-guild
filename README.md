@@ -225,7 +225,9 @@ answer and answer time (local `YYYY-MM-DD HH:MM`) of answered ones; `guild asks 
 `created_at`) narrow it and need `--all` or `--answered`; `<id>` takes no filters.
 
 `guild asks --answered` lists only answered asks, newest answer first, 10 per page
-(`--page <n>`), each with its party, answer and answer time.
+(`--page <n>`), each with its party, answer and answer time. The web board shows the
+same list in a collapsed "answered asks" section under the open asks, served at
+`GET /api/asks/answered?page=<n>`.
 
 ### `guild next`
 

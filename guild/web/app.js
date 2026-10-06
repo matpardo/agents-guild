@@ -5,11 +5,19 @@
   var BOARD_URL = "/api/board";
   var SESSION_URL = "/api/session";
   var RESOURCES_URL = "/api/resources";
+  var ANSWERED_ASKS_URL = "/api/asks/answered";
   var RESOURCE_ITEMS_PER_CATEGORY = 10;
   var NO_RESOURCES_MESSAGE = "no samples yet; run guild resources collect";
   var EMPTY_ANSWER_MESSAGE = "write an answer first";
   var NO_SESSION_MESSAGE = "session token not loaded, reload the page";
   var sessionToken = null;
+
+  var answered = {
+    open: false,
+    page: 1,
+    model: null,
+    error: null,
+  };
 
   var state = {
     partyFilter: "all",
@@ -635,6 +643,101 @@
     }
     appendAll(section, blocked.map(renderBlocked));
     appendAll(section, asks.map(renderAsk));
+  }
+
+  function renderAnsweredAsk(ask) {
+    var article = el("article");
+    article.className = "card answered-ask";
+    var head = el("div");
+    head.className = "card-head";
+    head.appendChild(textEl("span", "#" + ask.id));
+    head.appendChild(textEl("span", ask.party));
+    head.appendChild(textEl("strong", ask.question));
+    article.appendChild(head);
+    article.appendChild(textEl("p", "answer: " + ask.answer));
+    if (ask.answered !== null) {
+      article.appendChild(textEl("p", "answered: " + ask.answered));
+    }
+    return article;
+  }
+
+  function renderAnsweredPager(model) {
+    var pager = el("p");
+    pager.className = "answered-pager";
+    var previous = textEl("button", "newer");
+    previous.type = "button";
+    previous.disabled = model.page <= 1;
+    previous.addEventListener("click", function () {
+      answered.page = model.page - 1;
+      fetchAnsweredAsks();
+    });
+    var next = textEl("button", "older");
+    next.type = "button";
+    next.disabled = model.page >= model.page_count;
+    next.addEventListener("click", function () {
+      answered.page = model.page + 1;
+      fetchAnsweredAsks();
+    });
+    pager.appendChild(previous);
+    pager.appendChild(textEl("span", "page " + model.page + "/" + model.page_count));
+    pager.appendChild(next);
+    return pager;
+  }
+
+  function renderAnsweredBody(container) {
+    clear(container);
+    if (answered.error !== null) {
+      container.appendChild(textEl("p", answered.error));
+      return;
+    }
+    if (answered.model === null) {
+      container.appendChild(textEl("p", "loading"));
+      return;
+    }
+    if (answered.model.total === 0) {
+      container.appendChild(textEl("p", "no answered asks"));
+      return;
+    }
+    appendAll(container, answered.model.asks.map(renderAnsweredAsk));
+    container.appendChild(renderAnsweredPager(answered.model));
+  }
+
+  function fetchAnsweredAsks() {
+    var container = document.getElementById("answered-asks-body");
+    fetch(ANSWERED_ASKS_URL + "?page=" + answered.page)
+      .then(function (response) {
+        return response.json();
+      })
+      .then(function (model) {
+        answered.error = typeof model.error === "string" ? model.error : null;
+        answered.model = answered.error === null ? model : null;
+        renderAnsweredBody(container);
+      })
+      .catch(function () {
+        answered.error = "answered asks request failed";
+        renderAnsweredBody(container);
+      });
+  }
+
+  function renderAnsweredAsks() {
+    var section = document.getElementById("answered-asks");
+    var details = el("details");
+    details.open = answered.open;
+    details.appendChild(textEl("summary", "answered asks"));
+    var container = el("div");
+    container.id = "answered-asks-body";
+    details.appendChild(container);
+    details.addEventListener("toggle", function () {
+      answered.open = details.open;
+      if (details.open) {
+        renderAnsweredBody(container);
+        fetchAnsweredAsks();
+      }
+    });
+    section.appendChild(details);
+    if (details.open) {
+      renderAnsweredBody(container);
+    }
   }
 
   function renderStatusBadge(status) {
@@ -1406,6 +1509,7 @@
       state.raidFilter = event.target.value;
       fetchBoard();
     });
+    renderAnsweredAsks();
     fetchSession();
     fetchBoard();
     fetchResources();

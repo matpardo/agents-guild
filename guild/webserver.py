@@ -28,6 +28,7 @@ _MAX_BODY_BYTES = 16384
 _ASK_ACTION_RE = re.compile(r"^/api/asks/([^/]+)/(answer|dismiss)$")
 _NOTICE_ACTION_RE = re.compile(r"^/api/notices/([^/]+)/(seen|unseen)$")
 _SEEN_ALL_PATH = "/api/notices/seen-all"
+_ANSWERED_ASKS_PATH = "/api/asks/answered"
 _ASK_DETAIL_RE = re.compile(r"^/api/asks/(\d+)$")
 _ASK_ID_RE = re.compile(r"^[1-9][0-9]{0,17}$")
 _JSON_CONTENT_TYPE = "application/json; charset=utf-8"
@@ -84,6 +85,19 @@ def _resources_model(query):
         return resources_report.build_model(
             ctx.conn, ctx.now, _first_param(params, "project"), since, ctx.projects_dir
         )
+
+    return build
+
+
+def _answered_asks_model(query):
+    page_text = _first_param(parse_qs(query), "page")
+
+    def build(ctx):
+        if page_text is None:
+            return board_commands.answered_asks_model(ctx.conn, 1)
+        if not page_text.isdigit():
+            raise GuildError("page must be a positive integer", 1)
+        return board_commands.answered_asks_model(ctx.conn, int(page_text))
 
     return build
 
@@ -286,6 +300,8 @@ class BoardRequestHandler(http_server.BaseHTTPRequestHandler):
             return self._serve_file("index.html", "text/html; charset=utf-8")
         if path == "/api/board":
             return self._serve_model(board_commands.board_model)
+        if path == _ANSWERED_ASKS_PATH:
+            return self._serve_model(_answered_asks_model(parts.query))
         ask_match = _ASK_DETAIL_RE.match(path)
         if ask_match is not None:
             return self._serve_ask_detail(int(ask_match.group(1)))
