@@ -215,7 +215,8 @@
     var bar = el("progress");
     bar.max = progress.total;
     bar.value = progress.done;
-    appendAll(wrap, [classedText("span", "epic " + quest.epic + " " + progress.percent + "%", "muted"), bar]);
+    var label = "epic " + quest.epic + " " + progress.percent + "% (" + progress.done + "/" + progress.total + ")";
+    appendAll(wrap, [classedText("span", label, "muted"), bar]);
     return wrap;
   }
 
