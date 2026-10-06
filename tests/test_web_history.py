@@ -123,6 +123,10 @@ class HistoryRouteTests(WebServerTestCase):
         self.assertIn(b"partial data", body)
         self.assertNotIn(b"nothing in progress", body)
 
+    def test_history_js_labels_the_epic_bar_with_done_over_total(self):
+        response, body = self._get("/history.js", self._host())
+        self.assertIn(b'progress.done + "/" + progress.total', body)
+
     def test_api_active_quest_exposes_activity_and_stale_hours(self):
         self._seed_event("added-wip", 0, "alpha", "acme", "quest.added", {
             "slug": "wip", "project": "acme", "party": "alpha", "epic": None, "title": "Quest wip",
