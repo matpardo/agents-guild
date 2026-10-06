@@ -8,7 +8,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-from guild import config, db, identity, localbase, names, session_status, timeutil
+from guild import config, ctx_pressure, db, identity, localbase, names, session_status, timeutil
 from guild.adapters import github
 from guild.commands import brief as brief_commands
 from guild.commands import claim as claim_commands
@@ -243,8 +243,7 @@ def _ctx_nudge_lines(ctx, binding):
     if pct is None:
         return []
     project_data = config.load_project(ctx.projects_dir, project)
-    threshold = project_data.get("handoff_threshold")
-    if threshold is None or pct < threshold:
+    if not ctx_pressure.is_high(pct, project_data):
         return []
     marker = _nudge_marker_path(ctx)
     if marker.exists():

@@ -3,6 +3,7 @@ import sqlite3
 import subprocess
 from unittest import mock
 
+from guild import ctx_pressure
 from guild import paths
 from guild import notify
 from guild.commands import statusline as statusline_commands
@@ -206,10 +207,21 @@ class CtxNudgeTests(GuildTestCase):
         )
         self.assertNotIn("Context at", out)
 
-    def test_no_nudge_when_threshold_not_configured(self):
+    def test_nudge_falls_back_to_the_default_threshold(self):
         repo_dir = self.register_project("acme", ["acme/app"])
         self.run_cli(["party", "start", "alpha"], "sess-1", repo_dir)
-        statusline_commands.record_ctx(paths.state_dir(), "sess-1", 95)
+        statusline_commands.record_ctx(paths.state_dir(), "sess-1", ctx_pressure.DEFAULT_HANDOFF_THRESHOLD)
+        code, out, err = self.run_hook(
+            "prompt-submit", {"session_id": "sess-1", "cwd": str(repo_dir)}
+        )
+        self.assertIn("Context at", out)
+
+    def test_no_nudge_below_the_default_threshold(self):
+        repo_dir = self.register_project("acme", ["acme/app"])
+        self.run_cli(["party", "start", "alpha"], "sess-1", repo_dir)
+        statusline_commands.record_ctx(
+            paths.state_dir(), "sess-1", ctx_pressure.DEFAULT_HANDOFF_THRESHOLD - 1
+        )
         code, out, err = self.run_hook(
             "prompt-submit", {"session_id": "sess-1", "cwd": str(repo_dir)}
         )

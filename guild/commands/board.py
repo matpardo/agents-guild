@@ -1,11 +1,13 @@
 import json
+import shlex
 import textwrap
 
-from guild import config, links, party_status, sanitize, session_status, timeutil
+from guild import config, ctx_pressure, links, party_status, resume, sanitize, session_status, timeutil
 from guild.commands import claim as claim_commands
 from guild.commands import drift as drift_commands
 from guild.commands import merge_queue as merge_queue_commands
 from guild.commands import notice as notice_commands
+from guild.commands import party as party_commands
 from guild.commands import raid as raid_commands
 from guild.errors import GuildError
 
@@ -224,12 +226,14 @@ def _sorted_open_asks(conn, party_names):
     return rows
 
 
-def _needs_you_heading(ask_count, blocked_count):
+def _needs_you_heading(ask_count, blocked_count, ctx_high_count):
     parts = []
     if ask_count:
         parts.append("{} {}".format(ask_count, "open ask" if ask_count == 1 else "open asks"))
     if blocked_count:
         parts.append("{} blocked".format(blocked_count))
+    if ctx_high_count:
+        parts.append("{} context high".format(ctx_high_count))
     return "NEEDS YOU · {}".format(" · ".join(parts))
 
 
@@ -241,13 +245,26 @@ def _blocked_line(ctx, painter, row):
     return painter.paint(text, "red")
 
 
+def _ctx_high_parties(ctx, party_names):
+    party_rows = ctx.conn.execute("SELECT * FROM parties WHERE state != 'closed'").fetchall()
+    projects_by_name = {project["name"]: project for project in config.load_all_projects(ctx.projects_dir)}
+    names_over_threshold = []
+    for party_row in party_rows:
+        if party_names is not None and party_row["name"] not in party_names:
+            continue
+        if _ctx_model(ctx, party_row, projects_by_name.get(party_row["project"])) is not None:
+            names_over_threshold.append(party_row["name"])
+    return names_over_threshold
+
+
 def render_asks(ctx, party_names, color, width, detailed):
     painter = _Painter(color, width)
     rows = _sorted_open_asks(ctx.conn, party_names)
     blocked = session_status.blocked_rows(ctx.conn, party_names)
-    if not rows and not blocked:
+    ctx_high = _ctx_high_parties(ctx, party_names)
+    if not rows and not blocked and not ctx_high:
         return [painter.paint("NEEDS YOU · nothing", "green"), ""]
-    lines = [painter.paint(_needs_you_heading(len(rows), len(blocked)), "bold")]
+    lines = [painter.paint(_needs_you_heading(len(rows), len(blocked), len(ctx_high)), "bold")]
     lines.extend(_blocked_line(ctx, painter, row) for row in blocked)
     if detailed:
         for row in rows:
@@ -530,7 +547,34 @@ def _party_claims(ctx, party_name):
     return [row for row in claim_commands.list_claims(ctx.conn, ctx.now) if row["party"] == party_name]
 
 
-def _party_section(ctx, painter, party_row):
+def _ctx_model(ctx, party_row, project_config):
+    pressure = ctx_pressure.for_party(ctx, party_row, project_config)
+    if pressure is None or not pressure["high"]:
+        return None
+    return pressure
+
+
+def _resume_command(ctx, party_row):
+    if party_row["state"] != "awaiting-leader":
+        return None
+    leader = ctx.conn.execute(
+        "SELECT cwd, permission_mode FROM leaders WHERE party = ? AND generation = ?",
+        (party_row["name"], party_row["generation"]),
+    ).fetchone()
+    command = resume.fresh_command(
+        party_row["name"],
+        party_row["generation"] + 1,
+        None,
+        None if leader is None else leader["permission_mode"],
+        party_commands.is_keeper(ctx.conn, party_row["name"]),
+        resume.RESUME_PROMPT,
+    )
+    if leader is None or leader["cwd"] is None:
+        return command
+    return "cd {} && {}".format(shlex.quote(leader["cwd"]), command)
+
+
+def _party_section(ctx, painter, party_row, project_config):
     lines = [
         "{} {}  {}".format(
             painter.paint("━━", "cyan"),
@@ -542,6 +586,19 @@ def _party_section(ctx, painter, party_row):
     lines.append(
         painter.paint("  status: {}".format(party_status.label(ctx, status)), _STATUS_STYLES[status["status"]])
     )
+    pressure = _ctx_model(ctx, party_row, project_config)
+    if pressure is not None:
+        lines.append(
+            painter.paint(
+                "  context: {}% (handoff at {}%) → run guild handoff".format(
+                    pressure["pct"], pressure["threshold"]
+                ),
+                "red",
+            )
+        )
+    resume_command = _resume_command(ctx, party_row)
+    if resume_command is not None:
+        lines.append(painter.paint("  resume: {}".format(resume_command), "cyan"))
     next_ref = merge_queue_commands.next_to_merge(ctx.conn, {party_row["name"]})
     for label in merge_queue_commands.main_red_labels(ctx.conn, {party_row["name"]}):
         lines.append(painter.paint("  MAIN RED: {}".format(label), "red"))
@@ -623,8 +680,11 @@ def render_board(ctx, party_filter, raid_filter, color, width):
         lines.extend(_raid_next_to_merge_lines(ctx, painter, party_names))
     lines.extend(render_asks(ctx, party_names, color, width, False))
     lines.extend(_notices_section(ctx, painter, notice_rows))
+    projects_by_name = {project["name"]: project for project in config.load_all_projects(ctx.projects_dir)}
     for party_row in party_rows:
-        lines.extend(_party_section(ctx, painter, party_row))
+        lines.extend(
+            _party_section(ctx, painter, party_row, projects_by_name.get(party_row["project"]))
+        )
     return lines
 
 
@@ -768,6 +828,8 @@ def _party_model(ctx, party_row, project_config):
         "state": party_row["state"],
         "generation": party_row["generation"],
         "status": _status_model(ctx, party_row),
+        "ctx": _ctx_model(ctx, party_row, project_config),
+        "resume_command": _resume_command(ctx, party_row),
         "leader_session_name": _leader_session_name(ctx.conn, party_row["name"]),
         "quests": quest_models,
         "prs": [_pr_model(pr_row, project_config) for pr_row in orphan_prs],

@@ -94,6 +94,7 @@ class TooltipCoverageTests(unittest.TestCase):
             [
                 "noticeNew", "issued", "timeLeft", "askBlocks", "mainRed",
                 "generation", "leader", "noLeader", "claims", "synced",
+                "ctxHigh", "resumeCommand",
             ],
         )
 

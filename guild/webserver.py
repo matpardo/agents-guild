@@ -49,7 +49,7 @@ def _board_context():
     conn = db.connect(paths.db_path())
     return context.RunContext(
         conn, None, None, timeutil.utcnow(), None,
-        paths.claude_sessions_dir(), paths.projects_config_dir(), None,
+        paths.claude_sessions_dir(), paths.projects_config_dir(), paths.state_dir(),
     )
 
 

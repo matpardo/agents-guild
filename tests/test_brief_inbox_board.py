@@ -1,6 +1,9 @@
+import json
 import os
 import sqlite3
 
+from guild import ctx_pressure, paths
+from guild.commands import statusline as statusline_commands
 from tests.testutil import GuildTestCase
 
 
@@ -334,6 +337,85 @@ class BoardSessionStatusTests(GuildTestCase):
         code, out, err = self.run_cli(["board"], None, None)
         self.assertIn("NEEDS YOU · nothing", out)
         self.assertRegex(out, r"\n  status: waiting-input \d+s\n")
+
+    def _context_high(self):
+        statusline_commands.record_ctx(
+            paths.state_dir(), "sess-1", ctx_pressure.DEFAULT_HANDOFF_THRESHOLD + 6
+        )
+
+    def test_needs_you_counts_context_high_parties(self):
+        self._context_high()
+        code, out, err = self.run_cli(["board"], None, None)
+        self.assertIn("NEEDS YOU · 1 context high", out)
+        self.assertNotIn("NEEDS YOU · nothing", out)
+
+    def test_needs_you_counts_context_high_next_to_asks_and_blocked(self):
+        self._ask()
+        self._block()
+        self._context_high()
+        code, out, err = self.run_cli(["board"], None, None)
+        self.assertIn("NEEDS YOU · 1 open ask · 1 blocked · 1 context high", out)
+
+    def test_context_high_adds_no_line_above_the_parties(self):
+        self._context_high()
+        code, out, err = self.run_cli(["board"], None, None)
+        self.assertLess(out.index("NEEDS YOU · 1 context high"), out.index("━━ alpha"))
+        self.assertEqual(out.count("context: 86%"), 1)
+        self.assertGreater(out.index("context: 86%"), out.index("━━ alpha"))
+
+    def test_party_section_shows_the_context_pressure(self):
+        self._context_high()
+        code, out, err = self.run_cli(["board"], None, None)
+        self.assertIn(
+            "\n  context: 86% (handoff at 80%) → run guild handoff\n", out
+        )
+
+    def test_no_context_line_below_the_threshold(self):
+        statusline_commands.record_ctx(
+            paths.state_dir(), "sess-1", ctx_pressure.DEFAULT_HANDOFF_THRESHOLD - 1
+        )
+        code, out, err = self.run_cli(["board"], None, None)
+        self.assertNotIn("context:", out)
+        self.assertIn("NEEDS YOU · nothing", out)
+
+    def test_context_high_scoped_to_party_filter(self):
+        self.run_cli(["party", "start", "beta"], "sess-2", self.repo_dir)
+        self._context_high()
+        code, out, err = self.run_cli(["board", "--party", "beta"], None, None)
+        self.assertIn("NEEDS YOU · nothing", out)
+
+    def test_context_high_ignored_when_the_leader_session_is_gone(self):
+        self._context_high()
+        (self.sessions_dir / "{}.json".format(os.getpid())).unlink()
+        code, out, err = self.run_cli(["board"], None, None)
+        self.assertIn("NEEDS YOU · nothing", out)
+        self.assertNotIn("context:", out)
+
+    def test_project_threshold_overrides_the_default(self):
+        config_file = self.config_home / "guild" / "projects" / "acme.json"
+        data = json.loads(config_file.read_text())
+        data["handoff_threshold"] = 40
+        config_file.write_text(json.dumps(data))
+        statusline_commands.record_ctx(paths.state_dir(), "sess-1", 45)
+        code, out, err = self.run_cli(["board"], None, None)
+        self.assertIn("\n  context: 45% (handoff at 40%) → run guild handoff\n", out)
+
+    def test_resume_command_shown_after_a_handoff(self):
+        self.run_cli(["quest", "add", "demo", "--title", "Demo", "--no-epic"], "sess-1", self.repo_dir)
+        self.run_cli(["task", "add", "demo/T01", "--title", "First"], "sess-1", self.repo_dir)
+        self.run_cli(
+            ["handoff", "--in-flight", "wiring the board", "--learned", "nothing new"],
+            "sess-1",
+            self.repo_dir,
+        )
+        code, out, err = self.run_cli(["board"], None, None)
+        self.assertIn("  resume: ", out)
+        self.assertIn("GUILD_RESUME=alpha", out)
+        self.assertIn("alpha-g2", out)
+
+    def test_no_resume_command_while_the_party_is_active(self):
+        code, out, err = self.run_cli(["board"], None, None)
+        self.assertNotIn("  resume: ", out)
 
     def test_blocked_scoped_to_party_filter(self):
         self.run_cli(["party", "start", "beta"], "sess-2", self.repo_dir)

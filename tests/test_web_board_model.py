@@ -1,8 +1,9 @@
 import os
 import json
 
-from guild import context, db, paths, render, timeutil
+from guild import context, ctx_pressure, db, paths, render, timeutil
 from guild.commands import board as board_commands
+from guild.commands import statusline as statusline_commands
 from tests.testutil import GuildTestCase
 
 _TASKS_MD = """---
@@ -32,7 +33,7 @@ class BoardModelTestCase(GuildTestCase):
         conn = db.connect(paths.db_path())
         return context.RunContext(
             conn, None, None, timeutil.utcnow(), None,
-            paths.claude_sessions_dir(), paths.projects_config_dir(), None,
+            paths.claude_sessions_dir(), paths.projects_config_dir(), paths.state_dir(),
         )
 
     def _add_tracker_browse_url(self, project_name, browse_url):
@@ -192,7 +193,10 @@ class BoardModelShapeTests(BoardModelTestCase):
         party = model["parties"][0]
         self.assertEqual(
             set(party),
-            {"name", "state", "generation", "status", "leader_session_name", "quests", "prs", "raids", "claims"},
+            {
+                "name", "state", "generation", "status", "ctx", "resume_command",
+                "leader_session_name", "quests", "prs", "raids", "claims",
+            },
         )
         self.assertEqual(party["name"], "alpha")
         self.assertEqual(party["state"], "active")
@@ -340,6 +344,57 @@ if __name__ == "__main__":
     import unittest
 
     unittest.main()
+
+
+class BoardModelCtxPressureTests(BoardModelTestCase):
+    def setUp(self):
+        super().setUp()
+        self.repo_dir = self.register_project("acme", ["acme/app"])
+        self.run_cli(["party", "start", "alpha"], "sess-1", self.repo_dir)
+        self.write_session(os.getpid(), "sess-1", "alpha-g1")
+
+    def _party(self):
+        ctx = self._ctx()
+        model = board_commands.board_model(ctx)
+        ctx.conn.close()
+        return model["parties"][0]
+
+    def test_ctx_is_null_without_a_recorded_pct(self):
+        self.assertIsNone(self._party()["ctx"])
+
+    def test_ctx_is_null_below_the_threshold(self):
+        statusline_commands.record_ctx(
+            paths.state_dir(), "sess-1", ctx_pressure.DEFAULT_HANDOFF_THRESHOLD - 1
+        )
+        self.assertIsNone(self._party()["ctx"])
+
+    def test_ctx_carries_pct_and_threshold_when_high(self):
+        statusline_commands.record_ctx(paths.state_dir(), "sess-1", 93)
+        self.assertEqual(
+            self._party()["ctx"],
+            {"pct": 93, "threshold": ctx_pressure.DEFAULT_HANDOFF_THRESHOLD, "high": True},
+        )
+
+    def test_ctx_is_null_when_the_leader_session_is_gone(self):
+        statusline_commands.record_ctx(paths.state_dir(), "sess-1", 93)
+        (self.sessions_dir / "{}.json".format(os.getpid())).unlink()
+        self.assertIsNone(self._party()["ctx"])
+
+    def test_resume_command_is_null_while_active(self):
+        self.assertIsNone(self._party()["resume_command"])
+
+    def test_resume_command_is_set_after_a_handoff(self):
+        self.run_cli(["quest", "add", "demo", "--title", "Demo", "--no-epic"], "sess-1", self.repo_dir)
+        self.run_cli(["task", "add", "demo/T01", "--title", "First"], "sess-1", self.repo_dir)
+        self.run_cli(
+            ["handoff", "--in-flight", "wiring the board", "--learned", "nothing new"],
+            "sess-1",
+            self.repo_dir,
+        )
+        command = self._party()["resume_command"]
+        self.assertIn("GUILD_RESUME=alpha", command)
+        self.assertIn("alpha-g2", command)
+        self.assertIn(str(self.repo_dir), command)
 
 
 class BoardModelSessionStatusTests(BoardModelTestCase):
