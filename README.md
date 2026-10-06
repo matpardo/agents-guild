@@ -53,8 +53,17 @@ are updated in the same PR as the code.
 ./install.sh
 ```
 
-Symlinks `bin/guild` into `~/.local/bin/guild`. Make sure that directory is
-on your `PATH`. Not run automatically by anything in this repo.
+Symlinks `bin/guild` into `~/.local/bin/guild` and `GUILD.md` into
+`~/.claude/GUILD.md`, then runs `guild wire-settings`, which merges the hooks
+and permission rules from "Hooks" into `~/.claude/settings.json`. Make sure
+`~/.local/bin` is on your `PATH`. Not run automatically by anything in this
+repo.
+
+`guild wire-settings` is idempotent and can be re-run at any time: it adds
+only what is missing, keeps every other key and entry as it is, and prints
+one line per addition (`settings: already wired` when there is nothing to
+add). Before writing it copies the previous file to `settings.json.bak`. It
+refuses, leaving the file untouched, when `settings.json` is not valid JSON.
 
 Hooks run `guild` in every session, so the installed copy must never be a
 checkout you are editing: a half-written change goes live at once. If you
@@ -75,7 +84,8 @@ After each merge, update the installed worktree with one command:
 
 It refuses if the installed worktree has local changes, moves it to
 `origin/main`, lists the commits it brought, re-runs `install.sh` and runs
-`guild doctor`. It never edits `~/.claude/settings.json` or project configs.
+`guild doctor`. It never edits project configs; through `install.sh` it
+re-runs `guild wire-settings`, which only adds what is missing.
 
 `guild doctor` checks, read-only, that every guild hook is wired in
 `~/.claude/settings.json` (including `Notification` and `Stop`), that its
@@ -98,6 +108,7 @@ default so `guild doctor` stays fast and offline.
 ```
 guild whoami
 guild init-project <name> --config <file.json>
+guild wire-settings   # merge guild hooks and permission rules into ~/.claude/settings.json
 
 guild party start <name> [--keeper]   # --keeper: mark a Remote Control keeper party
 guild party resume <party> [--session <name>]   # --session: from a human terminal only
@@ -1808,7 +1819,8 @@ They also state the visibility rule: guild is optional and invisible outside the
 
 ## Hooks
 
-Wired from `~/.claude/settings.json` (not part of this repo):
+Wired into `~/.claude/settings.json` by `install.sh` (or `guild wire-settings`),
+which merges this block and keeps what is already there:
 
 ```json
 {
