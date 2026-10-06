@@ -206,6 +206,16 @@ main {
   border-left: 4px solid var(--danger);
 }
 
+.card.answered-ask {
+  border-left: 4px solid var(--accent);
+}
+
+.answered-pager {
+  display: flex;
+  gap: 0.5rem;
+  align-items: baseline;
+}
+
 .card.notice {
   border-left: 4px solid var(--accent);
 }

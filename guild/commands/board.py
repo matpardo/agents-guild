@@ -322,23 +322,57 @@ def _check_party_known(conn, party):
         raise GuildError("unknown party '{}'".format(party), 1)
 
 
-def render_answered_asks(ctx, party, since_cutoff, page, color, width):
-    painter = _Painter(color, width)
-    _check_party_known(ctx.conn, party)
-    rows = _answered_ask_rows(ctx.conn, party, since_cutoff)
+def _answered_page(conn, party, since_cutoff, page):
+    _check_party_known(conn, party)
+    rows = _answered_ask_rows(conn, party, since_cutoff)
     if not rows:
-        return [painter.paint("ANSWERED · nothing", "green"), ""]
+        return [], 0, 0
     page_count = -(-len(rows) // _ANSWERED_PAGE_SIZE)
     if page < 1 or page > page_count:
         raise GuildError("page {} out of range, 1-{}".format(page, page_count), 1)
     start = (page - 1) * _ANSWERED_PAGE_SIZE
-    lines = [painter.paint("ANSWERED · {} · page {}/{}".format(len(rows), page, page_count), "bold")]
-    for row in rows[start : start + _ANSWERED_PAGE_SIZE]:
+    return rows[start : start + _ANSWERED_PAGE_SIZE], len(rows), page_count
+
+
+def render_answered_asks(ctx, party, since_cutoff, page, color, width):
+    painter = _Painter(color, width)
+    page_rows, total, page_count = _answered_page(ctx.conn, party, since_cutoff, page)
+    if total == 0:
+        return [painter.paint("ANSWERED · nothing", "green"), ""]
+    lines = [painter.paint("ANSWERED · {} · page {}/{}".format(total, page, page_count), "bold")]
+    for row in page_rows:
         lines.extend(_all_ask_lines(painter, row))
     if page < page_count:
         lines.append(painter.paint("  → guild asks --answered --page {}".format(page + 1), "dim"))
     lines.append("")
     return lines
+
+
+def answered_asks_model(conn, page):
+    page_rows, total, page_count = _answered_page(conn, None, None, page)
+    return {
+        "page": page,
+        "page_count": page_count,
+        "total": total,
+        "asks": [_answered_ask_model(row) for row in page_rows],
+    }
+
+
+def _answered_ask_model(row):
+    return {
+        "id": row["id"],
+        "party": row["party"],
+        "question": sanitize.strip_control_sequences(row["question"]),
+        "answer": _optional_text(row["answer"]),
+        "answered_at": row["answered_at"],
+        "answered": _answered_label(row["answered_at"]),
+    }
+
+
+def _answered_label(answered_at):
+    if answered_at is None:
+        return None
+    return timeutil.issued_label(answered_at)
 
 
 def _party_scoped_notices(ctx, party_filter):
