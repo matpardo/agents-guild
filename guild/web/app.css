@@ -625,6 +625,10 @@ main.history-main {
   color: var(--danger);
 }
 
+.resume-command code {
+  word-break: break-all;
+}
+
 .badge-warn {
   background: var(--lifecycle-converging-bg);
   color: var(--lifecycle-converging-fg);

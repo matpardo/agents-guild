@@ -1563,9 +1563,10 @@ against path traversal, not an identity boundary.
   defaulted.
 - `handoff_threshold` (optional): context-usage percent (0-100) at or above
   which `UserPromptSubmit`/`PostToolUse` hooks nudge once per session toward
-  `guild handoff` (`guild handoff --respawn` for keeper parties).
+  `guild handoff` (`guild handoff --respawn` for keeper parties), and at or
+  above which the board reports the party as context high.
   Recommended: 40, so sessions stay short and each fresh generation starts from the brief.
-  Absent → no nudge.
+  Absent → 80.
 - `handoff_retention_days` (optional): positive integer, at most 3650. A closed
   party's last handoff file is deleted by `guild handoff prune` that many days
   after the party closed. Absent → it is kept forever, never defaulted.
@@ -1917,10 +1918,10 @@ Without a hooks manager, add the same call to the repository's
   resumed generation.
 - `prompt-submit`: prints only events new since this session's cursor
   (notices, answers/dismissals of this party's asks). Unbound sessions also
-  get the binding hint, once. If a project `handoff_threshold` is configured
-  and the last `guild statusline --ctx <pct>` recorded for this session is at
-  or above it, nudges once per session toward `guild handoff`. Local DB only,
-  no network.
+  get the binding hint, once. If the last `guild statusline --ctx <pct>`
+  recorded for this session is at or above the project's `handoff_threshold`
+  (80 when the project does not set one), nudges once per session toward
+  `guild handoff`. Local DB only, no network.
 - `post-tool-use`: the same new-events-since-cursor and context-threshold
   nudge as `prompt-submit` (sharing the same cursor, so nothing is reported
   twice across the two hooks), emitted as
@@ -2016,6 +2017,26 @@ Surfaces, each with the age of the status (`45s`, `12m`, `3h`, `2d`):
 - The raid lead's inbox: `- <party> (raid <raid>) waiting on permission` (or
   `input` for an elicitation) when a member blocks. Idle waits are not
   forwarded, and the message text never is.
+
+**Context pressure and the resume command.** A party whose live leader session
+is at or above the project's `handoff_threshold` is *context high*: it is about
+to hand off. The condition is derived on every render from the percentage the
+statusline recorded for that session, so it disappears by itself when the
+session ends or its context drops; nothing is stored.
+
+- `guild board`: counted in the heading
+  (`NEEDS YOU · 1 open ask · 1 blocked · 1 context high`) and, under the party
+  itself, `context: 86% (handoff at 80%) → run guild handoff`. The heading is a
+  counter only; no per-party line is added above the parties.
+- A party left in `awaiting-leader` by `guild handoff` also gets a
+  `resume: cd <cwd> && GUILD_RESUME=<party> claude -n <party>-g<next> …` line,
+  so the command to start the next generation survives the session that printed
+  it. `guild revive` lists only `active` parties, so this is the only place it
+  appears.
+- `guild web` / `/api/board`: a `context <pct>% / <threshold>%` badge on the
+  party and the same counter in the asks heading (`context high (1)`); per party
+  the model carries `ctx` (`pct`, `threshold`, `high`, or `null` when not high)
+  and `resume_command` (or `null`).
 
 **Push command.** An optional project config key runs a command when a session
 blocks, once per waiting episode (permission prompt or elicitation; not idle):

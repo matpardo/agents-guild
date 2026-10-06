@@ -177,6 +177,8 @@
       askBlocks: "How many references (tasks, PRs) still wait on this ask; 0 may mean the list is stale.",
       mainRed: "The main branch of this repo is failing; fix it before merging anything else.",
       generation: "How many times the party's leader session was replaced.",
+      ctxHigh: "The leader session is near its context limit and should run guild handoff soon.",
+      resumeCommand: "Run this to start the next generation of this party; it waits for a new leader.",
       leader: "The leader session of the party.",
       noLeader: "The party has no leader session right now.",
       claims: "Areas this party has reserved so other parties do not edit them.",
@@ -633,11 +635,23 @@
     return line;
   }
 
-  function renderAsks(asks, blocked) {
+  function ctxHighCount(parties) {
+    return parties.filter(function (party) {
+      return party.ctx !== null;
+    }).length;
+  }
+
+  function renderAsks(asks, blocked, parties) {
     var section = document.getElementById("asks");
+    var ctxHigh = ctxHighCount(parties);
     clear(section);
-    section.appendChild(textEl("h2", "asks (" + asks.length + ") · blocked (" + blocked.length + ")"));
-    if (asks.length === 0 && blocked.length === 0) {
+    section.appendChild(
+      textEl(
+        "h2",
+        "asks (" + asks.length + ") · blocked (" + blocked.length + ") · context high (" + ctxHigh + ")"
+      )
+    );
+    if (asks.length === 0 && blocked.length === 0 && ctxHigh === 0) {
       section.appendChild(textEl("p", "nothing needs you"));
       return;
     }
@@ -1076,11 +1090,24 @@
     summary.appendChild(textEl("strong", party.name));
     summary.appendChild(renderRoleBadge(party.raids));
     summary.appendChild(renderStatusBadge(party.status));
+    if (party.ctx !== null) {
+      var ctxBadge = textEl("span", "context " + party.ctx.pct + "% / " + party.ctx.threshold + "%");
+      ctxBadge.className = "status-badge badge-warn";
+      summary.appendChild(explain(ctxBadge, "ui", "ctxHigh"));
+    }
     summary.appendChild(explain(textEl("span", party.state), "partyState", party.state));
     summary.appendChild(explain(textEl("span", "gen " + party.generation), "ui", "generation"));
     var leaderKey = party.leader_session_name ? "leader" : "noLeader";
     summary.appendChild(explain(textEl("span", party.leader_session_name || "no leader"), "ui", leaderKey));
     details.appendChild(summary);
+
+    if (party.resume_command !== null) {
+      var resumeLine = el("p");
+      resumeLine.className = "resume-command";
+      resumeLine.appendChild(textEl("span", "resume: "));
+      resumeLine.appendChild(textEl("code", party.resume_command));
+      details.appendChild(explain(resumeLine, "ui", "resumeCommand"));
+    }
 
     appendAll(details, party.quests.map(renderQuest));
 
@@ -1468,7 +1495,7 @@
     refreshPartyFilterOptions(data.parties);
     refreshRaidFilterOptions(data.raids);
     var filtered = applyRaidFilter(applyPartyFilter(data));
-    renderAsks(filtered.asks, filtered.blocked);
+    renderAsks(filtered.asks, filtered.blocked, filtered.parties);
     renderNotices(filtered.notices);
     renderMergeQueues(filtered.merge_queues);
     renderDrift(filtered.drift);

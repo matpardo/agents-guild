@@ -27,7 +27,7 @@ class CardPrViewsTestCase(GuildTestCase):
         conn = db.connect(paths.db_path())
         ctx = context.RunContext(
             conn, None, None, timeutil.utcnow(), None,
-            paths.claude_sessions_dir(), paths.projects_config_dir(), None,
+            paths.claude_sessions_dir(), paths.projects_config_dir(), paths.state_dir(),
         )
         try:
             return board_commands.board_model(ctx)
