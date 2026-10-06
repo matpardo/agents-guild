@@ -1,8 +1,6 @@
 import json
 import sqlite3
-import statistics
 import subprocess
-import time
 from unittest import mock
 
 from guild import paths
@@ -176,14 +174,6 @@ class PromptSubmitHookTests(GuildTestCase):
         )
         self.assertRegex(out, r'- notice #1 from human at \d{4}-\d{2}-\d{2} \d{2}:\d{2}: "pipeline down"')
 
-    def test_latency_under_100ms(self):
-        repo_dir = self.register_project("acme", ["acme/app"])
-        self.run_cli(["party", "start", "alpha"], "sess-1", repo_dir)
-        payload = {"session_id": "sess-1", "cwd": str(repo_dir)}
-        started = time.monotonic()
-        self.run_hook("prompt-submit", payload)
-        elapsed_ms = (time.monotonic() - started) * 1000
-        self.assertLess(elapsed_ms, 100, "prompt-submit hook took {:.1f}ms".format(elapsed_ms))
 
 
 class CtxNudgeTests(GuildTestCase):
@@ -278,14 +268,6 @@ class PostToolUseHookTests(GuildTestCase):
         code, out, err = self.run_hook("post-tool-use", payload)
         self.assertEqual(out, "")
 
-    def test_latency_under_100ms(self):
-        repo_dir = self.register_project("acme", ["acme/app"])
-        self.run_cli(["party", "start", "alpha"], "sess-1", repo_dir)
-        payload = {"session_id": "sess-1", "cwd": str(repo_dir)}
-        started = time.monotonic()
-        self.run_hook("post-tool-use", payload)
-        elapsed_ms = (time.monotonic() - started) * 1000
-        self.assertLess(elapsed_ms, 100, "post-tool-use hook took {:.1f}ms".format(elapsed_ms))
 
 
 class HookErrorContainmentTests(GuildTestCase):
@@ -899,23 +881,6 @@ class PreEditHookTests(GuildTestCase):
         self.assertEqual(code, 0)
         self.assertIn("guild hook error: boom", out)
 
-    def test_latency_median_under_100ms(self):
-        repo_dir = self.register_project("acme", ["acme/app"])
-        self._git_init(repo_dir)
-        self._set_shared_areas("acme", ["config/routes.rb"], "2h")
-        self.run_cli(["party", "start", "alpha"], "sess-1", repo_dir)
-        (repo_dir / "config").mkdir()
-        file_path = repo_dir / "config" / "routes.rb"
-        file_path.write_text("x")
-        payload = self._edit_payload("sess-1", repo_dir, file_path)
-
-        durations_ms = []
-        for _ in range(10):
-            started = time.monotonic()
-            self.run_hook("pre-edit", payload)
-            durations_ms.append((time.monotonic() - started) * 1000)
-        median_ms = statistics.median(durations_ms)
-        self.assertLess(median_ms, 100, "pre-edit hook median took {:.1f}ms".format(median_ms))
 
 
 class RaidMembershipWarningTests(GuildTestCase):

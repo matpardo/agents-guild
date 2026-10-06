@@ -9,6 +9,8 @@ from guild.commands import notice as notice_commands
 from guild.commands import raid as raid_commands
 from guild.errors import GuildError
 
+_ANSWERED_PAGE_SIZE = 10
+
 _STYLES = {
     "bold": "1",
     "dim": "2",
@@ -297,16 +299,44 @@ def _all_ask_lines(painter, row):
 
 def render_all_asks(ctx, party, since_cutoff, color, width):
     painter = _Painter(color, width)
-    if party is not None:
-        known = ctx.conn.execute("SELECT name FROM parties WHERE name = ?", (party,)).fetchone()
-        if known is None:
-            raise GuildError("unknown party '{}'".format(party), 1)
+    _check_party_known(ctx.conn, party)
     rows = _all_ask_rows(ctx.conn, party, since_cutoff)
     if not rows:
         return [painter.paint("ASKS · nothing", "green"), ""]
     lines = [painter.paint(_all_asks_heading(rows), "bold")]
     for row in rows:
         lines.extend(_all_ask_lines(painter, row))
+    lines.append("")
+    return lines
+
+
+def _answered_ask_rows(conn, party, since_cutoff):
+    rows = [row for row in _all_ask_rows(conn, party, since_cutoff) if row["state"] == "answered"]
+    return sorted(rows, key=lambda row: (row["answered_at"] or "", row["id"]), reverse=True)
+
+
+def _check_party_known(conn, party):
+    if party is None:
+        return
+    if conn.execute("SELECT name FROM parties WHERE name = ?", (party,)).fetchone() is None:
+        raise GuildError("unknown party '{}'".format(party), 1)
+
+
+def render_answered_asks(ctx, party, since_cutoff, page, color, width):
+    painter = _Painter(color, width)
+    _check_party_known(ctx.conn, party)
+    rows = _answered_ask_rows(ctx.conn, party, since_cutoff)
+    if not rows:
+        return [painter.paint("ANSWERED · nothing", "green"), ""]
+    page_count = -(-len(rows) // _ANSWERED_PAGE_SIZE)
+    if page < 1 or page > page_count:
+        raise GuildError("page {} out of range, 1-{}".format(page, page_count), 1)
+    start = (page - 1) * _ANSWERED_PAGE_SIZE
+    lines = [painter.paint("ANSWERED · {} · page {}/{}".format(len(rows), page, page_count), "bold")]
+    for row in rows[start : start + _ANSWERED_PAGE_SIZE]:
+        lines.extend(_all_ask_lines(painter, row))
+    if page < page_count:
+        lines.append(painter.paint("  → guild asks --answered --page {}".format(page + 1), "dim"))
     lines.append("")
     return lines
 

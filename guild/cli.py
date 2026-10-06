@@ -198,7 +198,7 @@ def _handle_dismiss(ctx, args):
 def _handle_ask_detail(ctx, args):
     from guild import ask_detail
 
-    if args.all or args.party is not None or args.since is not None:
+    if args.all or args.answered or args.page is not None or args.party is not None or args.since is not None:
         raise GuildError("guild asks <id> takes no filters", 1)
     row = ctx.conn.execute("SELECT * FROM asks WHERE id = ?", (args.ask_id,)).fetchone()
     if row is None:
@@ -212,14 +212,26 @@ def _handle_asks(ctx, args):
 
     if args.ask_id is not None:
         return _handle_ask_detail(ctx, args)
-    if not args.all:
+    if args.all and args.answered:
+        raise GuildError("--all and --answered are exclusive", 1)
+    if args.page is not None and not args.answered:
+        raise GuildError("--page needs --answered", 1)
+    if not args.all and not args.answered:
         if args.party is not None or args.since is not None:
-            raise GuildError("--party/--since need --all", 1)
+            raise GuildError("--party/--since need --all or --answered", 1)
         _print_lines(board_commands.render_asks(ctx, None, _stdout_is_colored(), _terminal_width(), True))
         return 0
     since_cutoff = None
     if args.since is not None:
         since_cutoff = ctx.now - timeutil.parse_duration(args.since)
+    if args.answered:
+        page = 1 if args.page is None else args.page
+        _print_lines(
+            board_commands.render_answered_asks(
+                ctx, args.party, since_cutoff, page, _stdout_is_colored(), _terminal_width()
+            )
+        )
+        return 0
     _print_lines(
         board_commands.render_all_asks(
             ctx, args.party, since_cutoff, _stdout_is_colored(), _terminal_width()
@@ -813,6 +825,8 @@ def build_parser():
     asks = subparsers.add_parser("asks")
     asks.add_argument("ask_id", type=int, nargs="?")
     asks.add_argument("--all", action="store_true")
+    asks.add_argument("--answered", action="store_true")
+    asks.add_argument("--page", type=int)
     asks.add_argument("--party")
     asks.add_argument("--since")
     asks.set_defaults(handler=_handle_asks)
