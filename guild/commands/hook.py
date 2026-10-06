@@ -413,6 +413,13 @@ def _push_invocation(tokens, default_cwd):
     return target_dir, remaining[1:]
 
 
+def _is_delete_push(push_args):
+    if "--delete" in push_args or "-d" in push_args:
+        return True
+    refspecs = [tok for tok in push_args if not tok.startswith("-")][1:]
+    return any(refspec.startswith(":") for refspec in refspecs)
+
+
 def _resolve_push_branch(push_args, target_dir):
     non_flag = [tok for tok in push_args if not tok.startswith("-")]
     if len(non_flag) >= 2:
@@ -471,6 +478,8 @@ def pre_push(ctx, command):
         if invocation is None:
             continue
         target_dir, push_args = invocation
+        if _is_delete_push(push_args):
+            continue
         if not Path(target_dir).is_dir():
             return _unresolved_branch_result()
         branch = _resolve_push_branch(push_args, target_dir)
