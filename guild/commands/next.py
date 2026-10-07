@@ -1,7 +1,7 @@
 import json
 from datetime import timedelta
 
-from guild import config, events, resolve, sanitize, timeutil
+from guild import config, events, merge_queue, resolve, sanitize, timeutil
 from guild.commands import merge_queue as merge_queue_commands
 from guild.commands import pr as pr_commands
 from guild.commands import raid as raid_commands
@@ -55,6 +55,15 @@ def _open_ask_id_for_ref(conn, ref):
         if ref in json.loads(row["refs"]):
             return row["id"]
     return None
+
+
+def _tier0_candidates(conn, party):
+    results = []
+    for row in _own_open_prs(conn, party):
+        if not merge_queue.unblocks_everyone(row):
+            continue
+        results.append((row, "{} — land it first".format(merge_queue.urgency_clause(row)), False))
+    return results
 
 
 def _tier1_candidates(conn, party):
@@ -264,9 +273,9 @@ def _task_title_display(next_task):
     return next_task["title"]
 
 
-def _render_all(tier1, tier2, tier3, next_task, disagreements, raid_lines):
+def _render_all(candidates, next_task, disagreements, raid_lines):
     lines = []
-    for row, reason, _ in tier1 + tier2 + tier3:
+    for row, reason, _ in candidates:
         lines.append("PR {}: {}".format(_pr_label(row), reason))
     if next_task is not None:
         lines.append(
@@ -282,10 +291,8 @@ def _render_all(tier1, tier2, tier3, next_task, disagreements, raid_lines):
     return lines
 
 
-def _render_single(ctx, tier1, tier2, tier3, next_task, disagreements, blocked, raid_lines, acknowledge):
-    for candidates in (tier1, tier2, tier3):
-        if not candidates:
-            continue
+def _render_single(ctx, candidates, next_task, disagreements, blocked, raid_lines, acknowledge):
+    if candidates:
         row, reason, should_ack = candidates[0]
         if should_ack and acknowledge:
             pr_commands.acknowledge_comments(ctx, row["repo"], row["number"])
@@ -318,29 +325,43 @@ def _paused_lines(paused_rows):
     return ["nothing actionable", "raid paused: {}".format(", ".join(row["raid"] for row in paused_rows))]
 
 
-def _collect(ctx, party, project):
+def _without(candidates, taken):
+    return [
+        candidate for candidate in candidates
+        if (candidate[0]["repo"], candidate[0]["number"]) not in taken
+    ]
+
+
+def _candidates(ctx, party, project):
     stale_hours = _stale_hours(ctx.projects_dir, project)
-    tier1 = _tier1_candidates(ctx.conn, party)
-    tier2 = _tier2_candidates(ctx.conn, party)
-    tier3 = _tier3_candidates(ctx.conn, ctx.now, party, stale_hours)
+    tier0 = _tier0_candidates(ctx.conn, party)
+    taken = {(row["repo"], row["number"]) for row, _, _ in tier0}
+    tier1 = _without(_tier1_candidates(ctx.conn, party), taken)
+    tier2 = _without(_tier2_candidates(ctx.conn, party), taken)
+    tier3 = _without(_tier3_candidates(ctx.conn, ctx.now, party, stale_hours), taken)
+    return tier0 + tier1 + tier2 + tier3
+
+
+def _collect(ctx, party, project):
+    candidates = _candidates(ctx, party, project)
     if project is None:
-        return tier1, tier2, tier3, None, [], []
+        return candidates, None, [], []
     next_task, disagreements, blocked = _evaluate_next_task(ctx.conn, ctx.now, project, party)
-    return tier1, tier2, tier3, next_task, disagreements, blocked
+    return candidates, next_task, disagreements, blocked
 
 
 def has_work(ctx, binding):
     party = binding["party"]
     if raid_commands.paused_member_raids(ctx.conn, ctx.now, party):
         return False
-    tier1, tier2, tier3, next_task, _, _ = _collect(ctx, party, binding["project"])
-    return bool(tier1 or tier2 or tier3 or next_task is not None)
+    candidates, next_task, _, _ = _collect(ctx, party, binding["project"])
+    return bool(candidates or next_task is not None)
 
 
 def next_task_item(ctx, binding):
     if raid_commands.paused_member_raids(ctx.conn, ctx.now, binding["party"]):
         return None
-    return _collect(ctx, binding["party"], binding["project"])[3]
+    return _collect(ctx, binding["party"], binding["project"])[1]
 
 
 def run(ctx, binding, show_all, acknowledge):
@@ -348,10 +369,10 @@ def run(ctx, binding, show_all, acknowledge):
     paused_rows = raid_commands.paused_member_raids(ctx.conn, ctx.now, party)
     if paused_rows:
         return _paused_lines(paused_rows)
-    tier1, tier2, tier3, next_task, disagreements, blocked = _collect(ctx, party, project)
+    candidates, next_task, disagreements, blocked = _collect(ctx, party, project)
 
     raid_lines = _lead_raid_lines(ctx.conn, ctx.now, party)
 
     if show_all:
-        return _render_all(tier1, tier2, tier3, next_task, disagreements, raid_lines)
-    return _render_single(ctx, tier1, tier2, tier3, next_task, disagreements, blocked, raid_lines, acknowledge)
+        return _render_all(candidates, next_task, disagreements, raid_lines)
+    return _render_single(ctx, candidates, next_task, disagreements, blocked, raid_lines, acknowledge)

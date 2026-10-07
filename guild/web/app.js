@@ -101,7 +101,22 @@
       merged: "The PR was merged.",
       closed: "The PR was closed without merging.",
     },
+    prType: {
+      feat: "A new feature.",
+      fix: "A bug fix.",
+      hotfix: "An urgent fix for something already released or broken.",
+      chore: "Maintenance work with no behaviour change.",
+      refactor: "A change of structure with no behaviour change.",
+      docs: "Documentation only.",
+      test: "Tests only.",
+      perf: "A performance improvement.",
+      ci: "A change to the pipelines.",
+      build: "A change to the build or packaging.",
+      style: "Formatting only.",
+    },
     flag: {
+      "fixes-main": "The PR repairs a broken main branch; it goes first so everyone is unblocked.",
+      "fixes-flaky": "The PR fixes flaky tests; it goes first so the suite stops lying to everyone.",
       "needs-ask-answer": "The PR is stopped on an open ask; answer it so work can resume.",
       "needs-human-pr-review": "The PR touches something sensitive and needs a human review before merging.",
     },
@@ -873,6 +888,11 @@
     var head = el("div");
     head.className = "queue-entry-head";
     head.appendChild(link(entry.url, entry.ref));
+    if (entry.pr_type) {
+      var prType = textEl("span", entry.pr_type);
+      prType.className = "pill pr-type";
+      head.appendChild(explain(prType, "prType", entry.pr_type));
+    }
     entry.labels.forEach(function (label) {
       var pill = textEl("span", label);
       pill.className = "pill lifecycle-" + label;
@@ -948,6 +968,12 @@
     if (state.stateFilter === "needs-ask-answer") {
       return pr.needs_ask_answer;
     }
+    if (state.stateFilter === "fixes-main") {
+      return pr.fixes_main;
+    }
+    if (state.stateFilter === "fixes-flaky") {
+      return pr.fixes_flaky;
+    }
     if (state.stateFilter === "needs-human-pr-review") {
       return pr.needs_human_pr_review;
     }
@@ -985,6 +1011,21 @@
     var lifecycle = textEl("span", pr.lifecycle);
     lifecycle.className = "pill lifecycle-" + pr.lifecycle;
     row.appendChild(explain(lifecycle, "lifecycle", pr.lifecycle));
+    if (pr.pr_type) {
+      var prType = textEl("span", pr.pr_type);
+      prType.className = "pill pr-type";
+      row.appendChild(explain(prType, "prType", pr.pr_type));
+    }
+    if (pr.fixes_main) {
+      var fixesMain = textEl("span", "fixes-main");
+      fixesMain.className = "pill lifecycle-fixes-main";
+      row.appendChild(explain(fixesMain, "flag", "fixes-main"));
+    }
+    if (pr.fixes_flaky) {
+      var fixesFlaky = textEl("span", "fixes-flaky");
+      fixesFlaky.className = "pill lifecycle-fixes-flaky";
+      row.appendChild(explain(fixesFlaky, "flag", "fixes-flaky"));
+    }
     if (pr.needs_ask_answer) {
       var ask = textEl("span", "needs-ask-answer");
       ask.className = "pill lifecycle-needs-ask-answer";

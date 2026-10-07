@@ -341,6 +341,9 @@ _COLUMN_MIGRATIONS = (
     ("asks", "answered_at", "TEXT"),
     ("leaders", "handoff_consumed_at", "TEXT"),
     ("parties", "keeper", "INTEGER"),
+    ("prs", "pr_type", "TEXT"),
+    ("prs", "fixes_main", "INTEGER"),
+    ("prs", "fixes_flaky", "INTEGER"),
 )
 
 
@@ -391,6 +394,11 @@ def _split_needs_human(conn):
     conn.execute("UPDATE prs SET needs_human_pr_review = 0 WHERE needs_human_pr_review IS NULL")
 
 
+def _default_fix_marks(conn):
+    conn.execute("UPDATE prs SET fixes_main = 0 WHERE fixes_main IS NULL")
+    conn.execute("UPDATE prs SET fixes_flaky = 0 WHERE fixes_flaky IS NULL")
+
+
 def create_all(conn):
     for statement in _CREATE_STATEMENTS:
         conn.execute(statement)
@@ -398,6 +406,7 @@ def create_all(conn):
     for table, column, ddl_type in _COLUMN_MIGRATIONS:
         _add_column_if_missing(conn, table, column, ddl_type)
     _split_needs_human(conn)
+    _default_fix_marks(conn)
 
 
 def drop_projections(conn):

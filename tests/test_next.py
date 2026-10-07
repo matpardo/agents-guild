@@ -518,6 +518,74 @@ class NextTaskItemTests(NextTestCase):
         self.assertIsNone(self._item())
 
 
+class Tier0Tests(NextTestCase):
+    def setUp(self):
+        super().setUp()
+        self.run_cli(["quest", "add", "demo", "--title", "Demo", "--no-epic"], "sess-1", self.repo_dir)
+        self.run_cli(["task", "add", "demo/T01", "--title", "First"], "sess-1", self.repo_dir)
+
+    def _track(self, number, extra):
+        self.write_gh_fixture(
+            "view_acme-app_{}".format(number),
+            {"state": "OPEN", "isDraft": True, "headRefName": "fix/x", "title": "t"},
+        )
+        code, out, err = self.run_cli(
+            [
+                "pr", "track", "acme/app#{}".format(number), "--task", "demo/T01",
+                "--what", "x", "--waits", "y",
+            ] + extra,
+            "sess-1", self.repo_dir,
+        )
+        self.assertEqual(code, 0, err)
+
+    def _fail_checks(self, number):
+        self.write_gh_fixture(
+            "view_acme-app_{}".format(number),
+            {
+                "state": "OPEN", "isDraft": True, "headRefName": "fix/x", "title": "t",
+                "statusCheckRollup": [{"conclusion": "FAILURE"}],
+            },
+        )
+        self.run_cli(["sync", "--source", "gh"], "sess-1", self.repo_dir)
+
+    def test_a_healthy_main_fix_is_the_next_item(self):
+        self._track(1, ["--fixes-main"])
+        code, out, err = self.run_cli(["next"], "sess-1", self.repo_dir)
+        self.assertEqual(code, 0, err)
+        self.assertIn("PR acme/app#1: fixes a broken main — land it first", out)
+
+    def test_a_healthy_flaky_fix_is_the_next_item(self):
+        self._track(1, ["--fixes-flaky"])
+        code, out, err = self.run_cli(["next"], "sess-1", self.repo_dir)
+        self.assertIn("PR acme/app#1: fixes flaky tests — land it first", out)
+
+    def test_both_marks_are_named_in_one_reason(self):
+        self._track(1, ["--fixes-main", "--fixes-flaky"])
+        code, out, err = self.run_cli(["next"], "sess-1", self.repo_dir)
+        self.assertIn("fixes a broken main and flaky tests — land it first", out)
+
+    def test_a_marked_pr_comes_before_a_pr_with_failing_checks(self):
+        self._track(1, [])
+        self._track(2, ["--fixes-main"])
+        self._fail_checks(1)
+        code, out, err = self.run_cli(["next"], "sess-1", self.repo_dir)
+        self.assertIn("PR acme/app#2: fixes a broken main — land it first", out)
+        self.assertNotIn("acme/app#1", out)
+
+    def test_a_marked_pr_with_failing_checks_is_listed_once(self):
+        self._track(1, ["--fixes-main"])
+        self._fail_checks(1)
+        code, out, err = self.run_cli(["next", "--all"], "sess-1", self.repo_dir)
+        self.assertEqual(out.count("PR acme/app#1"), 1)
+        self.assertIn("fixes a broken main — land it first", out)
+
+    def test_an_unmarked_pr_still_leads_when_nothing_is_marked(self):
+        self._track(1, [])
+        self._fail_checks(1)
+        code, out, err = self.run_cli(["next"], "sess-1", self.repo_dir)
+        self.assertIn("PR acme/app#1: failing checks (1 failing)", out)
+
+
 if __name__ == "__main__":
     import unittest
 

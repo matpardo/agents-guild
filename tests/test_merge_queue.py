@@ -30,6 +30,9 @@ def _pr(number, **overrides):
         "unmet_deps": [],
         "needs_ask_answer": False,
         "needs_human_pr_review": False,
+        "pr_type": None,
+        "fixes_main": False,
+        "fixes_flaky": False,
     }
     pr.update(overrides)
     return pr
@@ -160,6 +163,15 @@ class StateTests(unittest.TestCase):
     def test_labels_list_lifecycle_then_ask_then_review(self):
         entry = self._entry(lifecycle="converging", needs_ask_answer=True, needs_human_pr_review=True)
         self.assertEqual(entry["labels"], ["converging", "needs-ask-answer", "needs-human-pr-review"])
+
+    def test_labels_put_the_urgency_marks_after_the_lifecycle(self):
+        entry = self._entry(lifecycle="converging", fixes_main=True, fixes_flaky=True, needs_ask_answer=True)
+        self.assertEqual(
+            entry["labels"], ["converging", "fixes-main", "fixes-flaky", "needs-ask-answer"]
+        )
+
+    def test_the_entry_carries_the_resolved_type(self):
+        self.assertEqual(self._entry(pr_type="hotfix")["pr_type"], "hotfix")
 
     def test_draft_ready_with_the_review_flag_is_promoted_first(self):
         entry = self._entry(lifecycle="draft", needs_human_pr_review=True, party="beta")
@@ -384,6 +396,50 @@ class GraphHelperTests(unittest.TestCase):
     def test_dependency_pairs_ignore_a_pr_depending_on_its_own_task(self):
         prs = [_pr(1, dep_keys=[("acme", "epic", "T01")])]
         self.assertEqual(merge_queue.dependency_pairs(prs), [])
+
+
+class UrgencyOrderingTests(unittest.TestCase):
+    def test_a_marked_pr_goes_first_among_free_prs(self):
+        result = _compute([_pr(1), _pr(2, fixes_main=True), _pr(3)], [])
+        self.assertEqual(_refs(result["queue"]), [_ref(2), _ref(1), _ref(3)])
+
+    def test_the_flaky_mark_weighs_the_same_as_the_main_mark(self):
+        result = _compute([_pr(1), _pr(2, fixes_flaky=True)], [])
+        self.assertEqual(_refs(result["queue"]), [_ref(2), _ref(1)])
+
+    def test_a_mark_beats_unblocking_more_prs(self):
+        prs = [
+            _pr(1, task_key=("acme", "epic", "T01")),
+            _pr(2, task_key=("acme", "epic", "T02"), dep_keys=[("acme", "epic", "T01")]),
+            _pr(3, fixes_main=True),
+        ]
+        result = _compute(prs, [])
+        self.assertEqual(_refs(result["queue"]), [_ref(3), _ref(1), _ref(2)])
+
+    def test_a_mark_never_jumps_a_task_dependency(self):
+        prs = [
+            _pr(1, task_key=("acme", "epic", "T01")),
+            _pr(2, task_key=("acme", "epic", "T02"), dep_keys=[("acme", "epic", "T01")], fixes_main=True),
+        ]
+        result = _compute(prs, [])
+        self.assertEqual(_refs(result["queue"]), [_ref(1), _ref(2)])
+
+    def test_a_mark_never_jumps_a_pin(self):
+        result = _compute([_pr(1), _pr(2, fixes_main=True)], [_pin(1, 2, "human")])
+        self.assertEqual(_refs(result["queue"]), [_ref(1), _ref(2)])
+
+    def test_both_marks_fall_back_to_the_number_tiebreak(self):
+        result = _compute([_pr(2, fixes_main=True), _pr(1, fixes_flaky=True)], [])
+        self.assertEqual(_refs(result["queue"]), [_ref(1), _ref(2)])
+
+    def test_the_reason_names_the_mark_first(self):
+        entry = _by_ref(_compute([_pr(1, fixes_main=True)], []))[_ref(1)]
+        self.assertEqual(entry["why"], "fixes a broken main; ready, checks \u27133")
+
+    def test_a_marked_pr_with_failing_checks_is_blocked_at_the_top(self):
+        result = _compute([_pr(1), _pr(2, fixes_main=True, checks_failing=1)], [])
+        self.assertEqual(_refs(result["queue"]), [_ref(2), _ref(1)])
+        self.assertEqual(result["queue"][0]["state"], "blocked")
 
 
 if __name__ == "__main__":

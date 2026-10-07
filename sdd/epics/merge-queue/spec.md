@@ -5,7 +5,7 @@ title: Merge queue for raids and parties
 status: done
 owner: matpardo
 created: 2026-09-29
-updated: 2026-09-29
+updated: 2026-10-07
 ---
 
 # Spec: Merge queue for raids and parties
@@ -25,6 +25,8 @@ In the first raid several PRs became ready at once and some touched the same sha
 - Pins: `guild merge-queue pin|unpin <repo#a> --before <repo#b>`, recorded as events with their author, authority checked, cycles rejected.
 - `guild merge-queue [--raid <name> | --party <name>]` and a `next to merge` line on `guild board`.
 - A merge queue section in `guild web`, read-only.
+- A PR's type, read from its branch prefix and overridable with `pr set --type`, shown as a label wherever a PR is shown.
+- Urgency marks `pr set --fixes-main` and `--fixes-flaky`: labels, and first position among the PRs that are free to go, never ahead of a task dependency or a pin.
 
 ## Out of scope
 
@@ -38,6 +40,7 @@ In the first raid several PRs became ready at once and some touched the same sha
 - [x] A pin overrides the computed order, is limited to the raid lead, the owning party or the human, and drops out when a PR merges or closes.
 - [x] `guild web` shows the same queue and reasons per raid and per party outside raids.
 - [x] No command in this epic writes to GitHub or merges a PR.
+- [x] A PR marked `fixes-main` is position 1 of the merge queue unless a task dependency or a pin puts another PR before it.
 
 ## Security and data
 

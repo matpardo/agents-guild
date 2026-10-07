@@ -10,6 +10,12 @@
   --green: #1e7a3a;
   --blue: #2b5fb8;
   --amber: #8a5a00;
+  --lifecycle-fixes-main-fg: #8c1d18;
+  --lifecycle-fixes-main-bg: #fbe3e1;
+  --lifecycle-fixes-flaky-fg: #1d4f9a;
+  --lifecycle-fixes-flaky-bg: #dce8fb;
+  --pr-type-fg: #44464f;
+  --pr-type-bg: #e8eaf0;
   --lifecycle-needs-ask-answer-fg: #8c1d18;
   --lifecycle-needs-ask-answer-bg: #fbe3e1;
   --lifecycle-needs-human-pr-review-fg: #7a4b00;
@@ -45,6 +51,12 @@
     --green: #7fd99a;
     --blue: #7aa6ff;
     --amber: #ffd479;
+    --lifecycle-fixes-main-fg: #ffb3ad;
+    --lifecycle-fixes-main-bg: #4a1c1a;
+    --lifecycle-fixes-flaky-fg: #a8c6ff;
+    --lifecycle-fixes-flaky-bg: #17284a;
+    --pr-type-fg: #c9ccd6;
+    --pr-type-bg: #2f3138;
     --lifecycle-needs-ask-answer-fg: #ffb3ad;
     --lifecycle-needs-ask-answer-bg: #4a1c1a;
     --lifecycle-needs-human-pr-review-fg: #ffd479;
@@ -384,6 +396,21 @@ a {
   border-radius: 3px;
   padding: 0 0.4rem;
   font-size: 0.8rem;
+}
+
+.lifecycle-fixes-main {
+  background: var(--lifecycle-fixes-main-bg);
+  color: var(--lifecycle-fixes-main-fg);
+}
+
+.lifecycle-fixes-flaky {
+  background: var(--lifecycle-fixes-flaky-bg);
+  color: var(--lifecycle-fixes-flaky-fg);
+}
+
+.pr-type {
+  background: var(--pr-type-bg);
+  color: var(--pr-type-fg);
 }
 
 .lifecycle-needs-ask-answer {

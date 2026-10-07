@@ -1,6 +1,6 @@
 import json
 
-from guild import config, db, events, identity, merge_queue, refs, resolve, sanitize, timeutil
+from guild import config, db, events, identity, merge_queue, pr_types, refs, resolve, sanitize, timeutil
 from guild.commands import main_status as main_status_commands
 from guild.commands import raid as raid_commands
 from guild.errors import GuildError
@@ -70,6 +70,9 @@ def _pr_record(conn, row):
         "checks_pending": row["checks_pending"] or 0,
         "needs_ask_answer": bool(row["needs_ask_answer"]),
         "needs_human_pr_review": bool(row["needs_human_pr_review"]),
+        "pr_type": pr_types.resolve(row["pr_type"], row["branch"]),
+        "fixes_main": bool(row["fixes_main"]),
+        "fixes_flaky": bool(row["fixes_flaky"]),
         "mergeable": row["mergeable"],
         "additions": row["additions"] or 0,
         "deletions": row["deletions"] or 0,
@@ -327,11 +330,18 @@ def _action_text(entry):
     return "{} ({})".format(entry["action"], entry["why"])
 
 
+def _bracket_texts(entry):
+    if entry["pr_type"] is None:
+        return entry["labels"]
+    return [entry["pr_type"]] + entry["labels"]
+
+
 def _task_text(entry):
     task = entry["task"] or "-"
-    if not entry["labels"]:
+    brackets = _bracket_texts(entry)
+    if not brackets:
         return task
-    return "{} {}".format(task, " ".join("[{}]".format(label) for label in entry["labels"]))
+    return "{} {}".format(task, " ".join("[{}]".format(text) for text in brackets))
 
 
 def _queue_line(position, entry):
@@ -377,6 +387,7 @@ def _entry_model(entry):
         "party": entry["party"],
         "task": entry["task"],
         "lifecycle": entry["lifecycle"],
+        "pr_type": entry["pr_type"],
         "checks_failing": entry["checks_failing"],
         "checks_passing": entry["checks_passing"],
         "checks_pending": entry["checks_pending"],
