@@ -46,9 +46,19 @@ def pin_window_name(tmux, window_id):
     )
 
 
-def set_title_options(tmux):
+def set_session_options(tmux):
     _ok(tmux, ["set-option", "-t", SESSION, "set-titles", "on"])
     _ok(tmux, ["set-option", "-t", SESSION, "set-titles-string", "#W"])
+    _ok(tmux, ["set-option", "-t", SESSION, "mouse", "on"])
+
+
+def recorded_window(conn, party, generation):
+    row = conn.execute(
+        "SELECT window_id FROM leader_windows WHERE party = ? AND generation = ?", (party, generation)
+    ).fetchone()
+    if row is None:
+        return None
+    return row["window_id"]
 
 
 def window_id_of_pane(tmux, pane):

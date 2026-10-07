@@ -114,15 +114,6 @@ def _launch_blocker(tmux, cwd):
     return None
 
 
-def _recorded_window(conn, party, generation):
-    row = conn.execute(
-        "SELECT window_id FROM leader_windows WHERE party = ? AND generation = ?", (party, generation)
-    ).fetchone()
-    if row is None:
-        return None
-    return row["window_id"]
-
-
 def _record_launch(ctx, binding, window_id):
     with db.writing(ctx.conn):
         events.record(
@@ -177,7 +168,7 @@ def _launch_next_generation(ctx, binding, command, cwd, tmux):
     if window_id is None:
         return None
     tmux_windows.pin_window_name(tmux, window_id)
-    tmux_windows.set_title_options(tmux)
+    tmux_windows.set_session_options(tmux)
     _record_launch(ctx, binding, window_id)
     return window_id
 
@@ -197,7 +188,7 @@ def _respawn(ctx, binding, model, tmux, tmux_pane, sleep):
     )
     blocker = _launch_blocker(tmux, leader["cwd"])
     if blocker is None:
-        recorded_window = _recorded_window(ctx.conn, party, generation)
+        recorded_window = tmux_windows.recorded_window(ctx.conn, party, generation)
         window_id = _launch_next_generation(ctx, binding, command, leader["cwd"], tmux)
         blocker = "tmux could not create the window" if window_id is None else None
     if blocker is not None:

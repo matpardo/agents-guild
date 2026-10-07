@@ -24,7 +24,7 @@ Every handoff writes a file that is never deleted, and per-session state (`ctx`,
 - Retention: keep the latest handoff of every open party; delete a superseded one once consumed; keep a closed party's last handoff for `handoff_retention_days` (explicit project config). Without `handoff_retention_days` a closed party's last handoff is kept and prune says so.
 - `guild handoff prune [--dry-run]`, also run at the end of the `sync --source gh` pass and on `party close`; prunes state markers of sessions neither running nor leading an open party, at least one day old.
 - `guild handoff --respawn`: launch the next generation in the `guild` tmux session; it waits for the new generation to bind, then the old process closes its own pane, only when its window is the one guild recorded as launching that generation; otherwise it prints a manual close line.
-- Keeper parties (`party start --keeper`): launched with `--remote-control`; their context nudge asks for `handoff --respawn`; `revive` relaunches them with Remote Control. `party start --keeper` only marks the party and prints the `guild revive --party <name>` hint.
+- Keeper parties (`party start --keeper`): launched with `--remote-control`; their context nudge asks for `handoff --respawn`, as does the nudge of any session running in a window guild recorded for its generation; `revive` relaunches them with Remote Control. `party start --keeper` only marks the party and prints the `guild revive --party <name>` hint.
 
 ## Out of scope
 
