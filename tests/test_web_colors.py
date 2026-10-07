@@ -4,6 +4,8 @@ from pathlib import Path
 
 _WEB_DIR = Path(__file__).resolve().parent.parent / "guild" / "web"
 _LIFECYCLES = (
+    "fixes-main",
+    "fixes-flaky",
     "needs-ask-answer",
     "needs-human-pr-review",
     "converging",
@@ -40,6 +42,26 @@ class LifecycleColorTests(unittest.TestCase):
         self.assertIn('<option value="needs-ask-answer">', html)
         self.assertIn('<option value="needs-human-pr-review">', html)
         self.assertNotIn("needs-human\"", html)
+
+    def test_app_js_renders_the_urgency_marks_and_filters_on_them(self):
+        for token in ("lifecycle-fixes-main", "lifecycle-fixes-flaky", "pr.fixes_main", "pr.fixes_flaky"):
+            with self.subTest(token=token):
+                self.assertIn(token, self.js)
+
+    def test_state_filter_offers_the_urgency_marks(self):
+        html = (_WEB_DIR / "index.html").read_text()
+        self.assertIn('<option value="fixes-main">', html)
+        self.assertIn('<option value="fixes-flaky">', html)
+
+    def test_app_js_renders_the_pr_type_chip(self):
+        self.assertIn('"pill pr-type"', self.js)
+
+    def test_app_css_defines_the_pr_type_chip_in_both_schemes(self):
+        self.assertEqual(len(re.findall(r"^\.pr-type\s*\{", self.css, re.M)), 1)
+        for name in ("--pr-type-fg", "--pr-type-bg"):
+            with self.subTest(name=name):
+                self.assertIn(name, self.css)
+                self.assertIn(name, _dark_block(self.css))
 
     def test_app_css_defines_one_rule_per_lifecycle(self):
         for lifecycle in _LIFECYCLES:

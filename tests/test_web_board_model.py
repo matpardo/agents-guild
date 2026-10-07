@@ -104,7 +104,7 @@ class BoardModelShapeTests(BoardModelTestCase):
             "sess-1", self.repo_dir,
         )
         code, out, err = self.run_cli(["board"], "sess-1", self.repo_dir)
-        self.assertIn("app#1  draft needs-ask-answer needs-human-pr-review  no checks", out)
+        self.assertIn("app#1  draft feat needs-ask-answer needs-human-pr-review  no checks", out)
 
     def _finish_pr(self, gh_fields):
         self.write_gh_fixture(
@@ -236,11 +236,13 @@ class BoardModelShapeTests(BoardModelTestCase):
             {
                 "repo", "number", "lifecycle", "needs_ask_answer", "needs_human_pr_review", "checks_failing",
                 "checks_passing", "checks_pending", "what", "waits", "url", "card", "card_url",
+                "pr_type", "fixes_main", "fixes_flaky",
             },
         )
         self.assertEqual(pr["repo"], "acme/app")
         self.assertEqual(pr["number"], 1)
         self.assertEqual((pr["needs_ask_answer"], pr["needs_human_pr_review"]), (False, False))
+        self.assertEqual((pr["pr_type"], pr["fixes_main"], pr["fixes_flaky"]), ("feat", False, False))
         self.assertEqual(pr["what"], "Adds X")
         self.assertEqual(pr["url"], "https://github.com/acme/app/pull/1")
 

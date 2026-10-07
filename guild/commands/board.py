@@ -2,7 +2,8 @@ import json
 import shlex
 import textwrap
 
-from guild import config, ctx_pressure, links, party_progress, party_status, resume, sanitize, session_status, timeutil
+from guild import config, ctx_pressure, links, party_progress, party_status, pr_types, resume
+from guild import sanitize, session_status, timeutil
 from guild.commands import claim as claim_commands
 from guild.commands import drift as drift_commands
 from guild.commands import merge_queue as merge_queue_commands
@@ -24,9 +25,13 @@ _STYLES = {
 }
 
 _FLAG_STYLES = (
+    ("fixes_main", "fixes-main", "red"),
+    ("fixes_flaky", "fixes-flaky", "cyan"),
     ("needs_ask_answer", "needs-ask-answer", "red"),
     ("needs_human_pr_review", "needs-human-pr-review", "yellow"),
 )
+
+_TYPE_STYLE = "bold"
 
 _STATUS_STYLES = {
     "waiting-permission": "red",
@@ -107,6 +112,9 @@ def _checks_painted(painter, pr_row):
 
 def _badges(pr_row):
     badges = [(pr_row["lifecycle"], _LIFECYCLE_STYLES[pr_row["lifecycle"]])]
+    pr_type = pr_types.resolve(pr_row["pr_type"], pr_row["branch"])
+    if pr_type is not None:
+        badges.append((pr_type, _TYPE_STYLE))
     badges.extend((label, style) for column, label, style in _FLAG_STYLES if pr_row[column])
     return badges
 
@@ -722,6 +730,9 @@ def _pr_model(pr_row, project_config):
         "lifecycle": pr_row["lifecycle"],
         "needs_ask_answer": bool(pr_row["needs_ask_answer"]),
         "needs_human_pr_review": bool(pr_row["needs_human_pr_review"]),
+        "pr_type": pr_types.resolve(pr_row["pr_type"], pr_row["branch"]),
+        "fixes_main": bool(pr_row["fixes_main"]),
+        "fixes_flaky": bool(pr_row["fixes_flaky"]),
         "checks_failing": pr_row["checks_failing"] or 0,
         "checks_passing": pr_row["checks_passing"] or 0,
         "checks_pending": pr_row["checks_pending"] or 0,

@@ -126,9 +126,12 @@ guild task block <quest>/<tid> --reason "..."
 guild task done  <quest>/<tid> [--summary "..."]   # epic quests: also mark it done in the epic's tasks.md
 
 guild pr track <owner/repo>#<n> (--task <quest>/<tid> | --card <KEY>) --what "..." --waits "..." [--needs-human-pr-review]
+                               [--type <t>] [--fixes-main] [--fixes-flaky]
 guild pr set   <owner/repo>#<n> [--lifecycle draft|converging|ready] [--waits "..."]
                                [--needs-ask-answer | --no-needs-ask-answer]
                                [--needs-human-pr-review | --no-needs-human-pr-review]
+                               [--type <t>] [--fixes-main | --no-fixes-main]
+                               [--fixes-flaky | --no-fixes-flaky]
 
 guild ask "<question>" --context "..." [--ref <ref> ...] [--option "..."]   # refs: pr:<owner/repo>#<n>, task:<quest>/<tid>, card:<KEY>; with exactly one task in progress and no task:/card: ref it is added for you
 guild answer <id> "<text>"
@@ -244,19 +247,23 @@ same list in a collapsed "answered asks" section under the open asks, served at
 
 Deterministic, per-party ranking, evaluated in order:
 
-1. Own PR with failing checks, a merge conflict (`mergeable == CONFLICTING`),
+1. Own PR marked `fixes-main` or `fixes-flaky`: it unblocks every party, so it
+   comes before the caller's own problems, healthy or not
+   (`fixes a broken main — land it first`). A PR listed here is not listed
+   again by the rules below.
+2. Own PR with failing checks, a merge conflict (`mergeable == CONFLICTING`),
    or unseen review comments (`review_comment_count >
    last_notified_comment_count`).
-2. Own PR flagged `needs-ask-answer` that has an ask, referencing it,
+3. Own PR flagged `needs-ask-answer` that has an ask, referencing it,
    answered after the PR was last `pr set`.
-3. Own PR `converging` with no activity for longer than the project's
+4. Own PR `converging` with no activity for longer than the project's
    `next.stale_hours` (skipped entirely when that key is absent — no hidden
    default).
-4. Next queued task of the caller's active quests, ordered by the observed
+5. Next queued task of the caller's active quests, ordered by the observed
    `tasks.order_idx` (nulls last, then `tid`), whose dependencies (`tasks.deps`)
    all resolve `done` (see resolver below), that has no open ask referencing
    it and is not task-claimed by another party.
-5. Raid lead work, only for a party that is the active lead of a raid: open
+6. Raid lead work, only for a party that is the active lead of a raid: open
    asks from the raid's other member parties (`raid <name>: ask #<id> from
    <party>: "<question>"`), then the raid's merge queue entries for the other
    members' PRs, one line per PR in queue order with its action
@@ -267,7 +274,7 @@ Deterministic, per-party ranking, evaluated in order:
    → fix before anything` for each red main. Without `--all` only
    the first item is printed. Read-only: guild never merges and nothing is
    acknowledged.
-6. Nothing actionable: the exact blockers (pending deps and who says so, open
+7. Nothing actionable: the exact blockers (pending deps and who says so, open
    ask ids, claim holders).
 
 Any disagreement the dependency resolver finds between sources it consulted
@@ -714,6 +721,25 @@ A PR that had the old `needs-human` lifecycle becomes `draft` with
 `needs-ask-answer` set, both in the live database and when events replay in
 `guild rebuild`.
 
+**Type.** A PR's type is read from its branch prefix: the text before the
+first `/`, lower-cased, mapped to one of `feat`, `fix`, `hotfix`, `chore`,
+`refactor`, `docs`, `test`, `perf`, `ci`, `build`, `style`, with the aliases
+`feature` → `feat`, `bugfix` and `bug` → `fix`, `doc` → `docs` and `tests` →
+`test`. A branch with no `/` or an unknown prefix has no type and shows
+nothing. `--type` on `pr track` or `pr set` stores an explicit type that wins
+over the branch; only that explicit value is stored, so a branch rename picked
+up by the next sync re-derives the type by itself. `guild sync` never sets it.
+
+**Urgency marks.** Two more independent booleans, never touched by sync:
+`--fixes-main` (the PR repairs a broken main branch) and `--fixes-flaky` (the
+PR fixes flaky tests). Both can be set at `pr track` and flipped with
+`--fixes-main`/`--no-fixes-main` and `--fixes-flaky`/`--no-fixes-flaky` on
+`pr set`. Neither blocks the PR: they move it to the front of the merge queue
+and of `guild next`, because a broken main or a lying test suite blocks every
+party. They are a claim about the PR, independent of `guild main red`: the
+mark is honoured whether or not any source says main is red, and merging the
+PR never clears the red mark.
+
 **State.** Only merge blockers decide the state, in this precedence:
 
 - `blocked`: a check is failing, `mergeable` is `CONFLICTING`, a task its own
@@ -736,7 +762,8 @@ from the `pr.synced` event; events from before it replay as unknown).
 Failing checks beat pending ones: a PR with both is blocked. Merged and
 closed PRs never appear.
 
-**Labels.** `draft` and `converging` (the lifecycle from GitHub), then
+**Labels.** The type (`[feat]`), then `draft` and `converging` (the lifecycle
+from GitHub), then `fixes-main` and `fixes-flaky` (the urgency marks), then
 `needs-ask-answer` and `needs-human-pr-review` (the human flags), are labels
 shown in brackets after the task, `[draft]`; only `needs-ask-answer` blocks. A draft that
 is otherwise `ready` is worth promoting, and one that is blocked or waiting
@@ -764,7 +791,12 @@ value:
    merged or closed PR is ignored, so stale pins drop out by themselves. A
    pin whose first PR is blocked keeps that PR in place and the second one
    waits on it.
-3. Among the PRs that are free, the one that unblocks the most goes first
+3. Among the PRs that are free, one marked `fixes-main` or `fixes-flaky` goes
+   first (both marks weigh the same), with the reason in its order notes
+   (`fixes a broken main`). A mark reorders only the PRs that are free to go:
+   it never jumps a task dependency or a pin, so a marked PR in the middle of a
+   chain still waits for the PR it depends on.
+4. Among the rest, the one that unblocks the most goes first
    (`unblocks N`: the distinct open PRs that depend on it, directly or
    transitively, plus the open PRs of the same repo that touch the same
    project `shared_areas` glob), then the lower PR number, then the repo.
@@ -929,7 +961,7 @@ project resolved from the parties shown, skipping parties without a
 project), then one collapsible block per party with its quests, tasks and
 PRs, plus PRs outside active tasks, raids (each with a `lead` badge when
 that membership is the raid's lead) and claims. A party filter, a state
-filter (`all`/`needs-ask-answer`/`needs-human-pr-review`/`converging`/`ready`/`draft`/`merged`) and a
+filter (`all`/`fixes-main`/`fixes-flaky`/`needs-ask-answer`/`needs-human-pr-review`/`converging`/`ready`/`draft`/`merged`) and a
 raid filter (`all` plus one option per raid, narrowing parties, asks and
 notices the same way `guild board --raid` does) narrow what is shown; the
 page re-fetches `/api/board` every 15 seconds,
@@ -942,8 +974,10 @@ tracker card when the project configures `tracker.browse_url` (see
 **Colors**: the page uses the terminal board's meanings, with CSS classes
 only (no inline style) and light and dark variants through
 `prefers-color-scheme`. A PR's lifecycle is a badge (`converging` amber, `ready` green,
-`draft` gray, `merged` purple, `closed` muted gray); the human flags add
-badges next to it (`needs-ask-answer` red, `needs-human-pr-review` amber). Checks show `✗N` in red when N > 0 and muted otherwise, `✓N` in
+`draft` gray, `merged` purple, `closed` muted gray); its type is a neutral
+gray chip next to it, and the urgency marks and human flags add badges
+(`fixes-main` red, `fixes-flaky` blue, `needs-ask-answer` red,
+`needs-human-pr-review` amber). Checks show `✗N` in red when N > 0 and muted otherwise, `✓N` in
 green, `⏳N` in amber when N checks are still running, and `no checks` muted
 when there are none. Merge queue entries in `waiting` state show their reason
 in amber. A task's state is colored
@@ -1574,7 +1608,7 @@ against path traversal, not an identity boundary.
     Validated when the config is loaded: it must start with `https://`,
     otherwise `guild init-project`/every command that loads the project
     fails with a clear error. Absent → tasks never carry a `card_url`.
-- `next.stale_hours` (optional): threshold for `guild next` tier 3
+- `next.stale_hours` (optional): threshold for `guild next` tier 4
   (`converging` PR with no activity). Absent → that tier is skipped, never
   defaulted.
 - `handoff_threshold` (optional): context-usage percent (0-100) at or above

@@ -5,7 +5,7 @@ title: Keep work moving without the human
 status: done
 owner: matpardo
 created: 2026-09-27
-updated: 2026-09-28
+updated: 2026-10-07
 ---
 
 # Spec: Keep work moving without the human
@@ -21,7 +21,7 @@ Sessions stop to ask "what should I review next?" and die when their context fil
 ## Scope
 
 - `sync --source sdd`: observed epics and tasks from explicit per-project regexes.
-- `guild next`: ranked next action (PR problems, answered asks, stale PRs, next task by order with dependencies done).
+- `guild next`: ranked next action (PRs marked `fixes-main` or `fixes-flaky` first, then PR problems, answered asks, stale PRs, next task by order with dependencies done).
 - Done-ness precedence guild > tracker > SDD, with disagreements shown.
 - Handoff at a context threshold; resume by party; resume from a terminal by session name.
 - `PostToolUse` hook so busy sessions see answers mid-turn.

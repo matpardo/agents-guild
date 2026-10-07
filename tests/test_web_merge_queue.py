@@ -70,7 +70,7 @@ class MergeQueueModelTests(MergeQueueModelTestCase):
         self.assertEqual(
             set(first),
             {
-                "position", "ref", "repo", "number", "party", "task", "lifecycle",
+                "position", "ref", "repo", "number", "party", "task", "lifecycle", "pr_type",
                 "checks_failing", "checks_passing", "checks_pending", "labels", "unblocks", "state", "next_action",
                 "action", "why", "reasons", "url",
             },

@@ -58,7 +58,7 @@ class SyncReadinessTests(GuildTestCase):
         )
         self.assertEqual(code, 0, err)
         board = self.sync_board({"state": "OPEN", "isDraft": False})
-        self.assertIn("app#1  ready needs-ask-answer needs-human-pr-review", board)
+        self.assertIn("app#1  ready feat needs-ask-answer needs-human-pr-review", board)
 
     def test_draft_pr_demotes_stale_ready_to_draft(self):
         self.set_lifecycle("ready")

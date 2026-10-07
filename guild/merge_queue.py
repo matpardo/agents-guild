@@ -14,6 +14,8 @@ _PROMOTE_ACTION = "promote"
 _REVIEW_ACTION = "review: human, then merge"
 _ASK_LABEL = "needs-ask-answer"
 _REVIEW_LABEL = "needs-human-pr-review"
+_FIXES_MAIN_LABEL = "fixes-main"
+_FIXES_FLAKY_LABEL = "fixes-flaky"
 
 
 def _is_open(pr):
@@ -47,11 +49,27 @@ def _labels(pr):
     labels = []
     if _is_draft(pr):
         labels.append(pr["lifecycle"])
+    if pr["fixes_main"]:
+        labels.append(_FIXES_MAIN_LABEL)
+    if pr["fixes_flaky"]:
+        labels.append(_FIXES_FLAKY_LABEL)
     if pr["needs_ask_answer"]:
         labels.append(_ASK_LABEL)
     if pr["needs_human_pr_review"]:
         labels.append(_REVIEW_LABEL)
     return labels
+
+
+def unblocks_everyone(pr):
+    return bool(pr["fixes_main"] or pr["fixes_flaky"])
+
+
+def urgency_clause(pr):
+    if pr["fixes_main"] and pr["fixes_flaky"]:
+        return "fixes a broken main and flaky tests"
+    if pr["fixes_main"]:
+        return "fixes a broken main"
+    return "fixes flaky tests"
 
 
 def _entry(pr):
@@ -65,6 +83,7 @@ def _entry(pr):
         "party": pr["party"],
         "task": task,
         "lifecycle": pr["lifecycle"],
+        "pr_type": pr["pr_type"],
         "checks_failing": pr["checks_failing"],
         "checks_passing": pr["checks_passing"],
         "checks_pending": pr["checks_pending"],
@@ -192,7 +211,11 @@ def _unblock_counts(open_prs, edges):
 
 
 def _topological_order(open_prs, edges, unblocks):
-    sort_keys = {pr["ref"]: (-unblocks[pr["ref"]], pr["number"], pr["repo"]) for pr in open_prs}
+    tie_keys = {pr["ref"]: (pr["number"], pr["repo"]) for pr in open_prs}
+    sort_keys = {
+        pr["ref"]: (0 if unblocks_everyone(pr) else 1, -unblocks[pr["ref"]]) + tie_keys[pr["ref"]]
+        for pr in open_prs
+    }
     blockers = {pr["ref"]: 0 for pr in open_prs}
     successors = _successors(edges)
     for first in successors:
@@ -208,9 +231,7 @@ def _topological_order(open_prs, edges, unblocks):
             blockers[following] -= 1
             if blockers[following] == 0:
                 heapq.heappush(heap, (sort_keys[following], following))
-    stuck = sorted(
-        (ref for ref in blockers if ref not in order), key=lambda ref: (sort_keys[ref][1], sort_keys[ref][2])
-    )
+    stuck = sorted((ref for ref in blockers if ref not in order), key=lambda ref: tie_keys[ref])
     return order, stuck
 
 
@@ -222,6 +243,8 @@ def _base_reason(pr):
 
 def _why(pr, state, position, edges):
     clauses = []
+    if unblocks_everyone(pr):
+        clauses.append(urgency_clause(pr))
     if state == _READY_STATE:
         clauses.append(_base_reason(pr))
     before = [edge for edge in edges if edge["first"] == pr["ref"]]
