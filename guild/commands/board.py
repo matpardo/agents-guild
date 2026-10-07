@@ -2,7 +2,7 @@ import json
 import shlex
 import textwrap
 
-from guild import config, ctx_pressure, links, party_status, resume, sanitize, session_status, timeutil
+from guild import config, ctx_pressure, links, party_progress, party_status, resume, sanitize, session_status, timeutil
 from guild.commands import claim as claim_commands
 from guild.commands import drift as drift_commands
 from guild.commands import merge_queue as merge_queue_commands
@@ -574,6 +574,25 @@ def _resume_command(ctx, party_row):
     return "cd {} && {}".format(shlex.quote(leader["cwd"]), command)
 
 
+def _plural(count, word):
+    return "{} {}{}".format(count, word, "" if count == 1 else "s")
+
+
+def _remaining_line(painter, remaining):
+    if remaining["all_done"]:
+        return painter.paint("  remaining: all done", "green")
+    text = "  remaining: {} ({} active, {} blocked, {} queued) in {}".format(
+        _plural(remaining["pending"], "task"),
+        remaining["active"],
+        remaining["blocked"],
+        remaining["queued"],
+        _plural(len(remaining["quests"]), "quest"),
+    )
+    if remaining["extra_prs"]:
+        text += " + {} outside quests".format(_plural(remaining["extra_prs"], "PR"))
+    return painter.paint(text, "yellow")
+
+
 def _party_section(ctx, painter, party_row, project_config):
     lines = [
         "{} {}  {}".format(
@@ -586,6 +605,7 @@ def _party_section(ctx, painter, party_row, project_config):
     lines.append(
         painter.paint("  status: {}".format(party_status.label(ctx, status)), _STATUS_STYLES[status["status"]])
     )
+    lines.append(_remaining_line(painter, party_progress.remaining(ctx.conn, party_row["name"])))
     pressure = _ctx_model(ctx, party_row, project_config)
     if pressure is not None:
         lines.append(
@@ -828,6 +848,7 @@ def _party_model(ctx, party_row, project_config):
         "state": party_row["state"],
         "generation": party_row["generation"],
         "status": _status_model(ctx, party_row),
+        "remaining": party_progress.remaining(ctx.conn, party_row["name"]),
         "ctx": _ctx_model(ctx, party_row, project_config),
         "resume_command": _resume_command(ctx, party_row),
         "leader_session_name": _leader_session_name(ctx.conn, party_row["name"]),

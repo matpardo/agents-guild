@@ -178,6 +178,8 @@
       mainRed: "The main branch of this repo is failing; fix it before merging anything else.",
       generation: "How many times the party's leader session was replaced.",
       ctxHigh: "The leader session is near its context limit and should run guild handoff soon.",
+      remaining: "Tasks not done in the party's active quests plus open PRs outside them; the tooltip lists done/total per quest.",
+      allDone: "Every task of the party's active quests is done and no open PR is left outside them.",
       resumeCommand: "Run this to start the next generation of this party; it waits for a new leader.",
       leader: "The leader session of the party.",
       noLeader: "The party has no leader session right now.",
@@ -1078,6 +1080,23 @@
     return badge;
   }
 
+  function renderRemainingBadge(remaining) {
+    if (remaining.all_done) {
+      return explain(textEl("span", "all done"), "ui", "allDone");
+    }
+    var left = remaining.pending + remaining.extra_prs;
+    var badge = textEl("span", left + " left");
+    badge.className = "status-badge badge-warn";
+    explain(badge, "ui", "remaining");
+    var perQuest = remaining.quests
+      .map(function (quest) {
+        return quest.slug + " " + quest.done + "/" + quest.total;
+      })
+      .join(", ");
+    badge.title = badge.title + (perQuest === "" ? "" : " " + perQuest);
+    return badge;
+  }
+
   function renderParty(party) {
     var details = el("details");
     details.className = "party";
@@ -1090,6 +1109,7 @@
     summary.appendChild(textEl("strong", party.name));
     summary.appendChild(renderRoleBadge(party.raids));
     summary.appendChild(renderStatusBadge(party.status));
+    summary.appendChild(renderRemainingBadge(party.remaining));
     if (party.ctx !== null) {
       var ctxBadge = textEl("span", "context " + party.ctx.pct + "% / " + party.ctx.threshold + "%");
       ctxBadge.className = "status-badge badge-warn";

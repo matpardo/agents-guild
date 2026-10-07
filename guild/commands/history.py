@@ -2,7 +2,7 @@ import json
 import statistics
 from datetime import timedelta
 
-from guild import config, timeutil
+from guild import config, party_progress, timeutil
 
 _WEEK = timedelta(days=7)
 _DEFAULT_STALE_HOURS = 48
@@ -219,18 +219,6 @@ def _percent(done, total):
     return done * 100 // total
 
 
-def _task_counts(conn, slug):
-    rows = conn.execute("SELECT state FROM quest_tasks WHERE quest = ?", (slug,)).fetchall()
-    states = [row["state"] for row in rows]
-    return {
-        "done": states.count("done"),
-        "active": states.count("active"),
-        "blocked": states.count("blocked"),
-        "queued": states.count("queued"),
-        "total": len(states),
-    }
-
-
 def _stale_hours(projects_dir, project):
     if project is None:
         return _DEFAULT_STALE_HOURS
@@ -289,7 +277,7 @@ def _last_activity_at(by_kind, slug, party, started_at):
 
 
 def _active_quest_entry(conn, by_kind, now, projects_dir, started_at, row):
-    tasks = _task_counts(conn, row["slug"])
+    tasks = party_progress.task_counts(conn, row["slug"])
     return {
         "slug": row["slug"],
         "party": row["party"],

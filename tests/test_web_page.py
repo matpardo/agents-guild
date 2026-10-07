@@ -59,6 +59,10 @@ class AppJsWriteTests(unittest.TestCase):
     def setUp(self):
         self.source = (_WEB_DIR / "app.js").read_text()
 
+    def test_party_summary_renders_the_remaining_badge(self):
+        self.assertIn('"ui", "remaining"', self.source)
+        self.assertIn('"ui", "allDone"', self.source)
+
     def test_notice_buttons_use_the_notice_routes(self):
         self.assertIn('"/api/notices/"', self.source)
         self.assertIn('"/api/notices/seen-all"', self.source)
