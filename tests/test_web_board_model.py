@@ -85,6 +85,19 @@ class BoardModelShapeTests(BoardModelTestCase):
         pr = tasks["T01"]["prs"][0]
         self.assertEqual((pr["needs_ask_answer"], pr["needs_human_pr_review"]), (True, True))
 
+    def test_party_model_carries_remaining_work(self):
+        ctx = self._ctx()
+        model = board_commands.board_model(ctx)
+        ctx.conn.close()
+        remaining = model["parties"][0]["remaining"]
+        self.assertEqual(remaining["quests"], [{"slug": "demo", "done": 0, "total": 2}])
+        self.assertEqual(
+            (remaining["active"], remaining["blocked"], remaining["queued"], remaining["pending"]),
+            (1, 0, 1, 2),
+        )
+        self.assertEqual(remaining["extra_prs"], 0)
+        self.assertFalse(remaining["all_done"])
+
     def test_terminal_board_shows_the_flag_badges(self):
         self.run_cli(
             ["pr", "set", "acme/app#1", "--needs-ask-answer", "--needs-human-pr-review"],
@@ -195,7 +208,7 @@ class BoardModelShapeTests(BoardModelTestCase):
             set(party),
             {
                 "name", "state", "generation", "status", "ctx", "resume_command",
-                "leader_session_name", "quests", "prs", "raids", "claims",
+                "leader_session_name", "quests", "prs", "raids", "claims", "remaining",
             },
         )
         self.assertEqual(party["name"], "alpha")

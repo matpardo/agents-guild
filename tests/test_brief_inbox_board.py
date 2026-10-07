@@ -196,6 +196,22 @@ class BoardTests(GuildTestCase):
         self.assertIn("━━ alpha", out)
         self.assertNotIn("━━ beta", out)
 
+    def test_board_shows_remaining_tasks_line(self):
+        repo_dir = self.register_project("acme", ["acme/app"])
+        self.run_cli(["party", "start", "alpha"], "sess-1", repo_dir)
+        self.run_cli(
+            ["quest", "add", "demo", "--title", "Demo", "--no-epic", "--tasks", "A,B"], "sess-1", repo_dir
+        )
+        self.run_cli(["task", "start", "demo/A"], "sess-1", repo_dir)
+        code, out, err = self.run_cli(["board"], None, None)
+        self.assertIn("remaining: 2 tasks (1 active, 0 blocked, 1 queued) in 1 quest", out)
+
+    def test_board_shows_all_done_for_idle_party(self):
+        repo_dir = self.register_project("acme", ["acme/app"])
+        self.run_cli(["party", "start", "alpha"], "sess-1", repo_dir)
+        code, out, err = self.run_cli(["board"], None, None)
+        self.assertIn("remaining: all done", out)
+
     def test_board_puts_open_asks_first_with_answer_hint(self):
         repo_dir = self.register_project("acme", ["acme/app"])
         self.run_cli(["party", "start", "alpha"], "sess-1", repo_dir)
