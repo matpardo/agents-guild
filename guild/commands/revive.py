@@ -241,7 +241,7 @@ def _launch(ctx, tmux, selected):
         lines.append(line)
         session_is_up = session_is_up or window_created
     if session_is_up:
-        tmux_windows.set_title_options(tmux)
+        tmux_windows.set_session_options(tmux)
     return lines
 
 

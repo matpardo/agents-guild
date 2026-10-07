@@ -1044,7 +1044,8 @@ for a leader (still active, closed, unknown or an invalid name), nothing is
 bound and the context says why (`GUILD_RESUME=<party> not applied: ...`). A
 session that already leads that party (e.g. after `/clear`) is left alone.
 
-`guild handoff --respawn` (keeper parties, see below) does not print a command for
+`guild handoff --respawn` (keeper parties, and any session guild launched in a
+tmux window, see below) does not print a command for
 the human: it launches that same fresh command itself in a window of the `guild`
 tmux session (created when absent, named after the party, name pinned like
 `revive`), records the window (`leader.window_launched`, table `leader_windows`
@@ -1058,7 +1059,10 @@ window yourself`. If tmux is missing, the cwd is gone or tmux cannot create the
 window it prints `respawn failed: <reason>; old session kept` plus the manual
 command; if the new generation does not bind in time the old window is kept and
 the new one is left running. Nothing else is ever killed. `--respawn` works for
-any party; only keepers get `--remote-control`.
+any party; only keepers get `--remote-control`. The context nudge asks for it
+when the party is a keeper or guild recorded a window for the current generation
+(`leader_windows`), so a session started by `revive`, `--respawn` or the dispatcher
+hands off inside tmux instead of exiting and closing its window.
 
 ### Task brief
 
@@ -1174,7 +1178,8 @@ guild revive --list            # no tmux needed: one copy-paste command per part
   `guild` session, is skipped with the reason printed.
 - Names: the tmux window is named after the party, with `automatic-rename`
   and `allow-rename` off, and the `guild` session sets `set-titles on` /
-  `set-titles-string "#W"` so the outer terminal title shows the party.
+  `set-titles-string "#W"` so the outer terminal title shows the party, plus
+  `mouse on` so the wheel scrolls the output instead of the prompt history.
   Only session and window options are set; your `~/.tmux.conf` is untouched.
   Claude sessions are named `<party>-g<N>` on both fresh launch and resume,
   so the prompt box and `/resume` picker show the party and its generation.
@@ -1574,7 +1579,8 @@ against path traversal, not an identity boundary.
   defaulted.
 - `handoff_threshold` (optional): context-usage percent (0-100) at or above
   which `UserPromptSubmit`/`PostToolUse` hooks nudge once per session toward
-  `guild handoff` (`guild handoff --respawn` for keeper parties), and at or
+  `guild handoff` (`guild handoff --respawn` for keeper parties and sessions
+  running in a window guild launched), and at or
   above which the board reports the party as context high.
   Recommended: 40, so sessions stay short and each fresh generation starts from the brief.
   Absent → 80.

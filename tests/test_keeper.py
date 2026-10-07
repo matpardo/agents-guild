@@ -153,8 +153,12 @@ class KeeperSurfacesTests(GuildTestCase):
 
 class KeeperNudgeTests(GuildTestCase):
     def _nudge(self, start_args):
+        return self._nudge_with_windows(start_args, [])
+
+    def _nudge_with_windows(self, start_args, window_generations):
         repo_dir = self.register_project("acme", ["acme/app"])
         self.run_cli(start_args, "sess-1", repo_dir)
+        self._record_windows(window_generations)
         config_file = self.config_home / "guild" / "projects" / "acme.json"
         data = json.loads(config_file.read_text())
         data["handoff_threshold"] = 80
@@ -162,6 +166,16 @@ class KeeperNudgeTests(GuildTestCase):
         statusline_commands.record_ctx(paths.state_dir(), "sess-1", 85)
         code, out, err = self.run_hook("prompt-submit", {"session_id": "sess-1", "cwd": str(repo_dir)})
         return out
+
+    def _record_windows(self, generations):
+        conn = db.connect(paths.db_path())
+        with db.writing(conn):
+            for generation in generations:
+                events.record(
+                    conn, timeutil.utcnow(), "tester@host", "alpha", None, "acme", "leader.window_launched", "local",
+                    {"party": "alpha", "generation": generation, "window_id": "@{}".format(generation)},
+                )
+        conn.close()
 
     def test_keeper_nudge_names_respawn(self):
         out = self._nudge(["party", "start", "alpha", "--keeper"])
@@ -172,4 +186,15 @@ class KeeperNudgeTests(GuildTestCase):
 
     def test_normal_nudge_is_unchanged(self):
         out = self._nudge(["party", "start", "alpha"])
+        self.assertIn("Context at 85%. Finish current step, run `guild handoff`.", out)
+
+    def test_normal_nudge_in_guild_window_names_respawn(self):
+        out = self._nudge_with_windows(["party", "start", "alpha"], [1])
+        self.assertIn(
+            'Context at 85%. Finish current step, run `guild handoff --respawn --in-flight "..." --learned "..."`.',
+            out,
+        )
+
+    def test_normal_nudge_with_window_of_other_generation_is_unchanged(self):
+        out = self._nudge_with_windows(["party", "start", "alpha"], [2])
         self.assertIn("Context at 85%. Finish current step, run `guild handoff`.", out)
