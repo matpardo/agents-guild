@@ -1581,7 +1581,9 @@ against path traversal, not an identity boundary.
   which `UserPromptSubmit`/`PostToolUse` hooks nudge once per session toward
   `guild handoff` (`guild handoff --respawn` for keeper parties and sessions
   running in a window guild launched), and at or
-  above which the board reports the party as context high.
+  above which the board reports the party as context high. The nudge asks the
+  session to start nothing new, let the executions already running finish, hand
+  off and then stop; the next generation continues from the handoff.
   Recommended: 40, so sessions stay short and each fresh generation starts from the brief.
   Absent → 80.
 - `handoff_retention_days` (optional): positive integer, at most 3650. A closed
@@ -1939,7 +1941,8 @@ Without a hooks manager, add the same call to the repository's
   get the binding hint, once. If the last `guild statusline --ctx <pct>`
   recorded for this session is at or above the project's `handoff_threshold`
   (80 when the project does not set one), nudges once per session toward
-  `guild handoff`. Local DB only, no network.
+  `guild handoff` — start nothing new, finish what is running, hand off, stop.
+  Local DB only, no network.
 - `post-tool-use`: the same new-events-since-cursor and context-threshold
   nudge as `prompt-submit` (sharing the same cursor, so nothing is reported
   twice across the two hooks), emitted as

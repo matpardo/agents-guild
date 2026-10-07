@@ -258,11 +258,14 @@ def _ctx_nudge_lines(ctx, binding):
     marker.touch()
     if _can_respawn(ctx.conn, binding):
         return [
-            'Context at {}%. Finish current step, run `guild handoff --respawn --in-flight "..." --learned "..."`.'.format(
-                pct
-            )
+            "Context at {}%. Start nothing new; let in-flight runs finish, then run "
+            '`guild handoff --respawn --in-flight "..." --learned "..."`. Nothing after it.'.format(pct)
         ]
-    return ["Context at {}%. Finish current step, run `guild handoff`.".format(pct)]
+    return [
+        "Context at {}%. Start nothing new; let in-flight runs finish, then run "
+        '`guild handoff --in-flight "..." --learned "..."`. '
+        "Give the human the printed command, then nothing.".format(pct)
+    ]
 
 
 def prompt_submit(ctx):
