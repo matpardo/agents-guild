@@ -1221,7 +1221,10 @@ guild revive --list            # no tmux needed: one copy-paste command per part
   and `allow-rename` off, and the `guild` session sets `set-titles on` /
   `set-titles-string "#W"` so the outer terminal title shows the party, plus
   `mouse on` so the wheel scrolls the output instead of the prompt history.
-  Only session and window options are set; your `~/.tmux.conf` is untouched.
+  Dragging selects text and copies it to the system clipboard (`set-clipboard
+  on`); Ctrl+click on a hyperlink opens it with `xdg-open`. Only session,
+  window and server options and one root key binding are set at runtime; your
+  `~/.tmux.conf` is untouched.
   Claude sessions are named `<party>-g<N>` on both fresh launch and resume,
   so the prompt box and `/resume` picker show the party and its generation.
 - `--list` prints, per party, a one-liner for terminals without tmux: it sets

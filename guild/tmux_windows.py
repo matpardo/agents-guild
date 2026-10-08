@@ -2,6 +2,13 @@ import shutil
 import subprocess
 
 SESSION = "guild"
+HYPERLINK_FEATURE_SLOT = "terminal-features[10]"
+OPEN_LINK_ON_CTRL_CLICK = [
+    "bind-key", "-n", "C-MouseDown1Pane",
+    "if-shell", "-F", "#{mouse_hyperlink}",
+    "run-shell -b 'xdg-open -- #{q:mouse_hyperlink}'",
+    "send-keys -M",
+]
 
 
 class Tmux:
@@ -50,6 +57,9 @@ def set_session_options(tmux):
     _ok(tmux, ["set-option", "-t", SESSION, "set-titles", "on"])
     _ok(tmux, ["set-option", "-t", SESSION, "set-titles-string", "#W"])
     _ok(tmux, ["set-option", "-t", SESSION, "mouse", "on"])
+    _ok(tmux, ["set-option", "-s", "set-clipboard", "on"])
+    _ok(tmux, ["set-option", "-s", HYPERLINK_FEATURE_SLOT, "*:hyperlinks"])
+    _ok(tmux, OPEN_LINK_ON_CTRL_CLICK)
 
 
 def recorded_window(conn, party, generation):
