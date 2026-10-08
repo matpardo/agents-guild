@@ -1,7 +1,7 @@
 # ADR: Install from a dedicated worktree
 
 - **Date:** 2026-09-28
-- **Status:** accepted
+- **Status:** superseded by 20261008_base-clone-install
 
 ## Context
 
