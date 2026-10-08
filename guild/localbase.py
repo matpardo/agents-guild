@@ -45,11 +45,15 @@ def _is_main_checkout(directory):
     return (Path(directory) / ".git").is_dir()
 
 
-def _clone_repo(directory, repos):
+def origin_repo_slug(directory):
     code, out, _ = _git(directory, ["config", "--get", "remote.origin.url"])
     if code != 0:
         return None
-    slug = _repo_slug(out)
+    return _repo_slug(out)
+
+
+def _clone_repo(directory, repos):
+    slug = origin_repo_slug(directory)
     if slug not in repos:
         return None
     return slug

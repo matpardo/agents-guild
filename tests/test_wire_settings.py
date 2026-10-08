@@ -68,7 +68,7 @@ class WireSettingsTests(GuildTestCase):
         self.assertEqual(settings["permissions"]["deny"], ["Bash(rm:*)"])
         self.assertEqual(settings["permissions"]["allow"][0], "Bash(ls:*)")
         self.assertEqual(settings["hooks"]["PreToolUse"][0], foreign_hook)
-        self.assertEqual(len(settings["hooks"]["PreToolUse"]), 3)
+        self.assertEqual(len(settings["hooks"]["PreToolUse"]), 4)
         self.assertEqual(len(settings["hooks"]["Stop"]), 1)
         self.assertNotIn("hook Stop", out)
 

@@ -1203,3 +1203,132 @@ class NotificationPushTests(GuildTestCase):
         count = conn.execute("SELECT COUNT(*) FROM events WHERE kind = 'session.waiting'").fetchone()[0]
         conn.close()
         self.assertEqual(count, 1)
+
+
+class PrePrOwnerHookTests(GuildTestCase):
+    def setUp(self):
+        super().setUp()
+        self.repo_dir = self.register_project("acme", ["acme/app", "acme/web"])
+        self._git(["init", "-q"])
+        self._git(["checkout", "-q", "-b", "feature/x"])
+        self._git(["remote", "add", "origin", "https://github.com/acme/app.git"])
+        self.run_cli(["party", "start", "alpha"], "sess-1", self.repo_dir)
+        self.run_cli(["quest", "add", "demo", "--title", "Demo", "--no-epic"], "sess-1", self.repo_dir)
+        self.run_cli(["task", "add", "demo/T01", "--title", "First"], "sess-1", self.repo_dir)
+        self.write_gh_fixture(
+            "view_acme-app_1",
+            {"state": "OPEN", "isDraft": False, "headRefName": "feature/x", "title": "t"},
+        )
+        self.run_cli(
+            ["pr", "track", "acme/app#1", "--task", "demo/T01", "--what", "x", "--waits", "y"],
+            "sess-1", self.repo_dir,
+        )
+        self.run_cli(["party", "start", "beta"], "sess-2", self.repo_dir)
+
+    def _git(self, args):
+        subprocess.run(["git"] + args, cwd=str(self.repo_dir), check=True)
+
+    def _bash(self, session_id, command):
+        return self.run_hook(
+            "pre-pr-owner",
+            {
+                "session_id": session_id,
+                "cwd": str(self.repo_dir),
+                "tool_name": "Bash",
+                "tool_input": {"command": command},
+            },
+        )
+
+    def _assert_asks(self, session_id, command):
+        code, out, err = self._bash(session_id, command)
+        self.assertEqual(code, 0)
+        decision = json.loads(out)["hookSpecificOutput"]
+        self.assertEqual(decision["hookEventName"], "PreToolUse")
+        self.assertEqual(decision["permissionDecision"], "ask")
+        self.assertIn("acme/app#1", decision["permissionDecisionReason"])
+        self.assertIn("alpha", decision["permissionDecisionReason"])
+
+    def _assert_silent(self, session_id, command):
+        code, out, err = self._bash(session_id, command)
+        self.assertEqual((code, out), (0, ""))
+
+    def test_foreign_push_asks(self):
+        self._assert_asks("sess-2", "git push origin feature/x")
+
+    def test_foreign_rebase_asks(self):
+        self._assert_asks("sess-2", "git rebase origin/main")
+
+    def test_foreign_commit_asks(self):
+        self._assert_asks("sess-2", "git commit -m wip")
+
+    def test_foreign_push_with_git_dash_c_asks(self):
+        self._assert_asks("sess-2", "git -C {} push".format(self.repo_dir))
+
+    def test_foreign_push_inside_shell_c_asks(self):
+        self._assert_asks("sess-2", "bash -c 'git push origin feature/x'")
+
+    def test_foreign_push_after_env_assignment_asks(self):
+        self._assert_asks("sess-2", "FOO=1 git push")
+
+    def test_foreign_push_after_and_operator_asks(self):
+        self._assert_asks("sess-2", "git fetch && git push")
+
+    def test_foreign_gh_pr_checkout_by_number_asks(self):
+        self._assert_asks("sess-2", "gh pr checkout 1 -R acme/app")
+
+    def test_foreign_gh_pr_comment_by_url_asks(self):
+        self._assert_asks("sess-2", "gh pr comment https://github.com/acme/app/pull/1 -b hi")
+
+    def test_foreign_gh_pr_comment_with_body_before_number_asks(self):
+        self._assert_asks("sess-2", "gh pr comment -b hi 1 -R acme/app")
+
+    def test_foreign_gh_pr_review_by_branch_asks(self):
+        self._assert_asks("sess-2", "gh pr review feature/x --approve")
+
+    def test_foreign_gh_pr_merge_without_argument_uses_current_branch(self):
+        self._assert_asks("sess-2", "gh pr merge --squash")
+
+    def test_foreign_gh_pr_number_uses_origin_repo_when_no_repo_flag(self):
+        self._assert_asks("sess-2", "gh pr ready 1")
+
+    def test_own_push_is_silent(self):
+        self._assert_silent("sess-1", "git push origin feature/x")
+
+    def test_own_gh_pr_comment_is_silent(self):
+        self._assert_silent("sess-1", "gh pr comment 1 -b hi")
+
+    def test_unbound_session_is_silent(self):
+        self._assert_silent("sess-9", "git push origin feature/x")
+
+    def test_untracked_branch_is_silent(self):
+        self._git(["checkout", "-q", "-b", "feature/untracked"])
+        self._assert_silent("sess-2", "git push origin feature/untracked")
+
+    def test_branch_delete_is_silent(self):
+        self._assert_silent("sess-2", "git push origin --delete feature/x")
+
+    def test_same_branch_name_in_other_repo_is_silent(self):
+        self._git(["remote", "set-url", "origin", "https://github.com/acme/web.git"])
+        self._assert_silent("sess-2", "git push origin feature/x")
+
+    def test_merged_pr_is_silent(self):
+        conn = sqlite3.connect(str(paths.db_path()))
+        conn.execute("UPDATE prs SET gh_state = 'MERGED' WHERE number = 1")
+        conn.commit()
+        conn.close()
+        self._assert_silent("sess-2", "git push origin feature/x")
+
+    def test_read_only_git_command_is_silent(self):
+        self._assert_silent("sess-2", "git status")
+
+    def test_read_only_gh_pr_command_is_silent(self):
+        self._assert_silent("sess-2", "gh pr view 1 -R acme/app")
+
+    def test_unparseable_command_is_silent(self):
+        self._assert_silent("sess-2", "git push 'unterminated")
+
+    def test_swallows_exceptions_as_system_message(self):
+        with mock.patch("guild.commands.hook.pre_pr_owner", side_effect=RuntimeError("boom")):
+            code, out, err = self._bash("sess-2", "git push")
+        self.assertEqual(code, 0)
+        self.assertIn("guild hook error: boom", out)

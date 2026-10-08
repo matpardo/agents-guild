@@ -978,6 +978,7 @@ def build_parser():
             "session-start",
             "prompt-submit",
             "pre-push",
+            "pre-pr-owner",
             "post-tool-use",
             "pre-edit",
             "pre-commit",
@@ -1037,6 +1038,20 @@ def _run_pre_push_hook(stdin_data):
     if result["blocked"]:
         sys.stderr.write(result["message"] + "\n")
         return 2
+    return 0
+
+
+def _run_pre_pr_owner_hook(stdin_data):
+    try:
+        command = stdin_data.get("tool_input", {}).get("command", "")
+        cwd = Path(stdin_data.get("cwd", str(Path.cwd())))
+        ctx = _build_context(stdin_data.get("session_id"), cwd)
+        result = hook_commands.pre_pr_owner(ctx, command)
+    except Exception as error:
+        sys.stdout.write(json.dumps({"systemMessage": "guild hook error: {}".format(error)}) + "\n")
+        return 0
+    if result is not None:
+        sys.stdout.write(json.dumps(result) + "\n")
     return 0
 
 
@@ -1108,6 +1123,8 @@ def _dispatch_hook(args):
         stdin_data = {}
     if args.hook_name == "pre-push":
         return _run_pre_push_hook(stdin_data)
+    if args.hook_name == "pre-pr-owner":
+        return _run_pre_pr_owner_hook(stdin_data)
     if args.hook_name == "pre-edit":
         return _run_pre_edit_hook(stdin_data)
     return _run_stateful_hook(args.hook_name, stdin_data)

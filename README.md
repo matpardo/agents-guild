@@ -188,6 +188,7 @@ guild hook session-start   # reads Claude Code hook JSON on stdin
 guild hook prompt-submit
 guild hook post-tool-use
 guild hook pre-push
+guild hook pre-pr-owner
 guild hook pre-edit
 guild hook pre-commit      # git hook: no stdin, session from CLAUDE_CODE_SESSION_ID
 
@@ -1896,6 +1897,10 @@ which merges this block and keeps what is already there:
       {
         "matcher": "Edit|Write|MultiEdit|NotebookEdit",
         "hooks": [{"type": "command", "command": "guild hook pre-edit"}]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [{"type": "command", "command": "guild hook pre-pr-owner"}]
       }
     ]
   },
@@ -1996,6 +2001,19 @@ Without a hooks manager, add the same call to the repository's
   (`area:<glob>`), or the push is denied naming the holder when another party
   holds one. If the base branch (`origin/HEAD`) or the diff cannot be
   resolved, it warns via `systemMessage` and does not check `shared_areas`.
+- `pre-pr-owner`: guards against crossing contexts between parties. On a
+  `Bash` call it detects writes to a tracked PR — `git push`/`rebase`/`commit`
+  on the branch of an open PR (same wrapper, `-C` and chaining handling as
+  `pre-push`; branch deletions pass) and `gh pr checkout|comment|review|edit|
+  ready|close|merge` addressed by number, URL, branch or the current branch.
+  The PR is looked up in the local `prs` table (branch matched together with
+  the `origin` repo). When the PR is tracked by a different party than the
+  session's, it answers
+  `{"hookSpecificOutput": {"hookEventName": "PreToolUse",
+  "permissionDecision": "ask", "permissionDecisionReason": "..."}}` so Claude
+  Code asks the human to confirm. Unbound sessions, untracked, merged or
+  closed PRs, read-only commands and unparseable commands are allowed
+  silently; errors become a `systemMessage` and never block.
 - `pre-edit`: guards a project's `shared_areas` (see "Project config") on
   `Edit`/`Write`/`MultiEdit`/`NotebookEdit` calls (`tool_input.file_path`, or
   `notebook_path` for `NotebookEdit`). Any other tool, no path, an unbound
