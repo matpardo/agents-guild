@@ -519,6 +519,123 @@ def pre_push(ctx, command):
     return {"blocked": False, "message": None, "system_message": None}
 
 
+_GIT_WRITE_VERBS = ("push", "rebase", "commit")
+_GH_PR_WRITE_VERBS = ("checkout", "comment", "review", "edit", "ready", "close", "merge")
+_GH_PR_VALUE_FLAGS = ("-R", "--repo", "-b", "--body", "-F", "--body-file", "-t", "--title", "-B", "--base")
+_GH_REPO_FLAGS = ("-R", "--repo")
+_PR_NUMBER_RE = re.compile(r"^\d+$")
+_PR_URL_RE = re.compile(r"github\.com/([^/]+/[^/]+)/pull/(\d+)")
+
+
+def _git_pr_target(tokens, default_cwd):
+    if not tokens or Path(tokens[0]).name != "git":
+        return None
+    target_dir, remaining = _git_global_options(tokens[1:], default_cwd)
+    if not remaining or remaining[0] not in _GIT_WRITE_VERBS:
+        return None
+    if remaining[0] == "push":
+        if _is_delete_push(remaining[1:]):
+            return None
+        branch = _resolve_push_branch(remaining[1:], target_dir)
+    else:
+        branch = _current_branch(target_dir)
+    if not branch:
+        return None
+    return {"repo": localbase.origin_repo_slug(target_dir), "number": None, "branch": branch}
+
+
+def _gh_pr_arguments(args):
+    repo = None
+    positional = None
+    index = 0
+    while index < len(args):
+        token = args[index]
+        if token in _GH_PR_VALUE_FLAGS:
+            if token in _GH_REPO_FLAGS and index + 1 < len(args):
+                repo = args[index + 1]
+            index += 2
+            continue
+        if not token.startswith("-") and positional is None:
+            positional = token
+        index += 1
+    return repo, positional
+
+
+def _gh_pr_target(tokens, default_cwd):
+    if len(tokens) < 3 or Path(tokens[0]).name != "gh":
+        return None
+    if tokens[1] != "pr" or tokens[2] not in _GH_PR_WRITE_VERBS:
+        return None
+    repo, positional = _gh_pr_arguments(tokens[3:])
+    if repo is None:
+        repo = localbase.origin_repo_slug(default_cwd)
+    if positional is None:
+        return {"repo": repo, "number": None, "branch": _current_branch(default_cwd)}
+    if _PR_NUMBER_RE.match(positional):
+        return {"repo": repo, "number": int(positional), "branch": None}
+    url_match = _PR_URL_RE.search(positional)
+    if url_match:
+        return {"repo": url_match.group(1), "number": int(url_match.group(2)), "branch": None}
+    return {"repo": repo, "number": None, "branch": positional}
+
+
+def _pr_target(tokens, default_cwd):
+    git_target = _git_pr_target(tokens, default_cwd)
+    if git_target is not None:
+        return git_target
+    return _gh_pr_target(tokens, default_cwd)
+
+
+def _foreign_pr(ctx, binding, target):
+    if target["number"] is None and not target["branch"]:
+        return None
+    if target["number"] is not None and target["repo"] is None:
+        return None
+    return ctx.conn.execute(
+        "SELECT repo, number, party FROM prs"
+        " WHERE party != ? AND COALESCE(gh_state, 'OPEN') = 'OPEN'"
+        " AND (? IS NULL OR repo = ?) AND (? IS NULL OR number = ?) AND (? IS NULL OR branch = ?)"
+        " ORDER BY repo, number LIMIT 1",
+        (
+            binding["party"],
+            target["repo"], target["repo"],
+            target["number"], target["number"],
+            target["branch"], target["branch"],
+        ),
+    ).fetchone()
+
+
+def _foreign_pr_confirmation(binding, row):
+    reason = "guild: {}#{} belongs to party '{}'; this session is party '{}' — confirm before touching it".format(
+        row["repo"], row["number"], row["party"], binding["party"]
+    )
+    return {
+        "hookSpecificOutput": {
+            "hookEventName": "PreToolUse",
+            "permissionDecision": "ask",
+            "permissionDecisionReason": reason,
+        }
+    }
+
+
+def pre_pr_owner(ctx, command):
+    binding = identity.resolve_binding(ctx.conn, ctx.session_id)
+    if binding is None:
+        return None
+    try:
+        segments = _push_segments(command)
+    except ValueError:
+        return None
+    for tokens in segments:
+        target = _pr_target(tokens, ctx.cwd)
+        if target is None:
+            continue
+        row = _foreign_pr(ctx, binding, target)
+        if row is not None:
+            return _foreign_pr_confirmation(binding, row)
+    return None
+
+
 def _edit_file_path(tool_name, tool_input):
     field = _EDIT_TOOL_PATH_FIELDS.get(tool_name)
     if field is None:

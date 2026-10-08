@@ -10,6 +10,7 @@ EXPECTED_HOOKS = (
     ("PostToolUse", None, "guild hook post-tool-use"),
     ("PreToolUse", "Bash", "guild hook pre-push"),
     ("PreToolUse", _EDIT_MATCHER, "guild hook pre-edit"),
+    ("PreToolUse", "Bash", "guild hook pre-pr-owner"),
     ("Notification", None, "guild hook notification"),
     ("Stop", None, "guild hook stop"),
 )
