@@ -328,6 +328,9 @@ class LaunchTests(ReviveBase):
         self.assertIn(["set-option", "-t", "guild", "set-titles", "on"], tmux.calls)
         self.assertIn(["set-option", "-t", "guild", "set-titles-string", "#W"], tmux.calls)
         self.assertIn(["set-option", "-t", "guild", "mouse", "on"], tmux.calls)
+        self.assertIn(["set-option", "-s", "set-clipboard", "on"], tmux.calls)
+        self.assertIn(["set-option", "-s", "terminal-features[10]", "*:hyperlinks"], tmux.calls)
+        self.assertIn("C-MouseDown1Pane", [arg for call in tmux.calls for arg in call])
         self.assertIn("launched alpha (resume)", out)
 
     def test_never_touches_global_options(self):
