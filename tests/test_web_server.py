@@ -168,9 +168,11 @@ class CliWiringTests(GuildTestCase):
         self.assertEqual(code, 0)
         mocked.assert_called_once_with(0)
 
-    def test_port_is_required(self):
-        code, out, err = self.run_cli(["web"], None, None)
-        self.assertNotEqual(code, 0)
+    def test_port_defaults_to_8765(self):
+        with mock.patch("guild.commands.web.webserver.serve_forever", return_value=0) as mocked:
+            code, out, err = self.run_cli(["web"], None, None)
+        self.assertEqual(code, 0)
+        mocked.assert_called_once_with(8765)
 
 
 if __name__ == "__main__":

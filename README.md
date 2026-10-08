@@ -66,24 +66,30 @@ add). Before writing it copies the previous file to `settings.json.bak`. It
 refuses, leaving the file untouched, when `settings.json` is not valid JSON.
 
 Hooks run `guild` in every session, so the installed copy must never be a
-checkout you are editing: a half-written change goes live at once. If you
-develop guild, install from a dedicated worktree that only moves to reviewed
-commits:
+checkout you are editing: a half-written change goes live at once. Install
+from the base clone and keep it on `main`, never editing there:
 
 ```
-git worktree add --detach ../agents-guild-live main
-../agents-guild-live/install.sh
-git -C ../agents-guild-live fetch && git -C ../agents-guild-live checkout --detach origin/main
+./install.sh
 ```
 
-After each merge, update the installed worktree with one command:
+If you develop guild, do it in a temporary `-dev` worktree on a feature
+branch (`main` stays checked out in the base, so a dev worktree never uses it),
+and remove it after the merge:
 
 ```
-./update.sh ../agents-guild-live
+git worktree add ../agents-guild-dev -b feat/x
+git worktree remove ../agents-guild-dev
 ```
 
-It refuses if the installed worktree has local changes, moves it to
-`origin/main`, lists the commits it brought, re-runs `install.sh` and runs
+After each merge, update the base clone with one command:
+
+```
+./update.sh
+```
+
+It refuses if the base clone has local changes or is not on `main`,
+fast-forwards it to `origin/main`, lists the commits it brought, re-runs `install.sh` and runs
 `guild doctor`. It never edits project configs; through `install.sh` it
 re-runs `guild wire-settings`, which only adds what is missing.
 
@@ -173,7 +179,7 @@ guild resources [--project <name>] [--since <dur>]   # read-only: what each proj
 guild resources collect                                # measure and record a resources.sampled event per project
 guild resources-timer install --every <dur> | uninstall | print
 guild board [--party <name> | --raid <name>]
-guild web --port <n>
+guild web [--port <n>]
 guild sync --source gh|sdd|tracker
 guild sync-timer install --every <dur> | uninstall | print
 guild dispatch run [--dry-run]                # react to new events: launch fresh sessions where a project enabled the dispatcher
@@ -935,9 +941,9 @@ by the column migration; `guild rebuild` replays it.
 
 ### `guild web`
 
-`guild web --port <n>` serves the same board in a browser, with more room
-than a terminal for filtering, collapsing and linking out. `--port` is
-required; pass `--port 0` to let the OS pick a free port. It always prints
+`guild web [--port <n>]` serves the same board in a browser, with more room
+than a terminal for filtering, collapsing and linking out. `--port` defaults
+to 8765; pass `--port 0` to let the OS pick a free port. It always prints
 the real, resolved URL before serving:
 
 ```

@@ -999,7 +999,7 @@ def build_parser():
     export.set_defaults(handler=_handle_export)
 
     web = subparsers.add_parser("web")
-    web.add_argument("--port", type=int, required=True)
+    web.add_argument("--port", type=int, default=8765)
     web.set_defaults(handler=_handle_web)
 
     return parser
