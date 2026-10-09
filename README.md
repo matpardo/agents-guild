@@ -132,11 +132,11 @@ guild task block <quest>/<tid> --reason "..."
 guild task done  <quest>/<tid> [--summary "..."]   # epic quests: also mark it done in the epic's tasks.md
 
 guild pr track <owner/repo>#<n> (--task <quest>/<tid> | --card <KEY>) --what "..." --waits "..." [--needs-human-pr-review]
-                               [--type <t>] [--fixes-main] [--fixes-flaky]
+                               [--fixes-main] [--fixes-flaky]
 guild pr set   <owner/repo>#<n> [--lifecycle draft|converging|ready] [--waits "..."]
                                [--needs-ask-answer | --no-needs-ask-answer]
                                [--needs-human-pr-review | --no-needs-human-pr-review]
-                               [--type <t>] [--fixes-main | --no-fixes-main]
+                               [--fixes-main | --no-fixes-main]
                                [--fixes-flaky | --no-fixes-flaky]
 
 guild ask "<question>" --context "..." [--ref <ref> ...] [--option "..."]   # refs: pr:<owner/repo>#<n>, task:<quest>/<tid>, card:<KEY>; with exactly one task in progress and no task:/card: ref it is added for you
@@ -728,14 +728,7 @@ A PR that had the old `needs-human` lifecycle becomes `draft` with
 `needs-ask-answer` set, both in the live database and when events replay in
 `guild rebuild`.
 
-**Type.** A PR's type is read from its branch prefix: the text before the
-first `/`, lower-cased, mapped to one of `feat`, `fix`, `hotfix`, `chore`,
-`refactor`, `docs`, `test`, `perf`, `ci`, `build`, `style`, with the aliases
-`feature` → `feat`, `bugfix` and `bug` → `fix`, `doc` → `docs` and `tests` →
-`test`. A branch with no `/` or an unknown prefix has no type and shows
-nothing. `--type` on `pr track` or `pr set` stores an explicit type that wins
-over the branch; only that explicit value is stored, so a branch rename picked
-up by the next sync re-derives the type by itself. `guild sync` never sets it.
+**Branch.** The full branch name of each PR is shown wherever the PR is shown: under the PR in `guild board`, at the end of its `guild merge-queue` line, and next to the PR in the web board. It comes from `pr track` and `guild sync`; a PR with no known branch shows nothing.
 
 **Urgency marks.** Two more independent booleans, never touched by sync:
 `--fixes-main` (the PR repairs a broken main branch) and `--fixes-flaky` (the

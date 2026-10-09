@@ -63,7 +63,7 @@ class PrTrackTests(GuildTestCase):
         conn = sqlite3.connect(str(self.data_home / "guild" / "guild.db"))
         conn.row_factory = sqlite3.Row
         row = conn.execute(
-            "SELECT needs_ask_answer, needs_human_pr_review, pr_type, fixes_main, fixes_flaky FROM prs"
+            "SELECT needs_ask_answer, needs_human_pr_review, fixes_main, fixes_flaky FROM prs"
         ).fetchone()
         conn.close()
         return row
@@ -94,49 +94,31 @@ class PrTrackTests(GuildTestCase):
     def test_track_sets_both_marks(self):
         self.assertEqual(self._track_marks(["--fixes-main", "--fixes-flaky"]), (1, 1))
 
-    def test_track_without_a_type_option_stores_no_explicit_type(self):
-        self.assertIsNone(self._track_row([])["pr_type"])
-
-    def test_track_stores_an_explicit_type(self):
-        self.assertEqual(self._track_row(["--type", "hotfix"])["pr_type"], "hotfix")
-
-    def test_track_rejects_an_unknown_type(self):
-        self.write_gh_fixture(
-            "view_acme-app_1",
-            {"state": "OPEN", "isDraft": True, "headRefName": "feature/x", "title": "t"},
-        )
+    def test_track_rejects_the_removed_type_option(self):
         code, out, err = self.run_cli(
             [
                 "pr", "track", "acme/app#1", "--task", "demo/T01",
-                "--what", "x", "--waits", "y", "--type", "feet",
+                "--what", "x", "--waits", "y", "--type", "hotfix",
             ],
             "sess-1", self.repo_dir,
         )
         self.assertEqual(code, 2)
-        self.assertIn("invalid choice", err)
+        self.assertIn("--type", err)
 
-    def test_board_shows_the_type_derived_from_the_branch(self):
+    def test_board_shows_the_full_branch_under_the_pr(self):
         self._track_row([])
         code, out, err = self.run_cli(["board"], "sess-1", self.repo_dir)
-        self.assertIn("app#1  draft feat", out)
+        self.assertIn("branch: feature/x", out)
 
-    def test_board_shows_no_type_for_an_unknown_branch_prefix(self):
-        self.write_gh_fixture(
-            "view_acme-app_2",
-            {"state": "OPEN", "isDraft": True, "headRefName": "wip/x", "title": "t"},
-        )
-        code, out, err = self.run_cli(
-            ["pr", "track", "acme/app#2", "--task", "demo/T01", "--what", "x", "--waits", "y"],
-            "sess-1", self.repo_dir,
-        )
-        self.assertEqual(code, 0, err)
+    def test_board_shows_no_type_badge(self):
+        self._track_row([])
         code, out, err = self.run_cli(["board"], "sess-1", self.repo_dir)
-        self.assertIn("app#2  draft  ", out)
+        self.assertIn("app#1  draft  ", out)
 
     def test_board_shows_the_marks_as_badges(self):
         self._track_row(["--fixes-main", "--fixes-flaky"])
         code, out, err = self.run_cli(["board"], "sess-1", self.repo_dir)
-        self.assertIn("app#1  draft feat fixes-main fixes-flaky", out)
+        self.assertIn("app#1  draft fixes-main fixes-flaky", out)
 
     def test_track_rejects_duplicate(self):
         self.write_gh_fixture(
@@ -230,7 +212,7 @@ class PrSetTests(GuildTestCase):
         conn = sqlite3.connect(str(self.data_home / "guild" / "guild.db"))
         conn.row_factory = sqlite3.Row
         row = conn.execute(
-            "SELECT lifecycle, needs_ask_answer, needs_human_pr_review, pr_type, fixes_main, fixes_flaky"
+            "SELECT lifecycle, needs_ask_answer, needs_human_pr_review, fixes_main, fixes_flaky"
             " FROM prs WHERE number = 1"
         ).fetchone()
         conn.close()
@@ -313,29 +295,12 @@ class PrSetTests(GuildTestCase):
         self.set_pr("--lifecycle", "converging")
         self.assertEqual(self.marks(), (1, 1))
 
-    def test_set_corrects_the_type(self):
-        self.set_pr("--type", "hotfix")
-        self.assertEqual(self.row()["pr_type"], "hotfix")
-        code, out, err = self.run_cli(["board"], "sess-1", self.repo_dir)
-        self.assertIn("app#1  draft hotfix", out)
-
-    def test_set_without_a_type_option_leaves_the_type_unchanged(self):
-        self.set_pr("--type", "chore")
-        self.set_pr("--lifecycle", "converging")
-        self.assertEqual(self.row()["pr_type"], "chore")
-
-    def test_set_accepts_the_type_alone(self):
+    def test_set_rejects_the_removed_type_option(self):
         code, out, err = self.run_cli(
             ["pr", "set", "acme/app#1", "--type", "docs"], "sess-1", self.repo_dir
         )
-        self.assertEqual(code, 0, err)
-
-    def test_set_rejects_an_unknown_type(self):
-        code, out, err = self.run_cli(
-            ["pr", "set", "acme/app#1", "--type", "feet"], "sess-1", self.repo_dir
-        )
         self.assertEqual(code, 2)
-        self.assertIn("invalid choice", err)
+        self.assertIn("--type", err)
 
     def test_set_unknown_pr_fails(self):
         code, out, err = self.run_cli(

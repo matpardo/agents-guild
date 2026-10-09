@@ -30,7 +30,7 @@ def _pr(number, **overrides):
         "unmet_deps": [],
         "needs_ask_answer": False,
         "needs_human_pr_review": False,
-        "pr_type": None,
+        "branch": None,
         "fixes_main": False,
         "fixes_flaky": False,
     }
@@ -170,8 +170,11 @@ class StateTests(unittest.TestCase):
             entry["labels"], ["converging", "fixes-main", "fixes-flaky", "needs-ask-answer"]
         )
 
-    def test_the_entry_carries_the_resolved_type(self):
-        self.assertEqual(self._entry(pr_type="hotfix")["pr_type"], "hotfix")
+    def test_the_entry_carries_the_branch(self):
+        self.assertEqual(self._entry(branch="hotfix/main-red")["branch"], "hotfix/main-red")
+
+    def test_the_entry_carries_no_branch_when_the_pr_has_none(self):
+        self.assertIsNone(self._entry()["branch"])
 
     def test_draft_ready_with_the_review_flag_is_promoted_first(self):
         entry = self._entry(lifecycle="draft", needs_human_pr_review=True, party="beta")

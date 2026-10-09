@@ -250,7 +250,8 @@ class BoardTests(GuildTestCase):
         self.assertIn("coding", lines[task_index + 1])
         self.assertIn("app#1  draft", lines[task_index + 2])
         self.assertIn("Adds X", lines[task_index + 2])
-        self.assertIn("waits: review", lines[task_index + 3])
+        self.assertIn("branch: feature/x", lines[task_index + 3])
+        self.assertIn("waits: review", lines[task_index + 4])
 
     def test_board_without_asks_says_nothing_needs_you(self):
         repo_dir = self.register_project("acme", ["acme/app"])

@@ -101,19 +101,6 @@
       merged: "The PR was merged.",
       closed: "The PR was closed without merging.",
     },
-    prType: {
-      feat: "A new feature.",
-      fix: "A bug fix.",
-      hotfix: "An urgent fix for something already released or broken.",
-      chore: "Maintenance work with no behaviour change.",
-      refactor: "A change of structure with no behaviour change.",
-      docs: "Documentation only.",
-      test: "Tests only.",
-      perf: "A performance improvement.",
-      ci: "A change to the pipelines.",
-      build: "A change to the build or packaging.",
-      style: "Formatting only.",
-    },
     flag: {
       "fixes-main": "The PR repairs a broken main branch; it goes first so everyone is unblocked.",
       "fixes-flaky": "The PR fixes flaky tests; it goes first so the suite stops lying to everyone.",
@@ -884,14 +871,19 @@
     appendAll(section, drift.map(renderDriftEntry));
   }
 
+  function branchEl(name) {
+    var branch = textEl("span", name);
+    branch.className = "branch";
+    branch.title = name;
+    return branch;
+  }
+
   function renderQueueEntryHead(entry) {
     var head = el("div");
     head.className = "queue-entry-head";
     head.appendChild(link(entry.url, entry.ref));
-    if (entry.pr_type) {
-      var prType = textEl("span", entry.pr_type);
-      prType.className = "pill pr-type";
-      head.appendChild(explain(prType, "prType", entry.pr_type));
+    if (entry.branch) {
+      head.appendChild(branchEl(entry.branch));
     }
     entry.labels.forEach(function (label) {
       var pill = textEl("span", label);
@@ -1011,10 +1003,8 @@
     var lifecycle = textEl("span", pr.lifecycle);
     lifecycle.className = "pill lifecycle-" + pr.lifecycle;
     row.appendChild(explain(lifecycle, "lifecycle", pr.lifecycle));
-    if (pr.pr_type) {
-      var prType = textEl("span", pr.pr_type);
-      prType.className = "pill pr-type";
-      row.appendChild(explain(prType, "prType", pr.pr_type));
+    if (pr.branch) {
+      row.appendChild(branchEl(pr.branch));
     }
     if (pr.fixes_main) {
       var fixesMain = textEl("span", "fixes-main");

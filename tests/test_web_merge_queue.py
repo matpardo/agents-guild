@@ -70,7 +70,7 @@ class MergeQueueModelTests(MergeQueueModelTestCase):
         self.assertEqual(
             set(first),
             {
-                "position", "ref", "repo", "number", "party", "task", "lifecycle", "pr_type",
+                "position", "ref", "repo", "number", "party", "task", "lifecycle", "branch",
                 "checks_failing", "checks_passing", "checks_pending", "labels", "unblocks", "state", "next_action",
                 "action", "why", "reasons", "url",
             },
@@ -80,6 +80,7 @@ class MergeQueueModelTests(MergeQueueModelTestCase):
         self.assertEqual(first["party"], "alpha")
         self.assertEqual(first["task"], "qa/T03")
         self.assertEqual(first["lifecycle"], "ready")
+        self.assertEqual(first["branch"], "feature/x")
         self.assertEqual((first["state"], first["action"], first["reasons"]), ("ready", "merge", []))
         self.assertEqual(first["unblocks"], 1)
 

@@ -67,7 +67,7 @@ class SyncTests(GuildTestCase):
         code, out, err = self.run_cli(["sync", "--source", "gh"], "sess-1", self.repo_dir)
         self.assertEqual(code, 0)
         code, out, err = self.run_cli(["board"], "sess-1", self.repo_dir)
-        self.assertIn("app#1  merged feat  ✗1 ✓1", out)
+        self.assertIn("app#1  merged  ✗1 ✓1", out)
 
     def _sync_rollup(self, rollup):
         self.write_gh_fixture(
@@ -157,12 +157,12 @@ class SyncTests(GuildTestCase):
     def test_board_shows_pending_checks_glyph(self):
         self._sync_rollup([{"__typename": "StatusContext", "state": "PENDING"}])
         code, out, err = self.run_cli(["board"], "sess-1", self.repo_dir)
-        self.assertIn("app#1  ready feat  ✗0 ✓0 ⏳1", out)
+        self.assertIn("app#1  ready  ✗0 ✓0 ⏳1", out)
 
     def test_board_says_no_checks_only_when_every_count_is_zero(self):
         self._sync_rollup([])
         code, out, err = self.run_cli(["board"], "sess-1", self.repo_dir)
-        self.assertIn("app#1  ready feat  no checks", out)
+        self.assertIn("app#1  ready  no checks", out)
 
     def test_old_pr_synced_event_without_checks_pending_replays(self):
         self._sync_rollup([{"conclusion": "FAILURE"}])

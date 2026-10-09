@@ -341,7 +341,6 @@ _COLUMN_MIGRATIONS = (
     ("asks", "answered_at", "TEXT"),
     ("leaders", "handoff_consumed_at", "TEXT"),
     ("parties", "keeper", "INTEGER"),
-    ("prs", "pr_type", "TEXT"),
     ("prs", "fixes_main", "INTEGER"),
     ("prs", "fixes_flaky", "INTEGER"),
 )

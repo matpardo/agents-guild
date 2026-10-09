@@ -83,7 +83,7 @@ def _entry(pr):
         "party": pr["party"],
         "task": task,
         "lifecycle": pr["lifecycle"],
-        "pr_type": pr["pr_type"],
+        "branch": pr["branch"],
         "checks_failing": pr["checks_failing"],
         "checks_passing": pr["checks_passing"],
         "checks_pending": pr["checks_pending"],

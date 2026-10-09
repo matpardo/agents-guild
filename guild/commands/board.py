@@ -2,7 +2,7 @@ import json
 import shlex
 import textwrap
 
-from guild import config, ctx_pressure, links, party_progress, party_status, pr_types, resume
+from guild import config, ctx_pressure, links, party_progress, party_status, resume
 from guild import sanitize, session_status, timeutil
 from guild.commands import claim as claim_commands
 from guild.commands import drift as drift_commands
@@ -31,7 +31,6 @@ _FLAG_STYLES = (
     ("needs_human_pr_review", "needs-human-pr-review", "yellow"),
 )
 
-_TYPE_STYLE = "bold"
 
 _STATUS_STYLES = {
     "waiting-permission": "red",
@@ -112,9 +111,6 @@ def _checks_painted(painter, pr_row):
 
 def _badges(pr_row):
     badges = [(pr_row["lifecycle"], _LIFECYCLE_STYLES[pr_row["lifecycle"]])]
-    pr_type = pr_types.resolve(pr_row["pr_type"], pr_row["branch"])
-    if pr_type is not None:
-        badges.append((pr_type, _TYPE_STYLE))
     badges.extend((label, style) for column, label, style in _FLAG_STYLES if pr_row[column])
     return badges
 
@@ -152,6 +148,10 @@ def _pr_lines(painter, pr_row, indent):
         break_on_hyphens=False,
     )
     head_lines[0] = head_lines[0].replace(status_plain, status_painted, 1)
+    branch = _optional_text(pr_row["branch"])
+    if branch is not None:
+        branch_lines = painter.wrap("branch: {}".format(branch), indent + "  ")
+        head_lines = head_lines + [painter.paint(line, "dim") for line in branch_lines]
     waits = _visible_waits(pr_row)
     if not waits:
         return head_lines
@@ -730,7 +730,6 @@ def _pr_model(pr_row, project_config):
         "lifecycle": pr_row["lifecycle"],
         "needs_ask_answer": bool(pr_row["needs_ask_answer"]),
         "needs_human_pr_review": bool(pr_row["needs_human_pr_review"]),
-        "pr_type": pr_types.resolve(pr_row["pr_type"], pr_row["branch"]),
         "fixes_main": bool(pr_row["fixes_main"]),
         "fixes_flaky": bool(pr_row["fixes_flaky"]),
         "checks_failing": pr_row["checks_failing"] or 0,
@@ -738,6 +737,7 @@ def _pr_model(pr_row, project_config):
         "checks_pending": pr_row["checks_pending"] or 0,
         "what": sanitize.strip_control_sequences(pr_row["what"]),
         "waits": _optional_text(_visible_waits(pr_row)),
+        "branch": _optional_text(pr_row["branch"]),
         "card": card,
         "card_url": links.card_url(project_config, card),
         "url": links.pr_url(pr_row["repo"], pr_row["number"]),

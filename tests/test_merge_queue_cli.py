@@ -56,18 +56,18 @@ class OutputTests(QueueCliTestCase):
         self.assertEqual(lines[0], "merge queue \u00b7 raid ci \u00b7 synced 0 min ago")
         self.assertEqual(
             lines[1],
-            "1. acme/app#2  beta  qb/T02 [feat]  unblocks 1 \u2014 merge"
-            " (ready, checks \u27131; before acme/app#1 (task T01 depends on T02))",
+            "1. acme/app#2  beta  qb/T02  unblocks 1 \u2014 merge"
+            " (ready, checks \u27131; before acme/app#1 (task T01 depends on T02))  branch: feature/x",
         )
         self.assertEqual(
-            lines[2], "\u25b6 next action: 2. acme/app#4  beta  qb/T02 [feat]  unblocks 1 \u2014 fix: checks failing (2) \u2192 beta"
+            lines[2], "\u25b6 next action: 2. acme/app#4  beta  qb/T02  unblocks 1 \u2014 fix: checks failing (2) \u2192 beta  branch: feature/x"
         )
         self.assertEqual(
             lines[3],
-            "3. acme/app#1  alpha  qa/T01 [feat]  unblocks 1 \u2014 fix: waits on task T02; waits on acme/app#4 \u2192 alpha",
+            "3. acme/app#1  alpha  qa/T01  unblocks 1 \u2014 fix: waits on task T02; waits on acme/app#4 \u2192 alpha  branch: feature/x",
         )
-        self.assertTrue(lines[4].startswith("4. acme/app#3  alpha  qa/T03 [feat]  unblocks 0 \u2014 merge"))
-        self.assertTrue(lines[5].startswith("5. acme/app#7  delta  qd/T01 [feat]  unblocks 0 \u2014 merge"))
+        self.assertTrue(lines[4].startswith("4. acme/app#3  alpha  qa/T03  unblocks 0 \u2014 merge"))
+        self.assertTrue(lines[5].startswith("5. acme/app#7  delta  qd/T01  unblocks 0 \u2014 merge"))
 
     def test_there_is_no_separate_blocked_section(self):
         code, out, err = self.queue(["--raid", "ci"], None)
@@ -82,6 +82,10 @@ class OutputTests(QueueCliTestCase):
         )
         self.assertTrue(out.splitlines()[2].startswith("1. acme/app#2"))
 
+    def test_each_entry_line_ends_with_the_full_branch(self):
+        code, out, err = self.queue(["--party", "gamma"], None)
+        self.assertIn("(ready, checks \u27131)  branch: feature/x", out)
+
     def test_footer_reminds_that_guild_never_merges(self):
         code, out, err = self.queue(["--raid", "ci"], None)
         self.assertEqual(out.splitlines()[-1], _REMINDER)
@@ -90,9 +94,9 @@ class OutputTests(QueueCliTestCase):
         code, out, err = self.queue(["--party", "gamma"], None)
         self.assertEqual(code, 0, err)
         self.assertIn("merge queue · party gamma", out)
-        self.assertIn("1. acme/app#5  gamma  qc/T01 [feat]  unblocks 0 \u2014 merge (ready, checks \u27131)", out)
+        self.assertIn("1. acme/app#5  gamma  qc/T01  unblocks 0 \u2014 merge (ready, checks \u27131)", out)
         self.assertIn(
-            "2. acme/app#6  gamma  qc/T01 [feat] [draft]  unblocks 0"
+            "2. acme/app#6  gamma  qc/T01 [draft]  unblocks 0"
             " \u2014 promote: gh pr ready \u2192 gamma (ready, checks \u27131)",
             out,
         )
@@ -109,7 +113,7 @@ class OutputTests(QueueCliTestCase):
     def test_blocked_only_queue_keeps_every_row_with_a_fix_action(self):
         self.run_cli(["pr", "set", "acme/app#5", "--needs-ask-answer"], "sess-3", self.repo_dir)
         code, out, err = self.queue(["--party", "gamma"], None)
-        self.assertIn("1. acme/app#5  gamma  qc/T01 [feat] [needs-ask-answer]  unblocks 0 \u2014 fix: needs ask answer \u2192 gamma", out)
+        self.assertIn("1. acme/app#5  gamma  qc/T01 [needs-ask-answer]  unblocks 0 \u2014 fix: needs ask answer \u2192 gamma", out)
         self.assertNotIn("next action", out)
 
     def test_pending_checks_show_a_wait_action(self):
@@ -119,20 +123,20 @@ class OutputTests(QueueCliTestCase):
         code, out, err = self.sync_gh("sess-1")
         self.assertEqual(code, 0, err)
         code, out, err = self.queue(["--party", "gamma"], None)
-        self.assertIn("1. acme/app#5  gamma  qc/T01 [feat]  unblocks 0 \u2014 wait: checks pending (1)", out)
-        self.assertIn("2. acme/app#6  gamma  qc/T01 [feat] [draft]", out)
+        self.assertIn("1. acme/app#5  gamma  qc/T01  unblocks 0 \u2014 wait: checks pending (1)", out)
+        self.assertIn("2. acme/app#6  gamma  qc/T01 [draft]", out)
         self.assertNotIn("next action", out)
 
     def test_review_flag_shows_a_human_review_action_and_its_label(self):
         self.run_cli(["pr", "set", "acme/app#5", "--needs-human-pr-review"], "sess-3", self.repo_dir)
         code, out, err = self.queue(["--party", "gamma"], None)
-        self.assertIn("qc/T01 [feat] [needs-human-pr-review]", out)
+        self.assertIn("qc/T01 [needs-human-pr-review]", out)
         self.assertIn("review: human, then merge", out)
 
     def test_ask_flag_shows_its_label_after_the_draft_label(self):
         self.run_cli(["pr", "set", "acme/app#6", "--needs-ask-answer"], "sess-3", self.repo_dir)
         code, out, err = self.queue(["--party", "gamma"], None)
-        self.assertIn("qc/T01 [feat] [draft] [needs-ask-answer]", out)
+        self.assertIn("qc/T01 [draft] [needs-ask-answer]", out)
 
     def test_party_with_no_open_prs_says_so(self):
         self.run_cli(["party", "start", "epsilon"], "sess-5", self.repo_dir)
@@ -148,9 +152,9 @@ class OutputTests(QueueCliTestCase):
         self.assertEqual(code, 0, err)
         code, out, err = self.queue(["--raid", "ci"], None)
         self.assertIn(
-            "acme/app#3  alpha  qa/T03 [feat] [draft]  unblocks 1 \u2014 promote: gh pr ready \u2192 alpha", out
+            "acme/app#3  alpha  qa/T03 [draft]  unblocks 1 \u2014 promote: gh pr ready \u2192 alpha", out
         )
-        self.assertIn("acme/app#7  delta  qd/T01 [feat]  unblocks 0 \u2014 wait: waits on acme/app#3", out)
+        self.assertIn("acme/app#7  delta  qd/T01  unblocks 0 \u2014 wait: waits on acme/app#3", out)
 
     def test_pin_to_a_blocked_pr_keeps_it_first_with_a_fix_action(self):
         self.run_cli(["pr", "set", "acme/app#3", "--needs-ask-answer"], "sess-1", self.repo_dir)
@@ -159,8 +163,8 @@ class OutputTests(QueueCliTestCase):
         )
         self.assertEqual(code, 0, err)
         code, out, err = self.queue(["--raid", "ci"], None)
-        self.assertIn("acme/app#3  alpha  qa/T03 [feat] [needs-ask-answer]  unblocks 1 \u2014 fix: needs ask answer \u2192 alpha", out)
-        self.assertIn("acme/app#7  delta  qd/T01 [feat]  unblocks 0 \u2014 fix: waits on acme/app#3 \u2192 delta", out)
+        self.assertIn("acme/app#3  alpha  qa/T03 [needs-ask-answer]  unblocks 1 \u2014 fix: needs ask answer \u2192 alpha", out)
+        self.assertIn("acme/app#7  delta  qd/T01  unblocks 0 \u2014 fix: waits on acme/app#3 \u2192 delta", out)
         self.assertLess(out.index("acme/app#3  alpha"), out.index("acme/app#7  delta"))
 
     def test_pins_show_in_the_ready_entry_text(self):
