@@ -29,7 +29,7 @@ def _task_fields(ctx, task_ref):
     return quest, tid
 
 
-def track(ctx, ref, task_ref, card, what, waits, needs_human_pr_review, pr_type, fixes_main, fixes_flaky):
+def track(ctx, ref, task_ref, card, what, waits, needs_human_pr_review, fixes_main, fixes_flaky):
     repo, number = refs.parse_pr_ref(ref)
     binding = identity.require_binding(ctx.conn, ctx.session_id)
     project = config.require_project(ctx.cwd, ctx.projects_dir)
@@ -69,7 +69,6 @@ def track(ctx, ref, task_ref, card, what, waits, needs_human_pr_review, pr_type,
                 "waits": waits,
                 "lifecycle": _TRACK_INITIAL_LIFECYCLE,
                 "needs_human_pr_review": int(needs_human_pr_review),
-                "pr_type": pr_type,
                 "fixes_main": int(fixes_main),
                 "fixes_flaky": int(fixes_flaky),
                 "branch": gh_data.get("headRefName"),
@@ -104,12 +103,12 @@ def _flag_value(requested, current):
     return int(requested)
 
 
-def set_(ctx, ref, lifecycle, waits, needs_ask_answer, needs_human_pr_review, pr_type, fixes_main, fixes_flaky):
-    options = (lifecycle, waits, needs_ask_answer, needs_human_pr_review, pr_type, fixes_main, fixes_flaky)
+def set_(ctx, ref, lifecycle, waits, needs_ask_answer, needs_human_pr_review, fixes_main, fixes_flaky):
+    options = (lifecycle, waits, needs_ask_answer, needs_human_pr_review, fixes_main, fixes_flaky)
     if all(option is None for option in options):
         raise GuildError(
             "pr set needs at least one of --lifecycle, --waits, --needs-ask-answer/--no-needs-ask-answer,"
-            " --needs-human-pr-review/--no-needs-human-pr-review, --type,"
+            " --needs-human-pr-review/--no-needs-human-pr-review,"
             " --fixes-main/--no-fixes-main, --fixes-flaky/--no-fixes-flaky",
             1,
         )
@@ -136,7 +135,6 @@ def set_(ctx, ref, lifecycle, waits, needs_ask_answer, needs_human_pr_review, pr
                 "waits": new_waits,
                 "needs_ask_answer": _flag_value(needs_ask_answer, row["needs_ask_answer"]),
                 "needs_human_pr_review": _flag_value(needs_human_pr_review, row["needs_human_pr_review"]),
-                "pr_type": pr_type if pr_type is not None else row["pr_type"],
                 "fixes_main": _flag_value(fixes_main, row["fixes_main"]),
                 "fixes_flaky": _flag_value(fixes_flaky, row["fixes_flaky"]),
             },

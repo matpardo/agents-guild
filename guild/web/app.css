@@ -14,8 +14,7 @@
   --lifecycle-fixes-main-bg: #fbe3e1;
   --lifecycle-fixes-flaky-fg: #1d4f9a;
   --lifecycle-fixes-flaky-bg: #dce8fb;
-  --pr-type-fg: #44464f;
-  --pr-type-bg: #e8eaf0;
+  --branch-fg: #5b5e68;
   --lifecycle-needs-ask-answer-fg: #8c1d18;
   --lifecycle-needs-ask-answer-bg: #fbe3e1;
   --lifecycle-needs-human-pr-review-fg: #7a4b00;
@@ -55,8 +54,7 @@
     --lifecycle-fixes-main-bg: #4a1c1a;
     --lifecycle-fixes-flaky-fg: #a8c6ff;
     --lifecycle-fixes-flaky-bg: #17284a;
-    --pr-type-fg: #c9ccd6;
-    --pr-type-bg: #2f3138;
+    --branch-fg: #a3a7b3;
     --lifecycle-needs-ask-answer-fg: #ffb3ad;
     --lifecycle-needs-ask-answer-bg: #4a1c1a;
     --lifecycle-needs-human-pr-review-fg: #ffd479;
@@ -408,9 +406,10 @@ a {
   color: var(--lifecycle-fixes-flaky-fg);
 }
 
-.pr-type {
-  background: var(--pr-type-bg);
-  color: var(--pr-type-fg);
+.branch {
+  color: var(--branch-fg);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.85em;
 }
 
 .lifecycle-needs-ask-answer {

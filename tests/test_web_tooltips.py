@@ -2,7 +2,7 @@ import re
 import unittest
 from pathlib import Path
 
-from guild import merge_queue, pr_types
+from guild import merge_queue
 from guild.commands import board
 from guild.resources import report
 
@@ -46,9 +46,6 @@ class TooltipCoverageTests(unittest.TestCase):
 
     def test_pr_flags(self):
         self.assertCovers("flag", [name for _, name, _ in board._FLAG_STYLES])
-
-    def test_pr_types(self):
-        self.assertCovers("prType", pr_types.TYPES)
 
     def test_queue_states(self):
         self.assertCovers(

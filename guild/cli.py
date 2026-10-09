@@ -5,7 +5,7 @@ import shutil
 import sys
 from pathlib import Path
 
-from guild import db, notify, origin, paths, pr_types, session_info, timeutil
+from guild import db, notify, origin, paths, session_info, timeutil
 from guild.commands import hook as hook_commands
 from guild.context import RunContext
 from guild.errors import GuildError
@@ -165,7 +165,6 @@ def _handle_pr_track(ctx, args):
             args.what,
             args.waits,
             args.needs_human_pr_review,
-            args.pr_type,
             args.fixes_main,
             args.fixes_flaky,
         )
@@ -184,7 +183,6 @@ def _handle_pr_set(ctx, args):
             args.waits,
             args.needs_ask_answer,
             args.needs_human_pr_review,
-            args.pr_type,
             args.fixes_main,
             args.fixes_flaky,
         )
@@ -697,7 +695,6 @@ def _add_pr_parser(subparsers):
     track.add_argument("--what", required=True)
     track.add_argument("--waits", required=True)
     track.add_argument("--needs-human-pr-review", action="store_true")
-    track.add_argument("--type", dest="pr_type", choices=pr_types.TYPES)
     track.add_argument("--fixes-main", action="store_true")
     track.add_argument("--fixes-flaky", action="store_true")
     track.set_defaults(handler=_handle_pr_track)
@@ -708,7 +705,6 @@ def _add_pr_parser(subparsers):
     set_parser.add_argument("--waits")
     _add_flag_pair(set_parser, "needs-ask-answer", "needs_ask_answer")
     _add_flag_pair(set_parser, "needs-human-pr-review", "needs_human_pr_review")
-    set_parser.add_argument("--type", dest="pr_type", choices=pr_types.TYPES)
     _add_flag_pair(set_parser, "fixes-main", "fixes_main")
     _add_flag_pair(set_parser, "fixes-flaky", "fixes_flaky")
     set_parser.set_defaults(handler=_handle_pr_set)

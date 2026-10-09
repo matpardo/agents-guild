@@ -31,7 +31,6 @@ _SEED = {
             "waits": "one more review",
             "lifecycle": "draft",
             "needs_ask_answer": True,
-            "pr_type": "hotfix",
             "fixes_main": True,
         }
     ],
@@ -61,7 +60,7 @@ class SeedTests(GuildTestCase):
         self.assertIn("queued: T04", out)
         self.assertIn("blocked: T05 — waiting on ci", out)
         self.assertNotIn("T06", out)
-        self.assertIn("app#894  draft hotfix fixes-main needs-ask-answer", out)
+        self.assertIn("app#894  draft fixes-main needs-ask-answer", out)
         code, out, err = self.run_cli(["asks"], None, None)
         self.assertIn("one more round?", out)
 

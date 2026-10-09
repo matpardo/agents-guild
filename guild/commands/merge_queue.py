@@ -1,6 +1,6 @@
 import json
 
-from guild import config, db, events, identity, merge_queue, pr_types, refs, resolve, sanitize, timeutil
+from guild import config, db, events, identity, merge_queue, refs, resolve, sanitize, timeutil
 from guild.commands import main_status as main_status_commands
 from guild.commands import raid as raid_commands
 from guild.errors import GuildError
@@ -45,6 +45,12 @@ def _globs(conn, row):
     return [glob_row["glob"] for glob_row in rows]
 
 
+def _optional_branch(branch):
+    if not branch:
+        return None
+    return sanitize.strip_control_sequences(branch)
+
+
 def _pr_record(conn, row):
     context = _task_context(conn, row)
     task_key = None
@@ -70,7 +76,7 @@ def _pr_record(conn, row):
         "checks_pending": row["checks_pending"] or 0,
         "needs_ask_answer": bool(row["needs_ask_answer"]),
         "needs_human_pr_review": bool(row["needs_human_pr_review"]),
-        "pr_type": pr_types.resolve(row["pr_type"], row["branch"]),
+        "branch": _optional_branch(row["branch"]),
         "fixes_main": bool(row["fixes_main"]),
         "fixes_flaky": bool(row["fixes_flaky"]),
         "mergeable": row["mergeable"],
@@ -330,24 +336,31 @@ def _action_text(entry):
     return "{} ({})".format(entry["action"], entry["why"])
 
 
-def _bracket_texts(entry):
-    if entry["pr_type"] is None:
-        return entry["labels"]
-    return [entry["pr_type"]] + entry["labels"]
-
-
 def _task_text(entry):
     task = entry["task"] or "-"
-    brackets = _bracket_texts(entry)
+    brackets = entry["labels"]
     if not brackets:
         return task
     return "{} {}".format(task, " ".join("[{}]".format(text) for text in brackets))
 
 
+def _branch_suffix(entry):
+    if entry["branch"] is None:
+        return ""
+    return "  branch: {}".format(entry["branch"])
+
+
 def _queue_line(position, entry):
     prefix = "\u25b6 next action: " if entry["next_action"] else ""
-    return "{}{}. {}  {}  {}  unblocks {} \u2014 {}".format(
-        prefix, position, entry["ref"], entry["party"], _task_text(entry), entry["unblocks"], _action_text(entry)
+    return "{}{}. {}  {}  {}  unblocks {} \u2014 {}{}".format(
+        prefix,
+        position,
+        entry["ref"],
+        entry["party"],
+        _task_text(entry),
+        entry["unblocks"],
+        _action_text(entry),
+        _branch_suffix(entry),
     )
 
 
@@ -387,7 +400,7 @@ def _entry_model(entry):
         "party": entry["party"],
         "task": entry["task"],
         "lifecycle": entry["lifecycle"],
-        "pr_type": entry["pr_type"],
+        "branch": entry["branch"],
         "checks_failing": entry["checks_failing"],
         "checks_passing": entry["checks_passing"],
         "checks_pending": entry["checks_pending"],

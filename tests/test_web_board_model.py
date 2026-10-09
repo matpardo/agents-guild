@@ -104,7 +104,7 @@ class BoardModelShapeTests(BoardModelTestCase):
             "sess-1", self.repo_dir,
         )
         code, out, err = self.run_cli(["board"], "sess-1", self.repo_dir)
-        self.assertIn("app#1  draft feat needs-ask-answer needs-human-pr-review  no checks", out)
+        self.assertIn("app#1  draft needs-ask-answer needs-human-pr-review  no checks", out)
 
     def _finish_pr(self, gh_fields):
         self.write_gh_fixture(
@@ -124,6 +124,23 @@ class BoardModelShapeTests(BoardModelTestCase):
         self.assertEqual(self._task_pr_model()["waits"], "review")
         code, out, err = self.run_cli(["board"], "sess-1", self.repo_dir)
         self.assertIn("waits: review", out)
+
+    def _clear_branch(self):
+        conn = db.connect(paths.db_path())
+        conn.execute("UPDATE prs SET branch = NULL")
+        conn.commit()
+        conn.close()
+
+    def test_pr_model_exposes_its_branch_and_the_board_prints_it_dim_under_the_head(self):
+        self.assertEqual(self._task_pr_model()["branch"], "feature/x")
+        code, out, err = self.run_cli(["board"], "sess-1", self.repo_dir)
+        self.assertIn("branch: feature/x", out)
+
+    def test_pr_without_a_branch_has_no_branch_in_the_model_and_no_branch_line(self):
+        self._clear_branch()
+        self.assertIsNone(self._task_pr_model()["branch"])
+        code, out, err = self.run_cli(["board"], "sess-1", self.repo_dir)
+        self.assertNotIn("branch:", out)
 
     def test_merged_pr_has_no_waits(self):
         self._finish_pr({"state": "MERGED", "isDraft": False, "mergedAt": "2026-09-01T10:00:00Z"})
@@ -236,13 +253,13 @@ class BoardModelShapeTests(BoardModelTestCase):
             {
                 "repo", "number", "lifecycle", "needs_ask_answer", "needs_human_pr_review", "checks_failing",
                 "checks_passing", "checks_pending", "what", "waits", "url", "card", "card_url",
-                "pr_type", "fixes_main", "fixes_flaky",
+                "branch", "fixes_main", "fixes_flaky",
             },
         )
         self.assertEqual(pr["repo"], "acme/app")
         self.assertEqual(pr["number"], 1)
         self.assertEqual((pr["needs_ask_answer"], pr["needs_human_pr_review"]), (False, False))
-        self.assertEqual((pr["pr_type"], pr["fixes_main"], pr["fixes_flaky"]), ("feat", False, False))
+        self.assertEqual((pr["branch"], pr["fixes_main"], pr["fixes_flaky"]), ("feature/x", False, False))
         self.assertEqual(pr["what"], "Adds X")
         self.assertEqual(pr["url"], "https://github.com/acme/app/pull/1")
 

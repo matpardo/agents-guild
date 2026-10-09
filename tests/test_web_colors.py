@@ -53,12 +53,15 @@ class LifecycleColorTests(unittest.TestCase):
         self.assertIn('<option value="fixes-main">', html)
         self.assertIn('<option value="fixes-flaky">', html)
 
-    def test_app_js_renders_the_pr_type_chip(self):
-        self.assertIn('"pill pr-type"', self.js)
+    def test_app_js_renders_the_branch_span(self):
+        self.assertIn('className = "branch"', self.js)
 
-    def test_app_css_defines_the_pr_type_chip_in_both_schemes(self):
-        self.assertEqual(len(re.findall(r"^\.pr-type\s*\{", self.css, re.M)), 1)
-        for name in ("--pr-type-fg", "--pr-type-bg"):
+    def test_app_js_has_no_pr_type_chip(self):
+        self.assertNotIn("pr-type", self.js)
+
+    def test_app_css_defines_the_branch_style_in_both_schemes(self):
+        self.assertEqual(len(re.findall(r"^\.branch\s*\{", self.css, re.M)), 1)
+        for name in ("--branch-fg",):
             with self.subTest(name=name):
                 self.assertIn(name, self.css)
                 self.assertIn(name, _dark_block(self.css))

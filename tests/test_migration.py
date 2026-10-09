@@ -148,14 +148,13 @@ class MigrationTests(GuildTestCase):
         self.assertIsNone(row["answered_at"])
         self.assertEqual(row["question"], "q")
 
-    def test_old_schema_db_gains_pr_type_and_mark_columns(self):
+    def test_old_schema_db_gains_the_mark_columns(self):
         db_path = self.data_home / "guild.db"
         _make_old_schema_db(db_path)
 
         conn = db.connect(db_path)
 
         pr_row = conn.execute("SELECT * FROM prs WHERE number = 1").fetchone()
-        self.assertIsNone(pr_row["pr_type"])
         self.assertEqual((pr_row["fixes_main"], pr_row["fixes_flaky"]), (0, 0))
         conn.close()
 
