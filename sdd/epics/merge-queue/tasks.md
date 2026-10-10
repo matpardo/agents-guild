@@ -53,6 +53,6 @@ updated: 2026-09-29
 ## T07 — Count unresolved review threads
 
 **Depends on:** T06
-**Status:** [x] done — #0
+**Status:** [x] done — #96
 
 **What:** `sync --source gh` stores `prs.unresolved_threads` for open PRs through a `gh api graphql` query; a query failure is a sync failure and keeps the previous count; merged and closed PRs are not queried.
