@@ -22,6 +22,20 @@ def _respond(name):
     sys.exit(1)
 
 
+def _respond_graphql(name):
+    if not os.path.isfile(os.path.join(_fixtures_dir(), name + ".json")) and not os.path.isfile(
+        os.path.join(_fixtures_dir(), name + ".err")
+    ):
+        sys.stdout.write(json.dumps(_threads_response([])))
+        sys.exit(0)
+    _respond(name)
+
+
+def _threads_response(resolved_flags):
+    nodes = [{"isResolved": flag} for flag in resolved_flags]
+    return {"data": {"repository": {"pullRequest": {"reviewThreads": {"nodes": nodes}}}}}
+
+
 def main():
     args = sys.argv[1:]
     if args[:2] == ["pr", "view"]:
@@ -41,6 +55,10 @@ def main():
         head_index = args.index("--head") + 1
         branch = args[head_index]
         _respond("list_{}".format(branch.replace("/", "-")))
+        return
+    if args[:2] == ["api", "graphql"]:
+        values = dict(arg.split("=", 1) for arg in args if "=" in arg and not arg.startswith("query="))
+        _respond_graphql("threads_{}-{}_{}".format(values["owner"], values["name"], values["number"]))
         return
     if args[:1] == ["api"]:
         parts = args[1].split("/")

@@ -1759,6 +1759,11 @@ replay cleanly.
 signal: the previous `merge_state` is kept. Events recorded before these fields
 existed replay with them empty.
 
+For open PRs it also stores `prs.unresolved_threads`, the number of unresolved
+review threads (`gh api graphql`, first 100 threads). If that query fails the
+failure is reported and the previous count is kept; merged and closed PRs are
+not queried.
+
 Default paths (all overridable via env, useful for tests):
 
 - DB: `$XDG_DATA_HOME/guild/guild.db` (default `~/.local/share/guild/`).
