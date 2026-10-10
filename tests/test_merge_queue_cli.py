@@ -116,6 +116,17 @@ class OutputTests(QueueCliTestCase):
         self.assertIn("1. acme/app#5  gamma  qc/T01 [needs-ask-answer]  unblocks 0 \u2014 fix: needs ask answer \u2192 gamma", out)
         self.assertNotIn("next action", out)
 
+    def test_unresolved_threads_block_with_a_fix_action(self):
+        nodes = [{"isResolved": False}, {"isResolved": False}, {"isResolved": True}]
+        self.write_gh_fixture(
+            "threads_acme-app_5",
+            {"data": {"repository": {"pullRequest": {"reviewThreads": {"nodes": nodes}}}}},
+        )
+        code, out, err = self.sync_gh("sess-1")
+        self.assertEqual(code, 0, err)
+        code, out, err = self.queue(["--party", "gamma"], None)
+        self.assertIn("fix: 2 unresolved threads \u2192 gamma", out)
+
     def test_pending_checks_show_a_wait_action(self):
         rollup = [{"__typename": "CheckRun", "status": "IN_PROGRESS", "conclusion": ""}]
         self.write_gh_fixture("view_acme-app_5", dict(OPEN_VIEW, statusCheckRollup=rollup))

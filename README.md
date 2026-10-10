@@ -745,12 +745,16 @@ PR never clears the red mark.
 
 **State.** Only merge blockers decide the state, in this precedence:
 
-- `blocked`: a check is failing, `mergeable` is `CONFLICTING`, a task its own
+- `blocked`: a check is failing, `mergeable` is `CONFLICTING`, the review
+  decision is `CHANGES_REQUESTED`, review threads are unresolved, the merge state
+  is `BEHIND`, a task its own
   task depends on (SDD `Depends on`, through the quest's epic) is not done by
   the same resolver `guild next` uses, it is flagged `needs-ask-answer`, or a PR
   that must come before it (by task dependency or pin, transitively) is
   blocked (`waits on <ref>`). Every reason that applies is listed: `needs ask answer`,
-  `checks failing (N)`, `merge conflict`, `waits on task Txx`, `waits on <ref>`.
+  `checks failing (N)`, `merge conflict`, `changes requested`,
+  `N unresolved threads`, `behind base`, `waits on task Txx`, `waits on <ref>`.
+  Missing review data counts as no signal.
 - `waiting`: not blocked, but checks are still running (`checks pending (N)`)
   or a PR that must come before it is itself waiting or ready but still draft
   (`waits on <ref>`).

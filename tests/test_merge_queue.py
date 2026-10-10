@@ -21,6 +21,9 @@ def _pr(number, **overrides):
         "checks_passing": 3,
         "checks_pending": 0,
         "mergeable": "MERGEABLE",
+        "review_decision": None,
+        "unresolved_threads": None,
+        "merge_state": None,
         "additions": 10,
         "deletions": 0,
         "created_at": "2026-09-01T10:00:00Z",
@@ -199,6 +202,21 @@ class StateTests(unittest.TestCase):
 
     def test_merge_conflict(self):
         self.assertEqual(self._blocked_reasons(mergeable="CONFLICTING"), ["merge conflict"])
+
+    def test_changes_requested(self):
+        self.assertEqual(self._blocked_reasons(review_decision="CHANGES_REQUESTED"), ["changes requested"])
+
+    def test_unresolved_threads(self):
+        self.assertEqual(self._blocked_reasons(unresolved_threads=1), ["1 unresolved thread"])
+        self.assertEqual(self._blocked_reasons(unresolved_threads=2), ["2 unresolved threads"])
+
+    def test_behind_base(self):
+        self.assertEqual(self._blocked_reasons(merge_state="BEHIND"), ["behind base"])
+
+    def test_dirty_blocked_and_empty_signals_are_ready(self):
+        self.assertEqual(merge_queue.review_reasons(None, None, None, None), [])
+        self.assertEqual(merge_queue.review_reasons("MERGEABLE", "APPROVED", 0, "DIRTY"), [])
+        self.assertEqual(merge_queue.review_reasons("MERGEABLE", None, 0, "BLOCKED"), [])
 
     def test_unknown_mergeable_state_is_not_a_conflict(self):
         result = _compute([_pr(1, mergeable=None), _pr(2, mergeable="UNKNOWN")], [])
