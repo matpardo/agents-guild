@@ -53,6 +53,6 @@ updated: 2026-09-28
 ## T07 — Party close applies the quest done gate
 
 **Depends on:** T06
-**Status:** [x] done — #0
+**Status:** [x] done — #95
 
 **What:** `guild party close` refuses while an active quest of the party has tasks not done or epic drift, listing each quest and why; `--force` closes anyway and reports every such quest as closed with unfinished work.
