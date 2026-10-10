@@ -46,6 +46,6 @@ updated: 2026-09-29
 ## T06 — Store review decision, merge state and base branch
 
 **Depends on:** T01
-**Status:** [x] done
+**Status:** [x] done — #94
 
 **What:** `sync --source gh` stores `prs.review_decision`, `prs.merge_state` and `prs.base_branch`; `UNKNOWN` merge state keeps the previous value; old `pr.synced` events replay with the fields empty.
