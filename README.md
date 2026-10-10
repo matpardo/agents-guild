@@ -1750,6 +1750,12 @@ existed lack those payload keys; `guild rebuild` tolerates that (carries the
 current stored value forward instead of raising) so historic databases
 replay cleanly.
 
+`guild sync --source gh` also stores, per tracked PR, `prs.review_decision`
+(`reviewDecision`), `prs.merge_state` (`mergeStateStatus`) and
+`prs.base_branch` (`baseRefName`). A `mergeStateStatus` of `UNKNOWN` carries no
+signal: the previous `merge_state` is kept. Events recorded before these fields
+existed replay with them empty.
+
 Default paths (all overridable via env, useful for tests):
 
 - DB: `$XDG_DATA_HOME/guild/guild.db` (default `~/.local/share/guild/`).

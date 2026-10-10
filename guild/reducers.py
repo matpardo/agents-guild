@@ -279,7 +279,9 @@ def _pr_set(conn, event):
     )
 
 
-_PR_SYNCED_CARRY_FORWARD_FIELDS = ("mergeable", "review_comment_count", "checks_pending")
+_PR_SYNCED_CARRY_FORWARD_FIELDS = (
+    "mergeable", "review_comment_count", "checks_pending", "review_decision", "merge_state", "base_branch",
+)
 
 
 def _pr_synced_field(current, payload, field):
@@ -302,14 +304,16 @@ def _pr_synced(conn, event):
     payload = event["payload"]
     current = conn.execute(
         "SELECT lifecycle, gh_state, gh_draft, branch, title, checks_failing, checks_passing,"
-        " checks_pending, mergeable, review_comment_count, last_activity_at FROM prs WHERE repo = ? AND number = ?",
+        " checks_pending, mergeable, review_comment_count, review_decision, merge_state, base_branch,"
+        " last_activity_at FROM prs WHERE repo = ? AND number = ?",
         (payload["repo"], payload["number"]),
     ).fetchone()
     last_activity_at = event["ts"] if _pr_synced_changed(current, payload) else current["last_activity_at"]
     conn.execute(
         "UPDATE prs SET lifecycle = ?, gh_state = ?, gh_draft = ?, branch = ?, title = ?,"
         " checks_failing = ?, checks_passing = ?, checks_pending = ?, mergeable = ?, review_comment_count = ?,"
-        " synced_at = ?, last_activity_at = ? WHERE repo = ? AND number = ?",
+        " review_decision = ?, merge_state = ?, base_branch = ?, synced_at = ?, last_activity_at = ?"
+        " WHERE repo = ? AND number = ?",
         (
             payload["lifecycle"],
             payload["gh_state"],
@@ -321,6 +325,9 @@ def _pr_synced(conn, event):
             _pr_synced_field(current, payload, "checks_pending"),
             _pr_synced_field(current, payload, "mergeable"),
             _pr_synced_field(current, payload, "review_comment_count"),
+            _pr_synced_field(current, payload, "review_decision"),
+            _pr_synced_field(current, payload, "merge_state"),
+            _pr_synced_field(current, payload, "base_branch"),
             payload["synced_at"],
             last_activity_at,
             payload["repo"],

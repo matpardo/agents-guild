@@ -42,3 +42,10 @@ updated: 2026-09-29
 **Status:** [x] done — #30
 
 **What:** board model `merge_queues` and a read-only merge queue section on the page that respects the raid and party filters.
+
+## T06 — Store review decision, merge state and base branch
+
+**Depends on:** T01
+**Status:** [x] done — #94
+
+**What:** `sync --source gh` stores `prs.review_decision`, `prs.merge_state` and `prs.base_branch`; `UNKNOWN` merge state keeps the previous value; old `pr.synced` events replay with the fields empty.
