@@ -4,6 +4,8 @@ from collections import deque
 _CLOSED_LIFECYCLES = ("merged", "closed")
 _READY_LIFECYCLE = "ready"
 _CONFLICTING = "CONFLICTING"
+_CHANGES_REQUESTED = "CHANGES_REQUESTED"
+_BEHIND = "BEHIND"
 _HUMAN_AUTHOR = "human"
 _DRAFT_LIFECYCLES = ("draft", "converging")
 _READY_STATE = "ready"
@@ -22,14 +24,28 @@ def _is_open(pr):
     return pr["lifecycle"] not in _CLOSED_LIFECYCLES
 
 
+def review_reasons(mergeable, review_decision, unresolved_threads, merge_state):
+    reasons = []
+    if mergeable == _CONFLICTING:
+        reasons.append("merge conflict")
+    if review_decision == _CHANGES_REQUESTED:
+        reasons.append("changes requested")
+    if unresolved_threads:
+        reasons.append("{} unresolved thread{}".format(unresolved_threads, "" if unresolved_threads == 1 else "s"))
+    if merge_state == _BEHIND:
+        reasons.append("behind base")
+    return reasons
+
+
 def _blocked_reasons(pr):
     reasons = []
     if pr["needs_ask_answer"]:
         reasons.append("needs ask answer")
     if pr["checks_failing"] > 0:
         reasons.append("checks failing ({})".format(pr["checks_failing"]))
-    if pr["mergeable"] == _CONFLICTING:
-        reasons.append("merge conflict")
+    reasons.extend(
+        review_reasons(pr["mergeable"], pr["review_decision"], pr["unresolved_threads"], pr["merge_state"])
+    )
     for tid in pr["unmet_deps"]:
         reasons.append("waits on task {}".format(tid))
     return reasons

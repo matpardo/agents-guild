@@ -72,8 +72,11 @@ def _tier1_candidates(conn, party):
         if (row["checks_failing"] or 0) > 0:
             results.append((row, "failing checks ({} failing)".format(row["checks_failing"]), False))
             continue
-        if row["mergeable"] == "CONFLICTING":
-            results.append((row, "merge conflict", False))
+        reasons = merge_queue.review_reasons(
+            row["mergeable"], row["review_decision"], row["unresolved_threads"], row["merge_state"]
+        )
+        if reasons:
+            results.append((row, "; ".join(reasons), False))
             continue
         unseen = (row["review_comment_count"] or 0) - (row["last_notified_comment_count"] or 0)
         if unseen > 0:
