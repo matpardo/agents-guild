@@ -12,6 +12,7 @@ class PartyCloseTests(GuildTestCase):
         self.run_cli(["party", "start", "alpha"], "sess-1", self.repo_dir)
         self.run_cli(["quest", "add", "demo", "--title", "Demo", "--no-epic"], "sess-1", self.repo_dir)
         self.run_cli(["task", "add", "demo/T01", "--title", "First"], "sess-1", self.repo_dir)
+        self.run_cli(["task", "done", "demo/T01", "--summary", "shipped"], "sess-1", self.repo_dir)
         self.run_cli(
             ["ask", "Ship it?", "--context", "tests green", "--ref", "task:demo/T01"], "sess-1", self.repo_dir
         )

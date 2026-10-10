@@ -37,7 +37,7 @@ class HandoffConsumedTests(GuildTestCase):
         self.assertIsNotNone(self._leader(1)["handoff_consumed_at"])
 
     def test_refused_resume_consumes_nothing(self):
-        self.run_cli(["party", "close", "alpha"], None, None)
+        self.run_cli(["party", "close", "alpha", "--force"], None, None)
         code, out, err = self.run_cli(["party", "resume", "alpha"], "sess-2", self.repo_dir)
         self.assertEqual(code, 1)
         self.assertIsNone(self._leader(1)["handoff_consumed_at"])

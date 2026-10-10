@@ -96,16 +96,31 @@ def _gate_drift(conn, project, epic, accept_drift):
     return findings
 
 
-def _gate_unfinished_tasks(conn, slug, force):
+def _unfinished_task_lines(conn, slug):
     rows = conn.execute(
         "SELECT tid, state FROM quest_tasks WHERE quest = ? AND state != 'done' ORDER BY tid", (slug,)
     ).fetchall()
-    if not rows or force:
+    return ["{} ({})".format(row["tid"], row["state"]) for row in rows]
+
+
+def _gate_unfinished_tasks(conn, slug, force):
+    lines = _unfinished_task_lines(conn, slug)
+    if not lines or force:
         return
-    listing = "\n".join("{} ({})".format(row["tid"], row["state"]) for row in rows)
     raise GuildError(
-        "quest '{}' has tasks not done, finish them or pass --force:\n{}".format(slug, listing), 1
+        "quest '{}' has tasks not done, finish them or pass --force:\n{}".format(slug, "\n".join(lines)), 1
     )
+
+
+def unfinished_work(conn, slug, project, epic):
+    problems = []
+    task_lines = _unfinished_task_lines(conn, slug)
+    if task_lines:
+        problems.append("quest '{}' has tasks not done:\n{}".format(slug, "\n".join(task_lines)))
+    findings = [] if epic is None else drift.epic_findings(conn, project, epic)
+    if findings:
+        problems.append("quest '{}' has drift in epic '{}':\n{}".format(slug, epic, "\n".join(findings)))
+    return problems
 
 
 def done(ctx, slug, accept_drift, force):

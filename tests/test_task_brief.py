@@ -323,7 +323,7 @@ class ErrorTests(TaskBriefBase):
         self.assertFails("ghost/demo/T01", "unknown party")
 
     def test_closed_party(self):
-        self.cli(["party", "close"])
+        self.cli(["party", "close", "--force"])
         self.assertFails("alpha/demo/T01", "party is closed")
 
     def test_foreign_quest(self):
