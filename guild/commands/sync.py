@@ -101,6 +101,16 @@ def _lifecycle_from_gh(current_lifecycle, gh_data):
 _UNKNOWN_MERGE_STATE = "UNKNOWN"
 
 
+def _open_pr_unresolved_threads(ctx, row, lifecycle, failures):
+    if lifecycle in ("merged", "closed"):
+        return None
+    try:
+        return github.unresolved_thread_count(ctx.cwd, row["repo"], row["number"])
+    except github.GhCommandError as error:
+        failures.append("{}#{}: review threads check failed: {}".format(row["repo"], row["number"], error))
+        return None
+
+
 def _sync_pr(ctx, projects, row, failures):
     gh_data = github.pr_view(
         ctx.cwd,
@@ -137,6 +147,9 @@ def _sync_pr(ctx, projects, row, failures):
     merge_state = gh_data.get("mergeStateStatus")
     if merge_state not in (None, _UNKNOWN_MERGE_STATE):
         payload["merge_state"] = merge_state
+    unresolved_threads = _open_pr_unresolved_threads(ctx, row, lifecycle, failures)
+    if unresolved_threads is not None:
+        payload["unresolved_threads"] = unresolved_threads
     change_set = _open_pr_change_set(ctx, projects, row, lifecycle, failures)
     if change_set is not None:
         payload["change_set"] = change_set

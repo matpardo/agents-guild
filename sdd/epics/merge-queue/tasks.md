@@ -49,3 +49,10 @@ updated: 2026-09-29
 **Status:** [x] done — #94
 
 **What:** `sync --source gh` stores `prs.review_decision`, `prs.merge_state` and `prs.base_branch`; `UNKNOWN` merge state keeps the previous value; old `pr.synced` events replay with the fields empty.
+
+## T07 — Count unresolved review threads
+
+**Depends on:** T06
+**Status:** [x] done — #0
+
+**What:** `sync --source gh` stores `prs.unresolved_threads` for open PRs through a `gh api graphql` query; a query failure is a sync failure and keeps the previous count; merged and closed PRs are not queried.

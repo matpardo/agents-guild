@@ -85,6 +85,47 @@ class PrActivityTests(GuildTestCase):
         row = self._pr_row()
         self.assertEqual((row["review_decision"], row["merge_state"], row["base_branch"]), (None, None, None))
 
+    def _write_threads(self, resolved_flags):
+        nodes = [{"isResolved": flag} for flag in resolved_flags]
+        self.write_gh_fixture(
+            "threads_acme-app_1",
+            {"data": {"repository": {"pullRequest": {"reviewThreads": {"nodes": nodes}}}}},
+        )
+
+    def test_sync_stores_unresolved_thread_count_ignoring_resolved_threads(self):
+        self._write_threads([False, True, False])
+        row = self._sync_view()
+        self.assertEqual(row["unresolved_threads"], 2)
+
+    def test_threads_error_keeps_the_old_value_and_reports_failure(self):
+        self._write_threads([False])
+        self._sync_view()
+        (self.gh_fixtures_dir / "threads_acme-app_1.json").unlink()
+        self.write_gh_error("threads_acme-app_1", "graphql down")
+        self.write_gh_fixture(
+            "view_acme-app_1", {"state": "OPEN", "isDraft": False, "headRefName": "feature/x", "title": "t"}
+        )
+        code, out, err = self.run_cli(["sync", "--source", "gh"], "sess-1", self.repo_dir)
+        self.assertIn("review threads check failed: graphql down", out + err)
+        self.assertEqual(self._pr_row()["unresolved_threads"], 1)
+
+    def test_merged_pr_does_not_query_threads(self):
+        self.write_gh_error("threads_acme-app_1", "must not be called")
+        row = self._sync_view(state="MERGED", mergedAt="2026-01-01T00:00:00Z")
+        self.assertEqual(row["lifecycle"], "merged")
+        self.assertIsNone(row["unresolved_threads"])
+
+    def test_replaying_an_old_pr_synced_event_leaves_unresolved_threads_empty(self):
+        self._write_threads([False])
+        self._sync_view()
+        conn = db.connect(paths.db_path())
+        conn.execute("UPDATE events SET payload = json_remove(payload, '$.unresolved_threads') WHERE kind = 'pr.synced'")
+        conn.commit()
+        conn.close()
+        code, out, err = self.run_cli(["rebuild"], None, None)
+        self.assertEqual(code, 0)
+        self.assertIsNone(self._pr_row()["unresolved_threads"])
+
     def test_sync_without_changes_does_not_bump_activity(self):
         self.run_cli(["sync", "--source", "gh"], "sess-1", self.repo_dir)
         before = self._pr_row()["last_activity_at"]

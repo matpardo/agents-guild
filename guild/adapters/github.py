@@ -76,3 +76,31 @@ def branch_checks(cwd, repo, branch):
         {"name": run["name"], "conclusion": (run.get("conclusion") or "").upper()}
         for run in json.loads(result.stdout)["check_runs"]
     ]
+
+
+_UNRESOLVED_THREADS_QUERY = (
+    "query($owner: String!, $name: String!, $number: Int!) {"
+    " repository(owner: $owner, name: $name) {"
+    " pullRequest(number: $number) {"
+    " reviewThreads(first: 100) { nodes { isResolved } } } } }"
+)
+
+
+def unresolved_thread_count(cwd, repo, number):
+    owner, name = repo.split("/", 1)
+    result = subprocess.run(
+        [
+            "gh", "api", "graphql",
+            "-f", "query={}".format(_UNRESOLVED_THREADS_QUERY),
+            "-F", "owner={}".format(owner),
+            "-F", "name={}".format(name),
+            "-F", "number={}".format(number),
+        ],
+        cwd=str(cwd),
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode != 0:
+        raise GhCommandError(result.stderr.strip() or "gh api graphql failed")
+    nodes = json.loads(result.stdout)["data"]["repository"]["pullRequest"]["reviewThreads"]["nodes"]
+    return sum(1 for node in nodes if not node["isResolved"])

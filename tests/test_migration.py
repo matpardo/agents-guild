@@ -295,7 +295,7 @@ class MigrationTests(GuildTestCase):
         self.assertTrue({"additions", "deletions", "created_at"} <= prs_columns)
         row = conn.execute("SELECT additions, deletions, created_at FROM prs WHERE number = 1").fetchone()
         self.assertEqual(tuple(row), (None, None, None))
-        self.assertTrue({"review_decision", "merge_state", "base_branch"} <= prs_columns)
+        self.assertTrue({"review_decision", "merge_state", "base_branch", "unresolved_threads"} <= prs_columns)
         self.assertEqual(conn.execute("SELECT COUNT(*) AS n FROM pr_shared_areas").fetchone()["n"], 0)
 
     def test_rebuild_works_after_migration(self):
