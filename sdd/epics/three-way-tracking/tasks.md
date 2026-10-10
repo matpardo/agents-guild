@@ -70,3 +70,10 @@ of <total> refs still open (may be stale)` when nothing is blocked anymore.
 **Status:** [x] done — #11
 
 **What:** the `sdd` config block accepts `git_repo`+`git_ref` instead of `root` (mutually exclusive, both git keys required together); `sync --source sdd` then fetches `origin`, lists and reads `tasks.md` files at that ref via `git ls-tree`/`git show`, never touching the repo's working copy, and stores each epic's `sdd_path` as `git:<ref>:<path>`.
+
+## T09 — Drift flags cards that lag behind guild and GitHub
+
+**Depends on:** T04
+**Status:** [x] done — #98
+
+**What:** two drift rules, `task started, card not started` (quest task `active` whose SDD card has `status_category == new`) and `PR merged, card not done`; `PR open, card not started` and the new merged rule also honor PRs tracked with `--card`. Findings name the card and the move to make (In Progress / Done).

@@ -882,9 +882,9 @@ sync filled.
 Without flags, the report is scoped to work in progress: every epic-scoped
 rule (`tracker and SDD disagree`, `SDD task without card`, `card not under
 its epic`, `epic done with open work`, `quest task not in SDD`, `task done,
-SDD not done`) runs only on epics referenced by an
+SDD not done`, `task started, card not started`) runs only on epics referenced by an
 `active` quest of the project, and every PR rule (`merged PR, task not
-done`, `PR open, card not started`, `PR closed unmerged`) runs only on PRs
+done`, `PR open, card not started`, `PR merged, card not done`, `PR closed unmerged`) runs only on PRs
 tracked by a party that is `active` or `awaiting-leader`. `party has no
 running leader` is unaffected by scope, always project-wide. `--all` drops
 this default and reports the whole project (the audit mode). `--epic <slug>`
@@ -902,7 +902,9 @@ naming the refs and what each source says:
 | `tracker and SDD disagree` | a task has a synced card and `sdd_status`, and card done (`status_category == done`) disagrees with `sdd_status == done` |
 | `SDD task without card` | the epic has a `jira_key` but the task has none (only for keyed epics) |
 | `card not under its epic` | the epic has a `jira_key` and the task's synced card has `parent_key IS NULL` |
-| `PR open, card not started` | a tracked PR is not merged/closed and its linked task's card has `status_category == new` |
+| `PR open, card not started` | a tracked PR is not merged/closed and its linked card (the task's SDD card, or the `--card` key of `pr track`) has `status_category == new`; names the card and says to move it to In Progress |
+| `PR merged, card not done` | a tracked PR has lifecycle `merged` and its linked card (task's SDD card or `--card` key) has `status_category != done`; says to move it to Done |
+| `task started, card not started` | a quest task is `active` in guild and its SDD card has `status_category == new`; says to move the card to In Progress |
 | `PR closed unmerged` | a tracked PR has lifecycle `closed` |
 | `party has no running leader` | an `active` party's `leader_session_id` is not the id of any session file under the Claude sessions dir (`awaiting-leader` parties are not findings) |
 | `epic done with open work` | the epic's `sdd_status == done` but it still has a non-done quest task, or an open tracked PR linked to it |

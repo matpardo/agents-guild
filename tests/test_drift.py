@@ -535,3 +535,86 @@ if __name__ == "__main__":
     import unittest
 
     unittest.main()
+
+
+class CardLagTests(DriftTestCase):
+    def setUp(self):
+        super().setUp()
+        self._write_epic(
+            "wave9", "status: active\n",
+            "## T01 — First\n\n**JIRA:** DEMO-90\n**Deps:** —\n**Status:** [ ] pending\n",
+        )
+        self._sync_sdd()
+        self.run_cli(
+            ["quest", "add", "wave9", "--title", "Wave 9", "--epic", "wave9", "--tasks", "T01"],
+            "sess-1", self.repo_dir,
+        )
+
+    def _track_with_card(self, number, card):
+        self.write_gh_fixture(
+            "view_acme-app_{}".format(number),
+            {"state": "OPEN", "isDraft": True, "headRefName": "feature/{}".format(number), "title": "t"},
+        )
+        argv = ["pr", "track", "acme/app#{}".format(number), "--card", card, "--what", "x", "--waits", "y"]
+        code, out, err = self.run_cli(argv, "sess-1", self.repo_dir)
+        self.assertEqual(code, 0, err)
+
+    def test_started_task_with_new_card_is_a_finding(self):
+        self._record_cards([self._card("DEMO-90", "new", status="To Do")])
+        self.run_cli(["task", "start", "wave9/T01", "--summary", "go"], "sess-1", self.repo_dir)
+        code, out, err = self._drift()
+        self.assertEqual(code, 0, err)
+        self.assertIn("task started, card not started (1)", out)
+        self.assertIn(
+            "task:wave9/T01 started, card DEMO-90 not started (To Do): move DEMO-90 to In Progress", out
+        )
+
+    def test_started_task_with_card_in_progress_is_not_a_finding(self):
+        self._record_cards([self._card("DEMO-90", "indeterminate")])
+        self.run_cli(["task", "start", "wave9/T01", "--summary", "go"], "sess-1", self.repo_dir)
+        code, out, err = self._drift()
+        self.assertNotIn("task started, card not started", out)
+
+    def test_queued_task_with_new_card_is_not_a_finding(self):
+        self._record_cards([self._card("DEMO-90", "new")])
+        code, out, err = self._drift()
+        self.assertNotIn("task started, card not started", out)
+
+    def test_merged_pr_with_card_not_done_is_a_finding(self):
+        self._record_cards([self._card("DEMO-90", "indeterminate", status="In Progress")])
+        self._track_pr(9, "wave9", "T01")
+        self._set_pr_lifecycle(9, "merged")
+        code, out, err = self._drift()
+        self.assertIn("PR merged, card not done (1)", out)
+        self.assertIn(
+            "pr:acme/app#9: merged, task:wave9/T01 card DEMO-90 not done (In Progress): move DEMO-90 to Done",
+            out,
+        )
+
+    def test_merged_pr_with_card_done_is_not_a_finding(self):
+        self._record_cards([self._card("DEMO-90", "done")])
+        self._track_pr(9, "wave9", "T01")
+        self._set_pr_lifecycle(9, "merged")
+        code, out, err = self._drift()
+        self.assertNotIn("PR merged, card not done", out)
+
+    def test_card_flag_pr_without_task_is_checked(self):
+        self._record_cards([self._card("DEMO-91", "new", status="To Do")])
+        self._track_with_card(10, "DEMO-91")
+        code, out, err = self._drift()
+        self.assertIn("pr:acme/app#10 (draft): card DEMO-91 not started (To Do): move DEMO-91 to In Progress", out)
+        self._set_pr_lifecycle(10, "merged")
+        code, out, err = self._drift()
+        self.assertIn("pr:acme/app#10: merged, card DEMO-91 not done (To Do): move DEMO-91 to Done", out)
+
+    def test_card_flag_pr_with_card_started_is_not_a_finding(self):
+        self._record_cards([self._card("DEMO-91", "indeterminate")])
+        self._track_with_card(10, "DEMO-91")
+        code, out, err = self._drift()
+        self.assertNotIn("PR open, card not started", out)
+
+    def test_card_flag_pr_is_outside_an_epic_scope(self):
+        self._record_cards([self._card("DEMO-91", "new")])
+        self._track_with_card(10, "DEMO-91")
+        code, out, err = self._drift("wave9")
+        self.assertNotIn("PR open, card not started", out)
