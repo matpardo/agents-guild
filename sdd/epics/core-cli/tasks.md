@@ -49,3 +49,10 @@ updated: 2026-09-28
 **Status:** [x] done — #10
 
 **What:** `guild party close [<party>]` works from a terminal once the session is gone; closing marks the party's quests done, dismisses its open asks, releases its claims and lists tracked PRs still open. `guild quest done <slug>` finishes a single quest.
+
+## T07 — Party close applies the quest done gate
+
+**Depends on:** T06
+**Status:** [x] done — #95
+
+**What:** `guild party close` refuses while an active quest of the party has tasks not done or epic drift, listing each quest and why; `--force` closes anyway and reports every such quest as closed with unfinished work.

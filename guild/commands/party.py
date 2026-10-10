@@ -4,6 +4,7 @@ from pathlib import Path
 from guild import config, db, events, handoff_prune, identity, names, paths, session_info
 from guild.commands import claim as claim_commands
 from guild.commands import next as next_commands
+from guild.commands import quest as quest_commands
 from guild.commands import raid as raid_commands
 from guild.errors import GuildError
 
@@ -197,6 +198,17 @@ def _require_lead_close_allowed(conn, now, party):
             )
 
 
+def _quests_unfinished_work(conn, party):
+    rows = conn.execute(
+        "SELECT slug, project, epic FROM quests WHERE party = ? AND state = 'active' ORDER BY slug", (party,)
+    ).fetchall()
+    return [
+        problem
+        for row in rows
+        for problem in quest_commands.unfinished_work(conn, row["slug"], row["project"], row["epic"])
+    ]
+
+
 def _prune_lines(ctx):
     try:
         deleted = handoff_prune.prune(ctx, paths.handoffs_dir())
@@ -216,6 +228,14 @@ def close(ctx, name, force):
         raise GuildError("unknown party '{}'".format(party), 1)
     if row["state"] == "closed":
         raise GuildError("party '{}' is already closed".format(party), 1)
+    unfinished = _quests_unfinished_work(ctx.conn, party)
+    if unfinished and not force:
+        raise GuildError(
+            "party '{}' has quests with unfinished work, finish them or pass --force:\n{}".format(
+                party, "\n".join(unfinished)
+            ),
+            1,
+        )
     if not force:
         _require_lead_close_allowed(ctx.conn, ctx.now, party)
     summary = _cleanup_summary(ctx, party)
@@ -233,6 +253,7 @@ def close(ctx, name, force):
             {"party": party, "generation": row["generation"]},
         )
     lines = ["party '{}' closed: {}".format(party, summary)]
+    lines.extend("closed with unfinished work: {}".format(problem) for problem in unfinished)
     lines.extend(_prune_lines(ctx))
     if open_prs:
         lines.append("tracked PRs still open: {}".format(", ".join(open_prs)))

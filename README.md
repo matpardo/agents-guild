@@ -118,7 +118,7 @@ guild wire-settings   # merge guild hooks and permission rules into ~/.claude/se
 
 guild party start <name> [--keeper]   # --keeper: mark a Remote Control keeper party
 guild party resume <party> [--session <name>]   # --session: from a human terminal only
-guild party close [<party>] [--force]  # <party>: from a terminal, or your own party; --force overrides the raid-lead guard
+guild party close [<party>] [--force]  # <party>: from a terminal, or your own party; --force overrides the raid-lead guard and the quest done gate
 
 guild quest add <slug> --title "..." --epic <slug> --tasks T09,T07b
 guild quest add <slug> --title "..." --no-epic [--tasks A,B [--titles "First,Second"]]
@@ -302,6 +302,9 @@ closes any party from a terminal (a session may only name its own party).
 A party that leads a raid cannot be closed while that raid has other active
 members (a member's open asks live and die with its membership): the command
 fails naming the raid and the members, and `guild party close --force` closes anyway.
+Close applies the `guild quest done` gate to each active quest of the party: it
+refuses, listing every quest with tasks not done or epic drift, and `--force`
+closes anyway, reporting each such quest as `closed with unfinished work`.
 Closing cascades in the same event: the party's active quests become `done`,
 its open asks are dismissed and its claims are released. Tracked PRs stay
 tracked for history and are listed if still open. `guild quest done <slug>`
