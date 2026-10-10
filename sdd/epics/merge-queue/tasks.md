@@ -56,3 +56,10 @@ updated: 2026-09-29
 **Status:** [x] done — #96
 
 **What:** `sync --source gh` stores `prs.unresolved_threads` for open PRs through a `gh api graphql` query; a query failure is a sync failure and keeps the previous count; merged and closed PRs are not queried.
+
+## T08 — Block the queue on review state
+
+**Depends on:** T06, T07
+**Status:** [x] done — #97
+
+**What:** the merge queue marks a PR blocked on `changes requested`, `N unresolved threads` and `behind base` next to `merge conflict`; missing data is no signal; `guild next` reuses the same reasons for own PRs.
