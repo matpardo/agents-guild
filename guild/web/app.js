@@ -150,6 +150,8 @@
       "SDD task without card": "An SDD task has no tracker card.",
       "card not under its epic": "A card exists that is not under its epic in the tracker.",
       "PR open, card not started": "A PR is open but its card was never started.",
+      "PR merged, card not done": "A PR was merged but its card is not done in the tracker.",
+      "task started, card not started": "A task is in progress but its card was never started.",
       "PR closed unmerged": "A PR was closed without merging while its task is still open.",
       "party has no running leader": "A party with open work has no running leader session.",
       "epic done with open work": "The epic is marked done but still has open work.",

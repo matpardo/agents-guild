@@ -126,26 +126,93 @@ def _rule_card_not_under_epic(conn, project, epics):
     ]
 
 
-def _rule_pr_open_card_not_started(conn, project, epics, party_states):
-    rows = conn.execute(
-        "SELECT prs.repo AS repo, prs.number AS number, prs.lifecycle AS lifecycle,"
-        " quests.epic AS epic, prs.task_tid AS tid, tasks.jira_key AS jira_key,"
-        " cards.status AS status"
-        " FROM prs"
+_PR_CARD_COLUMNS = (
+    "SELECT prs.repo AS repo, prs.number AS number, prs.lifecycle AS lifecycle,"
+    " quests.epic AS epic, prs.task_tid AS tid, cards.key AS card_key,"
+    " cards.status AS status, cards.status_category AS status_category"
+)
+
+
+def _card_link_scope_clause(epics, party_states):
+    if epics is None or party_states is not None:
+        return ""
+    return " AND 0"
+
+
+def _pr_card_findings(conn, project, epics, party_states, lifecycle_condition, card_condition, render):
+    task_link = (
+        _PR_CARD_COLUMNS
+        + " FROM prs"
         " JOIN quests ON quests.slug = prs.task_quest"
         " JOIN tasks ON tasks.project = quests.project AND tasks.epic = quests.epic"
         " AND tasks.tid = prs.task_tid"
         " JOIN cards ON cards.project = tasks.project AND cards.key = tasks.jira_key"
         " JOIN parties ON parties.name = prs.party"
-        " WHERE quests.project = ? AND prs.lifecycle NOT IN ('merged', 'closed')"
-        " AND cards.status_category = 'new'"
-        + _epic_clause("quests", epics) + _party_clause(party_states),
+        " WHERE quests.project = ? AND " + lifecycle_condition + " AND " + card_condition
+        + _epic_clause("quests", epics) + _party_clause(party_states)
+    )
+    card_link = (
+        _PR_CARD_COLUMNS.replace("quests.epic", "NULL")
+        + " FROM prs"
+        " JOIN parties ON parties.name = prs.party"
+        " JOIN cards ON cards.project = parties.project AND cards.key = prs.card"
+        " WHERE parties.project = ? AND " + lifecycle_condition + " AND " + card_condition
+        + _card_link_scope_clause(epics, party_states) + _party_clause(party_states)
+    )
+    params = (
+        _epic_params(project, epics) + _party_params(party_states)
+        + (project,) + _party_params(party_states)
+    )
+    rows = conn.execute(task_link + " UNION ALL " + card_link, params).fetchall()
+    return [render(row) for row in rows]
+
+
+def _pr_task_ref(row):
+    if row["tid"] is None:
+        return ""
+    return "task:{}/{} ".format(row["epic"], row["tid"])
+
+
+def _rule_pr_open_card_not_started(conn, project, epics, party_states):
+    return _pr_card_findings(
+        conn, project, epics, party_states,
+        "prs.lifecycle NOT IN ('merged', 'closed')", "cards.status_category = 'new'",
+        lambda row: "pr:{}#{} ({}): {}card {} not started ({}): move {} to In Progress".format(
+            row["repo"], row["number"], row["lifecycle"], _pr_task_ref(row),
+            row["card_key"], row["status"], row["card_key"],
+        ),
+    )
+
+
+def _rule_pr_merged_card_not_done(conn, project, epics, party_states):
+    return _pr_card_findings(
+        conn, project, epics, party_states,
+        "prs.lifecycle = 'merged'", "cards.status_category != 'done'",
+        lambda row: "pr:{}#{}: merged, {}card {} not done ({}): move {} to Done".format(
+            row["repo"], row["number"], _pr_task_ref(row),
+            row["card_key"], row["status"], row["card_key"],
+        ),
+    )
+
+
+def _rule_task_started_card_not_started(conn, project, epics, party_states):
+    rows = conn.execute(
+        "SELECT quests.epic AS epic, quest_tasks.quest AS quest, quest_tasks.tid AS tid,"
+        " tasks.jira_key AS jira_key, cards.status AS status"
+        " FROM quest_tasks"
+        " JOIN quests ON quests.slug = quest_tasks.quest"
+        " JOIN tasks ON tasks.project = quests.project AND tasks.epic = quests.epic"
+        " AND tasks.tid = quest_tasks.tid"
+        " JOIN cards ON cards.project = tasks.project AND cards.key = tasks.jira_key"
+        " JOIN parties ON parties.name = quests.party"
+        " WHERE quests.project = ? AND quest_tasks.state = 'active' AND cards.status_category = 'new'"
+        + _epic_clause("quests", epics) + _party_clause(party_states)
+        + " ORDER BY quests.epic, quest_tasks.quest, quest_tasks.tid",
         _epic_params(project, epics) + _party_params(party_states),
     ).fetchall()
     return [
-        "pr:{}#{} ({}): task:{}/{} card {} not started ({})".format(
-            row["repo"], row["number"], row["lifecycle"], row["epic"], row["tid"],
-            row["jira_key"], row["status"],
+        "task:{}/{} started, card {} not started ({}): move {} to In Progress".format(
+            row["quest"], row["tid"], row["jira_key"], row["status"], row["jira_key"]
         )
         for row in rows
     ]
@@ -270,6 +337,8 @@ def _collect_epic_scoped(conn, project, epics, party_states):
         ("SDD task without card", _rule_sdd_task_without_card(conn, project, epics)),
         ("card not under its epic", _rule_card_not_under_epic(conn, project, epics)),
         ("PR open, card not started", _rule_pr_open_card_not_started(conn, project, epics, party_states)),
+        ("PR merged, card not done", _rule_pr_merged_card_not_done(conn, project, epics, party_states)),
+        ("task started, card not started", _rule_task_started_card_not_started(conn, project, epics, party_states)),
         ("PR closed unmerged", _rule_pr_closed_unmerged(conn, project, epics, party_states)),
         ("epic done with open work", _rule_epic_done_with_open_work(conn, project, epics)),
         ("quest task not in SDD", _rule_quest_task_not_in_sdd(conn, project, epics, party_states)),
@@ -279,7 +348,7 @@ def _collect_epic_scoped(conn, project, epics, party_states):
 
 def _collect(conn, project, epics, party_states, sessions_dir):
     groups = _collect_epic_scoped(conn, project, epics, party_states)
-    groups.insert(6, ("party has no running leader", _rule_party_without_leader(conn, project, sessions_dir)))
+    groups.insert(8, ("party has no running leader", _rule_party_without_leader(conn, project, sessions_dir)))
     return groups
 
 
