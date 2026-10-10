@@ -53,6 +53,38 @@ class PrActivityTests(GuildTestCase):
         self.assertEqual(row["review_comment_count"], 3)
         self.assertEqual(row["last_notified_comment_count"], 0)
 
+    def _sync_view(self, **fields):
+        view = {"state": "OPEN", "isDraft": False, "headRefName": "feature/x", "title": "t"}
+        self.write_gh_fixture("view_acme-app_1", dict(view, **fields))
+        code, out, err = self.run_cli(["sync", "--source", "gh"], "sess-1", self.repo_dir)
+        self.assertEqual(code, 0)
+        return self._pr_row()
+
+    def test_sync_stores_review_decision_merge_state_and_base_branch(self):
+        row = self._sync_view(reviewDecision="APPROVED", mergeStateStatus="BLOCKED", baseRefName="main")
+        self.assertEqual(
+            (row["review_decision"], row["merge_state"], row["base_branch"]), ("APPROVED", "BLOCKED", "main")
+        )
+
+    def test_unknown_merge_state_keeps_the_previous_value(self):
+        self._sync_view(mergeStateStatus="CLEAN", baseRefName="main")
+        row = self._sync_view(mergeStateStatus="UNKNOWN", baseRefName="main")
+        self.assertEqual(row["merge_state"], "CLEAN")
+
+    def test_replaying_an_old_pr_synced_event_leaves_the_new_fields_empty(self):
+        self._sync_view(reviewDecision="APPROVED", mergeStateStatus="CLEAN", baseRefName="main")
+        conn = db.connect(paths.db_path())
+        conn.execute(
+            "UPDATE events SET payload = json_remove(payload, '$.review_decision', '$.merge_state', '$.base_branch')"
+            " WHERE kind = 'pr.synced'"
+        )
+        conn.commit()
+        conn.close()
+        code, out, err = self.run_cli(["rebuild"], None, None)
+        self.assertEqual(code, 0)
+        row = self._pr_row()
+        self.assertEqual((row["review_decision"], row["merge_state"], row["base_branch"]), (None, None, None))
+
     def test_sync_without_changes_does_not_bump_activity(self):
         self.run_cli(["sync", "--source", "gh"], "sess-1", self.repo_dir)
         before = self._pr_row()["last_activity_at"]

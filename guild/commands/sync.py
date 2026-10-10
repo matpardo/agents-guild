@@ -98,6 +98,9 @@ def _lifecycle_from_gh(current_lifecycle, gh_data):
     return "draft"
 
 
+_UNKNOWN_MERGE_STATE = "UNKNOWN"
+
+
 def _sync_pr(ctx, projects, row, failures):
     gh_data = github.pr_view(
         ctx.cwd,
@@ -105,7 +108,8 @@ def _sync_pr(ctx, projects, row, failures):
         row["number"],
         [
             "state", "isDraft", "mergedAt", "headRefName", "title", "statusCheckRollup",
-            "reviewDecision", "mergeable", "comments", "reviews", "headRefOid", "isCrossRepository",
+            "reviewDecision", "mergeable", "mergeStateStatus", "baseRefName", "comments", "reviews", "headRefOid",
+            "isCrossRepository",
         ],
     )
     failing, passing, pending = _count_checks(gh_data.get("statusCheckRollup"))
@@ -125,9 +129,14 @@ def _sync_pr(ctx, projects, row, failures):
         "checks_pending": pending,
         "lifecycle": lifecycle,
         "mergeable": gh_data.get("mergeable"),
+        "review_decision": gh_data.get("reviewDecision"),
+        "base_branch": gh_data.get("baseRefName"),
         "review_comment_count": review_comment_count,
         "synced_at": timeutil.to_iso(ctx.now),
     }
+    merge_state = gh_data.get("mergeStateStatus")
+    if merge_state not in (None, _UNKNOWN_MERGE_STATE):
+        payload["merge_state"] = merge_state
     change_set = _open_pr_change_set(ctx, projects, row, lifecycle, failures)
     if change_set is not None:
         payload["change_set"] = change_set
