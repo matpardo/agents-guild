@@ -190,3 +190,13 @@ updated: 2026-10-04
 
 **Acceptance:**
 - [x] A live session whose transcript ends in a usage-limit error gets `continue` once per limit hit, a minute after the reset; sessions without a recorded window, other trailing lines and dry-run send nothing.
+
+## T18 — Rule: daily reminder to record SDD progress
+
+**Depends on:** T03
+**Status:** [x] done — #117
+
+**What:** a notify-only state rule that reminds the owning party, once a day, to record progress in the epic `tasks.md` when a task has been in progress for over 24 hours with no SDD commit in that time.
+
+**Acceptance:**
+- [x] A long-running task on an epic quest with a stale `tasks.md` posts one notice per day; recent SDD commits, recent tasks, done tasks, non-epic quests, dry-run and an absent rule notify nothing.

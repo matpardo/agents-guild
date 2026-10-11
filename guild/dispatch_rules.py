@@ -1,4 +1,7 @@
-from guild import merge_queue, paths, resume, session_info, transcript_usage
+from pathlib import Path
+
+from guild import merge_queue, paths, resume, session_info, timeutil, transcript_usage
+from guild.adapters import sdd
 from guild.commands import merge_queue as merge_queue_commands
 from guild.commands import next as next_commands
 from guild.commands import revive
@@ -6,6 +9,7 @@ from guild.commands import revive
 
 _RESUME_GRACE_SECONDS = 60
 _RESUME_TEXT = "continue"
+_SDD_PROGRESS_SECONDS = 24 * 3600
 _CHECKED_LIFECYCLES = ("draft", "converging", "ready")
 _REASON_SLUGS = (
     ("merge conflict", "conflict"),
@@ -264,10 +268,60 @@ def _limit_resume_triggers(ctx, project_config):
     return triggers
 
 
+def _sdd_commit_time(sdd_config, sdd_path):
+    if sdd_path.startswith("git:"):
+        ref, path = sdd_path[4:].split(":", 1)
+        return sdd.last_commit_time(sdd_config["git_repo"], ref, path)
+    return sdd.last_commit_time(str(Path(sdd_path).parent), None, sdd_path)
+
+
+def _sdd_commit_time_or_none(sdd_config, sdd_path):
+    try:
+        return _sdd_commit_time(sdd_config, sdd_path)
+    except sdd.GitSddError:
+        return None
+
+
+def _sdd_progress_triggers(ctx, project_config):
+    sdd_config = project_config.get("sdd")
+    if sdd_config is None:
+        return []
+    now = ctx.now.timestamp()
+    rows = ctx.conn.execute(
+        "SELECT quests.party AS party, quests.slug AS quest, quests.epic AS epic, quest_tasks.tid AS tid,"
+        " epics.sdd_path AS sdd_path,"
+        " (SELECT MAX(events.ts) FROM events WHERE events.kind = 'task.started'"
+        "  AND json_extract(events.payload, '$.quest') = quests.slug"
+        "  AND json_extract(events.payload, '$.tid') = quest_tasks.tid) AS started"
+        " FROM quest_tasks JOIN quests ON quests.slug = quest_tasks.quest"
+        " JOIN epics ON epics.project = quests.project AND epics.epic = quests.epic"
+        " WHERE quests.project = ? AND quest_tasks.state = 'active' ORDER BY quests.slug, quest_tasks.tid",
+        (project_config["name"],),
+    ).fetchall()
+    commit_times = {}
+    triggers = []
+    for row in rows:
+        if now - timeutil.from_iso(row["started"]).timestamp() <= _SDD_PROGRESS_SECONDS:
+            continue
+        if row["sdd_path"] not in commit_times:
+            commit_times[row["sdd_path"]] = _sdd_commit_time_or_none(sdd_config, row["sdd_path"])
+        committed = commit_times[row["sdd_path"]]
+        if committed is None or now - committed <= _SDD_PROGRESS_SECONDS:
+            continue
+        subject = "{}/{}".format(row["quest"], row["tid"])
+        key = "sdd_progress:{}:{}:{}".format(row["party"], subject, ctx.now.strftime("%Y-%m-%d"))
+        text = "{}: record progress of {} in {} tasks.md (no SDD update in 24h)".format(
+            row["party"], row["tid"], row["epic"]
+        )
+        triggers.append(Trigger(project_config["name"], "sdd_progress", key, row["party"], subject, text))
+    return triggers
+
+
 STATE_RULES = {
     "next_task": _next_task_triggers,
     "merge_head": _merge_head_triggers,
     "limit_resume": _limit_resume_triggers,
+    "sdd_progress": _sdd_progress_triggers,
 }
-NOTIFY_ONLY_RULES = ("merge_head",)
+NOTIFY_ONLY_RULES = ("merge_head", "sdd_progress")
 NUDGE_RULES = ("limit_resume",)

@@ -178,6 +178,14 @@ def _run_git(repo, args):
     return result.stdout
 
 
+def last_commit_time(repo, ref, path):
+    args = ["log", "-1", "--format=%ct"]
+    if ref is not None:
+        args.append(ref)
+    output = _run_git(repo, args + ["--", path]).strip()
+    return int(output) if output else 0
+
+
 def git_fetch(repo):
     _run_git(repo, ["fetch", "--quiet", "origin"])
 

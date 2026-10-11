@@ -1346,6 +1346,7 @@ Rules, each `dry-run` (records what it would do) or `on`:
 | `pr_promote` | `pr.synced` of a converging draft PR with settled green checks (none failing or pending, at least one passing), no merge conflict, changes requested, unresolved threads or stale branch, no ask pending, not blocked externally, a known head commit, not seeded, in a repo of the project | the party that owns the PR is notified |
 | `next_task` | state rule: a party that handed off and has a next unblocked task (`guild next`) | that party |
 | `limit_resume` | state rule: a party with a live session whose transcript ends in a usage-limit (429) error, one minute after its reset time | that party is nudged, nothing is launched |
+| `sdd_progress` | state rule, notify only: an active task on an epic quest, started over 24 hours ago, whose epic `tasks.md` has no commit in the last 24 hours (needs the project `sdd` block) | the party that owns the task |
 | `merge_head` | state rule, notify only: the head of each merge queue scope (each raid, then each party outside a raid), see `guild merge-queue --head` | the party that owns the head PR |
 
 `merge_head` never launches a session. When the head of a scope is a PR not
@@ -1353,6 +1354,11 @@ announced before (`merge_head:<scope>:<ref>`), it posts one project notice
 `<party>: <ref> is first in the merge queue; run guild pr ready-check <ref>`
 and runs `notify.command` with the party and `merge-head`. In `dry-run` mode
 it only records a plan.
+
+`sdd_progress` never launches a session. Once per day (`sdd_progress:<party>:<quest>/<tid>:<UTC date>`)
+it posts one project notice `<party>: record progress of <tid> in <epic> tasks.md (no SDD update in 24h)`
+and runs `notify.command` with the party and `sdd-progress`. Guild never writes the SDD. Tasks of
+epics whose `tasks.md` cannot be read from git are skipped. In `dry-run` mode it only records a plan.
 
 `limit_resume` never launches a session. When the last turn of a live leader's
 transcript is a `rate_limit` API error, one minute after its `resetsAt` it types
@@ -1828,7 +1834,7 @@ against path traversal, not an identity boundary.
   defaults: `permission_mode` (`manual`, `acceptEdits` or `auto`;
   `bypassPermissions`, `dontAsk`, `plan` and anything else fail to load),
   `max_launches_per_hour` (integer from 1 to 20) and `rules` (an object whose
-  keys are `ask_answered`, `checks_failing`, `pr_unmergeable`, `next_task`, `merge_head` and `pr_promote` and whose values are `dry-run`
+  keys are `ask_answered`, `checks_failing`, `pr_unmergeable`, `next_task`, `merge_head`, `pr_promote`, `limit_resume` and `sdd_progress` and whose values are `dry-run`
   or `on`; `off` is rejected, remove the rule to disable it). Absent → the
   project is never dispatched.
 - Unknown top-level keys are allowed.
