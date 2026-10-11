@@ -180,8 +180,10 @@ guild resources collect                                # measure and record a re
 guild resources-timer install --every <dur> | uninstall | print
 guild board [--party <name> | --raid <name>]
 guild web [--port <n>]
-guild sync --source gh|sdd|tracker
+guild sync --source gh|sdd|tracker [--all-projects]
 guild sync-timer install --every <dur> | uninstall | print
+guild sync-sdd-timer install --every <dur> | uninstall | print
+guild sync-tracker-timer install --every <dur> | uninstall | print
 guild dispatch run [--dry-run]                # react to new events: launch fresh sessions where a project enabled the dispatcher
 guild dispatch status                         # per project: cursor, launches last hour, rules, launches in flight, recent decisions
 guild dispatch-timer install --every <dur> | uninstall | print
@@ -695,6 +697,16 @@ and writes nothing, for installing them by hand. `install` and `uninstall`
 fail with a clear error when the platform is not Linux or `systemctl` is not
 available; use `print` there. Nothing is pushed to running sessions: the timer
 only refreshes the synced state that sessions read.
+
+`guild sync-sdd-timer` and `guild sync-tracker-timer` take the same
+`install --every <dur> | uninstall | print` and manage their own units
+(`guild-sync-sdd.*`, `guild-sync-tracker.*`), so `guild drift` and `guild next`
+do not go stale between manual runs. They run `guild sync --source sdd|tracker
+--all-projects`: a timer has no working directory inside a project, so the sync
+visits every project config that has an `sdd` (or `tracker`) block and skips the
+rest without a failure. A project whose sync fails (unreadable SDD root, `acli`
+missing or not logged in) is reported as `<project>: <reason>` and the run exits
+non-zero; the previous tracker snapshot is kept.
 
 ### `guild merge-queue`
 

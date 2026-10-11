@@ -27,11 +27,14 @@ def _parse_item(item):
 
 
 def _search(jql):
-    result = subprocess.run(
-        ["acli", "jira", "workitem", "search", "--jql", jql, "--fields", _FIELDS, "--json", "--paginate"],
-        capture_output=True,
-        text=True,
-    )
+    try:
+        result = subprocess.run(
+            ["acli", "jira", "workitem", "search", "--jql", jql, "--fields", _FIELDS, "--json", "--paginate"],
+            capture_output=True,
+            text=True,
+        )
+    except OSError as error:
+        raise JiraAcliError("acli could not run: {}".format(error))
     if result.returncode != 0:
         raise JiraAcliError(result.stderr.strip() or "acli jira workitem search failed")
     try:

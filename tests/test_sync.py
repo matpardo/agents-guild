@@ -208,7 +208,7 @@ class SyncTests(GuildTestCase):
             conn, "sess-1", self.repo_dir, timeutil.utcnow(), origin.current_origin(), None, None, None
         )
         with self.assertRaises(GuildError) as raised:
-            sync_commands.run(ctx, "bogus", None)
+            sync_commands.run(ctx, "bogus", False, None)
         conn.close()
         self.assertIn("not implemented", raised.exception.message)
 

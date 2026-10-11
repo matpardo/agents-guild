@@ -473,7 +473,7 @@ def _handle_sync(ctx, args):
     from guild import lifecycle
     from guild.commands import sync as sync_commands
 
-    failures = sync_commands.run(ctx, args.source, lifecycle.run_process)
+    failures = sync_commands.run(ctx, args.source, args.all_projects, lifecycle.run_process)
     for failure in failures:
         sys.stderr.write("guild: sync failed for {}\n".format(failure))
     return 1 if failures else 0
@@ -913,6 +913,7 @@ def build_parser():
 
     sync = subparsers.add_parser("sync")
     sync.add_argument("--source", required=True, choices=["gh", "sdd", "tracker"])
+    sync.add_argument("--all-projects", action="store_true")
     sync.set_defaults(handler=_handle_sync)
 
     lifecycle_parser = subparsers.add_parser("lifecycle")
@@ -939,6 +940,8 @@ def build_parser():
     dispatch_status.set_defaults(handler=_handle_dispatch)
 
     _add_timer_parser(subparsers, "sync-timer", "sync-gh")
+    _add_timer_parser(subparsers, "sync-sdd-timer", "sync-sdd")
+    _add_timer_parser(subparsers, "sync-tracker-timer", "sync-tracker")
     _add_timer_parser(subparsers, "resources-timer", "resources-collect")
     _add_timer_parser(subparsers, "dispatch-timer", "dispatch")
 
