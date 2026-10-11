@@ -20,7 +20,7 @@ class FixRequestedTests(ChecksFailingBase):
         self.assertEqual(
             lines, ["acme: fix_requested acme/app#1 -> launched alpha g2 (window @10, mode acceptEdits)"]
         )
-        self.assertEqual(self.decision_keys(), ["fix_requested:acme/app#1:abc123"])
+        self.assertRegex(self.decision_keys()[0], r"^fix_requested:acme/app#1:[0-9a-f-]{36}$")
         self.assertTrue(
             self.tmux.launch_calls()[0][-1].endswith(
                 "Dispatched: the human asked you to fix acme/app#1: checks failing (1);"
@@ -38,17 +38,16 @@ class FixRequestedTests(ChecksFailingBase):
             self.run_pass(), ["acme: fix_requested acme/app#1 -> launched alpha g2 (window @10, mode acceptEdits)"]
         )
 
-    def test_new_head_fires_again(self):
+    def test_fires_once_per_request(self):
         self.write_block({"fix_requested": "dry-run"})
         self.sync_open(_FAILING, "abc123")
         self.ask_fix()
-        self.run_pass()
-        self.sync_open(_FAILING, "def456")
-        self.ask_fix()
         self.assertEqual(len(self.run_pass()), 1)
-        self.assertEqual(
-            self.decision_keys(), ["fix_requested:acme/app#1:abc123", "fix_requested:acme/app#1:def456"]
-        )
+        self.sync_open(_FAILING, "def456")
+        self.assertEqual(self.run_pass(), ["nothing to dispatch"])
+        code, out, err = self.run_cli(["pr", "ask-fix", "acme/app#1"], None, self.repo_dir)
+        self.assertEqual(code, 1)
+        self.assertEqual(len(self.decision_keys()), 1)
 
     def test_rule_absent_still_posts_the_notice_and_launches_nothing(self):
         self.write_block({"ask_answered": "on"})

@@ -39,7 +39,7 @@ class AskFixTestCase(MergeQueueTestCase):
         self.assertEqual(events[0]["project"], "acme")
         self.assertEqual(
             json.loads(events[0]["payload"]),
-            {"repo": "acme/app", "number": 1, "party": "alpha", "reasons": ["checks failing (1)"], "head_sha": "abc123"},
+            {"repo": "acme/app", "number": 1, "party": "alpha", "reasons": ["checks failing (1)"]},
         )
         notices = self.notices()
         self.assertEqual(len(notices), 1)
@@ -54,22 +54,84 @@ class AskFixTestCase(MergeQueueTestCase):
             "alpha: fix acme/app#1: checks failing (1), merge conflict, changes requested",
         )
 
-    def test_second_request_for_the_same_commit_is_deduped(self):
-        self.sync_view(_FAILING_VIEW)
-        self.ask_fix()
+    def request_column(self):
+        return self.query("SELECT fix_requested_at FROM prs")[0]["fix_requested_at"]
+
+    def assert_refused_while_open(self):
         code, out, err = self.ask_fix()
-        self.assertEqual(code, 0, err)
-        self.assertIn("already requested for this commit", out)
+        self.assertEqual(code, 1)
+        self.assertIn("fix already requested 0h ago; waiting on alpha", err)
         self.assertEqual(len(self.events()), 1)
         self.assertEqual(len(self.notices()), 1)
 
-    def test_new_head_allows_a_new_request(self):
+    def test_request_opens_the_tag_and_a_second_request_is_refused(self):
+        self.sync_view(_FAILING_VIEW)
+        self.ask_fix()
+        self.assertIsNotNone(self.request_column())
+        self.assert_refused_while_open()
+
+    def test_partial_push_keeps_the_tag(self):
         self.sync_view(_FAILING_VIEW)
         self.ask_fix()
         self.sync_view(dict(_FAILING_VIEW, headRefOid="def456"))
+        self.assertIsNotNone(self.request_column())
+        self.assert_refused_while_open()
+
+    def test_cleared_blockers_close_the_tag(self):
+        self.sync_view(_FAILING_VIEW)
+        self.ask_fix()
+        self.sync_view(dict(OPEN_VIEW, headRefOid="def456"))
+        self.assertIsNone(self.request_column())
+        self.sync_view(_FAILING_VIEW)
+        self.assertIsNone(self.request_column())
+
+    def test_merge_closes_the_tag(self):
+        self.sync_view(_FAILING_VIEW)
+        self.ask_fix()
+        self.sync_view(dict(_FAILING_VIEW, state="MERGED", mergedAt="2026-10-11T10:00:00Z"))
+        self.assertIsNone(self.request_column())
+
+    def test_stale_request_with_config_allows_a_new_one(self):
+        self._set_project_config({"fix_request_stale_hours": 4})
+        self.sync_view(_FAILING_VIEW)
+        self.ask_fix()
+        self.backdate_fix_request(3)
+        code, out, err = self.ask_fix()
+        self.assertEqual(code, 1)
+        self.assertIn("fix already requested 3h ago; waiting on alpha", err)
+        self.backdate_fix_request(5)
         code, out, err = self.ask_fix()
         self.assertEqual(code, 0, err)
         self.assertEqual(len(self.events()), 2)
+
+    def test_request_without_config_never_goes_stale(self):
+        self.sync_view(_FAILING_VIEW)
+        self.ask_fix()
+        self.backdate_fix_request(24 * 365)
+        code, out, err = self.ask_fix()
+        self.assertEqual(code, 1)
+        self.assertIn("fix already requested 8760h ago; waiting on alpha", err)
+
+    def test_invalid_stale_hours_config_is_rejected(self):
+        self.sync_view(_FAILING_VIEW)
+        self._set_project_config({"fix_request_stale_hours": 0})
+        code, out, err = self.ask_fix()
+        self.assertEqual(code, 1)
+        self.assertIn("fix_request_stale_hours", err)
+
+    def test_ready_check_shows_the_tag(self):
+        self.sync_view(_FAILING_VIEW)
+        self.ask_fix()
+        code, out, err = self.run_cli(["pr", "ready-check", _REF], None, self.repo_dir)
+        self.assertIn("- fixing \u00b7 alpha \u00b7 0h", out)
+
+    def test_board_and_merge_queue_show_the_tag(self):
+        self.sync_view(_FAILING_VIEW)
+        self.ask_fix()
+        code, out, err = self.run_cli(["merge-queue", "--party", "alpha"], None, self.repo_dir)
+        self.assertIn("[fixing \u00b7 alpha \u00b7 0h]", out)
+        code, out, err = self.run_cli(["board"], "sess-1", self.repo_dir)
+        self.assertIn("fixing \u00b7 alpha \u00b7 0h", out)
 
     def test_pr_without_automatic_blockers_is_refused(self):
         self.sync_view(dict(OPEN_VIEW, headRefOid="abc123"))
@@ -93,12 +155,6 @@ class AskFixTestCase(MergeQueueTestCase):
         self.assertEqual(code, 1)
         self.assertIn("closed", err)
 
-    def test_unsynced_head_is_refused(self):
-        self.sync_view(dict(_FAILING_VIEW, headRefOid=None))
-        code, out, err = self.ask_fix()
-        self.assertEqual(code, 1)
-        self.assertIn("no synced head commit", err)
-
     def test_untracked_pr_is_refused(self):
         code, out, err = self.run_cli(["pr", "ask-fix", "acme/app#9"], None, self.repo_dir)
         self.assertEqual(code, 1)
@@ -107,6 +163,7 @@ class AskFixTestCase(MergeQueueTestCase):
     def test_rebuild_restores_the_request_marker(self):
         self.sync_view(_FAILING_VIEW)
         self.ask_fix()
+        marker = self.request_column()
         self.run_cli(["rebuild"], None, self.repo_dir)
-        code, out, err = self.ask_fix()
-        self.assertIn("already requested for this commit", out)
+        self.assertEqual(self.request_column(), marker)
+        self.assert_refused_while_open()

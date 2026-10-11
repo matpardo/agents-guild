@@ -3,7 +3,7 @@ import shlex
 import textwrap
 from datetime import timedelta
 
-from guild import config, ctx_pressure, dispatch_launch, links, merge_queue, party_progress, party_status, pr_asks, resume
+from guild import config, ctx_pressure, dispatch_launch, fix_request, links, merge_queue, party_progress, party_status, pr_asks, resume
 from guild import sanitize, session_status, timeutil
 from guild.commands import brief as brief_commands
 from guild.commands import claim as claim_commands
@@ -117,13 +117,20 @@ def _checks_painted(painter, pr_row):
     return text
 
 
-def _badges(pr_row):
+def _fix_request(ctx, pr_row):
+    return fix_request.status(ctx.projects_dir, ctx.now, pr_row["repo"], pr_row["party"], pr_row["fix_requested_at"])
+
+
+def _badges(ctx, pr_row):
     badges = [(pr_row["lifecycle"], _LIFECYCLE_STYLES[pr_row["lifecycle"]])]
     for column, label, style in _FLAG_STYLES:
         if column == "needs_ask_answer" and pr_row["open_ask_id"] is not None:
             badges.append(("{} (ask #{})".format(label, pr_row["open_ask_id"]), style))
         elif pr_row[column]:
             badges.append((label, style))
+    request = _fix_request(ctx, pr_row)
+    if request is not None:
+        badges.append((fix_request.label(request), "yellow"))
     return badges
 
 
@@ -139,8 +146,8 @@ def _card_prefix(pr_row):
     return "{}  ".format(sanitize.strip_control_sequences(pr_row["card"]))
 
 
-def _pr_lines(painter, pr_row, indent):
-    badges = _badges(pr_row)
+def _pr_lines(ctx, painter, pr_row, indent):
+    badges = _badges(ctx, pr_row)
     status_plain = "{}  {}".format(" ".join(label for label, _ in badges), _checks_plain(pr_row))
     status_painted = "{}  {}".format(
         " ".join(painter.paint(label, style) for label, style in badges), _checks_painted(painter, pr_row)
@@ -454,7 +461,7 @@ def _notices_section(ctx, painter, rows):
     return lines
 
 
-def _task_lines(painter, task_row, task_prs):
+def _task_lines(ctx, painter, task_row, task_prs):
     if task_row["state"] == "blocked":
         return [
             painter.paint(
@@ -466,7 +473,7 @@ def _task_lines(painter, task_row, task_prs):
     if task_row["summary"]:
         lines.extend(painter.paint(line, "dim") for line in painter.wrap(task_row["summary"], "        "))
     for pr_row in task_prs:
-        lines.extend(_pr_lines(painter, pr_row, "        "))
+        lines.extend(_pr_lines(ctx, painter, pr_row, "        "))
     return lines
 
 
@@ -487,7 +494,7 @@ def _quest_lines(ctx, painter, quest_row, prs_by_task):
             queued.append(task_row["tid"])
             continue
         task_prs = prs_by_task.get((quest_row["slug"], task_row["tid"]), [])
-        lines.extend(_task_lines(painter, task_row, task_prs))
+        lines.extend(_task_lines(ctx, painter, task_row, task_prs))
     if queued:
         lines.append(painter.paint("    ○ queued: {}".format(", ".join(queued)), "dim"))
     return lines
@@ -694,7 +701,7 @@ def _party_section(ctx, painter, party_row, project_config):
     if orphan_prs:
         lines.append(painter.paint("  PRs outside active tasks", "dim"))
         for pr_row in orphan_prs:
-            lines.extend(_pr_lines(painter, pr_row, "    "))
+            lines.extend(_pr_lines(ctx, painter, pr_row, "    "))
     claims = _party_claims(ctx, party_row["name"])
     if claims:
         claim_text = ", ".join(
@@ -884,7 +891,7 @@ def _optional_text(value):
     return sanitize.strip_control_sequences(value)
 
 
-def _pr_model(pr_row, project_config):
+def _pr_model(ctx, pr_row, project_config):
     card = _optional_text(pr_row["card"])
     return {
         "repo": pr_row["repo"],
@@ -898,7 +905,7 @@ def _pr_model(pr_row, project_config):
         "blocked_external": _optional_text(pr_row["blocked_external"]),
         "party": pr_row["party"],
         "fix_reasons": merge_queue.fix_reasons(pr_row),
-        "fix_requested_at_head": pr_row["head_sha"] is not None and pr_row["head_sha"] == pr_row["fix_requested_sha"],
+        "fix_request": _fix_request(ctx, pr_row),
         "checks_failing": pr_row["checks_failing"] or 0,
         "checks_passing": pr_row["checks_passing"] or 0,
         "checks_pending": pr_row["checks_pending"] or 0,
@@ -959,8 +966,8 @@ def _notice_model(ctx, row):
     }
 
 
-def _task_model(conn, project, epic, task_row, task_prs, project_config):
-    key = _task_card_key(conn, project, epic, task_row["tid"])
+def _task_model(ctx, project, epic, task_row, task_prs, project_config):
+    key = _task_card_key(ctx.conn, project, epic, task_row["tid"])
     return {
         "tid": task_row["tid"],
         "title": sanitize.strip_control_sequences(task_row["title"]),
@@ -968,15 +975,15 @@ def _task_model(conn, project, epic, task_row, task_prs, project_config):
         "summary": _optional_text(task_row["summary"]),
         "blocked_reason": _optional_text(task_row["blocked_reason"]),
         "card_url": links.card_url(project_config, key),
-        "prs": [_pr_model(pr_row, project_config) for pr_row in task_prs],
+        "prs": [_pr_model(ctx, pr_row, project_config) for pr_row in task_prs],
     }
 
 
-def _quest_model(conn, project, quest_row, prs_by_task, project_config):
-    task_rows = _open_task_rows(conn, quest_row["slug"])
+def _quest_model(ctx, project, quest_row, prs_by_task, project_config):
+    task_rows = _open_task_rows(ctx.conn, quest_row["slug"])
     tasks = [
         _task_model(
-            conn,
+            ctx,
             project,
             quest_row["epic"],
             task_row,
@@ -1027,7 +1034,7 @@ def _party_model(ctx, party_row, project_config):
     prs_by_task = _prs_by_task(pr_rows)
     quests = _active_quests(ctx.conn, party_row["name"])
     quest_models = [
-        _quest_model(ctx.conn, party_row["project"], quest_row, prs_by_task, project_config)
+        _quest_model(ctx, party_row["project"], quest_row, prs_by_task, project_config)
         for quest_row in quests
     ]
     orphan_prs = _orphan_pr_rows(ctx, quests, pr_rows)
@@ -1045,7 +1052,7 @@ def _party_model(ctx, party_row, project_config):
         "resume_command": _resume_command(ctx, party_row),
         "leader_session_name": _leader_session_name(ctx.conn, party_row["name"]),
         "quests": quest_models,
-        "prs": [_pr_model(pr_row, project_config) for pr_row in orphan_prs],
+        "prs": [_pr_model(ctx, pr_row, project_config) for pr_row in orphan_prs],
         "raids": [
             {
                 "raid": row["raid"],
@@ -1095,7 +1102,7 @@ def board_model(ctx):
         "drift": [drift_commands.board_findings(ctx, project_name) for project_name in project_names],
         "raids": _raid_models(ctx.conn, ctx.now),
         "merge_queues": merge_queue_commands.board_models(
-            ctx.conn, ctx.now, [row["name"] for row in party_rows]
+            ctx.conn, ctx.projects_dir, ctx.now, [row["name"] for row in party_rows]
         ),
         "dispatcher": dispatcher_model(ctx, None),
         "projects": _project_models(ctx, party_rows, projects_by_name),

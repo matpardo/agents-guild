@@ -1,5 +1,8 @@
 import json
 import sqlite3
+from datetime import timedelta
+
+from guild import timeutil
 
 from tests.testutil import GuildTestCase
 
@@ -83,6 +86,12 @@ class MergeQueueTestCase(GuildTestCase):
 
     def sync_gh(self, session_id):
         return self.run_cli(["sync", "--source", "gh"], session_id, self.repo_dir)
+
+    def backdate_fix_request(self, hours):
+        conn = sqlite3.connect(str(self.data_home / "guild" / "guild.db"))
+        conn.execute("UPDATE prs SET fix_requested_at = ?", (timeutil.to_iso(timeutil.utcnow() - timedelta(hours=hours)),))
+        conn.commit()
+        conn.close()
 
     def query(self, sql):
         conn = sqlite3.connect(str(self.data_home / "guild" / "guild.db"))

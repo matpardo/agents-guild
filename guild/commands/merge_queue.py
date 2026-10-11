@@ -1,6 +1,6 @@
 import json
 
-from guild import config, db, events, identity, merge_queue, pr_asks, refs, resolve, sanitize, timeutil
+from guild import config, db, events, fix_request, identity, merge_queue, pr_asks, refs, resolve, sanitize, timeutil
 from guild.commands import main_status as main_status_commands
 from guild.commands import raid as raid_commands
 from guild.errors import GuildError
@@ -83,7 +83,7 @@ def _pr_record(conn, row):
         "fixes_main": bool(row["fixes_main"]),
         "fixes_flaky": bool(row["fixes_flaky"]),
         "blocked_external": row["blocked_external"],
-        "fix_requested_at_head": row["head_sha"] is not None and row["head_sha"] == row["fix_requested_sha"],
+        "fix_requested_at": row["fix_requested_at"],
         "mergeable": row["mergeable"],
         "review_decision": row["review_decision"],
         "unresolved_threads": row["unresolved_threads"],
@@ -344,9 +344,12 @@ def _action_text(entry):
     return "{} ({})".format(entry["action"], entry["why"])
 
 
-def _task_text(entry):
+def _task_text(ctx, entry):
     task = entry["task"] or "-"
-    brackets = entry["labels"]
+    brackets = list(entry["labels"])
+    request = fix_request.status(ctx.projects_dir, ctx.now, entry["repo"], entry["party"], entry["fix_requested_at"])
+    if request is not None:
+        brackets.append(fix_request.label(request))
     if not brackets:
         return task
     return "{} {}".format(task, " ".join("[{}]".format(text) for text in brackets))
@@ -358,25 +361,25 @@ def _branch_suffix(entry):
     return "  branch: {}".format(entry["branch"])
 
 
-def _queue_line(position, entry):
+def _queue_line(ctx, position, entry):
     prefix = "\u25b6 next action: " if entry["next_action"] else ""
     return "{}{}. {}  {}  {}  unblocks {} \u2014 {}{}".format(
         prefix,
         position,
         entry["ref"],
         entry["party"],
-        _task_text(entry),
+        _task_text(ctx, entry),
         entry["unblocks"],
         _action_text(entry),
         _branch_suffix(entry),
     )
 
 
-def _body_lines(scoped):
+def _body_lines(ctx, scoped):
     if not scoped["has_prs"]:
         return ["no open tracked PRs"]
     lines = [_main_line(row) for row in scoped["main"]]
-    lines.extend(_queue_line(index, entry) for index, entry in enumerate(scoped["queue"], start=1))
+    lines.extend(_queue_line(ctx, index, entry) for index, entry in enumerate(scoped["queue"], start=1))
     return lines
 
 
@@ -384,7 +387,7 @@ def run(ctx, raid, party):
     kind, name, party_names = _resolve_scope(ctx, raid, party)
     scoped = load_scoped_queue(ctx.conn, party_names)
     header = "merge queue \u00b7 {} {} \u00b7 {}".format(kind, name, _synced_label(ctx.now, scoped["synced_at"]))
-    lines = [header] + _body_lines(scoped) + [NEVER_MERGES_REMINDER]
+    lines = [header] + _body_lines(ctx, scoped) + [NEVER_MERGES_REMINDER]
     return [sanitize.strip_control_sequences(line) for line in lines]
 
 
@@ -471,7 +474,7 @@ def main_red_labels(conn, party_names):
     return [main_label(row) for row in load_scoped_queue(conn, party_names)["main"]]
 
 
-def _entry_model(entry):
+def _entry_model(projects_dir, now, entry):
     return {
         "ref": entry["ref"],
         "repo": entry["repo"],
@@ -485,7 +488,7 @@ def _entry_model(entry):
         "checks_pending": entry["checks_pending"],
         "labels": entry["labels"],
         "fix_reasons": entry["fix_reasons"],
-        "fix_requested_at_head": entry["fix_requested_at_head"],
+        "fix_request": fix_request.status(projects_dir, now, entry["repo"], entry["party"], entry["fix_requested_at"]),
         "url": "https://github.com/{}/pull/{}".format(entry["repo"], entry["number"]),
     }
 
@@ -502,9 +505,9 @@ def gates(entry, red_rows):
     return found
 
 
-def _queue_entry_model(position, entry, main_rows):
+def _queue_entry_model(projects_dir, now, position, entry, main_rows):
     return dict(
-        _entry_model(entry),
+        _entry_model(projects_dir, now, entry),
         position=position,
         unblocks=entry["unblocks"],
         blocked_external=entry["blocked_external"],
@@ -534,7 +537,7 @@ def _head_model(scoped):
     return {"ref": entry["ref"], "party": entry["party"], "url": "https://github.com/{}/pull/{}".format(entry["repo"], entry["number"])}
 
 
-def _scope_model(now, scope, scoped):
+def _scope_model(projects_dir, now, scope, scoped):
     return {
         "head": _head_model(scoped),
         "scope": scope,
@@ -542,13 +545,13 @@ def _scope_model(now, scope, scoped):
         "synced_label": _synced_label(now, scoped["synced_at"]),
         "main": [_main_model(row) for row in scoped["main"]],
         "queue": [
-            _queue_entry_model(position, entry, scoped["main"])
+            _queue_entry_model(projects_dir, now, position, entry, scoped["main"])
             for position, entry in enumerate(scoped["queue"], start=1)
         ],
     }
 
 
-def board_models(conn, now, party_names):
+def board_models(conn, projects_dir, now, party_names):
     records = open_pr_records(conn)
     pins = load_pins(conn)
     main_rows = main_status_commands.red_rows(conn)
@@ -558,11 +561,13 @@ def board_models(conn, now, party_names):
     for raid_name in sorted(grouped):
         members = {row["party"] for row in grouped[raid_name]}
         in_raid |= members
-        models.append(_scope_model(now, "raid:{}".format(raid_name), scoped_queue(records, pins, main_rows, members)))
+        models.append(_scope_model(
+                projects_dir, now, "raid:{}".format(raid_name), scoped_queue(records, pins, main_rows, members)
+            ))
     for party in sorted(party_names):
         if party in in_raid:
             continue
         scoped = scoped_queue(records, pins, main_rows, {party})
         if scoped["has_prs"]:
-            models.append(_scope_model(now, "party:{}".format(party), scoped))
+            models.append(_scope_model(projects_dir, now, "party:{}".format(party), scoped))
     return models

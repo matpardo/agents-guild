@@ -24,18 +24,31 @@ class WebPrAskFixTests(WebWriteTestCase):
         board = json.loads(body)
         return board["parties"][0]["quests"][0]["tasks"][0]["prs"][0]
 
-    def test_ask_fix_sets_the_head_flag(self):
+    def test_ask_fix_opens_the_request(self):
         pr = self._board_pr()
-        self.assertEqual((pr["party"], pr["fix_reasons"], pr["fix_requested_at_head"]), ("alpha", ["checks failing (1)"], False))
+        self.assertEqual((pr["party"], pr["fix_reasons"], pr["fix_request"]), ("alpha", ["checks failing (1)"], None))
         response, payload = self._post_json(_ASK_FIX, self._good_headers(), {})
         self.assertEqual(response.status, 200, payload)
-        self.assertTrue(self._board_pr()["fix_requested_at_head"])
+        request = self._board_pr()["fix_request"]
+        self.assertEqual((request["party"], request["age_hours"], request["stale"]), ("alpha", 0, False))
 
-    def test_new_head_clears_the_flag(self):
+    def test_new_head_keeps_the_request(self):
         self._post_json(_ASK_FIX, self._good_headers(), {})
         self.write_gh_fixture("view_acme-app_1", dict(_FAILING_VIEW, headRefOid="def456"))
         self.run_cli(["sync", "--source", "gh"], "sess-1", self.repo_dir)
-        self.assertFalse(self._board_pr()["fix_requested_at_head"])
+        self.assertIsNotNone(self._board_pr()["fix_request"])
+
+    def test_cleared_blockers_close_the_request(self):
+        self._post_json(_ASK_FIX, self._good_headers(), {})
+        self.write_gh_fixture("view_acme-app_1", dict(OPEN_VIEW, headRefOid="def456"))
+        self.run_cli(["sync", "--source", "gh"], "sess-1", self.repo_dir)
+        self.assertIsNone(self._board_pr()["fix_request"])
+
+    def test_second_request_is_422(self):
+        self._post_json(_ASK_FIX, self._good_headers(), {})
+        response, payload = self._post_json(_ASK_FIX, self._good_headers(), {})
+        self.assertEqual(response.status, 422)
+        self.assertIn("fix already requested", self._error(payload))
 
     def test_refusal_is_422(self):
         self.run_cli(["pr", "set", "acme/app#1", "--blocked-external", "legal"], "sess-1", self.repo_dir)
