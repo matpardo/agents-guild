@@ -77,3 +77,10 @@ updated: 2026-09-29
 **Status:** [x] done — #104
 
 **What:** `guild pr ready-check <owner/repo>#<n>` lists every blocker, wait and gate (draft, human review, main red) standing between a PR and its merge, and exits 0 only when the PR is ready to merge.
+
+## T11 — Block a PR on something outside development
+
+**Depends on:** T10
+**Status:** [x] done — #111
+
+**What:** `guild pr set --blocked-external "<reason>"` marks a PR that waits on a decision outside development; the queue blocks it and its dependents with `wait: external`, `guild next`, the queue head and `ready-check` skip them, and they do not count against the open-PR caps or `pr_unmergeable`.
