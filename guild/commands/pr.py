@@ -1,8 +1,12 @@
-from guild import config, db, events, identity, refs
+from guild import config, db, events, identity, merge_queue, refs
 from guild.adapters import github
+from guild.commands import main_status as main_status_commands
+from guild.commands import merge_queue as merge_queue_commands
 from guild.errors import GuildError
 
+_CLOSED_LIFECYCLES = ("merged", "closed")
 _TRACK_INITIAL_LIFECYCLE = "draft"
+_DRAFT_LIFECYCLES = ("draft", "converging")
 _DRAFT_READY_HINT = (
     "PR is draft on GitHub; mark it ready there (gh pr ready {}) or the next sync reverts it"
 )
@@ -143,3 +147,37 @@ def set_(ctx, ref, lifecycle, waits, needs_ask_answer, needs_human_pr_review, fi
     if new_lifecycle == "ready" and row["gh_draft"]:
         return message + "\n" + _DRAFT_READY_HINT.format(number)
     return message
+
+
+def _gate_lines(record, red_rows):
+    gates = []
+    if record["lifecycle"] in _DRAFT_LIFECYCLES:
+        gates.append("- gate: draft (gh pr ready {})".format(record["number"]))
+    if record["needs_human_pr_review"]:
+        gates.append("- gate: needs human review")
+    gates.extend(
+        "- gate: main red {}".format(merge_queue_commands.main_label(row))
+        for row in red_rows
+        if row["repo"] == record["repo"]
+    )
+    return gates
+
+
+def ready_check(ctx, ref):
+    repo, number = refs.parse_pr_ref(ref)
+    row = _load_pr(ctx, repo, number)
+    if row["lifecycle"] in _CLOSED_LIFECYCLES:
+        raise GuildError("PR '{}' is {}: nothing left to merge".format(ref, row["lifecycle"]), 1)
+    records = merge_queue_commands.open_pr_records(ctx.conn)
+    red_rows = main_status_commands.red_rows(ctx.conn)
+    queue = merge_queue.compute(records, merge_queue_commands.load_pins(ctx.conn), red_rows)["queue"]
+    ref_text = "{}#{}".format(repo, number)
+    entry = next(entry for entry in queue if entry["ref"] == ref_text)
+    record = next(record for record in records if record["ref"] == ref_text)
+    gates = _gate_lines(record, red_rows)
+    lines = ["{} {}".format(ref_text, entry["state"])]
+    lines.extend("- {}".format(blocker) for blocker in entry["blockers"])
+    lines.extend("- wait: {}".format(wait) for wait in entry["waits"])
+    lines.extend(gates)
+    exit_code = 0 if entry["action"] == "merge" and not gates else 1
+    return lines, exit_code

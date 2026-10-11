@@ -138,6 +138,7 @@ guild pr set   <owner/repo>#<n> [--lifecycle draft|converging|ready] [--waits ".
                                [--needs-human-pr-review | --no-needs-human-pr-review]
                                [--fixes-main | --no-fixes-main]
                                [--fixes-flaky | --no-fixes-flaky]
+guild pr ready-check <owner/repo>#<n>   # read-only: everything standing between the PR and a merge
 
 guild ask "<question>" --context "..." [--ref <ref> ...] [--option "..."]   # refs: pr:<owner/repo>#<n>, task:<quest>/<tid>, card:<KEY>; with exactly one task in progress and no task:/card: ref it is added for you
 guild answer <id> "<text>"
@@ -744,6 +745,13 @@ last line of the output says so).
 flag, a bound session uses its raid when its party is in exactly one, errors
 listing them when it is in several, and uses its own party when it is in
 none; a human terminal (or an unbound session) must pass a flag.
+
+**Ready check.** `guild pr ready-check <owner/repo>#<n>` computes the queue
+over every open tracked PR (cross-party stacks, pins and task dependencies
+count) and prints `<ref> <state>`, then one `- <blocker>` line per blocker,
+`- wait: <x>` per wait and `- gate: ...` per gate (draft with the
+`gh pr ready <n>` hint, needs human review, main red). It exits 0 only when
+the PR is a plain `merge` with no gate, else 1.
 
 **Lifecycle from GitHub.** Readiness is owned by `guild sync --source gh`, not
 by sessions. An open PR that is Ready for review on GitHub becomes `ready`

@@ -321,6 +321,8 @@ def _queue_entry(pr, unblocks, reasons, waits, why):
         unblocks=unblocks,
         state=state,
         reasons=reasons if state == _BLOCKED_STATE else waits,
+        blockers=reasons,
+        waits=waits,
         why=why,
         action=_action(pr, state, reasons, waits),
         next_action=False,
