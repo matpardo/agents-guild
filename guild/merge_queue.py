@@ -38,6 +38,16 @@ def review_reasons(mergeable, review_decision, unresolved_threads, merge_state):
     return reasons
 
 
+def fix_reasons(pr):
+    reasons = []
+    if pr["checks_failing"]:
+        reasons.append("checks failing ({})".format(pr["checks_failing"]))
+    reasons.extend(
+        review_reasons(pr["mergeable"], pr["review_decision"], pr["unresolved_threads"], pr["merge_state"])
+    )
+    return reasons
+
+
 def _ask_text(text, pr):
     if pr["ask_id"] is None:
         return text
@@ -50,11 +60,7 @@ def _blocked_reasons(pr):
         reasons.append("manual block: {}".format(pr["blocked_external"]))
     if pr["needs_ask_answer"]:
         reasons.append(_ask_text("needs ask answer", pr))
-    if pr["checks_failing"] > 0:
-        reasons.append("checks failing ({})".format(pr["checks_failing"]))
-    reasons.extend(
-        review_reasons(pr["mergeable"], pr["review_decision"], pr["unresolved_threads"], pr["merge_state"])
-    )
+    reasons.extend(fix_reasons(pr))
     for tid in pr["unmet_deps"]:
         reasons.append("waits on task {}".format(tid))
     return reasons
@@ -115,6 +121,8 @@ def _entry(pr):
         "checks_passing": pr["checks_passing"],
         "checks_pending": pr["checks_pending"],
         "labels": _labels(pr),
+        "fix_reasons": fix_reasons(pr),
+        "fix_requested_at_head": pr["fix_requested_at_head"],
     }
 
 

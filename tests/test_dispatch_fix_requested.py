@@ -1,0 +1,58 @@
+import os
+
+from tests.test_dispatch_checks_failing import ChecksFailingBase
+from tests.test_dispatch_checks_failing import _FAILING
+
+
+class FixRequestedTests(ChecksFailingBase):
+    def setUp(self):
+        super().setUp()
+        self.write_block({"fix_requested": "on"})
+
+    def ask_fix(self):
+        code, out, err = self.run_cli(["pr", "ask-fix", "acme/app#1"], None, self.repo_dir)
+        self.assertEqual(code, 0, err)
+
+    def test_request_launches_the_owner_with_the_fix_prompt(self):
+        self.sync_open(_FAILING, "abc123")
+        self.ask_fix()
+        lines = self.run_pass()
+        self.assertEqual(
+            lines, ["acme: fix_requested acme/app#1 -> launched alpha g2 (window @10, mode acceptEdits)"]
+        )
+        self.assertEqual(self.decision_keys(), ["fix_requested:acme/app#1:abc123"])
+        self.assertTrue(
+            self.tmux.launch_calls()[0][-1].endswith(
+                "Dispatched: the human asked you to fix acme/app#1: checks failing (1);"
+                " run guild pr ready-check acme/app#1.'"
+            )
+        )
+
+    def test_live_session_defers_until_it_ends(self):
+        self.write_session(os.getpid(), "sess-1", "alpha")
+        self.sync_open(_FAILING, "abc123")
+        self.ask_fix()
+        self.assertEqual(self.run_pass(), ["acme: fix_requested acme/app#1 -> deferred alpha: live session"])
+        (self.sessions_dir / "{}.json".format(os.getpid())).unlink()
+        self.assertEqual(
+            self.run_pass(), ["acme: fix_requested acme/app#1 -> launched alpha g2 (window @10, mode acceptEdits)"]
+        )
+
+    def test_new_head_fires_again(self):
+        self.write_block({"fix_requested": "dry-run"})
+        self.sync_open(_FAILING, "abc123")
+        self.ask_fix()
+        self.run_pass()
+        self.sync_open(_FAILING, "def456")
+        self.ask_fix()
+        self.assertEqual(len(self.run_pass()), 1)
+        self.assertEqual(
+            self.decision_keys(), ["fix_requested:acme/app#1:abc123", "fix_requested:acme/app#1:def456"]
+        )
+
+    def test_rule_absent_still_posts_the_notice_and_launches_nothing(self):
+        self.write_block({"ask_answered": "on"})
+        self.sync_open(_FAILING, "abc123")
+        self.ask_fix()
+        self.assertEqual(self.run_pass(), ["nothing to dispatch"])
+        self.assertEqual(self.tmux.launch_calls(), [])

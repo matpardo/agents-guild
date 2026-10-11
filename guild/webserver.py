@@ -30,7 +30,7 @@ _PAGE_FILES = ("index.html", "history.html", "progress.html")
 _MAX_BODY_BYTES = 16384
 _ASK_ACTION_RE = re.compile(r"^/api/asks/([^/]+)/(answer|dismiss)$")
 _NOTICE_ACTION_RE = re.compile(r"^/api/notices/([^/]+)/(seen|unseen)$")
-_PR_ACTION_RE = re.compile(r"^/api/prs/([^/]+/[^/]+)/(\d+)/(block|unblock)$")
+_PR_ACTION_RE = re.compile(r"^/api/prs/([^/]+/[^/]+)/(\d+)/(block|unblock|ask-fix)$")
 _SEEN_ALL_PATH = "/api/notices/seen-all"
 _ANSWERED_ASKS_PATH = "/api/asks/answered"
 _ASK_DETAIL_RE = re.compile(r"^/api/asks/(\d+)$")
@@ -146,6 +146,8 @@ def _run_pr_action(action, ref, payload):
     try:
         if action == "block":
             return pr_commands.block_external(ctx, ref, payload["reason"])
+        if action == "ask-fix":
+            return pr_commands.ask_fix(ctx, ref)
         return pr_commands.unblock_external(ctx, ref)
     finally:
         ctx.conn.close()

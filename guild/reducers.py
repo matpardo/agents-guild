@@ -310,7 +310,7 @@ def _pr_synced(conn, event):
     current = conn.execute(
         "SELECT lifecycle, gh_state, gh_draft, branch, title, checks_failing, checks_passing,"
         " checks_pending, mergeable, review_comment_count, review_decision, merge_state, base_branch,"
-        " unresolved_threads, last_activity_at FROM prs WHERE repo = ? AND number = ?",
+        " unresolved_threads, head_sha, last_activity_at FROM prs WHERE repo = ? AND number = ?",
         (payload["repo"], payload["number"]),
     ).fetchone()
     last_activity_at = event["ts"] if _pr_synced_changed(current, payload) else current["last_activity_at"]
@@ -318,7 +318,7 @@ def _pr_synced(conn, event):
         "UPDATE prs SET lifecycle = ?, gh_state = ?, gh_draft = ?, branch = ?, title = ?,"
         " checks_failing = ?, checks_passing = ?, checks_pending = ?, mergeable = ?, review_comment_count = ?,"
         " review_decision = ?, merge_state = ?, base_branch = ?, unresolved_threads = ?,"
-        " synced_at = ?, last_activity_at = ?"
+        " head_sha = ?, synced_at = ?, last_activity_at = ?"
         " WHERE repo = ? AND number = ?",
         (
             payload["lifecycle"],
@@ -335,6 +335,7 @@ def _pr_synced(conn, event):
             _pr_synced_field(current, payload, "merge_state"),
             _pr_synced_field(current, payload, "base_branch"),
             _pr_synced_field(current, payload, "unresolved_threads"),
+            payload.get("head_sha") or current["head_sha"],
             payload["synced_at"],
             last_activity_at,
             payload["repo"],
@@ -360,6 +361,14 @@ def _store_change_set(conn, repo, number, change_set):
     conn.execute("DELETE FROM pr_files WHERE repo = ? AND number = ?", (repo, number))
     for path in change_set["paths"]:
         conn.execute("INSERT INTO pr_files (repo, number, path) VALUES (?, ?, ?)", (repo, number, path))
+
+
+def _pr_fix_requested(conn, event):
+    payload = event["payload"]
+    conn.execute(
+        "UPDATE prs SET fix_requested_sha = ? WHERE repo = ? AND number = ?",
+        (payload["head_sha"], payload["repo"], payload["number"]),
+    )
 
 
 def _pr_comments_acknowledged(conn, event):
@@ -702,6 +711,7 @@ _REDUCERS = {
     "pr.set": _pr_set,
     "pr.synced": _pr_synced,
     "pr.comments_acknowledged": _pr_comments_acknowledged,
+    "pr.fix_requested": _pr_fix_requested,
     "ask.created": _ask_created,
     "ask.answered": _ask_answered,
     "ask.dismissed": _ask_dismissed,

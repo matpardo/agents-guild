@@ -369,6 +369,8 @@ _COLUMN_MIGRATIONS = (
     ("prs", "fixes_main", "INTEGER"),
     ("prs", "fixes_flaky", "INTEGER"),
     ("prs", "blocked_external", "TEXT"),
+    ("prs", "head_sha", "TEXT"),
+    ("prs", "fix_requested_sha", "TEXT"),
 )
 
 

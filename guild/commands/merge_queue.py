@@ -83,6 +83,7 @@ def _pr_record(conn, row):
         "fixes_main": bool(row["fixes_main"]),
         "fixes_flaky": bool(row["fixes_flaky"]),
         "blocked_external": row["blocked_external"],
+        "fix_requested_at_head": row["head_sha"] is not None and row["head_sha"] == row["fix_requested_sha"],
         "mergeable": row["mergeable"],
         "review_decision": row["review_decision"],
         "unresolved_threads": row["unresolved_threads"],
@@ -483,6 +484,8 @@ def _entry_model(entry):
         "checks_passing": entry["checks_passing"],
         "checks_pending": entry["checks_pending"],
         "labels": entry["labels"],
+        "fix_reasons": entry["fix_reasons"],
+        "fix_requested_at_head": entry["fix_requested_at_head"],
         "url": "https://github.com/{}/pull/{}".format(entry["repo"], entry["number"]),
     }
 

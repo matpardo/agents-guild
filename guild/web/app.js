@@ -416,7 +416,18 @@ var NO_SESSION_MESSAGE = "session token not loaded, reload the page";
     return input;
   }
 
-  function renderPrBlockControls(ref, blockedExternal, location) {
+  function renderAskFixButton(ref, fix, location) {
+    if (fix.requested) {
+      var requested = prButton(location, ref, "fix requested", function () {});
+      requested.disabled = true;
+      return requested;
+    }
+    return prButton(location, ref, "Ask " + fix.party + " to fix", function () {
+      postPrAction(location, ref, "ask-fix", {});
+    });
+  }
+
+  function renderPrBlockControls(ref, blockedExternal, location, fix) {
     var key = location + "|" + ref;
     var controls = el("span");
     controls.className = "pr-block-controls";
@@ -441,10 +452,17 @@ var NO_SESSION_MESSAGE = "session token not loaded, reload the page";
         })
       );
     }
+    if (!isManuallyBlocked(blockedExternal) && fix.reasons.length > 0) {
+      controls.appendChild(renderAskFixButton(ref, fix, location));
+    }
     var status = textEl("span", state.prStatuses[key] || "");
     status.className = "ask-status";
     controls.appendChild(status);
     return controls;
+  }
+
+  function fixOf(model) {
+    return { party: model.party, reasons: model.fix_reasons, requested: model.fix_requested_at_head };
   }
 
   function isManuallyBlocked(reason) {
@@ -1243,7 +1261,7 @@ var NO_SESSION_MESSAGE = "session token not loaded, reload the page";
     item.value = entry.position;
     item.appendChild(renderQueueEntryHead(entry));
     item.appendChild(renderQueueSummary(entry));
-    item.appendChild(renderPrBlockControls(entry.ref, entry.blocked_external, "queue"));
+    item.appendChild(renderPrBlockControls(entry.ref, entry.blocked_external, "queue", fixOf(entry)));
     if (entry.why) {
       item.appendChild(classedText("p", entry.why, "queue-reason"));
     }
@@ -1389,7 +1407,7 @@ var NO_SESSION_MESSAGE = "session token not loaded, reload the page";
     }
     appendAll(row, renderReasonPills(pr.review_reasons));
     row.appendChild(renderChecks(pr));
-    row.appendChild(renderPrBlockControls(pr.repo + "#" + pr.number, pr.blocked_external, "card"));
+    row.appendChild(renderPrBlockControls(pr.repo + "#" + pr.number, pr.blocked_external, "card", fixOf(pr)));
     if (pr.card_url) {
       row.appendChild(link(pr.card_url, pr.card));
     } else if (pr.card) {
