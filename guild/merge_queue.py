@@ -165,6 +165,28 @@ def _task_edges(open_prs):
     return edges
 
 
+def stack_pairs(prs):
+    by_branch = {(pr["repo"], pr["branch"]): pr["ref"] for pr in prs if pr["branch"] is not None}
+    pairs = []
+    for pr in prs:
+        parent = by_branch.get((pr["repo"], pr["base_branch"]))
+        if parent is not None and parent != pr["ref"]:
+            pairs.append((parent, pr["ref"]))
+    return pairs
+
+
+def _stack_edges(open_prs):
+    return [
+        {
+            "first": first,
+            "second": second,
+            "before": "before {} (it is stacked on this)".format(second),
+            "after": "after {} (stacked on it)".format(first),
+        }
+        for first, second in stack_pairs(open_prs)
+    ]
+
+
 def _pin_edges(open_refs, pins):
     edges = []
     for pin in pins:
@@ -354,7 +376,7 @@ def _main_entries(main_status):
 def compute(prs, pins, main_status):
     open_prs = [pr for pr in prs if _is_open(pr)]
     open_refs = {pr["ref"] for pr in open_prs}
-    edges = _task_edges(open_prs) + _pin_edges(open_refs, pins)
+    edges = _task_edges(open_prs) + _stack_edges(open_prs) + _pin_edges(open_refs, pins)
     unblocks = _unblock_counts(open_prs, edges)
     order, stuck = _topological_order(open_prs, edges, unblocks)
     by_ref = {pr["ref"]: pr for pr in open_prs}

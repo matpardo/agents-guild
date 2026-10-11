@@ -77,6 +77,7 @@ def _pr_record(conn, row):
         "needs_ask_answer": bool(row["needs_ask_answer"]),
         "needs_human_pr_review": bool(row["needs_human_pr_review"]),
         "branch": _optional_branch(row["branch"]),
+        "base_branch": _optional_branch(row["base_branch"]),
         "fixes_main": bool(row["fixes_main"]),
         "fixes_flaky": bool(row["fixes_flaky"]),
         "mergeable": row["mergeable"],
@@ -197,7 +198,7 @@ def _open_pin_pairs(conn, open_refs):
 def _reject_cycle(conn, first_ref, second_ref):
     records = open_pr_records(conn)
     open_refs = {record["ref"] for record in records}
-    pairs = merge_queue.dependency_pairs(records) + _open_pin_pairs(conn, open_refs)
+    pairs = merge_queue.dependency_pairs(records) + merge_queue.stack_pairs(records) + _open_pin_pairs(conn, open_refs)
     path = merge_queue.find_path(pairs, second_ref, first_ref)
     if path is None:
         return

@@ -63,3 +63,10 @@ updated: 2026-09-29
 **Status:** [x] done — #97
 
 **What:** the merge queue marks a PR blocked on `changes requested`, `N unresolved threads` and `behind base` next to `merge conflict`; missing data is no signal; `guild next` reuses the same reasons for own PRs.
+
+## T09 — Order stacked PRs after their base
+
+**Depends on:** T06
+**Status:** [x] done — #100
+
+**What:** a PR whose `base_branch` is the branch of another open PR of the same repo merges after it; the queue waits on a blocked base and a pin cannot invert the stack.
