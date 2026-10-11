@@ -170,7 +170,7 @@ guild raid join <name> --ttl <dur>      # the caller's bound party joins; joinin
 guild raid join <name> --until-leave    # joins with no expiry; ends only on `raid leave` or `party close`
 guild raid join <name> (--ttl <dur> | --until-leave) --lead  # also becomes the raid's lead
 guild raid leave <name>
-guild raid pause <name>               # lead only (any member if no lead): ask every member party to stop
+guild raid pause <name>               # lead only (any member if no lead; the human always): ask every member party to stop
 guild raid resume <name>              # lifts the pause and posts a notice to raid:<name>
 guild raids
 
@@ -1159,7 +1159,19 @@ seen cards have no badge and a subtle `Mark unseen`. The notices heading reads
 `new_notice_count`. `POST /api/notices/<id>/seen`, `/unseen` and
 `POST /api/notices/seen-all` (body `{}`) run `guild notice seen` / `unseen` /
 `seen --all` as the human actor and go through the same validation as the ask
-routes.
+routes. A form in the section creates a notice: text, a target select
+(`project:<name>` for each project and `raid:<name>` for each raid on the board)
+and a ttl select (1h, 8h, 1d, 3d). `POST /api/notices/create` (body
+`{"text": "<text>", "to": "<scope>", "ttl": "<dur>"}`) runs `guild notice
+create` as the human actor; empty text, an unknown scope, a bad ttl and the
+length caps answer `422` with the message. `--until` is CLI-only for now.
+
+**Raids**: a `raids` section lists each active raid with a `Pause raid` button
+(inline confirm: pausing stops dispatches and tells members to hand off), or a
+`paused` pill and a `Resume raid` button while paused. `POST
+/api/raids/<name>/pause` and `/resume` (body `{}`) run `guild raid pause` /
+`resume`. The human is always allowed (no session), like `guild merge-queue
+pin`; a pause by the human is recorded with `paused_by` `human`.
 
 **Answering from the page**: each open ask card has one button per option
 (clicking it only copies the option's text into the answer field), an answer
@@ -1179,7 +1191,8 @@ Project `pii_patterns` are those of the project of the party that asked, whereve
 step. Reads are `GET`; the only writes are `POST /api/asks/<id>/answer`
 (body `{"answer": "<text>"}`), `POST /api/asks/<id>/dismiss`,
 `POST /api/notices/<id>/seen`, `POST /api/notices/<id>/unseen`,
-`POST /api/notices/seen-all` (body `{}`),
+`POST /api/notices/seen-all` (body `{}`), `POST /api/notices/create`,
+`POST /api/raids/<name>/pause`, `POST /api/raids/<name>/resume`,
 `POST /api/prs/<owner>/<repo>/<n>/block` (body `{"reason": "<text>"}`) and
 `.../unblock`, with `<id>` and `<n>` positive integers
 (otherwise `404`); every other method,

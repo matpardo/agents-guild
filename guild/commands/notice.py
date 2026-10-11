@@ -32,6 +32,8 @@ def _reject_duplicate(ctx, actor_party, to, text):
 
 
 def create(ctx, text, to, ttl, until):
+    if text.strip() == "":
+        raise GuildError("notice text must not be empty", 1)
     _validate_scope(ctx, to)
     project = config.resolve_project(ctx.cwd, config.load_all_projects(ctx.projects_dir))
     patterns = pii.project_patterns(ctx.projects_dir, project)

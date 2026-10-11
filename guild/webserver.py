@@ -13,6 +13,7 @@ from guild.commands import board as board_commands
 from guild.commands import history as history_commands
 from guild.commands import notice as notice_commands
 from guild.commands import pr as pr_commands
+from guild.commands import raid_pause as raid_pause_commands
 from guild.errors import GuildError
 from guild.resources import report as resources_report
 
@@ -31,7 +32,9 @@ _MAX_BODY_BYTES = 16384
 _ASK_ACTION_RE = re.compile(r"^/api/asks/([^/]+)/(answer|dismiss)$")
 _NOTICE_ACTION_RE = re.compile(r"^/api/notices/([^/]+)/(seen|unseen)$")
 _PR_ACTION_RE = re.compile(r"^/api/prs/([^/]+/[^/]+)/(\d+)/(block|unblock|ask-fix)$")
+_RAID_ACTION_RE = re.compile(r"^/api/raids/([^/]+)/(pause|resume)$")
 _SEEN_ALL_PATH = "/api/notices/seen-all"
+_NOTICE_CREATE_PATH = "/api/notices/create"
 _ANSWERED_ASKS_PATH = "/api/asks/answered"
 _ASK_DETAIL_RE = re.compile(r"^/api/asks/(\d+)$")
 _ASK_ID_RE = re.compile(r"^[1-9][0-9]{0,17}$")
@@ -141,6 +144,24 @@ def _run_seen_all():
         ctx.conn.close()
 
 
+def _run_notice_create(payload):
+    ctx = _action_context()
+    try:
+        return notice_commands.create(ctx, payload["text"], payload["to"], payload["ttl"], None)
+    finally:
+        ctx.conn.close()
+
+
+def _run_raid_action(action, raid_name):
+    ctx = _action_context()
+    try:
+        if action == "pause":
+            return raid_pause_commands.pause(ctx, raid_name)
+        return raid_pause_commands.resume(ctx, raid_name)
+    finally:
+        ctx.conn.close()
+
+
 def _run_pr_action(action, ref, payload):
     ctx = _action_context()
     try:
@@ -240,6 +261,8 @@ class BoardRequestHandler(http_server.BaseHTTPRequestHandler):
         payload = self._read_json_object()
         if action == "answer" and not isinstance(payload.get("answer"), str):
             raise _RequestRejected(400, "answer must be a string")
+        if action == "create" and not all(isinstance(payload.get(key), str) for key in ("text", "to", "ttl")):
+            raise _RequestRejected(400, "text, to and ttl must be strings")
         if action == "block" and not isinstance(payload.get("reason"), str):
             raise _RequestRejected(400, "reason must be a string")
         return payload
@@ -269,6 +292,12 @@ class BoardRequestHandler(http_server.BaseHTTPRequestHandler):
             repo, number, action = pr_match.groups()
             ref = "{}#{}".format(repo, number)
             return self._post_action(action, lambda payload: _run_pr_action(action, ref, payload))
+        raid_match = _RAID_ACTION_RE.match(path)
+        if raid_match is not None:
+            raid_name, action = raid_match.groups()
+            return self._post_action(action, lambda payload: _run_raid_action(action, raid_name))
+        if path == _NOTICE_CREATE_PATH:
+            return self._post_action("create", _run_notice_create)
         if path == _SEEN_ALL_PATH:
             return self._post_action("seen-all", lambda payload: _run_seen_all())
         notice_match = _NOTICE_ACTION_RE.match(path)

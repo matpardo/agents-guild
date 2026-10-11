@@ -228,3 +228,33 @@ class WebQueueAskFixBehaviorTests(unittest.TestCase):
         text = self._queue_text(None, ["checks failing (1)"], request)
         self.assertIn("fixing \u00b7 stale", text)
         self.assertIn("Ask a again", text)
+
+
+@unittest.skipIf(shutil.which("node") is None, "node not installed")
+class WebNoticeAndRaidBehaviorTests(unittest.TestCase):
+    def _rendered(self, board, out_id):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "board.json"
+            path.write_text(json.dumps(board))
+            return subprocess.run(
+                ["node", str(_HARNESS), str(_APP_JS_PATH), str(path), "all", "all", out_id],
+                capture_output=True, text=True, timeout=30, check=True,
+            ).stdout.strip()
+
+    def _board(self, paused):
+        raids = [{"name": "r", "members": ["c"], "paused": paused, "lead": None}]
+        return dict(_BOARD, raids=raids, projects=[{"name": "acme"}])
+
+    def test_notice_form_lists_project_and_raid_scopes(self):
+        out = self._rendered(self._board(False), "notices")
+        self.assertIn("Create notice", out)
+        self.assertIn("project:acme raid:r", out)
+        self.assertIn("1h 8h 1d 3d", out)
+
+    def test_raid_button_follows_the_paused_state(self):
+        running = self._rendered(self._board(False), "raids")
+        self.assertIn("Pause raid", running)
+        self.assertNotIn("paused", running.replace("Pause raid", ""))
+        paused = self._rendered(self._board(True), "raids")
+        self.assertIn("Resume raid", paused)
+        self.assertIn("paused", paused)
