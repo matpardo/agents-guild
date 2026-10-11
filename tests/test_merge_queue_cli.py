@@ -320,3 +320,31 @@ if __name__ == "__main__":
     import unittest
 
     unittest.main()
+
+
+class HeadTests(QueueCliTestCase):
+    def head(self, argv):
+        return self.queue(["--head"] + argv, None)
+
+    def test_raid_head_names_the_first_entry_to_merge_and_its_party(self):
+        code, out, err = self.head(["--raid", "ci"])
+        self.assertEqual(code, 0, err)
+        self.assertEqual(out.strip(), "acme/app#2 beta qb/T02")
+
+    def test_party_head_is_scoped_to_the_party(self):
+        code, out, err = self.head(["--party", "alpha"])
+        self.assertEqual(out.strip(), "acme/app#3 alpha qa/T03")
+
+    def test_empty_queue_says_no_pr_is_ready(self):
+        self.start_party("eps", "sess-9")
+        code, out, err = self.head(["--party", "eps"])
+        self.assertEqual(code, 0, err)
+        self.assertEqual(out.strip(), "no PR ready to merge")
+
+    def test_external_blocked_head_is_skipped(self):
+        code, out, err = self.run_cli(
+            ["pr", "set", "acme/app#2", "--blocked-external", "decision"], "sess-2", self.repo_dir
+        )
+        self.assertEqual(code, 0, err)
+        code, out, err = self.head(["--raid", "ci"])
+        self.assertEqual(out.strip(), "acme/app#3 alpha qa/T03")

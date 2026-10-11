@@ -385,12 +385,47 @@ def run(ctx, raid, party):
     return [sanitize.strip_control_sequences(line) for line in lines]
 
 
-def next_to_merge(conn, party_names):
-    scoped = load_scoped_queue(conn, party_names)
+def _first_to_merge(scoped):
     for entry in scoped["queue"]:
         if entry["action"] == "merge":
-            return entry["ref"]
+            return entry
     return None
+
+
+def head_entry(conn, party_names):
+    return _first_to_merge(load_scoped_queue(conn, party_names))
+
+
+def next_to_merge(conn, party_names):
+    entry = head_entry(conn, party_names)
+    if entry is None:
+        return None
+    return entry["ref"]
+
+
+def head_line(ctx, raid, party):
+    _, _, party_names = _resolve_scope(ctx, raid, party)
+    entry = head_entry(ctx.conn, party_names)
+    if entry is None:
+        return "no PR ready to merge"
+    return sanitize.strip_control_sequences("{} {} {}".format(entry["ref"], entry["party"], entry["task"] or "-"))
+
+
+def scope_heads(conn, now):
+    records = open_pr_records(conn)
+    pins = load_pins(conn)
+    main_rows = main_status_commands.red_rows(conn)
+    grouped = raid_commands.active_raids_grouped(conn, now)
+    heads = []
+    in_raid = set()
+    for raid_name in sorted(grouped):
+        members = {row["party"] for row in grouped[raid_name]}
+        in_raid |= members
+        heads.append(("raid:{}".format(raid_name), _first_to_merge(scoped_queue(records, pins, main_rows, members))))
+    solo = {record["party"] for record in records} - in_raid
+    for party in sorted(solo):
+        heads.append(("party:{}".format(party), _first_to_merge(scoped_queue(records, pins, main_rows, {party}))))
+    return [(scope, entry) for scope, entry in heads if entry is not None]
 
 
 def external_blocked_refs(conn):

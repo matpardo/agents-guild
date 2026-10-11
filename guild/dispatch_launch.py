@@ -22,6 +22,7 @@ _RATE_WINDOW = timedelta(hours=1)
 _NOTICE_TTL = "12h"
 _WINDOW_FAILURE = "tmux could not create the window"
 _FAILURE_WAIT = "dispatch-failed"
+_MERGE_HEAD_WAIT = "merge-head"
 _HOUR_FORMAT = "%Y-%m-%dT%H"
 _BIND_DEADLINE = timedelta(minutes=10)
 _DEFER_DEADLINE = timedelta(hours=24)
@@ -74,6 +75,30 @@ class Launcher:
             return self._execute(project_config, trigger, mode, verdict)
         except Exception as error:
             return self._record_error(project_config, trigger, mode, error)
+
+    def announce(self, project_config, trigger, mode):
+        try:
+            return self._announce(project_config, trigger, mode)
+        except Exception as error:
+            return self._record_error(project_config, trigger, mode, error)
+
+    def preview_announce(self, trigger, mode):
+        if self._already_decided(trigger, mode):
+            return None
+        return "{}would notify {}".format(self._prefix(trigger), trigger.party)
+
+    def _announce(self, project_config, trigger, mode):
+        if self._already_decided(trigger, mode):
+            return None
+        prefix = self._prefix(trigger)
+        if mode == _DRY_RUN_MODE:
+            self._record_decided(trigger, mode, "planned", None, None, None)
+            return "{}planned: notify {}".format(prefix, trigger.party)
+        self._record_decided(trigger, mode, "notified", None, None, None)
+        announces = "dispatch:{}:{}:notified".format(trigger.project, trigger.key)
+        self._post_notice(trigger.project, _Notice(trigger.prompt, announces))
+        self._push(project_config, trigger.party, _MERGE_HEAD_WAIT)
+        return "{}notified {}".format(prefix, trigger.party)
 
     def preview(self, project_config, trigger, mode):
         verdict = self.evaluate(project_config, trigger, mode)
@@ -166,7 +191,7 @@ class Launcher:
         project = project_config["name"]
         text = "dispatch launch failed for {} g{}: {}".format(party, generation, reason)
         self._post_notice(project, _Notice(text, "dispatch:{}:{}:failed".format(project, key)))
-        self._push_failure(project_config, party)
+        self._push(project_config, party, _FAILURE_WAIT)
 
     def _fail_launch(self, project_config, key, party, generation, reason, window_id):
         project = project_config["name"]
@@ -424,11 +449,11 @@ class Launcher:
             self._ctx, None, notice.text, "project:{}".format(project), _NOTICE_TTL, notice.announces
         )
 
-    def _push_failure(self, project_config, party):
+    def _push(self, project_config, party, wait):
         notify_config = project_config.get("notify")
         if notify_config is None:
             return
         try:
-            self._push_runner(notify_config["command"] + [party, _FAILURE_WAIT])
+            self._push_runner(notify_config["command"] + [party, wait])
         except OSError as error:
             sys.stderr.write("guild: notify command failed: {}\n".format(error))
