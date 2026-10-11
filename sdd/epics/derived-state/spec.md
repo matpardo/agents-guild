@@ -2,10 +2,10 @@
 epic: derived-state
 type: spec
 title: Flags that follow the events that resolve them
-status: draft
+status: active
 owner: matpardo
 created: 2026-10-04
-updated: 2026-10-04
+updated: 2026-10-11
 ---
 
 # Spec: Flags that follow the events that resolve them

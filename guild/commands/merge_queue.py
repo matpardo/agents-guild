@@ -1,6 +1,6 @@
 import json
 
-from guild import config, db, events, identity, merge_queue, refs, resolve, sanitize, timeutil
+from guild import config, db, events, identity, merge_queue, pr_asks, refs, resolve, sanitize, timeutil
 from guild.commands import main_status as main_status_commands
 from guild.commands import raid as raid_commands
 from guild.errors import GuildError
@@ -75,7 +75,8 @@ def _pr_record(conn, row):
         "checks_failing": row["checks_failing"] or 0,
         "checks_passing": row["checks_passing"] or 0,
         "checks_pending": row["checks_pending"] or 0,
-        "needs_ask_answer": bool(row["needs_ask_answer"]),
+        "needs_ask_answer": pr_asks.needs_answer(row),
+        "ask_id": row["open_ask_id"],
         "needs_human_pr_review": bool(row["needs_human_pr_review"]),
         "branch": _optional_branch(row["branch"]),
         "base_branch": _optional_branch(row["base_branch"]),
@@ -99,7 +100,7 @@ def _pr_record(conn, row):
 
 def open_pr_records(conn):
     rows = conn.execute(
-        "SELECT * FROM prs WHERE lifecycle NOT IN ('merged', 'closed') ORDER BY repo ASC, number ASC"
+        pr_asks.PRS_WITH_ASK_SQL + " WHERE lifecycle NOT IN ('merged', 'closed') ORDER BY repo ASC, number ASC"
     ).fetchall()
     return [_pr_record(conn, row) for row in rows]
 

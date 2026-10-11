@@ -792,6 +792,12 @@ answers an ask; blocks the PR in the merge queue) and
 `--needs-human-pr-review` (the human should review the PR before it is
 merged; does not block). Each has a `--no-...` counterpart to clear it; an
 absent option leaves the flag unchanged. `pr set` needs at least one option.
+`needs-ask-answer` is also derived: a PR counts as needing an answer while the
+manual flag is set or an open ask refs it (`pr:<owner/repo>#<n>`), computed when
+read, so answering or dismissing the ask unblocks the PR with no `pr set`. The
+merge queue, `pr ready-check`, the board and the web PR pill then show
+`needs-ask-answer (ask #N)`; `--no-needs-ask-answer` clears only the manual
+flag, an open ask keeps blocking.
 A PR that had the old `needs-human` lifecycle becomes `draft` with
 `needs-ask-answer` set, both in the live database and when events replay in
 `guild rebuild`.
@@ -2212,7 +2218,11 @@ Without a hooks manager, add the same call to the repository's
 - `pre-push`: inspects `git push` commands before they run (including
   `env`/`command`/`sudo`-wrapped, `VAR=val`-prefixed, `bash -c`/`sh -c`
   nested, and `&&`/`;`/`||`-chained forms); blocks pushes to a branch whose
-  only PRs are merged/closed. Branch deletions (`--delete`, `-d`, or a
+  only PRs are merged/closed, and pushes while the repo's main is red (the
+  message names the failing checks and since when, and the way out: fix main
+  first or flag the PR with `guild pr set <ref> --fixes-main`; a branch whose
+  open tracked PR is flagged `fixes-main` passes, and nothing is checked when
+  there is no main status). Branch deletions (`--delete`, `-d`, or a
   `:<branch>` refspec) push no commits and pass unchecked. When a push is detected but its branch or
   directory cannot be determined (bad `-C` dir, detached HEAD, unparseable
   command), it warns via `systemMessage` instead of allowing the push

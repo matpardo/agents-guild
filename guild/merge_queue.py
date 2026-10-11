@@ -38,12 +38,18 @@ def review_reasons(mergeable, review_decision, unresolved_threads, merge_state):
     return reasons
 
 
+def _ask_text(text, pr):
+    if pr["ask_id"] is None:
+        return text
+    return "{} (ask #{})".format(text, pr["ask_id"])
+
+
 def _blocked_reasons(pr):
     reasons = []
     if pr["blocked_external"] is not None:
         reasons.append("external: {}".format(pr["blocked_external"]))
     if pr["needs_ask_answer"]:
-        reasons.append("needs ask answer")
+        reasons.append(_ask_text("needs ask answer", pr))
     if pr["checks_failing"] > 0:
         reasons.append("checks failing ({})".format(pr["checks_failing"]))
     reasons.extend(
@@ -73,7 +79,7 @@ def _labels(pr):
     if pr["fixes_flaky"]:
         labels.append(_FIXES_FLAKY_LABEL)
     if pr["needs_ask_answer"]:
-        labels.append(_ASK_LABEL)
+        labels.append(_ask_text(_ASK_LABEL, pr))
     if pr["needs_human_pr_review"]:
         labels.append(_REVIEW_LABEL)
     if pr["blocked_external"] is not None:

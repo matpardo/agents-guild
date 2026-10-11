@@ -97,6 +97,15 @@ class PromoteTests(ChecksFailingBase):
         self.sync_green("abc123")
         self.assertEqual(self.run_pass(), ["nothing to dispatch"])
 
+    def test_open_ask_on_the_pr_does_nothing(self):
+        self.run_cli(["party", "resume", "alpha"], "sess-1", self.repo_dir)
+        code, out, err = self.run_cli(
+            ["ask", "ok?", "--context", "x", "--ref", "pr:acme/app#1"], "sess-1", self.repo_dir
+        )
+        self.assertEqual(code, 0, err)
+        self.sync_green("abc123")
+        self.assertEqual(self.run_pass(), ["nothing to dispatch"])
+
     def test_external_block_does_nothing(self):
         self.pr_set("--blocked-external", "decision")
         self.sync_green("abc123")

@@ -496,6 +496,34 @@ def _file_cap_warning(ctx, target_dir, branch, paths):
     )
 
 
+def _red_main_push_result(ctx, target_dir, branch):
+    repo = localbase.origin_repo_slug(target_dir)
+    if repo is None:
+        return None
+    red = ctx.conn.execute(
+        "SELECT source, reason, updated_at FROM main_status WHERE repo = ? AND red = 1 ORDER BY source",
+        (repo,),
+    ).fetchall()
+    if not red:
+        return None
+    fixer = ctx.conn.execute(
+        "SELECT 1 FROM prs WHERE repo = ? AND branch = ? AND fixes_main = 1"
+        " AND lifecycle NOT IN ('merged', 'closed')",
+        (repo, branch),
+    ).fetchone()
+    if fixer is not None:
+        return None
+    checks = "; ".join(
+        "{} ({}, red since {})".format(row["reason"] or "no reason given", row["source"], row["updated_at"])
+        for row in red
+    )
+    message = (
+        "guild: main of {} is red: {}\n"
+        "fix main first, or flag your PR with `guild pr set <ref> --fixes-main` if it repairs main"
+    ).format(repo, checks)
+    return {"blocked": True, "message": message, "system_message": None}
+
+
 def _shared_areas_push_result(ctx, target_dir, paths):
     reasons = _claim_shared_areas_or_reasons(ctx.with_cwd(Path(target_dir)), paths)
     if not reasons:
@@ -543,6 +571,9 @@ def pre_push(ctx, command):
                 ),
                 "system_message": None,
             }
+        red_main_result = _red_main_push_result(ctx, target_dir, branch)
+        if red_main_result is not None:
+            return red_main_result
         paths, failure = _push_paths_or_result(target_dir)
         if failure is not None:
             return failure

@@ -32,6 +32,7 @@ def _pr(number, **overrides):
         "dep_keys": [],
         "unmet_deps": [],
         "needs_ask_answer": False,
+        "ask_id": None,
         "needs_human_pr_review": False,
         "branch": None,
         "base_branch": None,

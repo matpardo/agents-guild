@@ -1357,6 +1357,10 @@ var NO_SESSION_MESSAGE = "session token not loaded, reload the page";
       var ask = textEl("span", "needs-ask-answer");
       ask.className = "pill lifecycle-needs-ask-answer";
       row.appendChild(explain(ask, "flag", "needs-ask-answer"));
+      if (pr.ask_id !== null) {
+        ask.textContent = "needs-ask-answer (ask #" + pr.ask_id + ")";
+        ask.title = "An open ask refs this PR; answering ask #" + pr.ask_id + " unblocks it.";
+      }
     }
     if (pr.needs_human_pr_review) {
       var review = textEl("span", "needs-human-pr-review");
