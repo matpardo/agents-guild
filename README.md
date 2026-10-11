@@ -951,6 +951,12 @@ for each red main and `next to merge: <ref>` (the first PR of the
 queue whose action is `merge`), and each party block of `guild board` shows the same lines for that
 party's own queue, when they exist. `guild web` shows the same queues, see below.
 
+`guild board` also prints a `DISPATCHER` section after the notices: one line per
+dispatcher launch in flight (launched, not yet bound) with party, generation,
+age, rule and subject, and one red line per launch that failed in the last 24
+hours with its reason. The section is omitted when there is neither.
+`--party` and `--raid` keep only those parties' launches.
+
 ### `guild drift`
 
 `guild drift [--epic <slug> | --all]` reports, for the project resolved from
@@ -1045,7 +1051,10 @@ label pills (`draft`, `converging`), checks, party, task, state, `unblocks N`, t
 `next action` marker, blocked PRs in place; read-only, the same order as
 `guild merge-queue`, with `synced N min ago`; the party filter keeps
 only that party's PRs and the raid filter only that raid's card; the model
-key is `merge_queues`), drift findings for the default scope (grouped by rule, one block per
+key is `merge_queues`), a "dispatcher" section (launches in flight and
+launches that failed in the last 24 hours; hidden when both are empty; the
+model key is `dispatcher`; the party and raid filters keep only their parties),
+drift findings for the default scope (grouped by rule, one block per
 project resolved from the parties shown, skipping parties without a
 project), then one collapsible block per party with its quests, tasks and
 PRs, plus PRs outside active tasks, raids (each with a `lead` badge when

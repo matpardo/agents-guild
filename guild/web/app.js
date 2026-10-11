@@ -841,6 +841,29 @@
     section.appendChild(details);
   }
 
+  function renderLaunch(launch, label) {
+    var text = label + " " + launch.party + " g" + launch.generation + " " + launch.age + " ago (" + launch.rule + ", " + launch.subject + ")";
+    if (launch.reason) {
+      text += ": " + launch.reason;
+    }
+    return classedText("p", text, label === "failed" ? "queue-main-red" : "muted");
+  }
+
+  function renderDispatcher(dispatcher) {
+    var section = document.getElementById("dispatcher");
+    clear(section);
+    if (dispatcher.in_flight.length + dispatcher.failed.length === 0) {
+      return;
+    }
+    section.appendChild(textEl("h2", "dispatcher"));
+    appendAll(section, dispatcher.in_flight.map(function (launch) {
+      return renderLaunch(launch, "in flight");
+    }));
+    appendAll(section, dispatcher.failed.map(function (launch) {
+      return renderLaunch(launch, "failed");
+    }));
+  }
+
   function renderDriftEntry(entry) {
     var article = el("article");
     article.className = "card drift";
@@ -1261,7 +1284,14 @@
       drift: data.drift,
       raids: data.raids,
       merge_queues: filterMergeQueuesByParty(data.merge_queues, state.partyFilter),
+      dispatcher: filterDispatcher(data.dispatcher, function (launch) {
+        return launch.party === state.partyFilter;
+      }),
     };
+  }
+
+  function filterDispatcher(dispatcher, keep) {
+    return { in_flight: dispatcher.in_flight.filter(keep), failed: dispatcher.failed.filter(keep) };
   }
 
   function filterMergeQueuesByParty(queues, partyName) {
@@ -1329,6 +1359,9 @@
       raids: data.raids,
       merge_queues: data.merge_queues.filter(function (queue) {
         return queue.scope === "raid:" + state.raidFilter;
+      }),
+      dispatcher: filterDispatcher(data.dispatcher, function (launch) {
+        return members.indexOf(launch.party) !== -1;
       }),
     };
   }
@@ -1551,6 +1584,7 @@
     var filtered = applyRaidFilter(applyPartyFilter(data));
     renderAsks(filtered.asks, filtered.blocked, filtered.parties);
     renderNotices(filtered.notices);
+    renderDispatcher(filtered.dispatcher);
     renderMergeQueues(filtered.merge_queues);
     renderDrift(filtered.drift);
     renderParties(filtered.parties);

@@ -1,6 +1,7 @@
 import json
 import shlex
 import textwrap
+from datetime import timedelta
 
 from guild import config, ctx_pressure, links, party_progress, party_status, resume
 from guild import sanitize, session_status, timeutil
@@ -13,6 +14,7 @@ from guild.commands import raid as raid_commands
 from guild.errors import GuildError
 
 _ANSWERED_PAGE_SIZE = 10
+_FAILURE_WINDOW = timedelta(hours=24)
 
 _STYLES = {
     "bold": "1",
@@ -685,6 +687,60 @@ def _raid_next_to_merge_lines(ctx, painter, party_names):
     return lines + [""]
 
 
+def _dispatch_rows(ctx, party_names):
+    cutoff = timeutil.to_iso(ctx.now - _FAILURE_WINDOW)
+    rows = ctx.conn.execute(
+        "SELECT * FROM dispatch_decisions WHERE state IN ('launching', 'launched')"
+        " OR (state = 'failed' AND decided_at >= ?) ORDER BY decided_at DESC, rowid DESC",
+        (cutoff,),
+    ).fetchall()
+    if party_names is None:
+        return rows
+    return [row for row in rows if row["party"] in party_names]
+
+
+def _dispatch_launch_model(ctx, row):
+    return {
+        "party": row["party"],
+        "generation": row["generation"],
+        "rule": row["rule"],
+        "subject": sanitize.strip_control_sequences(row["subject"]),
+        "reason": _optional_text(row["reason"]),
+        "decided_at": row["decided_at"],
+        "age": timeutil.age_label(ctx.now, row["decided_at"]),
+    }
+
+
+def dispatcher_model(ctx, party_names):
+    rows = _dispatch_rows(ctx, party_names)
+    return {
+        "in_flight": [_dispatch_launch_model(ctx, row) for row in rows if row["state"] != "failed"],
+        "failed": [_dispatch_launch_model(ctx, row) for row in rows if row["state"] == "failed"],
+    }
+
+
+def _dispatcher_lines(ctx, painter, party_names):
+    model = dispatcher_model(ctx, party_names)
+    lines = [
+        "  in flight: {} g{} launched {} ago ({}, {})".format(
+            row["party"], row["generation"], row["age"], row["rule"], row["subject"]
+        )
+        for row in model["in_flight"]
+    ]
+    lines.extend(
+        painter.paint(
+            "  failed: {} g{} {} ago ({}): {}".format(
+                row["party"], row["generation"], row["age"], row["rule"], row["reason"]
+            ),
+            "red",
+        )
+        for row in model["failed"]
+    )
+    if not lines:
+        return []
+    return [painter.paint("DISPATCHER", "bold")] + lines + [""]
+
+
 def render_board(ctx, party_filter, raid_filter, color, width):
     painter = _Painter(color, width)
     if raid_filter is not None:
@@ -709,6 +765,7 @@ def render_board(ctx, party_filter, raid_filter, color, width):
         lines.extend(_raid_next_to_merge_lines(ctx, painter, party_names))
     lines.extend(render_asks(ctx, party_names, color, width, False))
     lines.extend(_notices_section(ctx, painter, notice_rows))
+    lines.extend(_dispatcher_lines(ctx, painter, party_names))
     projects_by_name = {project["name"]: project for project in config.load_all_projects(ctx.projects_dir)}
     for party_row in party_rows:
         lines.extend(
@@ -917,5 +974,6 @@ def board_model(ctx):
         "merge_queues": merge_queue_commands.board_models(
             ctx.conn, ctx.now, [row["name"] for row in party_rows]
         ),
+        "dispatcher": dispatcher_model(ctx, None),
     }
 
