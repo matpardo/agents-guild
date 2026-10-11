@@ -198,15 +198,22 @@ def _require_lead_close_allowed(conn, now, party):
             )
 
 
-def _quests_unfinished_work(conn, party):
-    rows = conn.execute(
+def _quests_unfinished_work(ctx, party):
+    rows = ctx.conn.execute(
         "SELECT slug, project, epic FROM quests WHERE party = ? AND state = 'active' ORDER BY slug", (party,)
     ).fetchall()
-    return [
+    epic_projects = sorted({row["project"] for row in rows if row["epic"] is not None})
+    stale_notes = [
+        note for project in epic_projects for note in quest_commands.refresh_sdd_snapshot(ctx, project)
+    ]
+    problems = [
         problem
         for row in rows
-        for problem in quest_commands.unfinished_work(conn, row["slug"], row["project"], row["epic"])
+        for problem in quest_commands.unfinished_work(ctx.conn, row["slug"], row["project"], row["epic"])
     ]
+    if not problems:
+        return []
+    return problems + stale_notes
 
 
 def _prune_lines(ctx):
@@ -228,7 +235,7 @@ def close(ctx, name, force):
         raise GuildError("unknown party '{}'".format(party), 1)
     if row["state"] == "closed":
         raise GuildError("party '{}' is already closed".format(party), 1)
-    unfinished = _quests_unfinished_work(ctx.conn, party)
+    unfinished = _quests_unfinished_work(ctx, party)
     if unfinished and not force:
         raise GuildError(
             "party '{}' has quests with unfinished work, finish them or pass --force:\n{}".format(
