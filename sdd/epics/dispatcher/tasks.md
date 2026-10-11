@@ -150,3 +150,13 @@ updated: 2026-10-04
 
 **Acceptance:**
 - [ ] A launch in flight and a failed launch appear on both surfaces.
+
+## T14 — Tell a live session when a dispatch waits on it
+
+**Depends on:** T07
+**Status:** [x] done — #102
+
+**What:** the per-prompt inbox reports a trigger deferred because the party's own session is live.
+
+**Acceptance:**
+- [x] The owning party sees the line once; other parties, dry-run and other busy reasons see nothing.

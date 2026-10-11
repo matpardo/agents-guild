@@ -134,11 +134,11 @@ class EphemeralBriefDocsTests(unittest.TestCase):
 class DispatcherDocsTests(unittest.TestCase):
     _decision = _DECISIONS_DIR / "20261004_dispatcher-launches-fresh-sessions.md"
 
-    def test_epic_is_active_with_all_thirteen_tasks(self):
+    def test_epic_is_active_with_all_fourteen_tasks(self):
         epic_dir = _EPICS_DIR / "dispatcher"
         self.assertEqual(_frontmatter(epic_dir / "spec.md")["status"], "active")
         tasks = sdd.parse_tasks_file(epic_dir / "tasks.md", _PATTERNS)
-        self.assertEqual([task["tid"] for task in tasks], ["T{:02d}".format(number) for number in range(1, 14)])
+        self.assertEqual([task["tid"] for task in tasks], ["T{:02d}".format(number) for number in range(1, 15)])
         by_tid = {task["tid"]: task["sdd_status"] for task in tasks}
         for tid in ("T10", "T11", "T12", "T13"):
             self.assertEqual(by_tid[tid], "pending")
