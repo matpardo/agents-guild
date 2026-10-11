@@ -77,3 +77,10 @@ updated: 2026-10-11
 **Status:** [x] done — #110
 
 **What:** with `max_open_prs_per_file` set, `sync --source gh` stores the changed files of every open tracked PR and `guild hook pre-push` warns, without denying, when a file of the push is already changed by that many other open PRs; exclusive `area:` claims stay for files that need exclusivity.
+
+## T11 — Ask for an architecture guard when a finding class repeats
+
+**Depends on:** T10
+**Status:** [x] done — #112
+
+**What:** `guild finding record <owner/repo>#<n> --class <slug>` counts each recurring audit or review finding class once per PR; with `finding_guard_threshold` set, one `project:` notice asks to make the class an architecture guard when it repeats that many times.

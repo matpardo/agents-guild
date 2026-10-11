@@ -696,6 +696,23 @@ def _add_flag_pair(parser, name, dest):
     group.add_argument("--no-" + name, dest=dest, action="store_const", const=False)
 
 
+def _handle_finding_record(ctx, args):
+    from guild.commands import finding as finding_commands
+
+    _print(finding_commands.record(ctx, args.ref, args.finding_class))
+    return 0
+
+
+def _add_finding_parser(subparsers):
+    parser = subparsers.add_parser("finding")
+    actions = parser.add_subparsers(dest="finding_action", required=True)
+
+    record = actions.add_parser("record")
+    record.add_argument("ref")
+    record.add_argument("--class", dest="finding_class", required=True)
+    record.set_defaults(handler=_handle_finding_record)
+
+
 def _add_pr_parser(subparsers):
     parser = subparsers.add_parser("pr")
     actions = parser.add_subparsers(dest="pr_action", required=True)
@@ -849,6 +866,7 @@ def build_parser():
     _add_quest_parser(subparsers)
     _add_task_parser(subparsers)
     _add_pr_parser(subparsers)
+    _add_finding_parser(subparsers)
 
     ask = subparsers.add_parser("ask")
     ask.add_argument("question")

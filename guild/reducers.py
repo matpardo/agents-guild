@@ -671,6 +671,15 @@ def _dump(value):
     return json.dumps(value)
 
 
+def _finding_recorded(conn, event):
+    payload = event["payload"]
+    conn.execute(
+        "INSERT OR IGNORE INTO findings (project, class, repo, number, party, recorded_at)"
+        " VALUES (?, ?, ?, ?, ?, ?)",
+        (payload["project"], payload["class"], payload["repo"], payload["number"], payload["party"], event["ts"]),
+    )
+
+
 _REDUCERS = {
     "party.started": _party_started,
     "party.resumed": _party_resumed,
@@ -688,6 +697,7 @@ _REDUCERS = {
     "task.done": _task_done,
     "epic.synced": _epic_synced,
     "tracker.synced": _tracker_synced,
+    "finding.recorded": _finding_recorded,
     "pr.tracked": _pr_tracked,
     "pr.set": _pr_set,
     "pr.synced": _pr_synced,
