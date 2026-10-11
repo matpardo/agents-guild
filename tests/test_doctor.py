@@ -165,3 +165,27 @@ class DoctorTests(GuildTestCase):
         self.assertEqual(code, 1)
         self.assertIn("ok      project acme", out)
         self.assertIn("invalid project broken.json", out)
+
+    def _clipboard_doctor_out(self, tools):
+        self._write_settings(_ALL_HOOKS)
+        self._link_rules()
+        which = lambda name: "/bin/" + name if name in tools else None
+        with mock.patch.dict(os.environ, {"DISPLAY": ":0"}), mock.patch(
+            "guild.tmux_windows.shutil.which", side_effect=which
+        ):
+            _, out, _ = self.run_cli(["doctor"], None, None)
+        return out
+
+    def test_warns_when_tmux_has_no_clipboard_tool(self):
+        out = self._clipboard_doctor_out({"tmux"})
+        self.assertIn(
+            "warn    tmux copy reaches the clipboard only through the terminal (OSC 52): "
+            "install xclip (X11) or wl-clipboard (Wayland)",
+            out,
+        )
+
+    def test_no_clipboard_warning_when_tool_found(self):
+        self.assertNotIn("OSC 52", self._clipboard_doctor_out({"tmux", "xclip"}))
+
+    def test_no_clipboard_warning_without_tmux(self):
+        self.assertNotIn("OSC 52", self._clipboard_doctor_out(set()))

@@ -1279,8 +1279,10 @@ guild revive --list            # no tmux needed: one copy-paste command per part
   and `allow-rename` off, and the `guild` session sets `set-titles on` /
   `set-titles-string "#W"` so the outer terminal title shows the party, plus
   `mouse on` so the wheel scrolls the output instead of the prompt history.
-  Dragging selects text and copies it to the system clipboard (`set-clipboard
-  on`); Ctrl+click on a hyperlink opens it with `xdg-open`. Only session,
+  Dragging selects text and copies it through the terminal (`set-clipboard
+  on`, OSC 52) and, when `wl-copy` (Wayland), `xclip` or `xsel` (X11) is on
+  `PATH`, also to the system clipboard (server option `copy-command`; `guild
+  doctor` warns when none is found); Ctrl+click on a hyperlink opens it with `xdg-open`. Only session,
   window and server options and one root key binding are set at runtime; your
   `~/.tmux.conf` is untouched.
   Claude sessions are named `<party>-g<N>` on both fresh launch and resume,

@@ -333,6 +333,32 @@ class LaunchTests(ReviveBase):
         self.assertIn("C-MouseDown1Pane", [arg for call in tmux.calls for arg in call])
         self.assertIn("launched alpha (resume)", out)
 
+    def _copy_command_calls(self, env, tools):
+        tmux = self._tmux()
+        with mock.patch.dict(os.environ, env, clear=True), mock.patch(
+            "guild.tmux_windows.shutil.which", side_effect=lambda name: "/bin/" + name if name in tools else None
+        ):
+            self._revive([], True, False, tmux, None)
+        return [call for call in tmux.calls if "copy-command" in call]
+
+    def test_copy_command_uses_xclip_on_x11(self):
+        calls = self._copy_command_calls({"DISPLAY": ":0"}, {"xclip", "xsel"})
+        self.assertEqual(calls, [["set-option", "-s", "copy-command", "xclip -selection clipboard -in"]])
+
+    def test_copy_command_uses_xsel_when_xclip_missing(self):
+        calls = self._copy_command_calls({"DISPLAY": ":0"}, {"xsel"})
+        self.assertEqual(calls, [["set-option", "-s", "copy-command", "xsel --clipboard --input"]])
+
+    def test_copy_command_prefers_wl_copy_on_wayland(self):
+        calls = self._copy_command_calls({"DISPLAY": ":0", "WAYLAND_DISPLAY": "wayland-0"}, {"wl-copy", "xclip"})
+        self.assertEqual(calls, [["set-option", "-s", "copy-command", "wl-copy"]])
+
+    def test_copy_command_skips_x11_tools_without_display(self):
+        self.assertEqual(self._copy_command_calls({}, {"xclip", "xsel", "wl-copy"}), [])
+
+    def test_no_copy_command_when_no_tool_found(self):
+        self.assertEqual(self._copy_command_calls({"DISPLAY": ":0"}, set()), [])
+
     def test_never_touches_global_options(self):
         tmux = self._tmux()
         self._revive([], True, False, tmux, None)
