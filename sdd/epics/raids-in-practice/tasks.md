@@ -74,6 +74,6 @@ updated: 2026-10-11
 ## T10 — Warn at push when too many open PRs touch the same file
 
 **Depends on:** T09
-**Status:** [ ] pending
+**Status:** [x] done — #110
 
 **What:** with `max_open_prs_per_file` set, `sync --source gh` stores the changed files of every open tracked PR and `guild hook pre-push` warns, without denying, when a file of the push is already changed by that many other open PRs; exclusive `area:` claims stay for files that need exclusivity.
