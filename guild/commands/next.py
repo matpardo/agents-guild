@@ -1,7 +1,7 @@
 import json
 from datetime import timedelta
 
-from guild import config, events, merge_queue, resolve, sanitize, timeutil
+from guild import config, events, merge_queue, pr_asks, resolve, sanitize, timeutil
 from guild.commands import drift as drift_commands
 from guild.commands import merge_queue as merge_queue_commands
 from guild.commands import pr as pr_commands
@@ -15,7 +15,7 @@ def _without_external(conn, rows):
 
 def _own_open_prs(conn, party):
     rows = conn.execute(
-        "SELECT * FROM prs WHERE party = ? AND lifecycle NOT IN ('merged', 'closed')"
+        pr_asks.PRS_WITH_ASK_SQL + " WHERE party = ? AND lifecycle NOT IN ('merged', 'closed')"
         " ORDER BY repo ASC, number ASC",
         (party,),
     ).fetchall()

@@ -3,7 +3,7 @@ import shlex
 import textwrap
 from datetime import timedelta
 
-from guild import config, ctx_pressure, dispatch_launch, links, merge_queue, party_progress, party_status, resume
+from guild import config, ctx_pressure, dispatch_launch, links, merge_queue, party_progress, party_status, pr_asks, resume
 from guild import sanitize, session_status, timeutil
 from guild.commands import brief as brief_commands
 from guild.commands import claim as claim_commands
@@ -119,7 +119,11 @@ def _checks_painted(painter, pr_row):
 
 def _badges(pr_row):
     badges = [(pr_row["lifecycle"], _LIFECYCLE_STYLES[pr_row["lifecycle"]])]
-    badges.extend((label, style) for column, label, style in _FLAG_STYLES if pr_row[column])
+    for column, label, style in _FLAG_STYLES:
+        if column == "needs_ask_answer" and pr_row["open_ask_id"] is not None:
+            badges.append(("{} (ask #{})".format(label, pr_row["open_ask_id"]), style))
+        elif pr_row[column]:
+            badges.append((label, style))
     return badges
 
 
@@ -532,7 +536,7 @@ def _leader_label(ctx, party_row):
 
 def _party_pr_rows(conn, party_name):
     return conn.execute(
-        "SELECT * FROM prs WHERE party = ? ORDER BY repo ASC, number ASC", (party_name,)
+        pr_asks.PRS_WITH_ASK_SQL + " WHERE party = ? ORDER BY repo ASC, number ASC", (party_name,)
     ).fetchall()
 
 
@@ -886,7 +890,8 @@ def _pr_model(pr_row, project_config):
         "repo": pr_row["repo"],
         "number": pr_row["number"],
         "lifecycle": pr_row["lifecycle"],
-        "needs_ask_answer": bool(pr_row["needs_ask_answer"]),
+        "needs_ask_answer": pr_asks.needs_answer(pr_row),
+        "ask_id": pr_row["open_ask_id"],
         "needs_human_pr_review": bool(pr_row["needs_human_pr_review"]),
         "fixes_main": bool(pr_row["fixes_main"]),
         "fixes_flaky": bool(pr_row["fixes_flaky"]),

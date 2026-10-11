@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from guild import merge_queue, paths, resume, session_info, timeutil, transcript_usage
+from guild import merge_queue, paths, pr_asks, resume, session_info, timeutil, transcript_usage
 from guild.adapters import sdd
 from guild.commands import merge_queue as merge_queue_commands
 from guild.commands import next as next_commands
@@ -76,7 +76,9 @@ def _owner(conn, projects, repo, number):
     owner = conn.execute(
         "SELECT prs.party AS party, parties.project AS project, prs.mergeable AS mergeable,"
         " prs.review_decision AS review_decision, prs.unresolved_threads AS unresolved_threads,"
-        " prs.merge_state AS merge_state, prs.blocked_external AS blocked_external, prs.needs_ask_answer AS needs_ask_answer, prs.needs_human_pr_review AS needs_human_pr_review FROM prs"
+        " prs.merge_state AS merge_state, prs.blocked_external AS blocked_external, prs.needs_ask_answer AS needs_ask_answer, prs.needs_human_pr_review AS needs_human_pr_review, "
+        + pr_asks.OPEN_ASK_ID_SQL
+        + " FROM prs"
         " JOIN parties ON parties.name = prs.party WHERE prs.repo = ? AND prs.number = ? AND prs.seeded = 0",
         (repo, number),
     ).fetchone()
@@ -150,7 +152,7 @@ def _pr_promote(conn, projects, event):
         return None
     repo, number = payload["repo"], payload["number"]
     owner = _owner(conn, projects, repo, number)
-    if owner is None or owner["blocked_external"] is not None or owner["needs_ask_answer"]:
+    if owner is None or owner["blocked_external"] is not None or pr_asks.needs_answer(owner):
         return None
     if _unmergeable_slugs(owner):
         return None
