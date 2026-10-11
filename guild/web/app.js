@@ -8,8 +8,10 @@
   var ANSWERED_ASKS_URL = "/api/asks/answered";
   var RESOURCE_ITEMS_PER_CATEGORY = 10;
   var NO_RESOURCES_MESSAGE = "no samples yet; run guild resources collect";
+  var EMPTY_REASON_MESSAGE = "write a reason first";
   var EMPTY_ANSWER_MESSAGE = "write an answer first";
-  var NO_SESSION_MESSAGE = "session token not loaded, reload the page";
+  var BLOCKED_EXTERNAL_TEXT = "blocked: external";
+var NO_SESSION_MESSAGE = "session token not loaded, reload the page";
   var sessionToken = null;
 
   var answered = {
@@ -31,6 +33,11 @@
     drafts: {},
     statuses: {},
     busy: {},
+    prBlockOpen: {},
+    prDrafts: {},
+    prStatuses: {},
+    prBusy: {},
+    focusedPrRef: null,
     noticeStatuses: {},
     noticeBusy: {},
     noticeAllStatus: "",
@@ -250,6 +257,11 @@
     return "/api/asks/" + askId + "/" + action;
   }
 
+  function prUrl(ref, action) {
+    var parts = ref.split("#");
+    return "/api/prs/" + parts[0] + "/" + parts[1] + "/" + action;
+  }
+
   function noticeUrl(noticeId, action) {
     return "/api/notices/" + noticeId + "/" + action;
   }
@@ -319,6 +331,101 @@
       state.noticeAllStatus = result.ok ? "" : errorMessage(result.body);
       fetchBoard();
     });
+  }
+
+  function postPrAction(ref, action, payload) {
+    if (sessionToken === null) {
+      state.prStatuses[ref] = NO_SESSION_MESSAGE;
+      fetchBoard();
+      return;
+    }
+    state.prBusy[ref] = true;
+    state.prStatuses[ref] = "sending...";
+    fetchBoard();
+    sendPost(prUrl(ref, action), payload).then(function (result) {
+      delete state.prBusy[ref];
+      if (result.ok) {
+        delete state.prBlockOpen[ref];
+        delete state.prDrafts[ref];
+        delete state.prStatuses[ref];
+      } else {
+        state.prStatuses[ref] = errorMessage(result.body);
+      }
+      fetchBoard();
+    });
+  }
+
+  function submitBlock(ref) {
+    var text = state.prDrafts[ref] || "";
+    if (text.trim() === "") {
+      state.prStatuses[ref] = EMPTY_REASON_MESSAGE;
+      fetchBoard();
+      return;
+    }
+    postPrAction(ref, "block", { reason: text });
+  }
+
+  function prButton(ref, label, handler) {
+    var button = textEl("button", label);
+    button.type = "button";
+    button.disabled = state.prBusy[ref] === true;
+    button.addEventListener("click", handler);
+    return button;
+  }
+
+  function renderBlockInput(ref) {
+    var input = el("input");
+    input.type = "text";
+    input.className = "block-reason";
+    input.placeholder = "reason";
+    input.value = state.prDrafts[ref] || "";
+    input.disabled = state.prBusy[ref] === true;
+    input.dataset.prRef = ref;
+    input.addEventListener("input", function () {
+      state.prDrafts[ref] = input.value;
+    });
+    return input;
+  }
+
+  function renderPrBlockControls(pr) {
+    var ref = pr.repo + "#" + pr.number;
+    var controls = el("span");
+    controls.className = "pr-block-controls";
+    if (pr.blocked_external !== null) {
+      controls.appendChild(
+        prButton(ref, "Unblock", function () {
+          postPrAction(ref, "unblock", {});
+        })
+      );
+    } else if (state.prBlockOpen[ref]) {
+      controls.appendChild(renderBlockInput(ref));
+      controls.appendChild(
+        prButton(ref, "Confirm block", function () {
+          submitBlock(ref);
+        })
+      );
+    } else {
+      controls.appendChild(
+        prButton(ref, "Block", function () {
+          state.prBlockOpen[ref] = true;
+          fetchBoard();
+        })
+      );
+    }
+    var status = textEl("span", state.prStatuses[ref] || "");
+    status.className = "ask-status";
+    controls.appendChild(status);
+    return controls;
+  }
+
+  function renderBlockedExternalPill(reason) {
+    var pill = textEl("span", BLOCKED_EXTERNAL_TEXT);
+    pill.className = "pill lifecycle-blocked-external";
+    explain(pill, "flag", "blocked-external");
+    if (reason !== null) {
+      pill.title = pill.title + " Reason: " + reason;
+    }
+    return pill;
   }
 
   function postAskAction(askId, action, payload) {
@@ -912,6 +1019,10 @@
       head.appendChild(branchEl(entry.branch));
     }
     entry.labels.forEach(function (label) {
+      if (label === "blocked-external") {
+        head.appendChild(renderBlockedExternalPill(null));
+        return;
+      }
       var pill = textEl("span", label);
       pill.className = "pill lifecycle-" + label;
       head.appendChild(explainLabel(pill, label));
@@ -1052,7 +1163,12 @@
       review.className = "pill lifecycle-needs-human-pr-review";
       row.appendChild(explain(review, "flag", "needs-human-pr-review"));
     }
+    if (pr.blocked_external !== null) {
+      row.appendChild(renderBlockedExternalPill(pr.blocked_external));
+      row.appendChild(textEl("span", pr.blocked_external));
+    }
     row.appendChild(renderChecks(pr));
+    row.appendChild(renderPrBlockControls(pr));
     if (pr.card_url) {
       row.appendChild(link(pr.card_url, pr.card));
     } else if (pr.card) {
@@ -1369,6 +1485,12 @@
   function rememberFocus() {
     var active = document.activeElement;
     state.focusedAskId = null;
+    state.focusedPrRef = null;
+    if (active && active.dataset && active.dataset.prRef) {
+      state.focusedPrRef = active.dataset.prRef;
+      state.focusStart = active.selectionStart;
+      state.focusEnd = active.selectionEnd;
+    }
     if (active && active.dataset && active.dataset.askId) {
       state.focusedAskId = active.dataset.askId;
       state.focusStart = active.selectionStart;
@@ -1376,7 +1498,20 @@
     }
   }
 
+  function restorePrFocus() {
+    var inputs = document.querySelectorAll("input.block-reason");
+    Array.prototype.forEach.call(inputs, function (input) {
+      if (input.dataset.prRef === state.focusedPrRef && !input.disabled) {
+        input.focus();
+        input.setSelectionRange(state.focusStart, state.focusEnd);
+      }
+    });
+  }
+
   function restoreFocus() {
+    if (state.focusedPrRef !== null) {
+      restorePrFocus();
+    }
     if (state.focusedAskId === null) {
       return;
     }

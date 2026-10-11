@@ -117,6 +117,52 @@ def _blocked_external_value(blocked_external, no_blocked_external, current):
     return blocked_external.strip()
 
 
+def _current_fields(row):
+    return {
+        "lifecycle": row["lifecycle"],
+        "waits": row["waits"],
+        "needs_ask_answer": int(row["needs_ask_answer"] or 0),
+        "needs_human_pr_review": int(row["needs_human_pr_review"] or 0),
+        "fixes_main": int(row["fixes_main"] or 0),
+        "fixes_flaky": int(row["fixes_flaky"] or 0),
+        "blocked_external": row["blocked_external"],
+    }
+
+
+def _record_pr_set(ctx, actor, project, repo, number, fields):
+    with db.writing(ctx.conn):
+        events.record(
+            ctx.conn,
+            ctx.now,
+            ctx.origin,
+            actor,
+            ctx.session_id,
+            project,
+            "pr.set",
+            "guild",
+            dict(fields, repo=repo, number=number),
+        )
+
+
+def _set_blocked_external_as_human(ctx, ref, reason):
+    repo, number = refs.parse_pr_ref(ref)
+    row = _load_pr(ctx, repo, number)
+    fields = _current_fields(row)
+    fields["blocked_external"] = reason
+    _record_pr_set(ctx, None, merge_queue_commands._project_for_repo(ctx, repo), repo, number, fields)
+    return "PR '{}#{}' updated".format(repo, number)
+
+
+def block_external(ctx, ref, reason):
+    if not reason.strip():
+        raise GuildError("a reason is required", 1)
+    return _set_blocked_external_as_human(ctx, ref, reason.strip())
+
+
+def unblock_external(ctx, ref):
+    return _set_blocked_external_as_human(ctx, ref, None)
+
+
 def set_(
     ctx, ref, lifecycle, waits, needs_ask_answer, needs_human_pr_review, fixes_main, fixes_flaky,
     blocked_external, no_blocked_external,
@@ -134,32 +180,16 @@ def set_(
     binding = identity.require_binding(ctx.conn, ctx.session_id)
     row = _load_pr(ctx, repo, number)
     project = config.require_project(ctx.cwd, ctx.projects_dir)
-    new_lifecycle = lifecycle if lifecycle is not None else row["lifecycle"]
-    new_waits = waits if waits is not None else row["waits"]
-    with db.writing(ctx.conn):
-        events.record(
-            ctx.conn,
-            ctx.now,
-            ctx.origin,
-            binding["party"],
-            ctx.session_id,
-            project,
-            "pr.set",
-            "guild",
-            {
-                "repo": repo,
-                "number": number,
-                "lifecycle": new_lifecycle,
-                "waits": new_waits,
-                "needs_ask_answer": _flag_value(needs_ask_answer, row["needs_ask_answer"]),
-                "needs_human_pr_review": _flag_value(needs_human_pr_review, row["needs_human_pr_review"]),
-                "fixes_main": _flag_value(fixes_main, row["fixes_main"]),
-                "fixes_flaky": _flag_value(fixes_flaky, row["fixes_flaky"]),
-                "blocked_external": _blocked_external_value(
-                    blocked_external, no_blocked_external, row["blocked_external"]
-                ),
-            },
-        )
+    fields = _current_fields(row)
+    fields["lifecycle"] = lifecycle if lifecycle is not None else row["lifecycle"]
+    fields["waits"] = waits if waits is not None else row["waits"]
+    fields["needs_ask_answer"] = _flag_value(needs_ask_answer, row["needs_ask_answer"])
+    fields["needs_human_pr_review"] = _flag_value(needs_human_pr_review, row["needs_human_pr_review"])
+    fields["fixes_main"] = _flag_value(fixes_main, row["fixes_main"])
+    fields["fixes_flaky"] = _flag_value(fixes_flaky, row["fixes_flaky"])
+    fields["blocked_external"] = _blocked_external_value(blocked_external, no_blocked_external, row["blocked_external"])
+    _record_pr_set(ctx, binding["party"], project, repo, number, fields)
+    new_lifecycle = fields["lifecycle"]
     message = "PR '{}#{}' updated".format(repo, number)
     if new_lifecycle == "ready" and row["gh_draft"]:
         return message + "\n" + _DRAFT_READY_HINT.format(number)

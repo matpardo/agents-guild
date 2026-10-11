@@ -12,6 +12,7 @@ from guild.commands import ask as ask_commands
 from guild.commands import board as board_commands
 from guild.commands import history as history_commands
 from guild.commands import notice as notice_commands
+from guild.commands import pr as pr_commands
 from guild.errors import GuildError
 from guild.resources import report as resources_report
 
@@ -27,6 +28,7 @@ _STATIC_FILES = {
 _MAX_BODY_BYTES = 16384
 _ASK_ACTION_RE = re.compile(r"^/api/asks/([^/]+)/(answer|dismiss)$")
 _NOTICE_ACTION_RE = re.compile(r"^/api/notices/([^/]+)/(seen|unseen)$")
+_PR_ACTION_RE = re.compile(r"^/api/prs/([^/]+/[^/]+)/(\d+)/(block|unblock)$")
 _SEEN_ALL_PATH = "/api/notices/seen-all"
 _ANSWERED_ASKS_PATH = "/api/asks/answered"
 _ASK_DETAIL_RE = re.compile(r"^/api/asks/(\d+)$")
@@ -137,6 +139,16 @@ def _run_seen_all():
         ctx.conn.close()
 
 
+def _run_pr_action(action, ref, payload):
+    ctx = _action_context()
+    try:
+        if action == "block":
+            return pr_commands.block_external(ctx, ref, payload["reason"])
+        return pr_commands.unblock_external(ctx, ref)
+    finally:
+        ctx.conn.close()
+
+
 class _RequestRejected(Exception):
     def __init__(self, status, message):
         super().__init__(message)
@@ -224,6 +236,8 @@ class BoardRequestHandler(http_server.BaseHTTPRequestHandler):
         payload = self._read_json_object()
         if action == "answer" and not isinstance(payload.get("answer"), str):
             raise _RequestRejected(400, "answer must be a string")
+        if action == "block" and not isinstance(payload.get("reason"), str):
+            raise _RequestRejected(400, "reason must be a string")
         return payload
 
     def _post_action(self, action, run):
@@ -246,6 +260,11 @@ class BoardRequestHandler(http_server.BaseHTTPRequestHandler):
             if not _ASK_ID_RE.match(ask_id):
                 return self._not_found()
             return self._post_action(action, lambda payload: _run_ask_action(action, int(ask_id), payload))
+        pr_match = _PR_ACTION_RE.match(path)
+        if pr_match is not None:
+            repo, number, action = pr_match.groups()
+            ref = "{}#{}".format(repo, number)
+            return self._post_action(action, lambda payload: _run_pr_action(action, ref, payload))
         if path == _SEEN_ALL_PATH:
             return self._post_action("seen-all", lambda payload: _run_seen_all())
         notice_match = _NOTICE_ACTION_RE.match(path)

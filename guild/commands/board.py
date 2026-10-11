@@ -790,6 +790,7 @@ def _pr_model(pr_row, project_config):
         "needs_human_pr_review": bool(pr_row["needs_human_pr_review"]),
         "fixes_main": bool(pr_row["fixes_main"]),
         "fixes_flaky": bool(pr_row["fixes_flaky"]),
+        "blocked_external": _optional_text(pr_row["blocked_external"]),
         "checks_failing": pr_row["checks_failing"] or 0,
         "checks_passing": pr_row["checks_passing"] or 0,
         "checks_pending": pr_row["checks_pending"] or 0,
