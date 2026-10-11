@@ -1039,11 +1039,44 @@ var NO_SESSION_MESSAGE = "session token not loaded, reload the page";
       article.appendChild(explain(textEl("h4", rule + " (" + findings.length + ")"), "drift", rule));
       var list = el("ul");
       findings.forEach(function (finding) {
-        list.appendChild(textEl("li", finding));
+        list.appendChild(textEl("li", finding.text));
       });
       article.appendChild(list);
     });
     return article;
+  }
+
+  function renderPartyDrift(partyDrift) {
+    if (partyDrift.findings.length === 0) {
+      return null;
+    }
+    var block = el("div");
+    block.className = "party-drift";
+    block.appendChild(textEl("h4", "drift"));
+    var list = el("ul");
+    partyDrift.findings.forEach(function (finding) {
+      list.appendChild(textEl("li", finding));
+    });
+    block.appendChild(list);
+    if (partyDrift.more > 0) {
+      block.appendChild(textEl("p", partyDrift.more + " more"));
+    }
+    return block;
+  }
+
+  function filterDriftByParties(drift, parties) {
+    return drift.map(function (entry) {
+      var findings = {};
+      Object.keys(entry.findings).forEach(function (rule) {
+        var kept = entry.findings[rule].filter(function (finding) {
+          return finding.party !== null && parties.indexOf(finding.party) !== -1;
+        });
+        if (kept.length > 0) {
+          findings[rule] = kept;
+        }
+      });
+      return { project: entry.project, scope: entry.scope, findings: findings };
+    });
   }
 
   function renderDrift(drift) {
@@ -1481,6 +1514,10 @@ var NO_SESSION_MESSAGE = "session token not loaded, reload the page";
     if (party.caps !== null && party.caps.wait !== null) {
       details.appendChild(explain(classedText("p", party.caps.wait, "queue-reason"), "ui", "capWait"));
     }
+    var partyDrift = renderPartyDrift(party.drift);
+    if (partyDrift) {
+      details.appendChild(partyDrift);
+    }
 
     appendAll(details, party.quests.map(renderQuest));
 
@@ -1577,7 +1614,7 @@ var NO_SESSION_MESSAGE = "session token not loaded, reload the page";
       parties: data.parties.filter(function (party) {
         return party.name === state.partyFilter;
       }),
-      drift: data.drift,
+      drift: filterDriftByParties(data.drift, [state.partyFilter]),
       projects: data.projects,
       raids: data.raids,
       merge_queues: filterMergeQueuesByParty(data.merge_queues, state.partyFilter),
@@ -1588,13 +1625,12 @@ var NO_SESSION_MESSAGE = "session token not loaded, reload the page";
   }
 
   function filterDispatcher(dispatcher, keep) {
-    return {
-      projects: dispatcher.projects,
+    return Object.assign({}, dispatcher, {
       in_flight: dispatcher.in_flight.filter(keep),
       failed: dispatcher.failed.filter(keep),
       deferred: dispatcher.deferred.filter(keep),
       recent: dispatcher.recent.filter(keep),
-    };
+    });
   }
 
   function filterMergeQueuesByParty(queues, partyName) {
@@ -1603,13 +1639,7 @@ var NO_SESSION_MESSAGE = "session token not loaded, reload the page";
     };
     return queues
       .map(function (queue) {
-        return {
-          scope: queue.scope,
-          synced_at: queue.synced_at,
-          synced_label: queue.synced_label,
-          main: queue.main,
-          queue: queue.queue.filter(matches),
-        };
+        return Object.assign({}, queue, { queue: queue.queue.filter(matches) });
       })
       .filter(function (queue) {
         return queue.queue.length > 0;
@@ -1658,7 +1688,7 @@ var NO_SESSION_MESSAGE = "session token not loaded, reload the page";
       parties: data.parties.filter(function (party) {
         return members.indexOf(party.name) !== -1;
       }),
-      drift: data.drift,
+      drift: filterDriftByParties(data.drift, members),
       projects: data.projects,
       raids: data.raids,
       merge_queues: data.merge_queues.filter(function (queue) {
@@ -1896,7 +1926,9 @@ var NO_SESSION_MESSAGE = "session token not loaded, reload the page";
           renderResources(model);
         }
       })
-      .catch(function () {});
+      .catch(function (error) {
+        console.error(error);
+      });
   }
 
   function render(data) {
@@ -1923,7 +1955,9 @@ var NO_SESSION_MESSAGE = "session token not loaded, reload the page";
       .then(function (body) {
         sessionToken = body.token;
       })
-      .catch(function () {});
+      .catch(function (error) {
+        console.error(error);
+      });
   }
 
   function fetchBoard() {
@@ -1932,7 +1966,9 @@ var NO_SESSION_MESSAGE = "session token not loaded, reload the page";
         return response.json();
       })
       .then(render)
-      .catch(function () {});
+      .catch(function (error) {
+        console.error(error);
+      });
   }
 
   document.addEventListener("DOMContentLoaded", function () {

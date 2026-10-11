@@ -26,16 +26,16 @@ def targeting_lines(rows, project, raid_member_of):
     return inbox_commands.framed(lines)
 
 
-_DRIFT_BRIEF_CAP = 5
+DRIFT_BRIEF_CAP = 5
 
 
 def _drift_lines(ctx, binding):
     findings = drift_commands.party_findings(ctx.conn, binding["project"], binding["party"])
     if not findings:
         return []
-    lines = ["drift:"] + ["  {}".format(finding) for finding in findings[:_DRIFT_BRIEF_CAP]]
-    if len(findings) > _DRIFT_BRIEF_CAP:
-        lines.append("  {} more: guild drift".format(len(findings) - _DRIFT_BRIEF_CAP))
+    lines = ["drift:"] + ["  {}".format(finding) for finding in findings[:DRIFT_BRIEF_CAP]]
+    if len(findings) > DRIFT_BRIEF_CAP:
+        lines.append("  {} more: guild drift".format(len(findings) - DRIFT_BRIEF_CAP))
     return lines
 
 

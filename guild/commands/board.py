@@ -5,6 +5,7 @@ from datetime import timedelta
 
 from guild import config, ctx_pressure, dispatch_launch, links, merge_queue, party_progress, party_status, resume
 from guild import sanitize, session_status, timeutil
+from guild.commands import brief as brief_commands
 from guild.commands import claim as claim_commands
 from guild.commands import drift as drift_commands
 from guild.commands import merge_queue as merge_queue_commands
@@ -1005,6 +1006,14 @@ def _blocked_model(ctx, row):
     }
 
 
+def _party_drift_model(ctx, party_row):
+    findings = drift_commands.party_findings(ctx.conn, party_row["project"], party_row["name"])
+    return {
+        "findings": findings[:brief_commands.DRIFT_BRIEF_CAP],
+        "more": max(0, len(findings) - brief_commands.DRIFT_BRIEF_CAP),
+    }
+
+
 def _party_model(ctx, party_row, project_config):
     pr_rows = _party_pr_rows(ctx.conn, party_row["name"])
     prs_by_task = _prs_by_task(pr_rows)
@@ -1022,6 +1031,7 @@ def _party_model(ctx, party_row, project_config):
         "generation": party_row["generation"],
         "status": _status_model(ctx, party_row),
         "remaining": party_progress.remaining(ctx.conn, party_row["name"]),
+        "drift": _party_drift_model(ctx, party_row),
         "ctx": _ctx_model(ctx, party_row, project_config),
         "caps": _party_caps(ctx, party_row, project_config),
         "resume_command": _resume_command(ctx, party_row),
