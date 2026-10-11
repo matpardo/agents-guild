@@ -6,7 +6,6 @@ from guild.errors import GuildError
 
 _CLOSED_LIFECYCLES = ("merged", "closed")
 _TRACK_INITIAL_LIFECYCLE = "draft"
-_DRAFT_LIFECYCLES = ("draft", "converging")
 _DRAFT_READY_HINT = (
     "PR is draft on GitHub; mark it ready there (gh pr ready {}) or the next sync reverts it"
 )
@@ -196,20 +195,6 @@ def set_(
     return message
 
 
-def _gate_lines(record, red_rows):
-    gates = []
-    if record["lifecycle"] in _DRAFT_LIFECYCLES:
-        gates.append("- gate: draft (gh pr ready {})".format(record["number"]))
-    if record["needs_human_pr_review"]:
-        gates.append("- gate: needs human review")
-    gates.extend(
-        "- gate: main red {}".format(merge_queue_commands.main_label(row))
-        for row in red_rows
-        if row["repo"] == record["repo"]
-    )
-    return gates
-
-
 def ready_check(ctx, ref):
     repo, number = refs.parse_pr_ref(ref)
     row = _load_pr(ctx, repo, number)
@@ -220,11 +205,10 @@ def ready_check(ctx, ref):
     queue = merge_queue.compute(records, merge_queue_commands.load_pins(ctx.conn), red_rows)["queue"]
     ref_text = "{}#{}".format(repo, number)
     entry = next(entry for entry in queue if entry["ref"] == ref_text)
-    record = next(record for record in records if record["ref"] == ref_text)
-    gates = _gate_lines(record, red_rows)
+    gates = merge_queue_commands.gates(entry, red_rows)
     lines = ["{} {}".format(ref_text, entry["state"])]
     lines.extend("- {}".format(blocker) for blocker in entry["blockers"])
     lines.extend("- wait: {}".format(wait) for wait in entry["waits"])
-    lines.extend(gates)
+    lines.extend("- gate: {}".format(gate) for gate in gates)
     exit_code = 0 if entry["action"] == "merge" and not gates else 1
     return lines, exit_code

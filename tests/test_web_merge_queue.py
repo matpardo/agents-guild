@@ -59,9 +59,21 @@ class MergeQueueModelTests(MergeQueueModelTestCase):
 
     def test_queue_shape(self):
         queue = self.queues_by_scope()["raid:ci"]
-        self.assertEqual(set(queue), {"scope", "synced_at", "synced_label", "main", "queue"})
+        self.assertEqual(set(queue), {"scope", "head", "synced_at", "synced_label", "main", "queue"})
         timeutil.from_iso(queue["synced_at"])
         self.assertEqual(queue["synced_label"], "synced 0 min ago")
+
+    def test_head_names_the_first_ready_pr_and_its_party(self):
+        queues = self.queues_by_scope()
+        head = queues["raid:ci"]["head"]
+        self.assertEqual((head["ref"], head["party"]), ("acme/app#1", "alpha"))
+        self.assertEqual(head["url"], "https://github.com/acme/app/pull/1")
+        self.assertIsNone(queues["raid:empty"]["head"])
+
+    def test_draft_entry_carries_its_gate(self):
+        entries = {entry["ref"]: entry for entry in self.queues_by_scope()["raid:ci"]["queue"]}
+        self.assertEqual(entries["acme/app#3"]["gates"], ["draft (gh pr ready 3)"])
+        self.assertEqual(entries["acme/app#1"]["gates"], [])
 
     def test_queue_entry_shape_and_order(self):
         queue = self.queues_by_scope()["raid:ci"]["queue"]
@@ -72,7 +84,7 @@ class MergeQueueModelTests(MergeQueueModelTestCase):
             {
                 "position", "ref", "repo", "number", "party", "task", "lifecycle", "branch",
                 "checks_failing", "checks_passing", "checks_pending", "labels", "unblocks", "state", "next_action",
-                "action", "why", "reasons", "url",
+                "action", "why", "reasons", "blockers", "waits", "gates", "url",
             },
         )
         self.assertEqual([entry["position"] for entry in queue], [1, 2, 3])
@@ -171,6 +183,12 @@ class MergeQueuePageTests(MergeQueueTestCase):
         self.assertIn('"pill lifecycle-" + label', self.js)
         self.assertIn("entry.labels.forEach", self.js)
         self.assertIn("merge_queues", self.js)
+
+    def test_page_renders_reason_pills_ready_check_detail_and_next_to_merge(self):
+        for token in ("renderReasonPills(entry.reasons)", "entry.gates", "entry.blockers", "entry.waits",
+                      "next to merge: ", "no PR ready to merge", "queue.head", "state.queueDetailOpen"):
+            with self.subTest(token=token):
+                self.assertIn(token, self.js)
 
     def test_page_filters_queues_by_raid_and_party(self):
         self.assertIn('"raid:" + state.raidFilter', self.js)

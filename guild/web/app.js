@@ -10,6 +10,7 @@
   var NO_RESOURCES_MESSAGE = "no samples yet; run guild resources collect";
   var EMPTY_REASON_MESSAGE = "write a reason first";
   var EMPTY_ANSWER_MESSAGE = "write an answer first";
+  var DEFAULT_BRANCHES = ["main", "master"];
   var BLOCKED_EXTERNAL_TEXT = "blocked: external";
 var NO_SESSION_MESSAGE = "session token not loaded, reload the page";
   var sessionToken = null;
@@ -28,6 +29,7 @@ var NO_SESSION_MESSAGE = "session token not loaded, reload the page";
     openParties: {},
     resourcesOpen: false,
     noticesOpen: true,
+    queueDetailOpen: {},
     openResourceProjects: {},
     openContexts: {},
     drafts: {},
@@ -132,6 +134,12 @@ var NO_SESSION_MESSAGE = "session token not loaded, reload the page";
       waiting: "The PR is waiting on checks that are still running.",
       blocked: "Something must be fixed before this PR can merge.",
     },
+    reason: {
+      threads: "Review threads on this PR are still unresolved.",
+      "changes requested": "A reviewer asked for changes on this PR.",
+      "behind base": "The PR branch is behind its base branch and needs an update.",
+      "merge conflict": "The PR conflicts with its base branch and cannot merge until resolved.",
+    },
     queueAction: {
       merge: "Merge this PR by hand; guild never merges.",
       promote: "Mark this draft ready for review with gh pr ready.",
@@ -197,6 +205,10 @@ var NO_SESSION_MESSAGE = "session token not loaded, reload the page";
       noLeader: "The party has no leader session right now.",
       claims: "Areas this party has reserved so other parties do not edit them.",
       synced: "How fresh the PR data from GitHub is.",
+      baseBranch: "The PR targets this branch instead of the default one, so it is stacked on another change.",
+      nextToMerge: "The first PR in this queue that is ready to merge by hand.",
+      noMergeReady: "No PR in this queue is ready to merge right now.",
+      queueDetail: "What stands between this PR and a merge: blockers, waits and gates.",
     },
   });
 
@@ -1033,6 +1045,45 @@ var NO_SESSION_MESSAGE = "session token not loaded, reload the page";
     return head;
   }
 
+  function reasonKind(reason) {
+    if (reason.indexOf("unresolved thread") !== -1) {
+      return "threads";
+    }
+    return reason;
+  }
+
+  function renderReasonPills(reasons) {
+    return reasons.map(function (reason) {
+      var pill = textEl("span", reason);
+      pill.className = "pill reason-pill";
+      return explain(pill, "reason", reasonKind(reason));
+    });
+  }
+
+  function renderQueueDetail(entry) {
+    var lines = entry.blockers.concat(entry.waits.map(function (wait) {
+      return "wait: " + wait;
+    }), entry.gates.map(function (gate) {
+      return "gate: " + gate;
+    }));
+    if (lines.length === 0) {
+      return null;
+    }
+    var details = el("details");
+    details.className = "queue-detail";
+    details.open = state.queueDetailOpen[entry.ref] === true;
+    details.addEventListener("toggle", function () {
+      state.queueDetailOpen[entry.ref] = details.open;
+    });
+    details.appendChild(explain(textEl("summary", "ready-check (" + lines.length + ")"), "ui", "queueDetail"));
+    var list = el("ul");
+    appendAll(list, lines.map(function (line) {
+      return textEl("li", line);
+    }));
+    details.appendChild(list);
+    return details;
+  }
+
   function renderQueueSummary(entry) {
     var summary = el("p");
     summary.className = "queue-reason";
@@ -1054,12 +1105,29 @@ var NO_SESSION_MESSAGE = "session token not loaded, reload the page";
     if (entry.why) {
       item.appendChild(classedText("p", entry.why, "queue-reason"));
     }
+    appendAll(item, renderReasonPills(entry.reasons));
+    var detail = renderQueueDetail(entry);
+    if (detail) {
+      item.appendChild(detail);
+    }
     return item;
   }
 
   function renderMainRow(row) {
     var text = "MAIN RED " + row.repo + " \u2014 " + row.reason + " (" + row.source + ") \u2192 fix before anything";
     return explain(classedText("p", text, "queue-main-red"), "ui", "mainRed");
+  }
+
+  function renderNextToMerge(head) {
+    if (head === null) {
+      return explain(classedText("p", "no PR ready to merge", "muted"), "ui", "noMergeReady");
+    }
+    var line = el("p");
+    line.className = "queue-next-to-merge";
+    line.appendChild(document.createTextNode("next to merge: "));
+    line.appendChild(link(head.url, head.ref));
+    line.appendChild(document.createTextNode(" (" + head.party + ")"));
+    return explain(line, "ui", "nextToMerge");
   }
 
   function renderMergeQueue(queue) {
@@ -1071,6 +1139,7 @@ var NO_SESSION_MESSAGE = "session token not loaded, reload the page";
     head.appendChild(explain(textEl("span", queue.synced_label), "ui", "synced"));
     article.appendChild(head);
     appendAll(article, queue.main.map(renderMainRow));
+    article.appendChild(renderNextToMerge(queue.head));
     var list = el("ol");
     list.className = "queue-list";
     appendAll(list, queue.queue.map(renderQueueEntry));
@@ -1167,6 +1236,12 @@ var NO_SESSION_MESSAGE = "session token not loaded, reload the page";
       row.appendChild(renderBlockedExternalPill(pr.blocked_external));
       row.appendChild(textEl("span", pr.blocked_external));
     }
+    if (pr.base_branch && DEFAULT_BRANCHES.indexOf(pr.base_branch) === -1) {
+      var base = textEl("span", "on " + pr.base_branch);
+      base.className = "branch";
+      row.appendChild(explain(base, "ui", "baseBranch"));
+    }
+    appendAll(row, renderReasonPills(pr.review_reasons));
     row.appendChild(renderChecks(pr));
     row.appendChild(renderPrBlockControls(pr));
     if (pr.card_url) {

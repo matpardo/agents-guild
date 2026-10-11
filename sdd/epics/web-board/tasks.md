@@ -84,3 +84,10 @@ updated: 2026-10-04
 **Status:** [x] done — #119
 
 **What:** the board shows a distinct `blocked: external` pill with the reason on PR cards and merge-queue entries, and the PR card has Block (asks for a reason) and Unblock actions that call `POST /api/prs/<owner>/<repo>/<n>/block` and `.../unblock`, recording the same `pr.set` event as `guild pr set --blocked-external`.
+
+## T12 — PR review state, ready-check detail and next to merge on the web
+
+**Depends on:** T11
+**Status:** [x] done — #120
+
+**What:** PR cards show review pills (unresolved threads, changes requested, behind base, merge conflict) and `on <base>` for stacked PRs; merge-queue entries show their reasons as pills and a collapsible ready-check detail (blockers, waits, gates); each queue scope shows `next to merge: <ref> (<party>)` or `no PR ready to merge`. The gate computation is shared with `guild pr ready-check`.

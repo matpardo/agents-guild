@@ -47,5 +47,10 @@ class PrBlockUiTests(unittest.TestCase):
             with self.subTest(token=token):
                 self.assertIn(token, self.js)
 
+    def test_pr_card_renders_review_pills_and_stacked_base(self):
+        for token in ("pr.review_reasons", "pr.base_branch", "DEFAULT_BRANCHES", '"on " + pr.base_branch'):
+            with self.subTest(token=token):
+                self.assertIn(token, self.js)
+
     def test_queue_entries_render_the_blocked_external_pill(self):
         self.assertIn('label === "blocked-external"', self.js)

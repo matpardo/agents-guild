@@ -6,6 +6,7 @@ from guild.commands import raid as raid_commands
 from guild.errors import GuildError
 
 _CLOSED_LIFECYCLES = ("merged", "closed")
+_DRAFT_LIFECYCLES = ("draft", "converging")
 NEVER_MERGES_REMINDER = "guild never merges: merge in this order by hand; re-run after each merge"
 
 
@@ -454,7 +455,19 @@ def _entry_model(entry):
     }
 
 
-def _queue_entry_model(position, entry):
+def gates(entry, red_rows):
+    found = []
+    if entry["lifecycle"] in _DRAFT_LIFECYCLES:
+        found.append("draft (gh pr ready {})".format(entry["number"]))
+    if "needs-human-pr-review" in entry["labels"]:
+        found.append("needs human review")
+    found.extend(
+        "main red {}".format(main_label(row)) for row in red_rows if row["repo"] == entry["repo"]
+    )
+    return found
+
+
+def _queue_entry_model(position, entry, main_rows):
     return dict(
         _entry_model(entry),
         position=position,
@@ -464,6 +477,9 @@ def _queue_entry_model(position, entry):
         action=sanitize.strip_control_sequences(entry["action"]),
         why=sanitize.strip_control_sequences(entry["why"]),
         reasons=[sanitize.strip_control_sequences(reason) for reason in entry["reasons"]],
+        blockers=[sanitize.strip_control_sequences(blocker) for blocker in entry["blockers"]],
+        waits=[sanitize.strip_control_sequences(wait) for wait in entry["waits"]],
+        gates=[sanitize.strip_control_sequences(gate) for gate in gates(entry, main_rows)],
     )
 
 
@@ -475,14 +491,22 @@ def _main_model(row):
     }
 
 
+def _head_model(scoped):
+    entry = _first_to_merge(scoped)
+    if entry is None:
+        return None
+    return {"ref": entry["ref"], "party": entry["party"], "url": "https://github.com/{}/pull/{}".format(entry["repo"], entry["number"])}
+
+
 def _scope_model(now, scope, scoped):
     return {
+        "head": _head_model(scoped),
         "scope": scope,
         "synced_at": scoped["synced_at"],
         "synced_label": _synced_label(now, scoped["synced_at"]),
         "main": [_main_model(row) for row in scoped["main"]],
         "queue": [
-            _queue_entry_model(position, entry)
+            _queue_entry_model(position, entry, scoped["main"])
             for position, entry in enumerate(scoped["queue"], start=1)
         ],
     }

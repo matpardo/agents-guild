@@ -253,7 +253,7 @@ class BoardModelShapeTests(BoardModelTestCase):
             {
                 "repo", "number", "lifecycle", "needs_ask_answer", "needs_human_pr_review", "checks_failing",
                 "checks_passing", "checks_pending", "what", "waits", "url", "card", "card_url",
-                "branch", "fixes_main", "fixes_flaky", "blocked_external",
+                "branch", "fixes_main", "fixes_flaky", "blocked_external", "base_branch", "review_reasons",
             },
         )
         self.assertEqual(pr["repo"], "acme/app")
@@ -261,6 +261,7 @@ class BoardModelShapeTests(BoardModelTestCase):
         self.assertEqual((pr["needs_ask_answer"], pr["needs_human_pr_review"]), (False, False))
         self.assertEqual((pr["branch"], pr["fixes_main"], pr["fixes_flaky"]), ("feature/x", False, False))
         self.assertIsNone(pr["blocked_external"])
+        self.assertEqual((pr["base_branch"], pr["review_reasons"]), (None, []))
         self.assertEqual(pr["what"], "Adds X")
         self.assertEqual(pr["url"], "https://github.com/acme/app/pull/1")
 

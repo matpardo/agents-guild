@@ -1,3 +1,6 @@
+import unittest
+
+from guild.commands import merge_queue
 from tests.mq_fixtures import OPEN_VIEW, TASKS_MD, MergeQueueTestCase
 
 
@@ -62,3 +65,29 @@ class ExternalReadyCheckTests(ReadyCheckTests):
         self.assertEqual(code, 0, err)
         code, out, err = self.check(3)
         self.assertEqual((code, out.splitlines()), (1, ["acme/app#3 blocked", "- external: team meeting"]))
+
+
+class GatesTests(unittest.TestCase):
+    def entry(self, lifecycle, labels):
+        return {"lifecycle": lifecycle, "labels": labels, "number": 7, "repo": "acme/app"}
+
+    def test_ready_entry_has_no_gates(self):
+        self.assertEqual(merge_queue.gates(self.entry("ready", []), []), [])
+
+    def test_draft_and_converging_hint_the_promote_command(self):
+        for lifecycle in ("draft", "converging"):
+            self.assertEqual(merge_queue.gates(self.entry(lifecycle, []), []), ["draft (gh pr ready 7)"])
+
+    def test_human_review_label_gates(self):
+        self.assertEqual(
+            merge_queue.gates(self.entry("ready", ["needs-human-pr-review"]), []), ["needs human review"]
+        )
+
+    def test_only_red_main_of_the_same_repo_gates(self):
+        rows = [
+            {"repo": "acme/app", "reason": "boom", "source": "ci"},
+            {"repo": "acme/other", "reason": "x", "source": "ci"},
+        ]
+        self.assertEqual(
+            merge_queue.gates(self.entry("ready", []), rows), ["main red acme/app \u2014 boom (ci)"]
+        )
