@@ -77,3 +77,10 @@ updated: 2026-10-04
 **Status:** [x] done — #74
 
 **What:** on wide screens the board shows asks, notices, drift and resources on the left and the merge queue followed by the parties on the right; the notices section collapses and keeps its state across refreshes.
+
+## T11 — Block or unblock a PR externally from the web
+
+**Depends on:** T10
+**Status:** [x] done — #119
+
+**What:** the board shows a distinct `blocked: external` pill with the reason on PR cards and merge-queue entries, and the PR card has Block (asks for a reason) and Unblock actions that call `POST /api/prs/<owner>/<repo>/<n>/block` and `.../unblock`, recording the same `pr.set` event as `guild pr set --blocked-external`.
