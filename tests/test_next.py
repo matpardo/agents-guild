@@ -603,3 +603,62 @@ if __name__ == "__main__":
     import unittest
 
     unittest.main()
+
+
+class MaxOpenPrsTests(NextTestCase):
+    def setUp(self):
+        super().setUp()
+        self.run_cli(["quest", "add", "demo", "--title", "Demo", "--no-epic"], "sess-1", self.repo_dir)
+        for tid in ("T01", "T02", "T03"):
+            self.run_cli(["task", "add", "demo/{}".format(tid), "--title", tid], "sess-1", self.repo_dir)
+        self._track(1, "T01")
+        self._track(2, "T02")
+        self.run_cli(["task", "start", "demo/T01"], "sess-1", self.repo_dir)
+        self.run_cli(["task", "start", "demo/T02"], "sess-1", self.repo_dir)
+
+    def _track(self, number, tid):
+        self.write_gh_fixture(
+            "view_acme-app_{}".format(number),
+            {"state": "OPEN", "isDraft": True, "headRefName": "feature/{}".format(number), "title": "t"},
+        )
+        self.run_cli(
+            ["pr", "track", "acme/app#{}".format(number), "--task", "demo/{}".format(tid),
+             "--what", "x", "--waits", "y"],
+            "sess-1", self.repo_dir,
+        )
+
+    def _set_cap(self, cap):
+        config_file = self.config_home / "guild" / "projects" / "acme.json"
+        data = json.loads(config_file.read_text())
+        data["max_open_prs"] = cap
+        config_file.write_text(json.dumps(data))
+
+    def test_absent_cap_offers_task(self):
+        code, out, err = self.run_cli(["next"], "sess-1", self.repo_dir)
+        self.assertIn("task demo/T03", out)
+
+    def test_below_cap_offers_task(self):
+        self._set_cap(3)
+        code, out, err = self.run_cli(["next"], "sess-1", self.repo_dir)
+        self.assertIn("task demo/T03", out)
+
+    def test_cap_reached_waits_on_first_queue_pr(self):
+        self._set_cap(2)
+        code, out, err = self.run_cli(["next"], "sess-1", self.repo_dir)
+        self.assertEqual(out.strip(), "wait: 2 open PRs, merge acme/app#1 first")
+
+    def test_all_shows_wait_line_without_task(self):
+        self._set_cap(2)
+        code, out, err = self.run_cli(["next", "--all"], "sess-1", self.repo_dir)
+        self.assertIn("wait: 2 open PRs, merge acme/app#1 first", out)
+        self.assertNotIn("task demo/T03", out)
+
+    def test_merged_and_closed_prs_are_not_counted(self):
+        self._set_cap(2)
+        self.write_gh_fixture(
+            "view_acme-app_1",
+            {"state": "MERGED", "isDraft": False, "headRefName": "feature/1", "title": "t", "mergedAt": "2026-01-01T00:00:00Z"},
+        )
+        self.run_cli(["sync", "--source", "gh"], "sess-1", self.repo_dir)
+        code, out, err = self.run_cli(["next"], "sess-1", self.repo_dir)
+        self.assertIn("task demo/T03", out)

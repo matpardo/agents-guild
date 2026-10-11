@@ -63,3 +63,10 @@ updated: 2026-09-28
 **Status:** [x] done — #7
 
 **What:** the printed resume command put backticks inside double quotes, so the human's shell ran `guild party resume` before `claude` started and the prompt arrived empty. The command is now `GUILD_RESUME=<party> claude -n <party>-g<N+1> '<fixed prompt>'`; the `SessionStart` hook binds an `awaiting-leader` party and injects the handoff, so the agent runs nothing.
+
+## T09 — Next waits when too many PRs are open
+
+**Depends on:** T08
+**Status:** [x] done — #106
+
+**What:** optional project key `max_open_prs`; a party at the cap gets `wait: <n> open PRs, merge <ref> first` from `guild next` instead of a new task, so stacked PRs stop piling conflicts. Overlap with open PRs is not checked: a task's files are unknown before work starts.

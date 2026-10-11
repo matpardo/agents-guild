@@ -274,11 +274,17 @@ Deterministic, per-party ranking, evaluated in order:
    one `update tracker/SDD: <finding>` line per finding, after the PR
    attention above and before the next task. Reads the DB only; guild never
    writes to the tracker or the SDD.
-6. Next queued task of the caller's active quests, ordered by the observed
+6. Open-PR cap: when the project sets `max_open_prs` and the caller's party
+   already has that many open (not merged, not closed) tracked PRs, no new
+   task is offered; the line is `wait: <n> open PRs, merge <ref> first`,
+   naming the party's first PR in merge-queue order. Absent key → no cap.
+   Whether a new task would touch files an open PR already changes is not
+   checked: a task's files are unknown before work starts.
+7. Next queued task of the caller's active quests, ordered by the observed
    `tasks.order_idx` (nulls last, then `tid`), whose dependencies (`tasks.deps`)
    all resolve `done` (see resolver below), that has no open ask referencing
    it and is not task-claimed by another party.
-7. Raid lead work, only for a party that is the active lead of a raid: open
+8. Raid lead work, only for a party that is the active lead of a raid: open
    asks from the raid's other member parties (`raid <name>: ask #<id> from
    <party>: "<question>"`), then the raid's merge queue entries for the other
    members' PRs, one line per PR in queue order with its action
@@ -289,7 +295,7 @@ Deterministic, per-party ranking, evaluated in order:
    → fix before anything` for each red main. Without `--all` only
    the first item is printed. Read-only: guild never merges and nothing is
    acknowledged.
-8. Nothing actionable: the exact blockers (pending deps and who says so, open
+9. Nothing actionable: the exact blockers (pending deps and who says so, open
    ask ids, claim holders).
 
 Any disagreement the dependency resolver finds between sources it consulted
@@ -1701,6 +1707,10 @@ against path traversal, not an identity boundary.
   off and then stop; the next generation continues from the handoff.
   Recommended: 40, so sessions stay short and each fresh generation starts from the brief.
   Absent → 80.
+- `max_open_prs` (optional): positive integer. When the caller's party has
+  that many open tracked PRs, `guild next` (and the dispatcher's new-task
+  wake-up) offers no new task and says to merge the first PR in queue order.
+  Absent → no cap, never defaulted.
 - `handoff_retention_days` (optional): positive integer, at most 3650. A closed
   party's last handoff file is deleted by `guild handoff prune` that many days
   after the party closed. Absent → it is kept forever, never defaulted.
