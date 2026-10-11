@@ -16,8 +16,8 @@ class BoardLayoutTests(unittest.TestCase):
         self.css = (_WEB_DIR / "app.css").read_text()
         self.js = (_WEB_DIR / "app.js").read_text()
 
-    def test_left_column_holds_asks_notices_and_drift(self):
-        self.assertEqual(_column(self.html, "left"), ["asks", "answered-asks", "notices", "drift"])
+    def test_left_column_holds_asks_notices_dispatcher_and_drift(self):
+        self.assertEqual(_column(self.html, "left"), ["asks", "answered-asks", "notices", "dispatcher", "drift"])
 
     def test_header_row_holds_resources_beside_the_filters(self):
         header = re.search(r"<header>(.*?)</header>", self.html, re.DOTALL).group(1)
