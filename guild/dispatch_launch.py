@@ -89,6 +89,43 @@ class Launcher:
             return None
         return "{}would notify {}".format(self._prefix(trigger), trigger.party)
 
+    def nudge(self, project_config, trigger, mode):
+        try:
+            return self._nudge(trigger, mode)
+        except Exception as error:
+            return self._record_error(project_config, trigger, mode, error)
+
+    def preview_nudge(self, trigger, mode):
+        if self._already_decided(trigger, mode):
+            return None
+        return "{}would nudge {}".format(self._prefix(trigger), trigger.party)
+
+    def _nudge(self, trigger, mode):
+        if self._already_decided(trigger, mode):
+            return None
+        prefix = self._prefix(trigger)
+        if mode == _DRY_RUN_MODE:
+            self._record_decided(trigger, mode, "planned", None, None, None)
+            return "{}planned: nudge {}".format(prefix, trigger.party)
+        generation = self._ctx.conn.execute(
+            "SELECT generation FROM parties WHERE name = ?", (trigger.party,)
+        ).fetchone()["generation"]
+        window_id = tmux_windows.recorded_window(self._ctx.conn, trigger.party, generation)
+        if not self._window_alive(window_id) or not tmux_windows.send_text(self._tmux, window_id, trigger.prompt):
+            return self._nudge_skipped(trigger, mode, prefix)
+        self._record_decided(trigger, mode, "nudged", generation, None, None)
+        return "{}nudged {} (window {})".format(prefix, trigger.party, window_id)
+
+    def _window_alive(self, window_id):
+        return window_id is not None and self._tmux.installed() and tmux_windows.window_in_session(self._tmux, window_id)
+
+    def _nudge_skipped(self, trigger, mode, prefix):
+        reason = "no window to nudge"
+        self._record_decided(trigger, mode, "skipped", None, None, reason)
+        text = "resume {} by hand: usage limit reset".format(trigger.party)
+        self._post_notice(trigger.project, _Notice(text, "dispatch:{}:{}:skipped".format(trigger.project, trigger.key)))
+        return "{}skipped {}: {}".format(prefix, trigger.party, reason)
+
     def promote(self, project_config, trigger, mode):
         try:
             return self._promote(project_config, trigger, mode)

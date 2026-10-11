@@ -9,6 +9,8 @@ UsageMessage = namedtuple(
 )
 
 _SYNTHETIC_MODEL = "<synthetic>"
+_TAIL_BYTES = 65536
+_RATE_LIMIT_ERROR = "rate_limit"
 
 
 def _parse_timestamp(text):
@@ -100,3 +102,32 @@ def scan(path, offset, cutoff):
             merged[message_id] = chunk
     messages = [message for message in merged.values() if not _is_all_zero(message)]
     return messages, next_offset
+
+
+def _tail_records(path):
+    with path.open("rb") as handle:
+        handle.seek(0, 2)
+        size = handle.tell()
+        handle.seek(max(0, size - _TAIL_BYTES))
+        lines = handle.read().split(b"\n")
+    if size > _TAIL_BYTES:
+        lines = lines[1:]
+    return [_decode(line) for line in lines if line.strip()]
+
+
+def rate_limit_reset(path):
+    try:
+        records = _tail_records(path)
+    except OSError:
+        return None
+    turns = [r for r in records if isinstance(r, dict) and r.get("type") in ("user", "assistant")]
+    if not turns:
+        return None
+    last = turns[-1]
+    if last.get("isApiErrorMessage") is not True or last.get("error") != _RATE_LIMIT_ERROR:
+        return None
+    limits = last.get("quotaLimits")
+    resets_at = limits.get("resetsAt") if isinstance(limits, dict) else None
+    if isinstance(resets_at, bool) or not isinstance(resets_at, int):
+        return None
+    return resets_at

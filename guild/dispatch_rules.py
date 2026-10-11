@@ -1,8 +1,11 @@
-from guild import merge_queue, resume
+from guild import merge_queue, paths, resume, session_info, transcript_usage
 from guild.commands import merge_queue as merge_queue_commands
 from guild.commands import next as next_commands
+from guild.commands import revive
 
 
+_RESUME_GRACE_SECONDS = 60
+_RESUME_TEXT = "continue"
 _CHECKED_LIFECYCLES = ("draft", "converging", "ready")
 _REASON_SLUGS = (
     ("merge conflict", "conflict"),
@@ -241,5 +244,30 @@ def _merge_head_triggers(ctx, project_config):
     return triggers
 
 
-STATE_RULES = {"next_task": _next_task_triggers, "merge_head": _merge_head_triggers}
+def _limit_resume_triggers(ctx, project_config):
+    project = project_config["name"]
+    live = session_info.live_session_ids(ctx.sessions_dir)
+    parties = ctx.conn.execute(
+        "SELECT name, leader_session_id FROM parties WHERE project = ? AND state != 'closed' ORDER BY name",
+        (project,),
+    ).fetchall()
+    triggers = []
+    for party in parties:
+        if party["leader_session_id"] not in live:
+            continue
+        transcript = revive.find_transcript(paths.claude_projects_dir(), party["leader_session_id"])
+        reset = None if transcript is None else transcript_usage.rate_limit_reset(transcript)
+        if reset is None or ctx.now.timestamp() < reset + _RESUME_GRACE_SECONDS:
+            continue
+        key = "limit_resume:{}:{}".format(party["name"], reset)
+        triggers.append(Trigger(project, "limit_resume", key, party["name"], str(reset), _RESUME_TEXT))
+    return triggers
+
+
+STATE_RULES = {
+    "next_task": _next_task_triggers,
+    "merge_head": _merge_head_triggers,
+    "limit_resume": _limit_resume_triggers,
+}
 NOTIFY_ONLY_RULES = ("merge_head",)
+NUDGE_RULES = ("limit_resume",)

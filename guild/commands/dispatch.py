@@ -96,6 +96,10 @@ def _state_triggers(ctx, trigger_for, project_config, lines):
 
 
 def _state_line(launcher, project_config, rule, trigger, mode, dry_run):
+    if rule in dispatch_rules.NUDGE_RULES:
+        if dry_run:
+            return launcher.preview_nudge(trigger, mode)
+        return launcher.nudge(project_config, trigger, mode)
     if rule not in dispatch_rules.NOTIFY_ONLY_RULES:
         return _decision_line(launcher, project_config, trigger, mode, dry_run)
     if dry_run:
