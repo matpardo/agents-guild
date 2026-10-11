@@ -1289,6 +1289,7 @@ Rules, each `dry-run` (records what it would do) or `on`:
 |---|---|---|
 | `ask_answered` | `ask.answered` on an ask that is still answered | the party that asked |
 | `checks_failing` | `pr.synced` of a draft, converging or ready PR with failing checks, none pending, a known head commit, not seeded, in a repo of the project | the party that owns the PR |
+| `pr_unmergeable` | `pr.synced` of a draft, converging or ready PR with a merge conflict, changes requested, unresolved review threads or a branch behind base, a known head commit, not seeded, in a repo of the project | the party that owns the PR |
 
 Only a party that handed off (state `awaiting-leader`, see `guild handoff`)
 is launched, as its next generation, in a window named after the party in the
@@ -1296,7 +1297,9 @@ is launched, as its next generation, in a window named after the party in the
 a prompt that names the trigger by id only: `Continue the work described in
 the guild brief. Dispatched: ask #<id> was answered; read guild asks <id>.` or
 `Continue the work described in the guild brief. Dispatched: checks fail on
-<repo>#<n>; run gh pr checks <n> --repo <repo>.` Answer text and CI output
+<repo>#<n>; run gh pr checks <n> --repo <repo>.` or `Continue the work
+described in the guild brief. Dispatched: <repo>#<n> is not mergeable (<reasons>);
+run gh pr view <n> --repo <repo> and resolve review threads.` Answer text and CI output
 never reach the command line.
 
 Nothing is launched for a party that has a live session, an open window in the
@@ -1319,7 +1322,10 @@ except keeper, closed and the previous-launch block.
   `dispatcher` block, so earlier events decide nothing; removing the block
   drops the cursor. Events older than one hour are ignored and counted.
 - Each trigger is decided once (`ask_answered:<id>`,
-  `checks_failing:<repo>#<n>:<head commit>`): the decision is recorded as a
+  `checks_failing:<repo>#<n>:<head commit>`,
+  `pr_unmergeable:<repo>#<n>:<head commit>:<reasons>` with the reasons as
+  sorted slugs `behind`, `changes_requested`, `conflict`, `unresolved_threads`,
+  so a changing thread count does not trigger again): the decision is recorded as a
   local `dispatch.decided` event before the launch, so a crash never launches
   twice. A `dry-run` decision does not block the real one. `sync --source gh`
   records the head commit of each PR (`head_sha` in `pr.synced`).
@@ -1331,7 +1337,10 @@ except keeper, closed and the previous-launch block.
 - The window is created detached (`tmux new-window -d`): it never takes the
   focus of the window you are typing in. The dispatcher does not change the
   `guild` session's title options; only `guild revive` does.
-- `checks_failing` ignores PRs from forks (`isCrossRepository`, recorded as
+- `pr_unmergeable` reads the review state from the PR row, not the event, since
+  `pr.synced` carries unchanged fields forward; failing checks are left to
+  `checks_failing`.
+- `checks_failing` and `pr_unmergeable` ignore PRs from forks (`isCrossRepository`, recorded as
   `cross_repository` in `pr.synced`); when `gh` does not say, the PR counts as
   in-repo.
 - Each pass first confirms earlier launches: a party whose generation reached
@@ -1611,7 +1620,8 @@ against path traversal, not an identity boundary.
   "next": {"stale_hours": 8},
   "handoff_threshold": 40,
   "dispatcher": {"permission_mode": "acceptEdits", "max_launches_per_hour": 3,
-                 "rules": {"ask_answered": "on", "checks_failing": "dry-run"}},
+                 "rules": {"ask_answered": "on", "checks_failing": "dry-run",
+                           "pr_unmergeable": "dry-run"}},
   "lifecycle": {
     "on_pr_merged": {"command": ["scripts/cleanup-merged.sh", "--dry-run"], "timeout_minutes": 30},
     "on_pr_closed": {"command": ["scripts/cleanup-merged.sh"], "timeout_minutes": 30}
@@ -1710,7 +1720,7 @@ against path traversal, not an identity boundary.
   defaults: `permission_mode` (`manual`, `acceptEdits` or `auto`;
   `bypassPermissions`, `dontAsk`, `plan` and anything else fail to load),
   `max_launches_per_hour` (integer from 1 to 20) and `rules` (an object whose
-  keys are `ask_answered` and `checks_failing` and whose values are `dry-run`
+  keys are `ask_answered`, `checks_failing` and `pr_unmergeable` and whose values are `dry-run`
   or `on`; `off` is rejected, remove the rule to disable it). Absent → the
   project is never dispatched.
 - Unknown top-level keys are allowed.
