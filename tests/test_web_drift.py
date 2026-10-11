@@ -128,7 +128,7 @@ class WebDriftBehaviorTests(unittest.TestCase):
     def test_party_filter_renders_a_board_with_a_merge_queue(self):
         entry = {
             "ref": "o/r#1", "repo": "o/r", "number": 1, "party": "a", "task": "q/T1", "lifecycle": "ready",
-            "branch": "b", "checks_failing": 0, "checks_passing": 1, "checks_pending": 0, "labels": [], "fix_reasons": [], "fix_requested_at_head": False,
+            "branch": "b", "checks_failing": 0, "checks_passing": 1, "checks_pending": 0, "labels": [], "fix_reasons": [], "fix_request": None,
             "url": "https://example.test/1", "position": 1, "unblocks": 0, "state": "ready", "next_action": False,
             "action": "merge", "why": "ready", "reasons": [], "blockers": [], "waits": [], "gates": [],
         }
@@ -150,7 +150,7 @@ class WebQueueBlockBehaviorTests(unittest.TestCase):
         labels = [] if blocked_external in (None, _MISSING) else ["blocked-external"]
         entry = {
             "ref": "o/r#1", "repo": "o/r", "number": 1, "party": "a", "task": "q/T1", "lifecycle": "ready",
-            "branch": "b", "checks_failing": 0, "checks_passing": 1, "checks_pending": 0, "labels": labels, "fix_reasons": [], "fix_requested_at_head": False,
+            "branch": "b", "checks_failing": 0, "checks_passing": 1, "checks_pending": 0, "labels": labels, "fix_reasons": [], "fix_request": None,
             "url": "https://example.test/1", "position": 1, "unblocks": 0,
             "state": "ready", "next_action": False, "action": "merge", "why": "ready", "reasons": [], "blockers": [],
             "waits": [], "gates": [],
@@ -186,14 +186,14 @@ class WebQueueBlockBehaviorTests(unittest.TestCase):
 
 @unittest.skipIf(shutil.which("node") is None, "node not installed")
 class WebQueueAskFixBehaviorTests(unittest.TestCase):
-    def _queue_text(self, blocked_external, fix_reasons, fix_requested_at_head):
+    def _queue_text(self, blocked_external, fix_reasons, fix_request):
         entry = {
             "ref": "o/r#1", "repo": "o/r", "number": 1, "party": "a", "task": "q/T1", "lifecycle": "ready",
             "branch": "b", "checks_failing": 1, "checks_passing": 0, "checks_pending": 0, "labels": [],
             "url": "https://example.test/1", "position": 1, "unblocks": 0, "state": "blocked", "next_action": False,
             "action": "fix", "why": "", "reasons": fix_reasons, "blockers": fix_reasons, "waits": [], "gates": [],
             "blocked_external": blocked_external, "fix_reasons": fix_reasons,
-            "fix_requested_at_head": fix_requested_at_head,
+            "fix_request": fix_request,
         }
         queue = {"head": None, "scope": "party:a", "synced_at": "now", "synced_label": "synced now", "main": [], "queue": [entry]}
         with tempfile.TemporaryDirectory() as tmp:
@@ -205,17 +205,26 @@ class WebQueueAskFixBehaviorTests(unittest.TestCase):
             ).stdout
 
     def test_auto_blocked_entry_names_the_party_in_the_button(self):
-        text = self._queue_text(None, ["checks failing (1)"], False)
+        text = self._queue_text(None, ["checks failing (1)"], None)
         self.assertIn("Ask a to fix", text)
-        self.assertNotIn("fix requested", text)
+        self.assertNotIn("fixing", text)
 
     def test_entry_without_automatic_blockers_has_no_button(self):
-        self.assertNotIn("to fix", self._queue_text(None, [], False))
+        self.assertNotIn("to fix", self._queue_text(None, [], None))
 
     def test_manually_blocked_entry_has_no_button(self):
-        self.assertNotIn("to fix", self._queue_text("legal", ["checks failing (1)"], False))
+        self.assertNotIn("to fix", self._queue_text("legal", ["checks failing (1)"], None))
 
-    def test_requested_entry_shows_fix_requested_instead_of_the_button(self):
-        text = self._queue_text(None, ["checks failing (1)"], True)
-        self.assertIn("fix requested", text)
-        self.assertNotIn("to fix", text)
+    def test_open_request_shows_the_pill_instead_of_the_button(self):
+        request = {"party": "a", "at": "2026-10-11T10:00:00+00:00", "age_hours": 3, "stale": False}
+        text = self._queue_text(None, ["checks failing (1)"], request)
+        self.assertIn("fixing \u00b7 a \u00b7 3h", text)
+        self.assertIn("clears when the blockers are gone", _APP_JS_PATH.read_text())
+        self.assertNotIn("to fix\"", text)
+        self.assertNotIn("Ask a", text)
+
+    def test_stale_request_shows_the_stale_pill_and_asks_again(self):
+        request = {"party": "a", "at": "2026-10-11T10:00:00+00:00", "age_hours": 30, "stale": True}
+        text = self._queue_text(None, ["checks failing (1)"], request)
+        self.assertIn("fixing \u00b7 stale", text)
+        self.assertIn("Ask a again", text)

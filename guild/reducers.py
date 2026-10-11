@@ -1,5 +1,7 @@
 import json
 
+from guild import merge_queue
+
 
 def _party_started(conn, event):
     payload = event["payload"]
@@ -342,8 +344,20 @@ def _pr_synced(conn, event):
             payload["number"],
         ),
     )
+    _close_settled_fix_request(conn, payload["repo"], payload["number"])
     if "change_set" in payload:
         _store_change_set(conn, payload["repo"], payload["number"], payload["change_set"])
+
+
+def _close_settled_fix_request(conn, repo, number):
+    row = conn.execute(
+        "SELECT lifecycle, checks_failing, mergeable, review_decision, unresolved_threads, merge_state"
+        " FROM prs WHERE repo = ? AND number = ?",
+        (repo, number),
+    ).fetchone()
+    if row["lifecycle"] not in ("merged", "closed") and merge_queue.fix_reasons(row):
+        return
+    conn.execute("UPDATE prs SET fix_requested_at = NULL WHERE repo = ? AND number = ?", (repo, number))
 
 
 def _store_change_set(conn, repo, number, change_set):
@@ -366,8 +380,8 @@ def _store_change_set(conn, repo, number, change_set):
 def _pr_fix_requested(conn, event):
     payload = event["payload"]
     conn.execute(
-        "UPDATE prs SET fix_requested_sha = ? WHERE repo = ? AND number = ?",
-        (payload["head_sha"], payload["repo"], payload["number"]),
+        "UPDATE prs SET fix_requested_at = ? WHERE repo = ? AND number = ?",
+        (event["ts"], payload["repo"], payload["number"]),
     )
 
 

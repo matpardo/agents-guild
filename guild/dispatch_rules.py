@@ -55,12 +55,12 @@ def _checks_trigger(project, party, repo, number, head_sha):
     return Trigger(project, "checks_failing", key, party, subject, prompt)
 
 
-def _fix_trigger(project, party, repo, number, head_sha, reasons):
+def _fix_trigger(project, party, repo, number, request_id, reasons):
     subject = "{}#{}".format(repo, number)
     prompt = "{} Dispatched: the human asked you to fix {}: {}; run guild pr ready-check {}.".format(
         resume.RESUME_PROMPT, subject, ", ".join(reasons), subject
     )
-    key = "fix_requested:{}:{}".format(subject, head_sha)
+    key = "fix_requested:{}:{}".format(subject, request_id)
     return Trigger(project, "fix_requested", key, party, subject, prompt)
 
 
@@ -137,7 +137,7 @@ def _fix_requested(conn, projects, event):
     if owner is None:
         return None
     return _fix_trigger(
-        owner["project"], owner["party"], payload["repo"], payload["number"], payload["head_sha"], payload["reasons"]
+        owner["project"], owner["party"], payload["repo"], payload["number"], event["id"], payload["reasons"]
     )
 
 
@@ -206,19 +206,19 @@ def _deferred_checks(conn, row):
 
 
 def _deferred_fix(conn, row):
-    subject, head_sha = row["key"].split(":", 1)[1].rsplit(":", 1)
+    subject, request_id = row["key"].split(":", 1)[1].rsplit(":", 1)
     repo, number = subject.rsplit("#", 1)
     pr = conn.execute(
-        "SELECT lifecycle, head_sha, checks_failing, mergeable, review_decision, unresolved_threads, merge_state"
-        " FROM prs WHERE repo = ? AND number = ? AND seeded = 0",
+        "SELECT lifecycle, fix_requested_at, checks_failing, mergeable, review_decision, unresolved_threads,"
+        " merge_state FROM prs WHERE repo = ? AND number = ? AND seeded = 0",
         (repo, int(number)),
     ).fetchone()
-    if pr is None or pr["lifecycle"] not in _CHECKED_LIFECYCLES or pr["head_sha"] != head_sha:
+    if pr is None or pr["lifecycle"] not in _CHECKED_LIFECYCLES or pr["fix_requested_at"] is None:
         return None
     reasons = merge_queue.fix_reasons(pr)
     if not reasons:
         return None
-    return _fix_trigger(row["project"], row["party"], repo, int(number), head_sha, reasons)
+    return _fix_trigger(row["project"], row["party"], repo, int(number), request_id, reasons)
 
 
 def _deferred_unmergeable(conn, row):

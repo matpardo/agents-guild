@@ -39,7 +39,7 @@ def _pr(number, **overrides):
         "fixes_main": False,
         "fixes_flaky": False,
         "blocked_external": None,
-        "fix_requested_at_head": False,
+        "fix_requested_at": None,
     }
     pr.update(overrides)
     return pr

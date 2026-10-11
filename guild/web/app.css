@@ -442,6 +442,11 @@ a {
   color: var(--lifecycle-converging-fg);
 }
 
+.lifecycle-fixing {
+  background: var(--lifecycle-converging-bg);
+  color: var(--lifecycle-converging-fg);
+}
+
 .lifecycle-ready {
   background: var(--lifecycle-ready-bg);
   color: var(--lifecycle-ready-fg);

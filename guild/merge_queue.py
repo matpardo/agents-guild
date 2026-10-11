@@ -122,7 +122,7 @@ def _entry(pr):
         "checks_pending": pr["checks_pending"],
         "labels": _labels(pr),
         "fix_reasons": fix_reasons(pr),
-        "fix_requested_at_head": pr["fix_requested_at_head"],
+        "fix_requested_at": pr["fix_requested_at"],
     }
 
 

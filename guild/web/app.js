@@ -417,12 +417,8 @@ var NO_SESSION_MESSAGE = "session token not loaded, reload the page";
   }
 
   function renderAskFixButton(ref, fix, location) {
-    if (fix.requested) {
-      var requested = prButton(location, ref, "fix requested", function () {});
-      requested.disabled = true;
-      return requested;
-    }
-    return prButton(location, ref, "Ask " + fix.party + " to fix", function () {
+    var label = fix.request && fix.request.stale ? "Ask " + fix.party + " again" : "Ask " + fix.party + " to fix";
+    return prButton(location, ref, label, function () {
       postPrAction(location, ref, "ask-fix", {});
     });
   }
@@ -452,7 +448,8 @@ var NO_SESSION_MESSAGE = "session token not loaded, reload the page";
         })
       );
     }
-    if (!isManuallyBlocked(blockedExternal) && fix.reasons.length > 0) {
+    var open = fix.request && !fix.request.stale;
+    if (!isManuallyBlocked(blockedExternal) && fix.reasons.length > 0 && !open) {
       controls.appendChild(renderAskFixButton(ref, fix, location));
     }
     var status = textEl("span", state.prStatuses[key] || "");
@@ -462,7 +459,15 @@ var NO_SESSION_MESSAGE = "session token not loaded, reload the page";
   }
 
   function fixOf(model) {
-    return { party: model.party, reasons: model.fix_reasons, requested: model.fix_requested_at_head };
+    return { party: model.party, reasons: model.fix_reasons, request: model.fix_request };
+  }
+
+  function renderFixingPill(model) {
+    var request = model.fix_request;
+    var pill = textEl("span", request.stale ? "fixing \u00b7 stale" : "fixing \u00b7 " + request.party + " \u00b7 " + request.age_hours + "h");
+    pill.className = "pill lifecycle-fixing";
+    pill.title = "the human asked " + request.party + " to fix this on " + request.at + "; clears when the blockers are gone";
+    return pill;
   }
 
   function isManuallyBlocked(reason) {
@@ -1194,6 +1199,9 @@ var NO_SESSION_MESSAGE = "session token not loaded, reload the page";
       pill.className = "pill lifecycle-" + label;
       head.appendChild(explainLabel(pill, label));
     });
+    if (entry.fix_request) {
+      head.appendChild(renderFixingPill(entry));
+    }
     head.appendChild(renderChecks(entry));
     head.appendChild(textEl("span", entry.party));
     head.appendChild(textEl("span", entry.task || "-"));
@@ -1406,6 +1414,9 @@ var NO_SESSION_MESSAGE = "session token not loaded, reload the page";
       row.appendChild(explain(base, "ui", "baseBranch"));
     }
     appendAll(row, renderReasonPills(pr.review_reasons));
+    if (pr.fix_request) {
+      row.appendChild(renderFixingPill(pr));
+    }
     row.appendChild(renderChecks(pr));
     row.appendChild(renderPrBlockControls(pr.repo + "#" + pr.number, pr.blocked_external, "card", fixOf(pr)));
     if (pr.card_url) {
