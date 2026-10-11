@@ -73,12 +73,12 @@ class WebDriftScriptTests(unittest.TestCase):
 _HARNESS = Path(__file__).resolve().parent / "web_drift_harness.js"
 _BOARD = {
     "generated_at": "now", "asks": [], "notices": [], "blocked": [], "merge_queues": [],
-    "dispatcher": {"in_flight": [], "failed": []}, "raids": [{"name": "r", "members": ["c"]}],
+    "dispatcher": {"in_flight": [], "failed": [], "projects": [], "deferred": [], "recent": []}, "projects": [], "raids": [{"name": "r", "members": ["c"]}],
     "parties": [
         {
             "name": name, "raids": [], "quests": [], "prs": [], "claims": [], "state": "active", "generation": 1,
             "status": {"name": "idle", "label": "idle"}, "remaining": {"all_done": True}, "ctx": None,
-            "resume_command": None, "drift": {"findings": [], "more": 0}, "leader_session_name": None,
+            "resume_command": None, "caps": None, "drift": {"findings": [], "more": 0}, "leader_session_name": None,
         }
         for name in ("a", "c")
     ],
