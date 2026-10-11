@@ -180,7 +180,7 @@ def _stack_edges(open_prs):
         {
             "first": first,
             "second": second,
-            "before": "before {} (stacked on it)".format(second),
+            "before": "before {} (it is stacked on this)".format(second),
             "after": "after {} (stacked on it)".format(first),
         }
         for first, second in stack_pairs(open_prs)

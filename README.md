@@ -854,7 +854,8 @@ failed call is a sync failure (non-zero exit) and keeps the previous rows. A
 raid lead should keep the sync running (see "Merge notices").
 
 **Stacked PRs.** A PR whose base branch is the branch of another open PR of
-the same repo merges after it; the queue shows `stacked on it` and a pin
+the same repo merges after it; the queue shows `after X (stacked on it)` on the stacked PR and
+`before Y (it is stacked on this)` on its base, and a pin
 cannot invert the stack (it is rejected as a cycle).
 
 **Pins.** `guild merge-queue pin <repo>#<a> --before <repo>#<b>` records that
