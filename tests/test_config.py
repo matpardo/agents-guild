@@ -357,6 +357,23 @@ class HandoffRetentionConfigTests(unittest.TestCase):
                     config.validate_project_config(self._with(value))
 
 
+class MaxOpenPrsConfigTests(unittest.TestCase):
+    def _with(self, value):
+        return {"name": "acme", "paths": ["/tmp/*"], "github": {"repos": []}, "max_open_prs": value}
+
+    def test_absent_is_valid(self):
+        config.validate_project_config({"name": "acme", "paths": ["/tmp/*"], "github": {"repos": []}})
+
+    def test_positive_integer_is_accepted(self):
+        config.validate_project_config(self._with(2))
+
+    def test_invalid_values_are_rejected(self):
+        for value in (0, -1, True, "2", 1.5):
+            with self.subTest(value=value):
+                with self.assertRaises(GuildError):
+                    config.validate_project_config(self._with(value))
+
+
 class DispatcherConfigTests(unittest.TestCase):
     def _block(self):
         return {

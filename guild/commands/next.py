@@ -129,6 +129,16 @@ def _stale_hours(projects_dir, project):
     return next_config.get("stale_hours")
 
 
+def _max_open_prs(projects_dir, project):
+    return config.load_project(projects_dir, project).get("max_open_prs")
+
+
+def _wait_line(conn, party, own_open):
+    queue = merge_queue_commands.load_scoped_queue(conn, {party})["queue"]
+    first = queue[0]["ref"] if queue else _pr_label(own_open[0])
+    return "wait: {} open PRs, merge {} first".format(len(own_open), first)
+
+
 def _claim_area(item):
     if item["epic"] is not None:
         return "task:{}/{}".format(item["epic"], item["tid"])
@@ -281,7 +291,7 @@ def _drift_line(finding):
     return "update tracker/SDD: {}".format(finding)
 
 
-def _render_all(candidates, drift, next_task, disagreements, raid_lines):
+def _render_all(candidates, drift, next_task, wait, disagreements, raid_lines):
     lines = []
     for row, reason, _ in candidates:
         lines.append("PR {}: {}".format(_pr_label(row), reason))
@@ -292,6 +302,8 @@ def _render_all(candidates, drift, next_task, disagreements, raid_lines):
                 next_task["quest"], next_task["tid"], _task_title_display(next_task)
             )
         )
+    if wait is not None:
+        lines.append(wait)
     for line in disagreements:
         lines.append("disagreement: {}".format(line))
     lines.extend(raid_lines)
@@ -300,7 +312,7 @@ def _render_all(candidates, drift, next_task, disagreements, raid_lines):
     return lines
 
 
-def _render_single(ctx, candidates, drift, next_task, disagreements, blocked, raid_lines, acknowledge):
+def _render_single(ctx, candidates, drift, next_task, wait, disagreements, blocked, raid_lines, acknowledge):
     if candidates:
         row, reason, should_ack = candidates[0]
         if should_ack and acknowledge:
@@ -320,6 +332,11 @@ def _render_single(ctx, candidates, drift, next_task, disagreements, blocked, ra
                 next_task["quest"], next_task["tid"], _task_title_display(next_task)
             )
         ]
+        for line in disagreements:
+            lines.append("disagreement: {}".format(line))
+        return lines
+    if wait is not None:
+        lines = [wait]
         for line in disagreements:
             lines.append("disagreement: {}".format(line))
         return lines
@@ -359,16 +376,20 @@ def _candidates(ctx, party, project):
 def _collect(ctx, party, project):
     candidates = _candidates(ctx, party, project)
     if project is None:
-        return candidates, None, [], []
+        return candidates, None, None, [], []
     next_task, disagreements, blocked = _evaluate_next_task(ctx.conn, ctx.now, project, party)
-    return candidates, next_task, disagreements, blocked
+    cap = _max_open_prs(ctx.projects_dir, project)
+    own_open = _own_open_prs(ctx.conn, party)
+    if next_task is None or cap is None or len(own_open) < cap:
+        return candidates, next_task, None, disagreements, blocked
+    return candidates, None, _wait_line(ctx.conn, party, own_open), disagreements, blocked
 
 
 def has_work(ctx, binding):
     party = binding["party"]
     if raid_commands.paused_member_raids(ctx.conn, ctx.now, party):
         return False
-    candidates, next_task, _, _ = _collect(ctx, party, binding["project"])
+    candidates, next_task, _, _, _ = _collect(ctx, party, binding["project"])
     return bool(candidates or next_task is not None)
 
 
@@ -389,11 +410,13 @@ def run(ctx, binding, show_all, acknowledge):
     paused_rows = raid_commands.paused_member_raids(ctx.conn, ctx.now, party)
     if paused_rows:
         return _paused_lines(paused_rows)
-    candidates, next_task, disagreements, blocked = _collect(ctx, party, project)
+    candidates, next_task, wait, disagreements, blocked = _collect(ctx, party, project)
 
     raid_lines = _lead_raid_lines(ctx.conn, ctx.now, party)
     drift = _party_drift(ctx, party, project)
 
     if show_all:
-        return _render_all(candidates, drift, next_task, disagreements, raid_lines)
-    return _render_single(ctx, candidates, drift, next_task, disagreements, blocked, raid_lines, acknowledge)
+        return _render_all(candidates, drift, next_task, wait, disagreements, raid_lines)
+    return _render_single(
+        ctx, candidates, drift, next_task, wait, disagreements, blocked, raid_lines, acknowledge
+    )
