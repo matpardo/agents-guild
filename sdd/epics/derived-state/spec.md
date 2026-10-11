@@ -2,7 +2,7 @@
 epic: derived-state
 type: spec
 title: Flags that follow the events that resolve them
-status: active
+status: done
 owner: matpardo
 created: 2026-10-04
 updated: 2026-10-11
@@ -30,8 +30,8 @@ PR flags and repository health come from events, so they never go stale.
 
 ## Success criteria
 
-- [ ] Answering an ask clears the flag on its PR without a `pr set`.
-- [ ] A push while main is red is refused with the reason and the way out.
+- [x] Answering an ask clears the flag on its PR without a `pr set`.
+- [x] A push while main is red is refused with the reason and the way out.
 
 ## Security and data
 
