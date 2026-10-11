@@ -102,6 +102,6 @@ updated: 2026-10-04
 ## T14 — Web drift follows the filters and shows each party its own drift
 
 **Depends on:** T12
-**Status:** [ ] pending
+**Status:** [x] done — #123
 
 **What:** drift findings carry their owning party (`board_findings` returns `{text, party}`; `guild drift` text is unchanged), the web drift section keeps only the active party or raid filter's findings (findings with no party only without a filter), and each party card shows its own drift with the session brief's cap of 5 and an `N more` line, hidden when empty.
