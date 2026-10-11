@@ -63,6 +63,8 @@ and permission rules from "Hooks" into `~/.claude/settings.json`. Make sure
 `~/.local/bin` is on your `PATH`. Not run automatically by anything in this
 repo.
 
+First steps: run `guild --help` to see every command with a one-line description, and `guild <command> --help` for its subcommands and flags.
+
 `guild wire-settings` is idempotent and can be re-run at any time: it adds
 only what is missing, keeps every other key and entry as it is, and prints
 one line per addition (`settings: already wired` when there is nothing to
@@ -110,6 +112,8 @@ code; if `gh` fails the scan prints a single `warn` and is skipped. Off by
 default so `guild doctor` stays fast and offline.
 
 ## Commands
+
+`guild --help` lists every command with a one-line description. `guild <command> --help` shows its subcommands and flags. This section is the full reference.
 
 ```
 guild whoami
