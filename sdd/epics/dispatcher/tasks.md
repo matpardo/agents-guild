@@ -184,9 +184,9 @@ updated: 2026-10-04
 ## T17 — Rule: resume a session after its usage limit
 
 **Depends on:** T03
-**Status:** [ ] pending
+**Status:** [x] done — #116
 
 **What:** a state rule that nudges a live session in a guild tmux window to continue once its usage limit has reset.
 
 **Acceptance:**
-- [ ] A live session whose transcript ends in a usage-limit error gets `continue` once per limit hit, a minute after the reset; sessions without a recorded window, other trailing lines and dry-run send nothing.
+- [x] A live session whose transcript ends in a usage-limit error gets `continue` once per limit hit, a minute after the reset; sessions without a recorded window, other trailing lines and dry-run send nothing.
