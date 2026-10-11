@@ -18,6 +18,7 @@ _ASK_LABEL = "needs-ask-answer"
 _REVIEW_LABEL = "needs-human-pr-review"
 _FIXES_MAIN_LABEL = "fixes-main"
 _FIXES_FLAKY_LABEL = "fixes-flaky"
+_BLOCKED_EXTERNAL_LABEL = "blocked-external"
 
 
 def _is_open(pr):
@@ -75,6 +76,8 @@ def _labels(pr):
         labels.append(_ASK_LABEL)
     if pr["needs_human_pr_review"]:
         labels.append(_REVIEW_LABEL)
+    if pr["blocked_external"] is not None:
+        labels.append(_BLOCKED_EXTERNAL_LABEL)
     return labels
 
 

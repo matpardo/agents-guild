@@ -8,6 +8,7 @@ _LIFECYCLES = (
     "fixes-flaky",
     "needs-ask-answer",
     "needs-human-pr-review",
+    "blocked-external",
     "converging",
     "ready",
     "draft",

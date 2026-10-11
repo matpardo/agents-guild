@@ -36,3 +36,16 @@ class BoardLayoutTests(unittest.TestCase):
         self.assertIn("noticesOpen: true", self.js)
         self.assertIn("details.open = state.noticesOpen", self.js)
         self.assertIn("state.noticesOpen = details.open", self.js)
+
+
+class PrBlockUiTests(unittest.TestCase):
+    def setUp(self):
+        self.js = (_WEB_DIR / "app.js").read_text()
+
+    def test_pr_card_has_block_and_unblock_actions(self):
+        for token in ('"Block"', '"Unblock"', "/api/prs/", "pr.blocked_external", "BLOCKED_EXTERNAL_TEXT"):
+            with self.subTest(token=token):
+                self.assertIn(token, self.js)
+
+    def test_queue_entries_render_the_blocked_external_pill(self):
+        self.assertIn('label === "blocked-external"', self.js)
