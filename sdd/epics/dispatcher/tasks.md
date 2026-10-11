@@ -204,9 +204,9 @@ updated: 2026-10-04
 ## T19 — Web and board show dispatcher rules, deferred and recent decisions
 
 **Depends on:** T13
-**Status:** [ ] pending
+**Status:** [x] done — #121
 
 **What:** the board and web dispatcher section also list each project's rules with their mode and the launches of the last hour against the cap, deferred dispatches and the latest decisions of the non-launch rules, and show every failure including `pr_promote`.
 
 **Acceptance:**
-- [ ] A failed `pr_promote` appears as failed; deferred dispatches and at most 10 recent decisions of the last 24 hours show, dry-run ones as planned, and empty parts are hidden.
+- [x] A failed `pr_promote` appears as failed; deferred dispatches and at most 10 recent decisions of the last 24 hours show, dry-run ones as planned, and empty parts are hidden.
