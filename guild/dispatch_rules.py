@@ -176,7 +176,7 @@ RULES = {"ask_answered": _ask_answered, "checks_failing": _checks_failing, "pr_u
 def _next_task_triggers(ctx, project_config):
     project = project_config["name"]
     parties = ctx.conn.execute(
-        "SELECT name FROM parties WHERE project = ? AND state = 'awaiting-leader' AND keeper = 0 ORDER BY name",
+        "SELECT name, generation FROM parties WHERE project = ? AND state = 'awaiting-leader' AND keeper = 0 ORDER BY name",
         (project,),
     ).fetchall()
     triggers = []
@@ -186,7 +186,7 @@ def _next_task_triggers(ctx, project_config):
             continue
         subject = "{}/{}".format(item["quest"], item["tid"])
         prompt = "{} Dispatched: next task {}; run guild next.".format(resume.RESUME_PROMPT, subject)
-        triggers.append(Trigger(project, "next_task", "next_task:{}:{}".format(party["name"], subject), party["name"], subject, prompt))
+        triggers.append(Trigger(project, "next_task", "next_task:{}:g{}:{}".format(party["name"], party["generation"], subject), party["name"], subject, prompt))
     return triggers
 
 

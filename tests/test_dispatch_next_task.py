@@ -71,10 +71,20 @@ class NextTaskTests(GuildTestCase):
         expected = "acme: next_task demo/T01 -> deferred alpha: live session"
         self.assertEqual(self.run_pass(), [expected])
         self.assertEqual(self.run_pass(), ["nothing to dispatch"])
-        self.assertEqual(self.decision_rows(), [("next_task:alpha:demo/T01", "deferred")])
+        self.assertEqual(self.decision_rows(), [("next_task:alpha:g1:demo/T01", "deferred")])
         (self.sessions_dir / "{}.json".format(os.getpid())).unlink()
         self.assertEqual(self.run_pass(), [_LAUNCHED])
         self.assertEqual(self.run_pass(), ["nothing to dispatch"])
+
+    def test_a_new_handoff_on_the_same_task_wakes_the_party_again(self):
+        self.hand_off()
+        self.run_pass()
+        code, out, err = self.run_cli(["party", "resume", "alpha"], "sess-2", self.repo_dir)
+        self.assertEqual(code, 0, err)
+        code, out, err = self.run_cli(["handoff", "--in-flight", "x", "--learned", "y"], "sess-2", self.repo_dir)
+        self.assertEqual(code, 0, err)
+        self.run_pass()
+        self.assertIn(("next_task:alpha:g2:demo/T01", "deferred"), self.decision_rows())
 
     def test_party_that_did_not_hand_off_is_skipped(self):
         self.assertEqual(self.run_pass(), ["nothing to dispatch"])
