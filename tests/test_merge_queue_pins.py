@@ -1,3 +1,5 @@
+import sqlite3
+
 from tests.mq_fixtures import TASKS_MD, MergeQueueTestCase
 
 
@@ -166,6 +168,16 @@ class PinValidationTests(PinTestCase):
         code, out, err = self.pin(None, 1, 3)
         self.assertEqual(code, 1)
         self.assertIn("cycle: acme/app#1 -> acme/app#3 -> acme/app#1", err)
+
+    def test_pin_inverting_a_stack_is_a_cycle(self):
+        conn = sqlite3.connect(str(self.data_home / "guild" / "guild.db"))
+        conn.execute("UPDATE prs SET branch = 'feat/base' WHERE number = 2")
+        conn.execute("UPDATE prs SET base_branch = 'feat/base' WHERE number = 3")
+        conn.commit()
+        conn.close()
+        code, out, err = self.pin(None, 3, 2)
+        self.assertEqual(code, 1)
+        self.assertIn("cycle: acme/app#3 -> acme/app#2 -> acme/app#3", err)
 
     def test_pin_along_a_task_dependency_is_accepted(self):
         code, out, err = self.pin(None, 3, 1)

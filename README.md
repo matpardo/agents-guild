@@ -853,6 +853,10 @@ claims cost no extra call, and their overlaps are unknown to the queue. A
 failed call is a sync failure (non-zero exit) and keeps the previous rows. A
 raid lead should keep the sync running (see "Merge notices").
 
+**Stacked PRs.** A PR whose base branch is the branch of another open PR of
+the same repo merges after it; the queue shows `stacked on it` and a pin
+cannot invert the stack (it is rejected as a cycle).
+
 **Pins.** `guild merge-queue pin <repo>#<a> --before <repo>#<b>` records that
 `a` merges before `b` (event `merge_queue.pinned`, with the author party or
 `human`; projection `merge_queue_pins`, rebuild-safe); `unpin` removes it
@@ -861,7 +865,7 @@ pin: when both PRs belong to members of the same raid, only that raid's lead
 party or the human (also when one party owns both); otherwise only the party
 that owns both PRs, or the human. The human is a session-less terminal; a
 bound session acts as its party and an unbound session is refused. A pin that
-would close a cycle with existing pins or task dependencies is rejected
+would close a cycle with existing pins, stacks or task dependencies is rejected
 naming the cycle (`pin would create a cycle: a -> b -> a`), a duplicate pin
 and an `unpin` of a missing pin are errors. `unpin` still works after a PR
 merges.

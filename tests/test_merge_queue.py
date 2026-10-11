@@ -34,6 +34,7 @@ def _pr(number, **overrides):
         "needs_ask_answer": False,
         "needs_human_pr_review": False,
         "branch": None,
+        "base_branch": None,
         "fixes_main": False,
         "fixes_flaky": False,
     }
@@ -285,6 +286,30 @@ class StateTests(unittest.TestCase):
         result = _compute(prs, [_pin(1, 3, "a"), _pin(3, 1, "a")])
         self.assertEqual(_refs(result["queue"]), [_ref(2), _ref(3)])
         self.assertNotIn("pinned", _by_ref(result)[_ref(3)]["why"])
+
+
+class StackTests(unittest.TestCase):
+    def test_child_merges_after_its_base_despite_number_and_unblocks(self):
+        prs = [_pr(1, base_branch="feat/base"), _pr(2, branch="feat/base"), _pr(3, dep_keys=[("acme", "epic", "T01")])]
+        result = _compute(prs, [])
+        self.assertEqual(_refs(result["queue"]), [_ref(2), _ref(1), _ref(3)])
+        self.assertIn("stacked on", _by_ref(result)[_ref(1)]["why"])
+
+    def test_child_waits_on_a_blocked_base(self):
+        prs = [_pr(1, base_branch="feat/base"), _pr(2, branch="feat/base", needs_ask_answer=True)]
+        entry = _by_ref(_compute(prs, []))[_ref(1)]
+        self.assertEqual(entry["reasons"], ["waits on acme/app#2"])
+
+    def test_prs_of_different_repos_are_not_linked(self):
+        prs = [_pr(1, base_branch="feat/base"), _pr(2, repo="acme/other", ref="acme/other#2", branch="feat/base")]
+        self.assertEqual(merge_queue.stack_pairs(prs), [])
+
+    def test_missing_base_branch_is_ignored(self):
+        self.assertEqual(merge_queue.stack_pairs([_pr(1), _pr(2, branch="feat/base")]), [])
+
+    def test_merged_base_does_not_order_the_child(self):
+        prs = [_pr(1, base_branch="feat/base"), _pr(2, branch="feat/base", lifecycle="merged")]
+        self.assertEqual(_refs(_compute(prs, [])["queue"]), [_ref(1)])
 
 
 class BlockedPlacementTests(unittest.TestCase):
