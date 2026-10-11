@@ -70,3 +70,10 @@ updated: 2026-09-29
 **Status:** [x] done — #100
 
 **What:** a PR whose `base_branch` is the branch of another open PR of the same repo merges after it; the queue waits on a blocked base and a pin cannot invert the stack.
+
+## T10 — Ready check for one PR
+
+**Depends on:** T09
+**Status:** [x] done — #104
+
+**What:** `guild pr ready-check <owner/repo>#<n>` lists every blocker, wait and gate (draft, human review, main red) standing between a PR and its merge, and exits 0 only when the PR is ready to merge.

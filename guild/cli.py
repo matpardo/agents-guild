@@ -190,6 +190,14 @@ def _handle_pr_set(ctx, args):
     return 0
 
 
+def _handle_pr_ready_check(ctx, args):
+    from guild.commands import pr as pr_commands
+
+    lines, exit_code = pr_commands.ready_check(ctx, args.ref)
+    _print_lines(lines)
+    return exit_code
+
+
 def _handle_ask(ctx, args):
     from guild.commands import ask as ask_commands
 
@@ -708,6 +716,10 @@ def _add_pr_parser(subparsers):
     _add_flag_pair(set_parser, "fixes-main", "fixes_main")
     _add_flag_pair(set_parser, "fixes-flaky", "fixes_flaky")
     set_parser.set_defaults(handler=_handle_pr_set)
+
+    ready_check = actions.add_parser("ready-check")
+    ready_check.add_argument("ref")
+    ready_check.set_defaults(handler=_handle_pr_ready_check)
 
 
 def _add_notice_parser(subparsers):
