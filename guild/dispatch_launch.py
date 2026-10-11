@@ -23,7 +23,7 @@ _RATE_WINDOW = timedelta(hours=1)
 _NOTICE_TTL = "12h"
 _WINDOW_FAILURE = "tmux could not create the window"
 _FAILURE_WAIT = "dispatch-failed"
-_MERGE_HEAD_WAIT = "merge-head"
+_ANNOUNCE_WAITS = {"merge_head": "merge-head", "sdd_progress": "sdd-progress"}
 _PROMOTE_WAIT = "pr-promote"
 _HOUR_FORMAT = "%Y-%m-%dT%H"
 _BIND_DEADLINE = timedelta(minutes=10)
@@ -176,7 +176,7 @@ class Launcher:
         self._record_decided(trigger, mode, "notified", None, None, None)
         announces = "dispatch:{}:{}:notified".format(trigger.project, trigger.key)
         self._post_notice(trigger.project, _Notice(trigger.prompt, announces))
-        self._push(project_config, trigger.party, _MERGE_HEAD_WAIT)
+        self._push(project_config, trigger.party, _ANNOUNCE_WAITS[trigger.rule])
         return "{}notified {}".format(prefix, trigger.party)
 
     def preview(self, project_config, trigger, mode):
