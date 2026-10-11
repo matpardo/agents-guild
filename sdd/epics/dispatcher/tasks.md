@@ -210,3 +210,13 @@ updated: 2026-10-04
 
 **Acceptance:**
 - [x] A failed `pr_promote` appears as failed; deferred dispatches and at most 10 recent decisions of the last 24 hours show, dry-run ones as planned, and empty parts are hidden.
+
+## T20 — Ask the owning party to fix an automatically blocked PR
+
+**Depends on:** T13
+**Status:** [x] done — #130
+
+**What:** `guild pr ask-fix` and a web button let the human ask the owning party to fix a PR blocked by failing checks, a merge conflict, changes requested, unresolved threads or a branch behind base; the dispatcher's `fix_requested` rule launches the owner once per PR and head commit.
+
+**Acceptance:**
+- [x] The request is refused for a PR with no automatic blockers, a manually blocked PR and a PR that is not open; a second request on the same head commit is reported as already requested; a notice naming the party is posted even when the rule is off.
