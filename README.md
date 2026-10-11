@@ -1070,6 +1070,9 @@ the real, resolved URL before serving:
 guild web: http://127.0.0.1:<port>/
 ```
 
+The server serves the page files it loaded at start, so restart `guild web`
+after updating guild.
+
 **Layout**: on screens at least 1000px wide the page has two columns: the
 right one is sticky and always visible, holding the open asks and the merge
 queue; the left one holds notices, drift and the parties. On narrower

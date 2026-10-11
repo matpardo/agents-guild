@@ -25,6 +25,8 @@ _STATIC_FILES = {
     "/progress.js": ("progress.js", "application/javascript; charset=utf-8"),
 }
 
+_PAGE_FILES = ("index.html", "history.html", "progress.html")
+
 _MAX_BODY_BYTES = 16384
 _ASK_ACTION_RE = re.compile(r"^/api/asks/([^/]+)/(answer|dismiss)$")
 _NOTICE_ACTION_RE = re.compile(r"^/api/notices/([^/]+)/(seen|unseen)$")
@@ -288,8 +290,7 @@ class BoardRequestHandler(http_server.BaseHTTPRequestHandler):
         self._write(405, b"method not allowed", "text/plain; charset=utf-8", None)
 
     def _serve_file(self, name, content_type):
-        body = (_WEB_DIR / name).read_bytes()
-        self._write(200, body, content_type, None)
+        self._write(200, self.server.static_bodies[name], content_type, None)
 
     def _serve_model(self, build_model):
         ctx = _board_context()
@@ -374,6 +375,8 @@ def start(port):
     server = http_server.ThreadingHTTPServer(("127.0.0.1", port), BoardRequestHandler)
     server.daemon_threads = True
     server.session_token = secrets.token_urlsafe(32)
+    names = _PAGE_FILES + tuple(name for name, _ in _STATIC_FILES.values())
+    server.static_bodies = {name: (_WEB_DIR / name).read_bytes() for name in names}
     return server
 
 

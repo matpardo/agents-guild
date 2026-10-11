@@ -3,7 +3,10 @@ import contextlib
 import http.client
 import io
 import json
+import shutil
+import tempfile
 import threading
+from pathlib import Path
 from unittest import mock
 
 from guild import webserver
@@ -179,3 +182,27 @@ if __name__ == "__main__":
     import unittest
 
     unittest.main()
+
+
+class StaticSnapshotTests(GuildTestCase):
+    def test_static_files_are_served_from_start_time_snapshot(self):
+        web_dir = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, web_dir)
+        shutil.copytree(webserver._WEB_DIR, web_dir, dirs_exist_ok=True)
+        original = (web_dir / "app.js").read_bytes()
+        patcher = mock.patch.object(webserver, "_WEB_DIR", web_dir)
+        patcher.start()
+        self.addCleanup(patcher.stop)
+        server = webserver.start(0)
+        thread = threading.Thread(target=server.serve_forever, daemon=True)
+        thread.start()
+        self.addCleanup(thread.join, 5)
+        self.addCleanup(server.server_close)
+        self.addCleanup(server.shutdown)
+        (web_dir / "app.js").write_bytes(b"changed")
+        port = server.server_address[1]
+        conn = http.client.HTTPConnection("127.0.0.1", port, timeout=5)
+        conn.request("GET", "/app.js", headers={"Host": "127.0.0.1:{}".format(port)})
+        body = conn.getresponse().read()
+        conn.close()
+        self.assertEqual(body, original)
