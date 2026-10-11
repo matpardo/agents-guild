@@ -1343,6 +1343,7 @@ Rules, each `dry-run` (records what it would do) or `on`:
 | `ask_answered` | `ask.answered` on an ask that is still answered | the party that asked |
 | `checks_failing` | `pr.synced` of a draft, converging or ready PR with failing checks, none pending, a known head commit, not seeded, in a repo of the project | the party that owns the PR |
 | `pr_unmergeable` | `pr.synced` of a draft, converging or ready PR with a merge conflict, changes requested, unresolved review threads or a branch behind base, a known head commit, not seeded, in a repo of the project | the party that owns the PR |
+| `pr_promote` | `pr.synced` of a converging draft PR with settled green checks (none failing or pending, at least one passing), no merge conflict, changes requested, unresolved threads or stale branch, no ask pending, not blocked externally, a known head commit, not seeded, in a repo of the project | the party that owns the PR is notified |
 | `next_task` | state rule: a party that handed off and has a next unblocked task (`guild next`) | that party |
 | `merge_head` | state rule, notify only: the head of each merge queue scope (each raid, then each party outside a raid), see `guild merge-queue --head` | the party that owns the head PR |
 
@@ -1351,6 +1352,14 @@ announced before (`merge_head:<scope>:<ref>`), it posts one project notice
 `<party>: <ref> is first in the merge queue; run guild pr ready-check <ref>`
 and runs `notify.command` with the party and `merge-head`. In `dry-run` mode
 it only records a plan.
+
+`pr_promote` never launches a session either. Once per head commit
+(`pr_promote:<repo>#<n>:<head commit>`) it runs `gh pr ready <n> --repo <repo>`,
+posts the project notice `<ref> promoted to ready` and runs `notify.command` with
+the party and `pr-promote`. A PR flagged `--needs-human-pr-review` is never
+marked ready: the notice is `<ref> converged; needs human review before ready`.
+When `gh` fails the decision is recorded as `failed`, with a notice, and the
+head is not retried. In `dry-run` mode it only records a plan.
 
 
 `next_task` is a state rule: it has no cursor and no age limit. Every pass it
@@ -1809,7 +1818,7 @@ against path traversal, not an identity boundary.
   defaults: `permission_mode` (`manual`, `acceptEdits` or `auto`;
   `bypassPermissions`, `dontAsk`, `plan` and anything else fail to load),
   `max_launches_per_hour` (integer from 1 to 20) and `rules` (an object whose
-  keys are `ask_answered`, `checks_failing`, `pr_unmergeable`, `next_task` and `merge_head` and whose values are `dry-run`
+  keys are `ask_answered`, `checks_failing`, `pr_unmergeable`, `next_task`, `merge_head` and `pr_promote` and whose values are `dry-run`
   or `on`; `off` is rejected, remove the rule to disable it). Absent → the
   project is never dispatched.
 - Unknown top-level keys are allowed.

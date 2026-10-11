@@ -44,9 +44,17 @@ def _is_stale(ctx, event):
 
 
 def _decision_line(launcher, project_config, trigger, mode, dry_run):
+    if isinstance(trigger, dispatch_rules.PromoteTrigger):
+        return _promote_line(launcher, project_config, trigger, mode, dry_run)
     if dry_run:
         return launcher.preview(project_config, trigger, mode)
     return launcher.decide(project_config, trigger, mode)
+
+
+def _promote_line(launcher, project_config, trigger, mode, dry_run):
+    if dry_run:
+        return launcher.preview_promote(trigger, mode)
+    return launcher.promote(project_config, trigger, mode)
 
 
 def _trigger_or_error(ctx, projects, trigger_for, event, lines):
@@ -188,7 +196,7 @@ def _in_flight_line(ctx, row):
 
 
 def _outcome_label(row):
-    if row["outcome"] in ("skipped", "deferred"):
+    if row["outcome"] in ("skipped", "deferred", "failed"):
         return "{} {}: {}".format(row["outcome"], row["party"], row["reason"])
     verb = "launched" if row["outcome"] == "launching" else row["outcome"]
     label = "{} {} g{}".format(verb, row["party"], row["generation"])

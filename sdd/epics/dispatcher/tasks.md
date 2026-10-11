@@ -124,7 +124,7 @@ updated: 2026-10-04
 ## T11 — Rule: converged and green PR
 
 **Depends on:** T09
-**Status:** [ ] pending
+**Status:** [x] done — #115
 
 **What:** a converging draft with settled green checks, mergeable and with no ask pending is marked ready with `gh pr ready` and notified; a PR that needs human review is only notified.
 

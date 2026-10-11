@@ -47,6 +47,12 @@ def main():
         prefix = "view_files" if "files" in fields.split(",") else "view"
         _respond("{}_{}_{}".format(prefix, repo.replace("/", "-"), number))
         return
+    if args[:2] == ["pr", "ready"]:
+        repo = args[args.index("--repo") + 1]
+        with open(os.path.join(_fixtures_dir(), "ready_calls.log"), "a") as log:
+            log.write("{} {}\n".format(repo, args[2]))
+        _respond("ready_{}_{}".format(repo.replace("/", "-"), args[2]))
+        return
     if args[:2] == ["pr", "list"] and "--repo" in args:
         repo = args[args.index("--repo") + 1]
         _respond("open_{}".format(repo.replace("/", "-")))
