@@ -185,6 +185,8 @@ def _handle_pr_set(ctx, args):
             args.needs_human_pr_review,
             args.fixes_main,
             args.fixes_flaky,
+            args.blocked_external,
+            args.no_blocked_external,
         )
     )
     return 0
@@ -715,6 +717,9 @@ def _add_pr_parser(subparsers):
     _add_flag_pair(set_parser, "needs-human-pr-review", "needs_human_pr_review")
     _add_flag_pair(set_parser, "fixes-main", "fixes_main")
     _add_flag_pair(set_parser, "fixes-flaky", "fixes_flaky")
+    external = set_parser.add_mutually_exclusive_group()
+    external.add_argument("--blocked-external")
+    external.add_argument("--no-blocked-external", action="store_true")
     set_parser.set_defaults(handler=_handle_pr_set)
 
     ready_check = actions.add_parser("ready-check")

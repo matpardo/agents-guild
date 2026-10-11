@@ -253,17 +253,20 @@ def _pr_set(conn, event):
     payload = event["payload"]
     current = conn.execute(
         "SELECT lifecycle, waits, needs_ask_answer, needs_human_pr_review, last_activity_at,"
-        " fixes_main, fixes_flaky FROM prs WHERE repo = ? AND number = ?",
+        " fixes_main, fixes_flaky, blocked_external FROM prs WHERE repo = ? AND number = ?",
         (payload["repo"], payload["number"]),
     ).fetchone()
     values = _flags_and_lifecycle(payload, current)
-    changed = current["waits"] != payload["waits"] or any(
-        current[field] != values[field] for field in ("lifecycle",) + _PR_FLAG_FIELDS
+    blocked_external = payload.get("blocked_external", current["blocked_external"])
+    changed = (
+        current["waits"] != payload["waits"]
+        or current["blocked_external"] != blocked_external
+        or any(current[field] != values[field] for field in ("lifecycle",) + _PR_FLAG_FIELDS)
     )
     last_activity_at = event["ts"] if changed else current["last_activity_at"]
     conn.execute(
         "UPDATE prs SET lifecycle = ?, waits = ?, needs_ask_answer = ?, needs_human_pr_review = ?,"
-        " fixes_main = ?, fixes_flaky = ?, last_activity_at = ?"
+        " fixes_main = ?, fixes_flaky = ?, blocked_external = ?, last_activity_at = ?"
         " WHERE repo = ? AND number = ?",
         (
             values["lifecycle"],
@@ -272,6 +275,7 @@ def _pr_set(conn, event):
             values["needs_human_pr_review"],
             values["fixes_main"],
             values["fixes_flaky"],
+            blocked_external,
             last_activity_at,
             payload["repo"],
             payload["number"],

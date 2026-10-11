@@ -94,6 +94,15 @@ class UnmergeableTests(ChecksFailingBase):
         self.sync_pr("abc123", "CONFLICTING", 3, {"isCrossRepository": True}, "OPEN", True)
         self.assertEqual(self.run_pass(), ["nothing to dispatch"])
 
+    def test_external_blocked_pr_launches_nothing(self):
+        self.run_cli(["party", "resume", "alpha"], "sess-1", self.repo_dir)
+        code, out, err = self.run_cli(
+            ["pr", "set", "acme/app#1", "--blocked-external", "decision"], "sess-1", self.repo_dir
+        )
+        self.assertEqual(code, 0, err)
+        self.sync_bad("abc123", "CONFLICTING", 3)
+        self.assertEqual(self.run_pass(), ["nothing to dispatch"])
+
     def test_clean_pr_launches_nothing(self):
         self.sync_bad("abc123", "MERGEABLE", 0)
         self.assertEqual(self.run_pass(), ["nothing to dispatch"])

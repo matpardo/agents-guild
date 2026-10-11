@@ -50,3 +50,15 @@ class ReadyCheckTests(MergeQueueTestCase):
         code, out, err = self.check(9)
         self.assertEqual(code, 1)
         self.assertIn("not tracked", err)
+
+
+class ExternalReadyCheckTests(ReadyCheckTests):
+    def test_external_block_fails_the_check_and_lists_the_reason(self):
+        self.track("sess-1", 3, "qa/T03", "ready")
+        self.sync_gh("sess-1")
+        code, out, err = self.run_cli(
+            ["pr", "set", "acme/app#3", "--blocked-external", "team meeting"], "sess-1", self.repo_dir
+        )
+        self.assertEqual(code, 0, err)
+        code, out, err = self.check(3)
+        self.assertEqual((code, out.splitlines()), (1, ["acme/app#3 blocked", "- external: team meeting"]))

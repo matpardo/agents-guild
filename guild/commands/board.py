@@ -29,6 +29,7 @@ _FLAG_STYLES = (
     ("fixes_flaky", "fixes-flaky", "cyan"),
     ("needs_ask_answer", "needs-ask-answer", "red"),
     ("needs_human_pr_review", "needs-human-pr-review", "yellow"),
+    ("blocked_external", "blocked-external", "yellow"),
 )
 
 

@@ -58,7 +58,7 @@ def _owner(conn, projects, repo, number):
     owner = conn.execute(
         "SELECT prs.party AS party, parties.project AS project, prs.mergeable AS mergeable,"
         " prs.review_decision AS review_decision, prs.unresolved_threads AS unresolved_threads,"
-        " prs.merge_state AS merge_state FROM prs"
+        " prs.merge_state AS merge_state, prs.blocked_external AS blocked_external FROM prs"
         " JOIN parties ON parties.name = prs.party WHERE prs.repo = ? AND prs.number = ? AND prs.seeded = 0",
         (repo, number),
     ).fetchone()
@@ -111,6 +111,8 @@ def _pr_unmergeable(conn, projects, event):
     repo, number = payload["repo"], payload["number"]
     owner = _owner(conn, projects, repo, number)
     if owner is None:
+        return None
+    if owner["blocked_external"] is not None:
         return None
     slugs = _unmergeable_slugs(owner)
     if not slugs:

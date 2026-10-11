@@ -138,6 +138,7 @@ guild pr set   <owner/repo>#<n> [--lifecycle draft|converging|ready] [--waits ".
                                [--needs-human-pr-review | --no-needs-human-pr-review]
                                [--fixes-main | --no-fixes-main]
                                [--fixes-flaky | --no-fixes-flaky]
+                               [--blocked-external "<reason>" | --no-blocked-external]
 guild pr ready-check <owner/repo>#<n>   # read-only: everything standing between the PR and a merge
 
 guild ask "<question>" --context "..." [--ref <ref> ...] [--option "..."]   # refs: pr:<owner/repo>#<n>, task:<quest>/<tid>, card:<KEY>; with exactly one task in progress and no task:/card: ref it is added for you
@@ -281,7 +282,8 @@ Deterministic, per-party ranking, evaluated in order:
    project sets `max_open_prs` and all parties of the project together have
    that many open tracked PRs, the line is `wait: <n> open PRs in project,
    merge <ref> first`, naming the first PR of the project-wide queue. Absent
-   keys → no cap.
+   keys → no cap. PRs blocked externally (directly or through a queue
+   predecessor) are not counted by either cap.
    Whether a new task would touch files an open PR already changes is not
    checked: a task's files are unknown before work starts.
 7. Next queued task of the caller's active quests, ordered by the observed
@@ -785,6 +787,17 @@ absent option leaves the flag unchanged. `pr set` needs at least one option.
 A PR that had the old `needs-human` lifecycle becomes `draft` with
 `needs-ask-answer` set, both in the live database and when events replay in
 `guild rebuild`.
+
+**External block.** `guild pr set --blocked-external "<reason>"` marks a PR
+that waits on something outside development (a decision, a meeting); sync
+never clears it, `--no-blocked-external` does. In the merge queue the PR is
+blocked with the reason `external: <reason>`, keeps its place, and its action
+is `wait: external (<reason>)`; PRs queued after it (pins, task dependencies,
+stacks) are blocked too, with the same action. None of them is the head of the
+queue, the `next action` target or a `guild next` item, `pr ready-check`
+exits 1 for them, and the dispatcher's `pr_unmergeable` rule skips the flagged
+PR. They are excluded from `max_open_prs_per_party`, `max_open_prs` and
+`max_open_prs_per_file`.
 
 **Branch.** The full branch name of each PR is shown wherever the PR is shown: under the PR in `guild board`, at the end of its `guild merge-queue` line, and next to the PR in the web board. It comes from `pr track` and `guild sync`; a PR with no known branch shows nothing.
 

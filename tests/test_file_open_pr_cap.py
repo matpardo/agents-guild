@@ -145,6 +145,12 @@ class PrePushFileCapTests(FileOpenPrCapTestCase):
         self.assertIn("a.yml: acme/app#2 (beta), acme/app#3 (beta)", out)
         self.assertIn("merge or rebase", out)
 
+    def test_external_blocked_pr_drops_out(self):
+        self.run_cli(["pr", "set", "acme/app#2", "--blocked-external", "decision"], "sess-2", self.repo_dir)
+        self._commit_file("a.yml")
+        code, out, err = self._push()
+        self.assertNotIn("merge or rebase", out)
+
     def test_silent_below_cap(self):
         self._commit_file("z.yml")
         code, out, err = self._push()
