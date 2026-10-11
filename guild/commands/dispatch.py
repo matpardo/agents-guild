@@ -79,6 +79,28 @@ def _event_lines(ctx, launcher, projects, enabled, active, event, dry_run, ignor
     return lines
 
 
+def _state_triggers(ctx, trigger_for, project_config, lines):
+    try:
+        return trigger_for(ctx, project_config)
+    except Exception as error:
+        lines.append("{}: state rule skipped ({})".format(project_config["name"], type(error).__name__))
+        return []
+
+
+def _state_lines(ctx, launcher, enabled, dry_run):
+    lines = []
+    for project_config in enabled.values():
+        for rule, trigger_for in dispatch_rules.STATE_RULES.items():
+            mode = project_config["dispatcher"]["rules"].get(rule)
+            if mode is None:
+                continue
+            for trigger in _state_triggers(ctx, trigger_for, project_config, lines):
+                line = _decision_line(launcher, project_config, trigger, mode, dry_run)
+                if line is not None:
+                    lines.append(line)
+    return lines
+
+
 def _deferred_lines(ctx, launcher, enabled, dry_run):
     rows = ctx.conn.execute(
         "SELECT * FROM dispatch_decisions WHERE outcome = 'deferred' ORDER BY decided_at ASC, rowid ASC"
@@ -122,6 +144,7 @@ def _pass(ctx, launcher, dry_run):
     if not dry_run:
         lines.extend(launcher.reconcile(projects))
     lines.extend(_deferred_lines(ctx, launcher, enabled, dry_run))
+    lines.extend(_state_lines(ctx, launcher, enabled, dry_run))
     active = {name: known[name] for name in enabled if name in known}
     if not active:
         return lines or [_NOTHING_LINE]

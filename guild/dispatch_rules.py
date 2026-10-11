@@ -1,4 +1,5 @@
 from guild import merge_queue, resume
+from guild.commands import next as next_commands
 
 
 _CHECKED_LIFECYCLES = ("draft", "converging", "ready")
@@ -170,3 +171,23 @@ def deferred_trigger(conn, row):
 
 
 RULES = {"ask_answered": _ask_answered, "checks_failing": _checks_failing, "pr_unmergeable": _pr_unmergeable}
+
+
+def _next_task_triggers(ctx, project_config):
+    project = project_config["name"]
+    parties = ctx.conn.execute(
+        "SELECT name, generation FROM parties WHERE project = ? AND state = 'awaiting-leader' AND keeper = 0 ORDER BY name",
+        (project,),
+    ).fetchall()
+    triggers = []
+    for party in parties:
+        item = next_commands.next_task_item(ctx, {"party": party["name"], "project": project})
+        if item is None:
+            continue
+        subject = "{}/{}".format(item["quest"], item["tid"])
+        prompt = "{} Dispatched: next task {}; run guild next.".format(resume.RESUME_PROMPT, subject)
+        triggers.append(Trigger(project, "next_task", "next_task:{}:g{}:{}".format(party["name"], party["generation"], subject), party["name"], subject, prompt))
+    return triggers
+
+
+STATE_RULES = {"next_task": _next_task_triggers}
