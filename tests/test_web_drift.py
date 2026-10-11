@@ -1,0 +1,65 @@
+import re
+import unittest
+from pathlib import Path
+
+from guild import context, db, paths, timeutil
+from guild.commands import board as board_commands
+from tests.test_party_drift import PartyDriftTestCase
+
+_APP_JS = (Path(__file__).resolve().parent.parent / "guild" / "web" / "app.js").read_text()
+
+
+class WebDriftModelTests(PartyDriftTestCase):
+    def _model(self):
+        conn = db.connect(paths.db_path())
+        ctx = context.RunContext(
+            conn, None, None, timeutil.utcnow(), None,
+            paths.claude_sessions_dir(), paths.projects_config_dir(), paths.state_dir(),
+        )
+        model = board_commands.board_model(ctx)
+        conn.close()
+        return model
+
+    def _parties(self, model):
+        return {party["name"]: party for party in model["parties"]}
+
+    def test_board_findings_carry_the_owning_party(self):
+        self._record_cards([self._card("DEMO-90", "new")])
+        self._start_task()
+        findings = self._model()["drift"][0]["findings"]["task started, card not started"]
+        self.assertEqual([finding["party"] for finding in findings], ["alpha"])
+        self.assertIn("move DEMO-90 to In Progress", findings[0]["text"])
+
+    def test_finding_without_a_party_carries_none(self):
+        self._record_cards([self._card("DEMO-90", "done", status="Done")])
+        findings = self._model()["drift"][0]["findings"]["tracker and SDD disagree"]
+        self.assertEqual([finding["party"] for finding in findings], [None])
+
+    def test_party_card_lists_its_own_drift_only(self):
+        self._record_cards([self._card("DEMO-90", "new")])
+        self._start_task()
+        parties = self._parties(self._model())
+        self.assertEqual(len(parties["alpha"]["drift"]["findings"]), 1)
+        self.assertEqual(parties["alpha"]["drift"]["more"], 0)
+        self.assertEqual(parties["beta"]["drift"], {"findings": [], "more": 0})
+
+    def test_party_card_drift_is_capped_with_a_more_count(self):
+        self._record_cards([self._card("DEMO-90", "new")])
+        for number in range(1, 8):
+            self._track_pr(number, "wave9", "T01")
+        drift = self._parties(self._model())["alpha"]["drift"]
+        self.assertEqual((len(drift["findings"]), drift["more"]), (5, 2))
+
+
+class WebDriftScriptTests(unittest.TestCase):
+    def test_drift_follows_the_party_and_raid_filters(self):
+        self.assertIn("drift: filterDriftByParties(data.drift, [state.partyFilter])", _APP_JS)
+        self.assertIn("drift: filterDriftByParties(data.drift, members)", _APP_JS)
+        self.assertIn("finding.party !== null && parties.indexOf(finding.party) !== -1", _APP_JS)
+
+    def test_party_card_renders_its_drift_with_a_more_line(self):
+        self.assertIn("renderPartyDrift(party.drift)", _APP_JS)
+        self.assertIn('partyDrift.more + " more"', _APP_JS)
+
+    def test_renders_finding_text(self):
+        self.assertTrue(re.search(r'textEl\("li", finding\.text\)', _APP_JS))

@@ -960,6 +960,8 @@ and the launches of the last hour against `max_launches_per_hour`, one line per
 deferred dispatch (party, rule, subject, age, reason) and up to 10 `recent:`
 decisions of the last 24 hours, newest first (dry-run decisions show as
 `planned`). The section is omitted when none of these exist.
+`guild dispatch status` leaves out the `gN` generation on decisions that have
+none (notify-only rules such as `merge_head`, `sdd_progress`, `pr_promote`).
 `--party` and `--raid` keep only those parties' launches.
 
 `guild board` also prints one `project <name>` block per project of the parties
@@ -1072,7 +1074,9 @@ launch cap, launches in flight, failures, deferred dispatches and recent
 decisions; empty parts are hidden; the model key is `dispatcher`; the party and raid filters keep only their parties),
 drift findings for the default scope (grouped by rule, one block per
 project resolved from the parties shown, skipping parties without a
-project), a "projects" section (one card per project of the parties shown,
+project; each finding carries its owning `party` when known, and the party
+and raid filters keep only their parties' findings, hiding findings with no
+party), a "projects" section (one card per project of the parties shown,
 model key `projects`: `open PRs N/cap` and the `wait:` text of `guild next`
 when `max_open_prs` is reached, `hot files` touched by at least
 `max_open_prs_per_file` open PRs with their refs, `finding classes` with PR
@@ -1081,7 +1085,10 @@ count and threshold marking the classes at or above
 from the last successful `sync --source sdd|tracker`; the lists are hidden
 when the feature is off or empty; each party also shows `open PRs N/cap`
 and its `wait:` text when `max_open_prs_per_party` is set, model key
-`caps`), then one collapsible block per party with its quests, tasks and
+`caps`),
+then one collapsible block per party with its own drift (the same
+findings and cap of 5 as the session brief, then `N more`; hidden when
+empty), quests, tasks and
 PRs, plus PRs outside active tasks, raids (each with a `lead` badge when
 that membership is the raid's lead) and claims. A party filter, a state
 filter (`all`/`fixes-main`/`fixes-flaky`/`needs-ask-answer`/`needs-human-pr-review`/`converging`/`ready`/`draft`/`merged`) and a

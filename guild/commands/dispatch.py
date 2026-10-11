@@ -203,7 +203,9 @@ def _outcome_label(row):
     if row["outcome"] in ("skipped", "deferred", "failed"):
         return "{} {}: {}".format(row["outcome"], row["party"], row["reason"])
     verb = "launched" if row["outcome"] == "launching" else row["outcome"]
-    label = "{} {} g{}".format(verb, row["party"], row["generation"])
+    label = "{} {}".format(verb, row["party"])
+    if row["generation"] is not None:
+        label = "{} g{}".format(label, row["generation"])
     if row["state"] is None:
         return label
     return "{} [{}]".format(label, row["state"])

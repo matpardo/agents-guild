@@ -98,3 +98,10 @@ updated: 2026-10-04
 **Status:** [x] done — #122
 
 **What:** party cards show `open PRs N/cap` and the `guild next` wait text when the cap is reached; a per-project card shows the project cap, hot files (files touched by at least `max_open_prs_per_file` open PRs, with their refs), finding classes with PR count and threshold, and `sdd synced Xm ago, tracker synced Ym ago`. `guild board` prints the same and `guild finding list` lists the finding classes. Queue reason pills carry tooltips.
+
+## T14 — Web drift follows the filters and shows each party its own drift
+
+**Depends on:** T12
+**Status:** [ ] pending
+
+**What:** drift findings carry their owning party (`board_findings` returns `{text, party}`; `guild drift` text is unchanged), the web drift section keeps only the active party or raid filter's findings (findings with no party only without a filter), and each party card shows its own drift with the session brief's cap of 5 and an `N more` line, hidden when empty.

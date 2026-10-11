@@ -278,6 +278,14 @@ class StatusTests(DispatchRunBase):
         recent = [line for line in lines if " -> skipped " in line]
         self.assertEqual(len(recent), 10)
 
+    def test_status_omits_the_generation_when_the_decision_has_none(self):
+        self.run_pass(False)
+        now = self.ctx().now
+        self._decide("pr_promote:7", "on", "planned", "alpha", None, "acme/app#7", None, now - timedelta(minutes=1))
+        lines = dispatch_commands.status(self.ctx())
+        self.assertTrue(any(line.endswith("pr_promote acme/app#7 -> planned alpha") for line in lines), lines)
+        self.assertFalse(any("None" in line for line in lines), lines)
+
     def test_status_through_cli(self):
         code, out, err = self.run_cli(["dispatch", "status"], None, self.repo_dir)
         self.assertEqual(code, 0)

@@ -1,3 +1,5 @@
+import re
+
 from guild import session_info
 
 _DEFAULT_PARTY_SCOPE = ("state", ("active", "awaiting-leader"))
@@ -431,10 +433,43 @@ def merged_pr_moves(conn, pr):
     return moves
 
 
+_PARTY_OWNED_RULES = frozenset((
+    "merged PR, task not done",
+    "PR open, card not started",
+    "PR merged, card not done",
+    "task started, card not started",
+    "PR closed unmerged",
+    "quest task not in SDD",
+    "task done, SDD not done",
+))
+_PR_REF = re.compile(r"pr:(\S+)#(\d+)")
+_TASK_REF = re.compile(r"task:([^/\s]+)/")
+
+
+def _finding_party(conn, rule, text):
+    if rule not in _PARTY_OWNED_RULES:
+        return None
+    pr_ref = _PR_REF.search(text)
+    if pr_ref is not None:
+        row = conn.execute(
+            "SELECT party FROM prs WHERE repo = ? AND number = ?", (pr_ref.group(1), int(pr_ref.group(2)))
+        ).fetchone()
+        return None if row is None else row["party"]
+    task_ref = _TASK_REF.search(text)
+    if task_ref is None:
+        return None
+    row = conn.execute("SELECT party FROM quests WHERE slug = ?", (task_ref.group(1),)).fetchone()
+    return None if row is None else row["party"]
+
+
 def board_findings(ctx, project):
     epics, party_scope, scope_line = _resolve_scope(ctx.conn, project, None, False)
     groups = _collect(ctx.conn, project, epics, party_scope, ctx.sessions_dir)
-    findings = {name: rule_findings for name, rule_findings in groups if rule_findings}
+    findings = {
+        name: [{"text": text, "party": _finding_party(ctx.conn, name, text)} for text in rule_findings]
+        for name, rule_findings in groups
+        if rule_findings
+    }
     return {"project": project, "scope": scope_line, "findings": findings}
 
 
