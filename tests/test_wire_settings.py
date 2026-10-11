@@ -107,7 +107,8 @@ class WireSettingsTests(GuildTestCase):
     def test_doctor_is_healthy_after_wiring(self):
         self._wire()
         (self.home / ".claude" / "GUILD.md").write_text("rules")
-        code, out, err = self.run_cli(["doctor"], None, None)
+        with mock.patch("guild.commands.doctor.shutil.which", return_value=None):
+            code, out, err = self.run_cli(["doctor"], None, None)
         self.assertEqual(code, 0, out + err)
         self.assertNotIn("missing", out)
         self.assertNotIn("warn", out)

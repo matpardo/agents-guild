@@ -1,7 +1,8 @@
 import re
+import shutil
 from pathlib import Path
 
-from guild import claude_settings, config, localbase
+from guild import claude_settings, config, localbase, tmux_windows
 from guild.adapters import github
 from guild.errors import GuildError
 
@@ -52,6 +53,18 @@ def _rules_line():
     if present:
         return True, "ok      ~/.claude/GUILD.md"
     return False, "missing ~/.claude/GUILD.md (run install.sh)"
+
+
+def _clipboard_lines():
+    if shutil.which("tmux") is None or tmux_windows.clipboard_command() is not None:
+        return []
+    return [
+        (
+            True,
+            "warn    tmux copy reaches the clipboard only through the terminal (OSC 52): "
+            "install xclip (X11) or wl-clipboard (Wayland)",
+        )
+    ]
 
 
 def _project_lines(projects_dir):
@@ -112,6 +125,7 @@ def run(ctx, scan_prs):
     checks.extend(_ask_rule_lines(settings))
     checks.extend(_allow_rule_lines(settings))
     checks.append(_rules_line())
+    checks.extend(_clipboard_lines())
     checks.extend(_project_lines(ctx.projects_dir))
     if scan_prs:
         checks.extend(_scan_lines(ctx))

@@ -1,3 +1,4 @@
+import os
 import shutil
 import subprocess
 
@@ -9,6 +10,10 @@ OPEN_LINK_ON_CTRL_CLICK = [
     "run-shell -b 'xdg-open -- #{q:mouse_hyperlink}'",
     "send-keys -M",
 ]
+X11_CLIPBOARD_COMMANDS = (
+    ("xclip", "xclip -selection clipboard -in"),
+    ("xsel", "xsel --clipboard --input"),
+)
 
 
 class Tmux:
@@ -23,6 +28,17 @@ class Tmux:
 def _ok(tmux, args):
     returncode, _ = tmux.run(args)
     return returncode == 0
+
+
+def clipboard_command():
+    if os.environ.get("WAYLAND_DISPLAY") and shutil.which("wl-copy"):
+        return "wl-copy"
+    if not os.environ.get("DISPLAY"):
+        return None
+    for tool, command in X11_CLIPBOARD_COMMANDS:
+        if shutil.which(tool):
+            return command
+    return None
 
 
 def session_exists(tmux):
@@ -58,6 +74,9 @@ def set_session_options(tmux):
     _ok(tmux, ["set-option", "-t", SESSION, "set-titles-string", "#W"])
     _ok(tmux, ["set-option", "-t", SESSION, "mouse", "on"])
     _ok(tmux, ["set-option", "-s", "set-clipboard", "on"])
+    copy_command = clipboard_command()
+    if copy_command:
+        _ok(tmux, ["set-option", "-s", "copy-command", copy_command])
     _ok(tmux, ["set-option", "-s", HYPERLINK_FEATURE_SLOT, "*:hyperlinks"])
     _ok(tmux, OPEN_LINK_ON_CTRL_CLICK)
 
