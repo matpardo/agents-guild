@@ -105,3 +105,10 @@ updated: 2026-10-04
 **Status:** [x] done — #123
 
 **What:** drift findings carry their owning party (`board_findings` returns `{text, party}`; `guild drift` text is unchanged), the web drift section keeps only the active party or raid filter's findings (findings with no party only without a filter), and each party card shows its own drift with the session brief's cap of 5 and an `N more` line, hidden when empty.
+
+## T15 — Block or unblock a PR from the web merge queue
+
+**Depends on:** T11
+**Status:** [x] done — #126
+
+**What:** each merge-queue entry has the same Block (asks for a reason) and Unblock controls as the PR card, from one shared renderer, and shows the `blocked: external` reason; queue entries carry their own `blocked_external`.
