@@ -84,3 +84,10 @@ of <total> refs still open (may be stale)` when nothing is blocked anymore.
 **Status:** [x] done — #99
 
 **What:** `guild sync-sdd-timer` and `guild sync-tracker-timer` (`install --every <dur> | uninstall | print`) manage their own systemd units running `sync --source sdd|tracker --all-projects`, which syncs every project with an `sdd`/`tracker` block and skips the others without a failure; a missing `acli` is a reported sync failure.
+
+## T11 — Own-party drift reaches the party during work
+
+**Depends on:** T09
+**Status:** [x] done — #101
+
+**What:** a party sees its own tracker and SDD drift without running `guild drift`: a capped `drift:` section in the session brief, an `update tracker/SDD: <finding>` item in `guild next` (after own PR attention, before the next task), a `move <KEY> to In Progress` line on `task start`, and an owner follow-up line (`move <KEY> to Done; mark <tid> done in <epic> tasks.md`) in merge notices.
