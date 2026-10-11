@@ -119,3 +119,10 @@ updated: 2026-10-04
 **Status:** [x] done — #127
 
 **What:** the web treats only a non-empty `blocked_external` as a manual block (a missing field no longer shows Unblock); the pill reads `blocked: manual`, the buttons Block manually and Unblock, queue dependents read `waits on manually blocked <ref>: <reason>` and the blocked PR `manual block: <reason>`; the reason box state is keyed by location and ref.
+
+## T17 — The web serves the static files it loaded at start
+
+**Depends on:** T1
+**Status:** [x] done — #128
+
+**What:** `guild web` reads its pages, scripts and styles once when the server is created and serves those bytes, so a running server never pairs new files with its older in-memory model; a restart picks up an update. T16 is added by the open PR #127.
