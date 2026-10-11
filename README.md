@@ -1291,6 +1291,17 @@ Rules, each `dry-run` (records what it would do) or `on`:
 | `checks_failing` | `pr.synced` of a draft, converging or ready PR with failing checks, none pending, a known head commit, not seeded, in a repo of the project | the party that owns the PR |
 | `pr_unmergeable` | `pr.synced` of a draft, converging or ready PR with a merge conflict, changes requested, unresolved review threads or a branch behind base, a known head commit, not seeded, in a repo of the project | the party that owns the PR |
 
+| `next_task` | state rule: a party that handed off and has a next unblocked task (`guild next`) | that party |
+
+`next_task` is a state rule: it has no cursor and no age limit. Every pass it
+looks at the parties of the project that handed off (keepers excluded) and
+launches the ones whose next task is unblocked, once per task
+(`next_task:<party>:<quest>/<tid>`). Paused raids and tasks claimed by another
+party yield nothing. It is opt-in like the others; enable it as `dry-run`
+first and read `guild dispatch run --dry-run` before switching it to `on`.
+Prompt: `Continue the work described in the guild brief. Dispatched: next task
+<quest>/<tid>; run guild next.`
+
 Only a party that handed off (state `awaiting-leader`, see `guild handoff`)
 is launched, as its next generation, in a window named after the party in the
 `guild` tmux session, with `GUILD_RESUME=<party> claude -n <party>-g<N+1>` and
