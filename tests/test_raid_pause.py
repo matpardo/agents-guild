@@ -55,10 +55,15 @@ class PauseResumeCommandTests(RaidPauseTestCase):
         self.assertEqual(code, 1)
         self.assertIn("not a member of raid 'ci'", err)
 
-    def test_pause_requires_binding(self):
-        code, out, err = self.run_cli(["raid", "pause", "ci"], None, None)
+    def test_pause_requires_binding_for_a_session(self):
+        code, out, err = self.run_cli(["raid", "pause", "ci"], "sess-9", self.repo_dir)
         self.assertEqual(code, 1)
         self.assertIn("session not bound", err)
+
+    def test_human_pauses_without_a_session(self):
+        code, out, err = self.run_cli(["raid", "pause", "ci"], None, None)
+        self.assertEqual(code, 0, err)
+        self.assertEqual(self._pause_row("ci")["paused_by"], "human")
 
     def test_pause_twice_fails(self):
         self.run_cli(["raid", "pause", "ci"], "sess-1", self.repo_dir)

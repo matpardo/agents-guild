@@ -9,6 +9,9 @@
   var RESOURCE_ITEMS_PER_CATEGORY = 10;
   var NO_RESOURCES_MESSAGE = "no samples yet; run guild resources collect";
   var EMPTY_REASON_MESSAGE = "write a reason first";
+  var NOTICE_FORM_FOCUS_KEY = "notice-form";
+  var NOTICE_TTLS = ["1h", "8h", "1d", "3d"];
+  var RAID_PAUSE_CONFIRM_TEXT = "Pausing stops dispatches and tells members to hand off.";
   var EMPTY_ANSWER_MESSAGE = "write an answer first";
   var DEFAULT_BRANCHES = ["main", "master"];
   var BLOCKED_EXTERNAL_TEXT = "blocked: manual";
@@ -43,6 +46,12 @@ var NO_SESSION_MESSAGE = "session token not loaded, reload the page";
     noticeStatuses: {},
     noticeBusy: {},
     noticeAllStatus: "",
+    noticeForm: { text: "", to: "", ttl: "1d" },
+    noticeFormStatus: "",
+    noticeFormBusy: false,
+    raidPauseOpen: {},
+    raidStatuses: {},
+    raidBusy: {},
     focusedAskId: null,
     focusStart: 0,
     focusEnd: 0,
@@ -355,6 +364,46 @@ var NO_SESSION_MESSAGE = "session token not loaded, reload the page";
     sendPost("/api/notices/seen-all", {}).then(function (result) {
       delete state.noticeBusy.all;
       state.noticeAllStatus = result.ok ? "" : errorMessage(result.body);
+      fetchBoard();
+    });
+  }
+
+  function postNoticeCreate() {
+    if (sessionToken === null) {
+      state.noticeFormStatus = NO_SESSION_MESSAGE;
+      fetchBoard();
+      return;
+    }
+    state.noticeFormBusy = true;
+    state.noticeFormStatus = "sending...";
+    fetchBoard();
+    sendPost("/api/notices/create", state.noticeForm).then(function (result) {
+      state.noticeFormBusy = false;
+      state.noticeFormStatus = result.ok ? "" : errorMessage(result.body);
+      if (result.ok) {
+        state.noticeForm = { text: "", to: state.noticeForm.to, ttl: state.noticeForm.ttl };
+      }
+      fetchBoard();
+    });
+  }
+
+  function postRaidAction(raidName, action) {
+    if (sessionToken === null) {
+      state.raidStatuses[raidName] = NO_SESSION_MESSAGE;
+      fetchBoard();
+      return;
+    }
+    state.raidBusy[raidName] = true;
+    state.raidStatuses[raidName] = "sending...";
+    fetchBoard();
+    sendPost("/api/raids/" + raidName + "/" + action, {}).then(function (result) {
+      delete state.raidBusy[raidName];
+      if (result.ok) {
+        delete state.raidPauseOpen[raidName];
+        delete state.raidStatuses[raidName];
+      } else {
+        state.raidStatuses[raidName] = errorMessage(result.body);
+      }
       fetchBoard();
     });
   }
@@ -984,7 +1033,124 @@ var NO_SESSION_MESSAGE = "session token not loaded, reload the page";
     return controls;
   }
 
-  function renderNotices(notices) {
+  function noticeTargets(projects, raids) {
+    return projects
+      .map(function (project) {
+        return "project:" + project.name;
+      })
+      .concat(
+        raids.map(function (raid) {
+          return "raid:" + raid.name;
+        })
+      );
+  }
+
+  function noticeSelect(values, current, onChange) {
+    var select = el("select");
+    values.forEach(function (value) {
+      select.appendChild(option(value));
+    });
+    select.value = current;
+    select.disabled = state.noticeFormBusy;
+    select.addEventListener("change", function () {
+      onChange(select.value);
+    });
+    return select;
+  }
+
+  function renderNoticeForm(projects, raids) {
+    var targets = noticeTargets(projects, raids);
+    if (targets.indexOf(state.noticeForm.to) === -1) {
+      state.noticeForm.to = targets.length > 0 ? targets[0] : "";
+    }
+    var form = el("div");
+    form.className = "notice-actions notice-form";
+    var input = el("input");
+    input.type = "text";
+    input.className = "block-reason notice-text";
+    input.placeholder = "new notice";
+    input.value = state.noticeForm.text;
+    input.disabled = state.noticeFormBusy;
+    input.dataset.focusKey = NOTICE_FORM_FOCUS_KEY;
+    input.addEventListener("input", function () {
+      state.noticeForm.text = input.value;
+    });
+    form.appendChild(input);
+    form.appendChild(
+      noticeSelect(targets, state.noticeForm.to, function (value) {
+        state.noticeForm.to = value;
+      })
+    );
+    form.appendChild(
+      noticeSelect(NOTICE_TTLS, state.noticeForm.ttl, function (value) {
+        state.noticeForm.ttl = value;
+      })
+    );
+    var button = textEl("button", "Create notice");
+    button.type = "button";
+    button.disabled = state.noticeFormBusy;
+    button.addEventListener("click", postNoticeCreate);
+    form.appendChild(button);
+    var status = textEl("span", state.noticeFormStatus);
+    status.className = "ask-status";
+    form.appendChild(status);
+    return form;
+  }
+
+  function renderRaidControls(raid) {
+    var controls = el("span");
+    controls.className = "pr-block-controls";
+    var busy = state.raidBusy[raid.name] === true;
+    var addButton = function (label, handler) {
+      var button = textEl("button", label);
+      button.type = "button";
+      button.disabled = busy;
+      button.addEventListener("click", handler);
+      controls.appendChild(button);
+    };
+    if (raid.paused) {
+      addButton("Resume raid", function () {
+        postRaidAction(raid.name, "resume");
+      });
+    } else if (state.raidPauseOpen[raid.name]) {
+      controls.appendChild(textEl("span", RAID_PAUSE_CONFIRM_TEXT));
+      addButton("Confirm pause", function () {
+        postRaidAction(raid.name, "pause");
+      });
+    } else {
+      addButton("Pause raid", function () {
+        state.raidPauseOpen[raid.name] = true;
+        fetchBoard();
+      });
+    }
+    var status = textEl("span", state.raidStatuses[raid.name] || "");
+    status.className = "ask-status";
+    controls.appendChild(status);
+    return controls;
+  }
+
+  function renderRaid(raid) {
+    var article = el("article");
+    article.className = "card raid-card";
+    article.appendChild(textEl("h3", raid.name));
+    if (raid.paused) {
+      article.appendChild(classedText("span", "paused", "pill lifecycle-blocked-external"));
+    }
+    article.appendChild(renderRaidControls(raid));
+    return article;
+  }
+
+  function renderRaids(raids) {
+    var section = document.getElementById("raids");
+    clear(section);
+    if (raids.length === 0) {
+      return;
+    }
+    section.appendChild(textEl("h2", "raids"));
+    appendAll(section, raids.map(renderRaid));
+  }
+
+  function renderNotices(notices, projects, raids) {
     var section = document.getElementById("notices");
     clear(section);
     var newCount = notices.filter(function (notice) {
@@ -999,6 +1165,7 @@ var NO_SESSION_MESSAGE = "session token not loaded, reload the page";
     var summary = el("summary");
     summary.appendChild(textEl("h2", "notices (" + notices.length + ") · " + newCount + " new"));
     details.appendChild(summary);
+    details.appendChild(renderNoticeForm(projects, raids));
     details.appendChild(renderSeenAllControls(newCount));
     appendAll(details, notices.map(renderNotice));
     section.appendChild(details);
@@ -1982,7 +2149,8 @@ var NO_SESSION_MESSAGE = "session token not loaded, reload the page";
     refreshRaidFilterOptions(data.raids);
     var filtered = applyRaidFilter(applyPartyFilter(data));
     renderAsks(filtered.asks, filtered.blocked, filtered.parties);
-    renderNotices(filtered.notices);
+    renderNotices(filtered.notices, filtered.projects, filtered.raids);
+    renderRaids(filtered.raids);
     renderDispatcher(filtered.dispatcher);
     renderMergeQueues(filtered.merge_queues);
     renderDrift(filtered.drift);

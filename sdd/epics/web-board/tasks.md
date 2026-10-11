@@ -133,3 +133,10 @@ updated: 2026-10-04
 **Status:** [x] done — #129
 
 **What:** the in-progress page shows no stale marker when the project has no `next.stale_hours` (no 48h default, consistent with `guild next`); the config loader rejects a `next.stale_hours` that is not a positive integer and a `tracker` block whose `kind` is missing or not a supported value.
+
+## T19 — Create notices and pause raids from the web
+
+**Depends on:** T10
+**Status:** [x] done — #133
+
+**What:** a form in the notices section creates a notice (text, project or raid target, ttl) through `POST /api/notices/create`, and each raid has a pause/resume button (inline confirm on pause) through `POST /api/raids/<name>/pause` and `/resume`; the human may pause without a session. `--until` stays CLI-only.
