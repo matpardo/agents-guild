@@ -42,6 +42,22 @@ SYNC_GH = _UnitSpec(
     "sync-timer",
     "",
 )
+SYNC_SDD = _UnitSpec(
+    "guild-sync-sdd.service",
+    "guild-sync-sdd.timer",
+    "guild sync --source sdd",
+    "sync --source sdd --all-projects",
+    "sync-sdd-timer",
+    "",
+)
+SYNC_TRACKER = _UnitSpec(
+    "guild-sync-tracker.service",
+    "guild-sync-tracker.timer",
+    "guild sync --source tracker",
+    "sync --source tracker --all-projects",
+    "sync-tracker-timer",
+    "",
+)
 RESOURCES_COLLECT = _UnitSpec(
     "guild-resources-collect.service",
     "guild-resources-collect.timer",
@@ -58,7 +74,7 @@ DISPATCH = _UnitSpec(
     "dispatch-timer",
     "NoNewPrivileges=yes\nNice=10\n",
 )
-UNITS = {"sync-gh": SYNC_GH, "resources-collect": RESOURCES_COLLECT, "dispatch": DISPATCH}
+UNITS = {"sync-gh": SYNC_GH, "sync-sdd": SYNC_SDD, "sync-tracker": SYNC_TRACKER, "resources-collect": RESOURCES_COLLECT, "dispatch": DISPATCH}
 
 
 def run_systemctl(argv):

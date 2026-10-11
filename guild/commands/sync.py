@@ -601,8 +601,7 @@ def _sync_epic_file(ctx, project, epic, text, sdd_path, patterns, epic_key_field
         )
 
 
-def _sync_sdd(ctx):
-    project = config.require_project(ctx.cwd, ctx.projects_dir)
+def _sync_sdd(ctx, project):
     project_data = config.load_project(ctx.projects_dir, project)
     sdd_config = project_data.get("sdd")
     if sdd_config is None:
@@ -696,8 +695,7 @@ def _missing_keys(keys, seen):
 _SNAPSHOT_KEPT = "tracker snapshot not updated: previous cards kept"
 
 
-def _sync_tracker(ctx):
-    project = config.require_project(ctx.cwd, ctx.projects_dir)
+def _sync_tracker(ctx, project):
     project_data = config.load_project(ctx.projects_dir, project)
     _require_tracker_config(project_data, project)
 
@@ -732,11 +730,32 @@ def _sync_tracker(ctx):
     return failures
 
 
-def run(ctx, source, lifecycle_runner):
+_PROJECT_SOURCES = {"sdd": ("sdd", _sync_sdd), "tracker": ("tracker", _sync_tracker)}
+
+
+def _sync_all_projects(ctx, source):
+    config_key, sync_project = _PROJECT_SOURCES[source]
+    failures = []
+    for project in config.load_all_projects(ctx.projects_dir):
+        if config_key not in project:
+            continue
+        try:
+            failures.extend(
+                "{}: {}".format(project["name"], failure) for failure in sync_project(ctx, project["name"])
+            )
+        except GuildError as error:
+            failures.append("{}: {}".format(project["name"], error.message))
+    return failures
+
+
+def run(ctx, source, all_projects, lifecycle_runner):
     if source == "gh":
+        if all_projects:
+            raise GuildError("--all-projects applies to sdd and tracker sources only", 1)
         return _sync_gh(ctx, lifecycle_runner)
-    if source == "sdd":
-        return _sync_sdd(ctx)
-    if source == "tracker":
-        return _sync_tracker(ctx)
-    raise GuildError("sync source '{}' is not implemented".format(source), 1)
+    if source not in _PROJECT_SOURCES:
+        raise GuildError("sync source '{}' is not implemented".format(source), 1)
+    if all_projects:
+        return _sync_all_projects(ctx, source)
+    _, sync_project = _PROJECT_SOURCES[source]
+    return sync_project(ctx, config.require_project(ctx.cwd, ctx.projects_dir))
