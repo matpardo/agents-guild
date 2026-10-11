@@ -201,6 +201,9 @@ var NO_SESSION_MESSAGE = "session token not loaded, reload the page";
       remaining: "Tasks not done in the party's active quests plus open PRs outside them; the tooltip lists done/total per quest.",
       allDone: "Every task of the party's active quests is done and no open PR is left outside them.",
       resumeCommand: "Run this to start the next generation of this party; it waits for a new leader.",
+      dispatcherRules: "Dispatcher rules this project enabled with their mode, and launches in the last hour against the hourly cap.",
+      dispatcherDeferred: "A dispatch waiting on a live session, an open window or a paused raid; retried until it expires after 24 hours.",
+      dispatcherPlanned: "The rule is in dry-run: it recorded what it would do and did nothing.",
       leader: "The leader session of the party.",
       noLeader: "The party has no leader session right now.",
       claims: "Areas this party has reserved so other parties do not edit them.",
@@ -968,19 +971,46 @@ var NO_SESSION_MESSAGE = "session token not loaded, reload the page";
     return classedText("p", text, label === "failed" ? "queue-main-red" : "muted");
   }
 
+  function renderDispatchProject(project) {
+    var rules = Object.keys(project.rules).map(function (rule) {
+      return rule + " " + project.rules[rule];
+    }).join(", ");
+    return explain(
+      classedText("p", project.name + ": " + rules + " | launches last hour " + project.launches_last_hour + "/" + project.max_launches_per_hour, "muted"),
+      "ui",
+      "dispatcherRules"
+    );
+  }
+
+  function renderDeferred(launch) {
+    var text = "deferred " + launch.party + " " + launch.rule + " " + launch.subject + " " + launch.age + " ago: " + launch.reason;
+    return explain(classedText("p", text, "muted"), "ui", "dispatcherDeferred");
+  }
+
+  function renderRecent(decision) {
+    var text = "recent " + decision.outcome + " " + decision.rule + " " + decision.subject + " " + decision.party + " " + decision.age + " ago";
+    var node = classedText("p", text, "muted");
+    return decision.outcome === "planned" ? explain(node, "ui", "dispatcherPlanned") : node;
+  }
+
   function renderDispatcher(dispatcher) {
     var section = document.getElementById("dispatcher");
     clear(section);
-    if (dispatcher.in_flight.length + dispatcher.failed.length === 0) {
+    var count = dispatcher.projects.length + dispatcher.in_flight.length + dispatcher.failed.length
+      + dispatcher.deferred.length + dispatcher.recent.length;
+    if (count === 0) {
       return;
     }
     section.appendChild(textEl("h2", "dispatcher"));
+    appendAll(section, dispatcher.projects.map(renderDispatchProject));
     appendAll(section, dispatcher.in_flight.map(function (launch) {
       return renderLaunch(launch, "in flight");
     }));
     appendAll(section, dispatcher.failed.map(function (launch) {
       return renderLaunch(launch, "failed");
     }));
+    appendAll(section, dispatcher.deferred.map(renderDeferred));
+    appendAll(section, dispatcher.recent.map(renderRecent));
   }
 
   function renderDriftEntry(entry) {
@@ -1482,7 +1512,13 @@ var NO_SESSION_MESSAGE = "session token not loaded, reload the page";
   }
 
   function filterDispatcher(dispatcher, keep) {
-    return { in_flight: dispatcher.in_flight.filter(keep), failed: dispatcher.failed.filter(keep) };
+    return {
+      projects: dispatcher.projects,
+      in_flight: dispatcher.in_flight.filter(keep),
+      failed: dispatcher.failed.filter(keep),
+      deferred: dispatcher.deferred.filter(keep),
+      recent: dispatcher.recent.filter(keep),
+    };
   }
 
   function filterMergeQueuesByParty(queues, partyName) {
