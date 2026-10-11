@@ -144,12 +144,12 @@ updated: 2026-10-04
 ## T13 — Board and web show dispatcher launches
 
 **Depends on:** T07
-**Status:** [ ] pending
+**Status:** [x] done — #114
 
 **What:** `guild board` and `guild web` show launches in flight and recent failures.
 
 **Acceptance:**
-- [ ] A launch in flight and a failed launch appear on both surfaces.
+- [x] A launch in flight and a failed launch appear on both surfaces.
 
 ## T14 — Tell a live session when a dispatch waits on it
 
