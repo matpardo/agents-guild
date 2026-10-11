@@ -1309,6 +1309,9 @@ except keeper, closed and the previous-launch block.
   reasons. `guild dispatch status` prints, per project, the cursor, launches
   in the last hour, the rules, launches in flight and the ten latest
   decisions.
+- A trigger deferred because the party has a live session shows up in that
+  session's inbox as `- dispatch <rule>: <subject> needs you (deferred while
+  your session is live)`, once. Dry-run and other busy reasons stay silent.
 - A session that ends idle keeps its party out of dispatch until it is closed.
   Lifecycle commands (`guild lifecycle`) stay in `sync`.
 

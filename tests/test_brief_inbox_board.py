@@ -2,7 +2,7 @@ import json
 import os
 import sqlite3
 
-from guild import ctx_pressure, paths
+from guild import ctx_pressure, db, events, paths, timeutil
 from guild.commands import statusline as statusline_commands
 from tests.testutil import GuildTestCase
 
@@ -445,3 +445,52 @@ if __name__ == "__main__":
     import unittest
 
     unittest.main()
+
+
+class InboxDeferredDispatchTests(GuildTestCase):
+    def setUp(self):
+        super().setUp()
+        self.repo_dir = self.register_project("acme", ["acme/app"])
+        self.run_cli(["party", "start", "alpha"], "sess-1", self.repo_dir)
+        self.run_cli(["party", "start", "beta"], "sess-2", self.repo_dir)
+
+    def _decide(self, mode, reason):
+        payload = {
+            "project": "acme",
+            "rule": "checks-failing",
+            "key": "k",
+            "mode": mode,
+            "outcome": "deferred",
+            "party": "alpha",
+            "generation": 2,
+            "permission_mode": None,
+            "subject": "acme/app#7",
+            "reason": reason,
+        }
+        conn = db.connect(paths.db_path())
+        with db.writing(conn):
+            events.record(conn, timeutil.utcnow(), "test@host", "alpha", None, "acme", "dispatch.decided", "local", payload)
+        conn.close()
+
+    def _inbox(self, session_id):
+        code, out, err = self.run_cli(["inbox", "--since-last"], session_id, self.repo_dir)
+        self.assertEqual(code, 0, err)
+        return out
+
+    def test_owner_sees_deferred_line_once(self):
+        self._decide("on", "live session")
+        line = "- dispatch checks-failing: acme/app#7 needs you (deferred while your session is live)"
+        self.assertIn(line, self._inbox("sess-1"))
+        self.assertNotIn(line, self._inbox("sess-1"))
+
+    def test_other_party_sees_nothing(self):
+        self._decide("on", "live session")
+        self.assertNotIn("dispatch checks-failing", self._inbox("sess-2"))
+
+    def test_dry_run_is_silent(self):
+        self._decide("dry-run", "live session")
+        self.assertNotIn("dispatch checks-failing", self._inbox("sess-1"))
+
+    def test_other_reasons_are_silent(self):
+        self._decide("on", "raid ci paused")
+        self.assertNotIn("dispatch checks-failing", self._inbox("sess-1"))
