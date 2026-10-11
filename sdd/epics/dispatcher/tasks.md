@@ -174,9 +174,9 @@ updated: 2026-10-04
 ## T16 — Rule: next task wake-up
 
 **Depends on:** T03
-**Status:** [ ] pending
+**Status:** [x] done — #105
 
 **What:** a state rule that recomputes every pass and dispatches a handed-off party whose next unblocked task is ready.
 
 **Acceptance:**
-- [ ] The party is launched once per task; keepers, parties that did not hand off, paused raids and tasks claimed by others launch nothing.
+- [x] The party is launched once per task; keepers, parties that did not hand off, paused raids and tasks claimed by others launch nothing.
