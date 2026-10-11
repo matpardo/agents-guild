@@ -224,9 +224,9 @@ updated: 2026-10-04
 ## T21 — A fixing tag stays on until the blockers clear
 
 **Depends on:** T20
-**Status:** [ ] pending
+**Status:** [x] done — #132
 
 **What:** a fix request stays open from `guild pr ask-fix` until the PR has no automatic blockers left or is merged or closed, or goes stale after the optional project key `fix_request_stale_hours`; while open, `ask-fix` refuses, the dispatcher fires once per request and the board, merge queue, `pr ready-check` and web show a `fixing` tag instead of the ask button.
 
 **Acceptance:**
-- [ ] A partial push keeps the tag, cleared blockers or a merge close it, a stale request can be asked again only with the key set, and a rebuild restores the request time.
+- [x] A partial push keeps the tag, cleared blockers or a merge close it, a stale request can be asked again only with the key set, and a rebuild restores the request time.
