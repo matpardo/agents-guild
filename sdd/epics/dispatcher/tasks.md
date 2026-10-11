@@ -160,3 +160,13 @@ updated: 2026-10-04
 
 **Acceptance:**
 - [x] The owning party sees the line once; other parties, dry-run and other busy reasons see nothing.
+
+## T15 — Rule: PR stops being mergeable
+
+**Depends on:** T03
+**Status:** [ ] pending
+
+**What:** the owning party is dispatched when its PR gets a merge conflict, changes requested, unresolved review threads or falls behind base.
+
+**Acceptance:**
+- [ ] The trigger fires once per head commit and reason set; a changing thread count does not fire it again.
