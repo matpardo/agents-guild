@@ -141,3 +141,34 @@ class WebDriftBehaviorTests(unittest.TestCase):
                 capture_output=True, text=True, timeout=30, check=True,
             ).stdout.strip()
         self.assertEqual(out, "drift p scope: x rule1 (1) FA")
+
+
+@unittest.skipIf(shutil.which("node") is None, "node not installed")
+class WebQueueBlockBehaviorTests(unittest.TestCase):
+    def _queue_text(self, blocked_external):
+        labels = [] if blocked_external is None else ["blocked-external"]
+        entry = {
+            "ref": "o/r#1", "repo": "o/r", "number": 1, "party": "a", "task": "q/T1", "lifecycle": "ready",
+            "branch": "b", "checks_failing": 0, "checks_passing": 1, "checks_pending": 0, "labels": labels,
+            "blocked_external": blocked_external, "url": "https://example.test/1", "position": 1, "unblocks": 0,
+            "state": "ready", "next_action": False, "action": "merge", "why": "ready", "reasons": [], "blockers": [],
+            "waits": [], "gates": [],
+        }
+        queue = {"head": None, "scope": "party:a", "synced_at": "now", "synced_label": "synced now", "main": [], "queue": [entry]}
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "board.json"
+            path.write_text(json.dumps(dict(_BOARD, merge_queues=[queue])))
+            return subprocess.run(
+                ["node", str(_HARNESS), str(_APP_JS_PATH), str(path), "all", "all", "merge-queues"],
+                capture_output=True, text=True, timeout=30, check=True,
+            ).stdout
+
+    def test_queue_entry_offers_block(self):
+        text = self._queue_text(None)
+        self.assertIn("Block", text)
+        self.assertNotIn("Unblock", text)
+
+    def test_blocked_queue_entry_offers_unblock_and_shows_the_reason(self):
+        text = self._queue_text("waiting on legal")
+        self.assertIn("Unblock", text)
+        self.assertIn("waiting on legal", text)

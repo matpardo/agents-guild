@@ -399,32 +399,31 @@ var NO_SESSION_MESSAGE = "session token not loaded, reload the page";
     return button;
   }
 
-  function renderBlockInput(ref) {
+  function renderBlockInput(ref, location) {
     var input = el("input");
     input.type = "text";
     input.className = "block-reason";
     input.placeholder = "reason";
     input.value = state.prDrafts[ref] || "";
     input.disabled = state.prBusy[ref] === true;
-    input.dataset.prRef = ref;
+    input.dataset.focusKey = location + "|" + ref;
     input.addEventListener("input", function () {
       state.prDrafts[ref] = input.value;
     });
     return input;
   }
 
-  function renderPrBlockControls(pr) {
-    var ref = pr.repo + "#" + pr.number;
+  function renderPrBlockControls(ref, blockedExternal, location) {
     var controls = el("span");
     controls.className = "pr-block-controls";
-    if (pr.blocked_external !== null) {
+    if (blockedExternal !== null) {
       controls.appendChild(
         prButton(ref, "Unblock", function () {
           postPrAction(ref, "unblock", {});
         })
       );
     } else if (state.prBlockOpen[ref]) {
-      controls.appendChild(renderBlockInput(ref));
+      controls.appendChild(renderBlockInput(ref, location));
       controls.appendChild(
         prButton(ref, "Confirm block", function () {
           submitBlock(ref);
@@ -1159,7 +1158,10 @@ var NO_SESSION_MESSAGE = "session token not loaded, reload the page";
     }
     entry.labels.forEach(function (label) {
       if (label === "blocked-external") {
-        head.appendChild(renderBlockedExternalPill(null));
+        head.appendChild(renderBlockedExternalPill(entry.blocked_external));
+        if (entry.blocked_external !== null) {
+          head.appendChild(textEl("span", entry.blocked_external));
+        }
         return;
       }
       var pill = textEl("span", label);
@@ -1233,6 +1235,7 @@ var NO_SESSION_MESSAGE = "session token not loaded, reload the page";
     item.value = entry.position;
     item.appendChild(renderQueueEntryHead(entry));
     item.appendChild(renderQueueSummary(entry));
+    item.appendChild(renderPrBlockControls(entry.ref, entry.blocked_external, "queue"));
     if (entry.why) {
       item.appendChild(classedText("p", entry.why, "queue-reason"));
     }
@@ -1378,7 +1381,7 @@ var NO_SESSION_MESSAGE = "session token not loaded, reload the page";
     }
     appendAll(row, renderReasonPills(pr.review_reasons));
     row.appendChild(renderChecks(pr));
-    row.appendChild(renderPrBlockControls(pr));
+    row.appendChild(renderPrBlockControls(pr.repo + "#" + pr.number, pr.blocked_external, "card"));
     if (pr.card_url) {
       row.appendChild(link(pr.card_url, pr.card));
     } else if (pr.card) {
@@ -1708,8 +1711,8 @@ var NO_SESSION_MESSAGE = "session token not loaded, reload the page";
     var active = document.activeElement;
     state.focusedAskId = null;
     state.focusedPrRef = null;
-    if (active && active.dataset && active.dataset.prRef) {
-      state.focusedPrRef = active.dataset.prRef;
+    if (active && active.dataset && active.dataset.focusKey) {
+      state.focusedPrRef = active.dataset.focusKey;
       state.focusStart = active.selectionStart;
       state.focusEnd = active.selectionEnd;
     }
@@ -1723,7 +1726,7 @@ var NO_SESSION_MESSAGE = "session token not loaded, reload the page";
   function restorePrFocus() {
     var inputs = document.querySelectorAll("input.block-reason");
     Array.prototype.forEach.call(inputs, function (input) {
-      if (input.dataset.prRef === state.focusedPrRef && !input.disabled) {
+      if (input.dataset.focusKey === state.focusedPrRef && !input.disabled) {
         input.focus();
         input.setSelectionRange(state.focusStart, state.focusEnd);
       }

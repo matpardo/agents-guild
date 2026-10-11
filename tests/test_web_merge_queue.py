@@ -83,7 +83,7 @@ class MergeQueueModelTests(MergeQueueModelTestCase):
             set(first),
             {
                 "position", "ref", "repo", "number", "party", "task", "lifecycle", "branch",
-                "checks_failing", "checks_passing", "checks_pending", "labels", "unblocks", "state", "next_action",
+                "checks_failing", "checks_passing", "checks_pending", "labels", "blocked_external", "unblocks", "state", "next_action",
                 "action", "why", "reasons", "blockers", "waits", "gates", "url",
             },
         )
@@ -114,6 +114,13 @@ class MergeQueueModelTests(MergeQueueModelTestCase):
         self.assertEqual(blocked[0]["labels"], ["draft", "needs-ask-answer"])
         self.assertEqual(blocked[0]["action"], "fix: needs ask answer \u2192 beta")
         self.assertFalse(blocked[0]["next_action"])
+
+    def test_blocked_externally_entry_carries_its_own_reason(self):
+        self.run_cli(["pr", "set", "acme/app#3", "--blocked-external", "waiting on legal"], "sess-2", self.repo_dir)
+        queue = self.queues_by_scope()["raid:ci"]["queue"]
+        reasons = {entry["ref"]: entry["blocked_external"] for entry in queue}
+        self.assertEqual(reasons["acme/app#3"], "waiting on legal")
+        self.assertEqual(reasons["acme/app#1"], None)
 
     def test_raid_without_open_prs_has_an_empty_queue(self):
         queue = self.queues_by_scope()["raid:empty"]
