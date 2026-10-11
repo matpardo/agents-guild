@@ -122,7 +122,7 @@ updated: 2026-10-04
 
 ## T17 — The web serves the static files it loaded at start
 
-**Depends on:** T1
+**Depends on:** T01
 **Status:** [x] done — #128
 
 **What:** `guild web` reads its pages, scripts and styles once when the server is created and serves those bytes, so a running server never pairs new files with its older in-memory model; a restart picks up an update. T16 is added by the open PR #127.
