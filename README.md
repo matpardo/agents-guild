@@ -292,7 +292,7 @@ Deterministic, per-party ranking, evaluated in order:
    project sets `max_open_prs` and all parties of the project together have
    that many open tracked PRs, the line is `wait: <n> open PRs in project,
    merge <ref> first`, naming the first PR of the project-wide queue. Absent
-   keys → no cap. PRs blocked externally (directly or through a queue
+   keys → no cap. PRs blocked manually (directly or through a queue
    predecessor) are not counted by either cap.
    Whether a new task would touch files an open PR already changes is not
    checked: a task's files are unknown before work starts.
@@ -809,12 +809,12 @@ A PR that had the old `needs-human` lifecycle becomes `draft` with
 `needs-ask-answer` set, both in the live database and when events replay in
 `guild rebuild`.
 
-**External block.** `guild pr set --blocked-external "<reason>"` marks a PR
+**Manual block.** `guild pr set --blocked-external "<reason>"` (the flag keeps its name) marks a PR
 that waits on something outside development (a decision, a meeting); sync
-never clears it, `--no-blocked-external` does. `guild web` shows the PR with a `blocked: external` pill carrying the reason (also on its merge-queue entry), and its Block (asks for a reason) and Unblock buttons, on the PR card and on its merge-queue entry, do the same from the browser, recording the same `pr.set` event with no party. In the merge queue the PR is
-blocked with the reason `external: <reason>`, keeps its place, and its action
-is `wait: external (<reason>)`; PRs queued after it (pins, task dependencies,
-stacks) are blocked too, with the same action. None of them is the head of the
+never clears it, `--no-blocked-external` does. `guild web` shows the PR with a `blocked: manual` pill carrying the reason (also on its merge-queue entry), and its Block manually (asks for a reason) and Unblock buttons, on the PR card and on its merge-queue entry, do the same from the browser, recording the same `pr.set` event with no party. In the merge queue the PR is
+blocked with the reason `manual block: <reason>`, keeps its place, and its action
+is `manual block: <reason>`; PRs queued after it (pins, task dependencies,
+stacks) are blocked too, with the action `waits on manually blocked <ref>: <reason>`. None of them is the head of the
 queue, the `next action` target or a `guild next` item, `pr ready-check`
 exits 1 for them, and the dispatcher's `pr_unmergeable` rule skips the flagged
 PR. They are excluded from `max_open_prs_per_party`, `max_open_prs` and
