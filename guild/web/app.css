@@ -787,3 +787,12 @@ main.history-main {
 .stale-marker {
   margin-left: 0.5rem;
 }
+
+.reason-pill {
+  color: var(--amber);
+  border: 1px solid var(--amber);
+}
+
+.queue-detail {
+  font-size: 0.85rem;
+}

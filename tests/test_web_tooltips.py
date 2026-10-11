@@ -59,6 +59,9 @@ class TooltipCoverageTests(unittest.TestCase):
             [merge_queue._MERGE_ACTION, merge_queue._PROMOTE_ACTION, "review", "fix", "wait"],
         )
 
+    def test_review_reasons(self):
+        self.assertCovers("reason", ["threads", "changes requested", "behind base", "merge conflict"])
+
     def test_task_states(self):
         self.assertCovers("taskState", ["queued", "active", "blocked", "done"])
 
@@ -95,6 +98,7 @@ class TooltipCoverageTests(unittest.TestCase):
                 "noticeNew", "issued", "timeLeft", "askBlocks", "mainRed",
                 "generation", "leader", "noLeader", "claims", "synced",
                 "ctxHigh", "resumeCommand", "remaining", "allDone",
+                "baseBranch", "nextToMerge", "noMergeReady", "queueDetail",
             ],
         )
 

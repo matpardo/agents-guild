@@ -1048,7 +1048,7 @@ refs, how many refs still block it, a collapsible context), active notices,
 the merge queue (one card per raid, plus one per party outside raids that has
 open PRs: a `MAIN RED` row per red main, then numbered PR links with their
 label pills (`draft`, `converging`), checks, party, task, state, `unblocks N`, the action and the
-`next action` marker, blocked PRs in place; read-only, the same order as
+`next action` marker, the reasons as pills, a collapsible ready-check detail per PR (blockers, waits and gates, the same content as `guild pr ready-check`) and a `next to merge: <ref> (<party>)` line, or `no PR ready to merge`, matching `guild merge-queue --head`; blocked PRs in place; read-only, the same order as
 `guild merge-queue`, with `synced N min ago`; the party filter keeps
 only that party's PRs and the raid filter only that raid's card; the model
 key is `merge_queues`), a "dispatcher" section (launches in flight and
@@ -1064,7 +1064,7 @@ raid filter (`all` plus one option per raid, narrowing parties, asks and
 notices the same way `guild board --raid` does) narrow what is shown; the
 page re-fetches `/api/board` every 15 seconds,
 keeping the current filters and which blocks are collapsed. PR links open
-`https://github.com/<repo>/pull/<n>` in a new tab; a task also links to its
+`https://github.com/<repo>/pull/<n>` in a new tab; PR cards also show review pills (`N unresolved threads`, `changes requested`, `behind base`, `merge conflict`, the same reasons as the merge queue) and `on <base>` when the PR targets a branch other than `main` or `master`. A task also links to its
 tracker card when the project configures `tracker.browse_url` (see
 "Project config"). A collapsible "resources" section at the bottom shows the
 `guild resources` report from `GET /api/resources` (see "`guild resources`").

@@ -3,7 +3,7 @@ import shlex
 import textwrap
 from datetime import timedelta
 
-from guild import config, ctx_pressure, links, party_progress, party_status, resume
+from guild import config, ctx_pressure, links, merge_queue, party_progress, party_status, resume
 from guild import sanitize, session_status, timeutil
 from guild.commands import claim as claim_commands
 from guild.commands import drift as drift_commands
@@ -797,6 +797,10 @@ def _pr_model(pr_row, project_config):
         "what": sanitize.strip_control_sequences(pr_row["what"]),
         "waits": _optional_text(_visible_waits(pr_row)),
         "branch": _optional_text(pr_row["branch"]),
+        "base_branch": _optional_text(pr_row["base_branch"]),
+        "review_reasons": merge_queue.review_reasons(
+            pr_row["mergeable"], pr_row["review_decision"], pr_row["unresolved_threads"], pr_row["merge_state"]
+        ),
         "card": card,
         "card_url": links.card_url(project_config, card),
         "url": links.pr_url(pr_row["repo"], pr_row["number"]),
