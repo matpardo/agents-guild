@@ -811,7 +811,7 @@ A PR that had the old `needs-human` lifecycle becomes `draft` with
 
 **External block.** `guild pr set --blocked-external "<reason>"` marks a PR
 that waits on something outside development (a decision, a meeting); sync
-never clears it, `--no-blocked-external` does. `guild web` shows the PR with a `blocked: external` pill carrying the reason (also on its merge-queue entry), and its Block (asks for a reason) and Unblock buttons do the same from the browser, recording the same `pr.set` event with no party. In the merge queue the PR is
+never clears it, `--no-blocked-external` does. `guild web` shows the PR with a `blocked: external` pill carrying the reason (also on its merge-queue entry), and its Block (asks for a reason) and Unblock buttons, on the PR card and on its merge-queue entry, do the same from the browser, recording the same `pr.set` event with no party. In the merge queue the PR is
 blocked with the reason `external: <reason>`, keeps its place, and its action
 is `wait: external (<reason>)`; PRs queued after it (pins, task dependencies,
 stacks) are blocked too, with the same action. None of them is the head of the

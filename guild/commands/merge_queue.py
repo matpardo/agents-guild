@@ -504,6 +504,7 @@ def _queue_entry_model(position, entry, main_rows):
         _entry_model(entry),
         position=position,
         unblocks=entry["unblocks"],
+        blocked_external=entry["blocked_external"],
         state=entry["state"],
         next_action=entry["next_action"],
         action=sanitize.strip_control_sequences(entry["action"]),

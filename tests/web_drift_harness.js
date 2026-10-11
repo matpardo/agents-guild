@@ -1,6 +1,6 @@
 const fs = require("fs");
 const vm = require("vm");
-const [src, dataFile, partyF, raidF] = process.argv.slice(2);
+const [src, dataFile, partyF, raidF, outId = "drift"] = process.argv.slice(2);
 const data = JSON.parse(fs.readFileSync(dataFile, "utf8"));
 function mk(tag) {
   const o = { tag, children: [], _text: "", value: "all", options: [], style: {}, dataset: {}, attrs: {},
@@ -35,5 +35,5 @@ setTimeout(() => {
   doc.getElementById("raid-filter").value = raidF;
   doc.getElementById("party-filter").h.change({ target: { value: partyF } });
   doc.getElementById("raid-filter").h.change({ target: { value: raidF } });
-  setTimeout(() => { console.log(doc.getElementById("drift").textContent); process.exit(0); }, 50);
+  setTimeout(() => { console.log(doc.getElementById(outId).textContent); process.exit(0); }, 50);
 }, 50);

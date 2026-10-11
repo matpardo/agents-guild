@@ -339,6 +339,7 @@ def _queue_entry(pr, unblocks, reasons, waits, why, external):
         why=why,
         action=_action(pr, state, reasons, waits, external),
         external=external,
+        blocked_external=pr["blocked_external"],
         next_action=False,
     )
 
