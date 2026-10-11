@@ -272,23 +272,28 @@ class StaleHoursTests(LiveHistoryTestCase):
             {"name": "acme", "paths": [str(self.root) + "/*"], "github": {"repos": ["acme/app"]}}, **data
         )))
 
-    def test_defaults_to_48_without_project_config(self):
+    def test_is_none_without_project_config(self):
         self._live_quest(10, "q1", "alpha", "acme", None, ["T01"])
-        self.assertEqual(self._model()["active_quests"][0]["stale_hours"], 48)
+        self.assertIsNone(self._model()["active_quests"][0]["stale_hours"])
 
-    def test_defaults_to_48_when_config_has_no_next_section(self):
+    def test_is_none_when_config_has_no_next_section(self):
         self._write_project({})
         self._live_quest(10, "q1", "alpha", "acme", None, ["T01"])
-        self.assertEqual(self._model()["active_quests"][0]["stale_hours"], 48)
+        self.assertIsNone(self._model()["active_quests"][0]["stale_hours"])
+
+    def test_is_none_when_next_has_no_stale_hours(self):
+        self._write_project({"next": {}})
+        self._live_quest(10, "q1", "alpha", "acme", None, ["T01"])
+        self.assertIsNone(self._model()["active_quests"][0]["stale_hours"])
 
     def test_uses_project_next_stale_hours(self):
         self._write_project({"next": {"stale_hours": 12}})
         self._live_quest(10, "q1", "alpha", "acme", None, ["T01"])
         self.assertEqual(self._model()["active_quests"][0]["stale_hours"], 12)
 
-    def test_defaults_to_48_without_project(self):
+    def test_is_none_without_project(self):
         self._live_quest(10, "q1", "alpha", None, None, ["T01"])
-        self.assertEqual(self._model()["active_quests"][0]["stale_hours"], 48)
+        self.assertIsNone(self._model()["active_quests"][0]["stale_hours"])
 
 
 class IncompleteQuestTests(HistoryTestCase):

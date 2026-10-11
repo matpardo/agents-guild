@@ -1205,7 +1205,7 @@ the board.
 lists the quests in progress as a table: party, quest, a `<progress>` bar with
 done/total tasks, start and time since the last activity ("nothing in
 progress" when empty). A quest idle for longer than the project's
-`next.stale_hours` (48 when the key is absent) gets a `stale` marker.
+`next.stale_hours` gets a `stale` marker (no marker when the key is absent).
 
 `GET /history` (`guild/web/history.html`, script `guild/web/history.js`) shows a
 totals strip (quests, PRs merged, tasks, asks answered with median, handoffs),
@@ -1791,7 +1791,7 @@ against path traversal, not an identity boundary.
 
 `sdd.root` above can instead be `"git_repo": "~/Documents/_projects/acme/sdd-docs", "git_ref": "origin/main"` to read the same `epics_dir` from a git ref instead of a working copy.
 
-All keys. The loader rejects a wrong type with a clear error for every key except `sdd`, `next`, `handoff_threshold` and `pii_patterns`, which are read where they are used. An optional key is off when absent; the only defaults are the two stated below (`handoff_threshold`, and the web in-progress page under `next.stale_hours`). Unknown top-level keys are allowed.
+All keys. The loader rejects a wrong type with a clear error for every key except `sdd`, `handoff_threshold` and `pii_patterns`, which are read where they are used. An optional key is off when absent; the only default is the one stated below (`handoff_threshold`). Unknown top-level keys are allowed.
 
 - `name` (string, required): project name, a valid slug; `guild init-project <name>` requires it to match, and the file is `<name>.json`.
 - `paths` (non-empty list of globs, required): checkouts of the project; `~` is expanded. The project of a command is the first config with a glob matching the cwd or one of its ancestors.
@@ -1802,9 +1802,9 @@ All keys. The loader rejects a wrong type with a clear error for every key excep
     - `git_repo` + `git_ref` (e.g. `"origin/main"`), both required together: `guild` runs `git -C <git_repo> fetch --quiet origin`, lists `tasks.md` files at `<git_ref>` with `git ls-tree` and reads each with `git show <git_ref>:<path>`. It never checks out, resets or otherwise touches `git_repo`'s working tree, so it is safe to point at a clone a human or another session is using. A failed fetch, an unknown ref, or zero `tasks.md` files under `epics_dir` at that ref is a clear error, never an empty sync. `epics.sdd_path` is stored as `git:<git_ref>:<path>` in this mode. Prefer it for a docs repo shared with other sessions: a worktree can be deleted or switched out from under `root`, and `sync` would silently read nothing.
   - `epic_key_field` (string, absent: `epics.jira_key` is `NULL`): the frontmatter key (a `key: value` line between the leading `---` markers of the epic's `tasks.md`) that names the epic's own tracker card, e.g. `jira: DEMO-1`. Never guessed from the epic slug.
   - `epic_status_field` (string, absent: `epics.sdd_status` is `NULL`): the frontmatter key that carries the epic's own SDD status, e.g. `status: done`, parsed like `epic_key_field`.
-- `tracker` (object, absent: no tracker sync): drives `guild sync --source tracker` (see "Tracker sync"). `kind` is required when the block exists; only `"jira-acli"` is supported, anything else is a clear error.
+- `tracker` (object, absent: no tracker sync): drives `guild sync --source tracker` (see "Tracker sync"). `kind` is required when the block exists; only `"jira-acli"` is supported, anything else is rejected when the config loads.
   - `browse_url` (string starting with `https://`, absent: tasks carry no `card_url`): the base `guild web` prepends to a task's tracker key to build its card link (`https://acme.atlassian.net/browse/DEMO-1`).
-- `next.stale_hours` (number, absent: `guild next` skips its stale-`converging` step): hours without activity after which a `converging` PR is reported. The web in-progress page uses it as well and falls back to 48 when absent.
+- `next.stale_hours` (positive integer, absent: `guild next` skips its stale-`converging` step and the web in-progress page shows no stale marker): hours without activity after which a `converging` PR is reported and a quest is marked stale.
 - `handoff_threshold` (integer percent 0-100, default 80): context usage at or above which the `UserPromptSubmit`/`PostToolUse` hooks nudge once per session toward `guild handoff` (`guild handoff --respawn` for keeper parties and sessions in a window guild launched) and the board reports the party as context high. The nudge asks the session to start nothing new, let running executions finish, hand off and stop. Recommended: 40, so sessions stay short and each fresh generation starts from the brief.
 - `max_open_prs_per_party` (positive integer, absent: no cap): open tracked PRs of one party at which `guild next` (and the dispatcher's `next_task`) offers no new task and says to merge the first PR in queue order. Recommended: 3.
 - `max_open_prs` (positive integer, absent: no cap): the same, counting the open tracked PRs of all parties of the project. Size it to review throughput, e.g. 10.

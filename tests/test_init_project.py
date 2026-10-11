@@ -38,7 +38,7 @@ class InitProjectTests(GuildTestCase):
                     "name": "acme",
                     "paths": ["/tmp/acme/*"],
                     "github": {"repos": ["acme/app"]},
-                    "tracker": {"browse_url": "http://tracker.example/browse/"},
+                    "tracker": {"kind": "jira-acli", "browse_url": "http://tracker.example/browse/"},
                 }
             )
         )
@@ -54,7 +54,7 @@ class InitProjectTests(GuildTestCase):
                     "name": "acme",
                     "paths": ["/tmp/acme/*"],
                     "github": {"repos": ["acme/app"]},
-                    "tracker": {"browse_url": "https://tracker.example/browse/"},
+                    "tracker": {"kind": "jira-acli", "browse_url": "https://tracker.example/browse/"},
                 }
             )
         )

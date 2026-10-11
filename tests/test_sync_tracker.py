@@ -65,13 +65,13 @@ class SyncTrackerTests(GuildTestCase):
         self._write_project_config(tracker_config={"kind": "other"})
         code, out, err = self._sync_tracker()
         self.assertEqual(code, 1)
-        self.assertIn("not supported", err)
+        self.assertIn("tracker.kind", err)
 
     def test_sync_rejects_missing_kind(self):
         self._write_project_config(tracker_config={})
         code, out, err = self._sync_tracker()
         self.assertEqual(code, 1)
-        self.assertIn("not supported", err)
+        self.assertIn("tracker.kind", err)
 
     def test_children_of_epic_and_standalone_task_and_epic_itself(self):
         self._write_project_config(

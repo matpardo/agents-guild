@@ -75,6 +75,10 @@ class HistoryRouteTests(WebServerTestCase):
         self.assertEqual(response.getheader("Content-Type"), "application/javascript; charset=utf-8")
         self.assertIn(b"/api/history", body)
 
+    def test_progress_js_marks_stale_only_when_stale_hours_is_set(self):
+        response, body = self._get("/progress.js", self._host())
+        self.assertIn(b"quest.stale_hours !== null &&", body)
+
     def test_api_history_returns_model_shape_when_empty(self):
         response, model = self._get_history("")
         self.assertEqual(response.status, 200)
@@ -140,7 +144,7 @@ class HistoryRouteTests(WebServerTestCase):
         conn.close()
         response, model = self._get_history("")
         quest = model["active_quests"][0]
-        self.assertEqual(quest["stale_hours"], 48)
+        self.assertIsNone(quest["stale_hours"])
         self.assertEqual(quest["last_activity_at"], _at(0))
         self.assertIn("week_totals", model)
         self.assertIn("since", model)

@@ -39,7 +39,7 @@ class BoardModelTestCase(GuildTestCase):
     def _add_tracker_browse_url(self, project_name, browse_url):
         config_file = self.config_home / "guild" / "projects" / "{}.json".format(project_name)
         data = json.loads(config_file.read_text())
-        data["tracker"] = {"browse_url": browse_url}
+        data["tracker"] = {"kind": "jira-acli", "browse_url": browse_url}
         config_file.write_text(json.dumps(data))
 
 
