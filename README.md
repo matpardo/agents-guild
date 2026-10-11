@@ -319,14 +319,18 @@ fails naming the raid and the members, and `guild party close --force` closes an
 Close applies the `guild quest done` gate to each active quest of the party: it
 refuses, listing every quest with tasks not done or epic drift, and `--force`
 closes anyway, reporting each such quest as `closed with unfinished work`.
+Before judging drift, close refreshes the SDD snapshot once per project with an
+`sdd` block, as `guild sync --source sdd` would.
 Closing cascades in the same event: the party's active quests become `done`,
 its open asks are dismissed and its claims are released. Tracked PRs stay
 tracked for history and are listed if still open. `guild quest done <slug>`
 finishes one quest without closing its party. It refuses while the quest has tasks
 that are not `done` (queued, active or blocked), listing them; `--force` finishes anyway,
 and the achievement snapshot still records reality (`tasks_done` counts only done tasks).
-Quests without tasks are allowed. For an epic quest it then runs the
-drift check (the `guild drift` rules, scoped to that epic) and refuses with the
+Quests without tasks are allowed. For an epic quest it first refreshes the SDD
+snapshot of the project (as `guild sync --source sdd`, when the project has an `sdd`
+block); if the refresh fails it keeps the stored snapshot and the refusal says it may be
+stale. It then runs the drift check (the `guild drift` rules, scoped to that epic) and refuses with the
 findings listed; `--accept-drift` finishes anyway and records the findings. No-epic
 quests skip the gate. The `quest.done` event freezes an `achievement` snapshot
 (started_at, done_at, party, project, epic, title, tasks_done, tasks_blocked_events,

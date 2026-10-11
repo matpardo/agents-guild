@@ -1,7 +1,7 @@
 import json
 
 from guild import config, db, events, identity, names, timeutil
-from guild.commands import achievement, drift
+from guild.commands import achievement, drift, sync
 from guild.errors import GuildError
 
 _TASK_CLAIM_PREFIX = "task:{}/"
@@ -85,13 +85,30 @@ def reject_taken_tasks(conn, now, project, epic, tasks, party):
         raise GuildError("; ".join(conflicts), 1)
 
 
-def _gate_drift(conn, project, epic, accept_drift):
+def refresh_sdd_snapshot(ctx, project):
+    if config.load_project(ctx.projects_dir, project).get("sdd") is None:
+        return []
+    try:
+        failures = sync.sync_sdd(ctx, project)
+    except GuildError as error:
+        failures = [error.message]
+    if not failures:
+        return []
+    return [
+        "sdd snapshot may be stale ({}): run `guild sync --source sdd`".format("; ".join(failures))
+    ]
+
+
+def _gate_drift(ctx, project, epic, accept_drift, stale_notes):
     if epic is None:
         return []
-    findings = drift.epic_findings(conn, project, epic)
+    findings = drift.epic_findings(ctx.conn, project, epic)
     if findings and not accept_drift:
         raise GuildError(
-            "drift in epic '{}', fix it or pass --accept-drift:\n{}".format(epic, "\n".join(findings)), 1
+            "drift in epic '{}', fix it or pass --accept-drift:\n{}".format(
+                epic, "\n".join(findings + stale_notes)
+            ),
+            1,
         )
     return findings
 
@@ -137,7 +154,8 @@ def done(ctx, slug, accept_drift, force):
     if row["state"] != "active":
         raise GuildError("quest '{}' is already {}".format(slug, row["state"]), 1)
     _gate_unfinished_tasks(ctx.conn, slug, force)
-    findings = _gate_drift(ctx.conn, row["project"], row["epic"], accept_drift)
+    stale_notes = [] if row["epic"] is None else refresh_sdd_snapshot(ctx, row["project"])
+    findings = _gate_drift(ctx, row["project"], row["epic"], accept_drift, stale_notes)
     snapshot = achievement.build(ctx.conn, slug, ctx.now, findings)
     with db.writing(ctx.conn):
         events.record(

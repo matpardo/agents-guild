@@ -56,3 +56,10 @@ updated: 2026-09-28
 **Status:** [x] done — #95
 
 **What:** `guild party close` refuses while an active quest of the party has tasks not done or epic drift, listing each quest and why; `--force` closes anyway and reports every such quest as closed with unfinished work.
+
+## T08 — Quest done refreshes the SDD snapshot
+
+**Depends on:** T07
+**Status:** [x] done — #107
+
+**What:** `guild quest done` and `guild party close` refresh the SDD snapshot of the quest project before judging drift, once per project on close; when the refresh fails they keep the stored snapshot and say it may be stale.
