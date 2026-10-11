@@ -39,6 +39,8 @@ def review_reasons(mergeable, review_decision, unresolved_threads, merge_state):
 
 def _blocked_reasons(pr):
     reasons = []
+    if pr["blocked_external"] is not None:
+        reasons.append("external: {}".format(pr["blocked_external"]))
     if pr["needs_ask_answer"]:
         reasons.append("needs ask answer")
     if pr["checks_failing"] > 0:
@@ -302,7 +304,9 @@ def _state(reasons, waits):
     return _READY_STATE
 
 
-def _action(pr, state, reasons, waits):
+def _action(pr, state, reasons, waits, external):
+    if external is not None:
+        return "wait: external ({})".format(external)
     if state == _BLOCKED_STATE:
         return "fix: {} \u2192 {}".format("; ".join(reasons), pr["party"])
     if state == _WAITING_STATE:
@@ -314,7 +318,7 @@ def _action(pr, state, reasons, waits):
     return _MERGE_ACTION
 
 
-def _queue_entry(pr, unblocks, reasons, waits, why):
+def _queue_entry(pr, unblocks, reasons, waits, why, external):
     state = _state(reasons, waits)
     return dict(
         _entry(pr),
@@ -324,7 +328,8 @@ def _queue_entry(pr, unblocks, reasons, waits, why):
         blockers=reasons,
         waits=waits,
         why=why,
-        action=_action(pr, state, reasons, waits),
+        action=_action(pr, state, reasons, waits, external),
+        external=external,
         next_action=False,
     )
 
@@ -335,6 +340,7 @@ def _ordered_entries(by_ref, order, edges, unblocks):
     predecessors = _predecessors(ordered_edges)
     blocked_refs = set()
     pending_refs = set()
+    external_reasons = {}
     entries = []
     for ref in order:
         pr = by_ref[ref]
@@ -344,25 +350,32 @@ def _ordered_entries(by_ref, order, edges, unblocks):
         waits = _wait_reasons(pr)
         waits.extend("waits on {}".format(first) for first in before if first in pending_refs)
         state = _state(reasons, waits)
+        external = pr["blocked_external"]
+        if external is None:
+            external = next((external_reasons[first] for first in before if first in external_reasons), None)
+        if external is not None:
+            external_reasons[ref] = external
         if state == _BLOCKED_STATE:
             blocked_refs.add(ref)
         if state == _WAITING_STATE or (state == _READY_STATE and _is_draft(pr)):
             pending_refs.add(ref)
-        entries.append(_queue_entry(pr, unblocks[ref], reasons, waits, _why(pr, state, position, ordered_edges)))
+        entries.append(_queue_entry(pr, unblocks[ref], reasons, waits, _why(pr, state, position, ordered_edges), external))
     return entries
 
 
 def _stuck_entries(by_ref, stuck, unblocks):
     cycle = "ordering cycle between pins and task dependencies: {}".format(", ".join(stuck))
     return [
-        _queue_entry(by_ref[ref], unblocks[ref], _blocked_reasons(by_ref[ref]) + [cycle], [], "")
+        _queue_entry(
+            by_ref[ref], unblocks[ref], _blocked_reasons(by_ref[ref]) + [cycle], [], "", by_ref[ref]["blocked_external"]
+        )
         for ref in stuck
     ]
 
 
 def _flag_next_action(entries):
     for index, entry in enumerate(entries):
-        if entry["state"] != _BLOCKED_STATE:
+        if entry["state"] != _BLOCKED_STATE or entry["external"] is not None:
             continue
         if any(later["action"] == _MERGE_ACTION for later in entries[index + 1:]):
             entry["next_action"] = True

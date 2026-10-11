@@ -107,13 +107,27 @@ def _flag_value(requested, current):
     return int(requested)
 
 
-def set_(ctx, ref, lifecycle, waits, needs_ask_answer, needs_human_pr_review, fixes_main, fixes_flaky):
-    options = (lifecycle, waits, needs_ask_answer, needs_human_pr_review, fixes_main, fixes_flaky)
-    if all(option is None for option in options):
+def _blocked_external_value(blocked_external, no_blocked_external, current):
+    if no_blocked_external:
+        return None
+    if blocked_external is None:
+        return current
+    if not blocked_external.strip():
+        raise GuildError("--blocked-external needs a reason", 1)
+    return blocked_external.strip()
+
+
+def set_(
+    ctx, ref, lifecycle, waits, needs_ask_answer, needs_human_pr_review, fixes_main, fixes_flaky,
+    blocked_external, no_blocked_external,
+):
+    options = (lifecycle, waits, needs_ask_answer, needs_human_pr_review, fixes_main, fixes_flaky, blocked_external)
+    if all(option is None for option in options) and not no_blocked_external:
         raise GuildError(
             "pr set needs at least one of --lifecycle, --waits, --needs-ask-answer/--no-needs-ask-answer,"
             " --needs-human-pr-review/--no-needs-human-pr-review,"
-            " --fixes-main/--no-fixes-main, --fixes-flaky/--no-fixes-flaky",
+            " --fixes-main/--no-fixes-main, --fixes-flaky/--no-fixes-flaky,"
+            " --blocked-external/--no-blocked-external",
             1,
         )
     repo, number = refs.parse_pr_ref(ref)
@@ -141,6 +155,9 @@ def set_(ctx, ref, lifecycle, waits, needs_ask_answer, needs_human_pr_review, fi
                 "needs_human_pr_review": _flag_value(needs_human_pr_review, row["needs_human_pr_review"]),
                 "fixes_main": _flag_value(fixes_main, row["fixes_main"]),
                 "fixes_flaky": _flag_value(fixes_flaky, row["fixes_flaky"]),
+                "blocked_external": _blocked_external_value(
+                    blocked_external, no_blocked_external, row["blocked_external"]
+                ),
             },
         )
     message = "PR '{}#{}' updated".format(repo, number)

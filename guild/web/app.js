@@ -106,6 +106,7 @@
       "fixes-flaky": "The PR fixes flaky tests; it goes first so the suite stops lying to everyone.",
       "needs-ask-answer": "The PR is stopped on an open ask; answer it so work can resume.",
       "needs-human-pr-review": "The PR touches something sensitive and needs a human review before merging.",
+      "blocked-external": "The PR waits on something outside development; do not try to fix it.",
     },
     checks: {
       failing: "Number of failing CI checks; red when above zero.",

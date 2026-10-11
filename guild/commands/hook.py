@@ -13,6 +13,7 @@ from guild.adapters import github
 from guild.commands import brief as brief_commands
 from guild.commands import claim as claim_commands
 from guild.commands import inbox as inbox_commands
+from guild.commands import merge_queue as merge_queue_commands
 from guild.commands import next as next_commands
 from guild.commands import party as party_commands
 from guild.commands import raid as raid_commands
@@ -481,15 +482,17 @@ def _file_cap_warning(ctx, target_dir, branch, paths):
     cap = project_data.get("max_open_prs_per_file")
     if cap is None:
         return None
+    external = merge_queue_commands.external_blocked_refs(ctx.conn)
     lines = []
     for path in sorted(paths):
-        rows = ctx.conn.execute(
+        found = ctx.conn.execute(
             "SELECT prs.repo, prs.number, prs.party FROM pr_files JOIN prs"
             " ON prs.repo = pr_files.repo AND prs.number = pr_files.number"
             " WHERE prs.repo = ? AND pr_files.path = ? AND prs.lifecycle NOT IN ('merged', 'closed')"
             " AND (prs.branch IS NULL OR prs.branch != ?) ORDER BY prs.number",
             (repo, path, branch),
         ).fetchall()
+        rows = [row for row in found if "{}#{}".format(row["repo"], row["number"]) not in external]
         if len(rows) >= cap:
             refs = ", ".join("{}#{} ({})".format(row["repo"], row["number"], row["party"]) for row in rows)
             lines.append("{}: {}".format(path, refs))

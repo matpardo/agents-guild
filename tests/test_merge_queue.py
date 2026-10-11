@@ -37,6 +37,7 @@ def _pr(number, **overrides):
         "base_branch": None,
         "fixes_main": False,
         "fixes_flaky": False,
+        "blocked_external": None,
     }
     pr.update(overrides)
     return pr
@@ -490,3 +491,36 @@ class UrgencyOrderingTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class ExternalBlockTests(unittest.TestCase):
+    def test_flagged_pr_is_blocked_with_a_wait_action_and_keeps_its_place(self):
+        result = merge_queue.compute(
+            [_pr(1, blocked_external="team meeting"), _pr(2)], [], []
+        )["queue"]
+        self.assertEqual(_refs(result), [_ref(1), _ref(2)])
+        self.assertEqual(result[0]["state"], "blocked")
+        self.assertEqual(result[0]["reasons"], ["external: team meeting"])
+        self.assertEqual(result[0]["action"], "wait: external (team meeting)")
+        self.assertEqual(result[1]["action"], "merge")
+
+    def test_pinned_dependent_is_blocked_and_waits_externally(self):
+        result = merge_queue.compute(
+            [_pr(1, blocked_external="team meeting"), _pr(2)], [_pin(1, 2, "alpha")], []
+        )["queue"]
+        self.assertEqual(result[1]["state"], "blocked")
+        self.assertEqual(result[1]["reasons"], ["waits on {}".format(_ref(1))])
+        self.assertEqual(result[1]["action"], "wait: external (team meeting)")
+        self.assertEqual(result[1]["external"], "team meeting")
+
+    def test_cross_repo_pin_propagates(self):
+        other = _pr(3, repo="acme/docs", ref="acme/docs#3")
+        pin = {"first": _ref(1), "second": "acme/docs#3", "author": "alpha"}
+        result = merge_queue.compute([_pr(1, blocked_external="x"), other], [pin], [])["queue"]
+        self.assertEqual(result[1]["external"], "x")
+
+    def test_external_entry_is_not_the_next_action_target(self):
+        result = merge_queue.compute(
+            [_pr(1, blocked_external="x"), _pr(2, checks_failing=1), _pr(3)], [], []
+        )["queue"]
+        self.assertEqual([entry["next_action"] for entry in result], [False, True, False])

@@ -356,6 +356,7 @@ _COLUMN_MIGRATIONS = (
     ("parties", "keeper", "INTEGER"),
     ("prs", "fixes_main", "INTEGER"),
     ("prs", "fixes_flaky", "INTEGER"),
+    ("prs", "blocked_external", "TEXT"),
 )
 
 

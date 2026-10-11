@@ -8,12 +8,18 @@ from guild.commands import pr as pr_commands
 from guild.commands import raid as raid_commands
 
 
+def _without_external(conn, rows):
+    external = merge_queue_commands.external_blocked_refs(conn)
+    return [row for row in rows if "{}#{}".format(row["repo"], row["number"]) not in external]
+
+
 def _own_open_prs(conn, party):
-    return conn.execute(
+    rows = conn.execute(
         "SELECT * FROM prs WHERE party = ? AND lifecycle NOT IN ('merged', 'closed')"
         " ORDER BY repo ASC, number ASC",
         (party,),
     ).fetchall()
+    return _without_external(conn, rows)
 
 
 def _last_pr_set_ts(conn, repo, number):
@@ -140,16 +146,17 @@ def _project_parties(conn, project):
 
 def _scope_open_prs(conn, parties):
     marks = ",".join("?" * len(parties))
-    return conn.execute(
+    rows = conn.execute(
         "SELECT * FROM prs WHERE party IN ({}) AND lifecycle NOT IN ('merged', 'closed')"
         " ORDER BY repo ASC, number ASC".format(marks),
         sorted(parties),
     ).fetchall()
+    return _without_external(conn, rows)
 
 
 def _wait_line(conn, parties, scope_label, open_prs):
     queue = merge_queue_commands.load_scoped_queue(conn, parties)["queue"]
-    first = queue[0]["ref"] if queue else _pr_label(open_prs[0])
+    first = next((entry["ref"] for entry in queue if entry["external"] is None), _pr_label(open_prs[0]))
     return "wait: {} open PRs{}, merge {} first".format(len(open_prs), scope_label, first)
 
 

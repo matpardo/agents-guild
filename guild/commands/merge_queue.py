@@ -80,6 +80,7 @@ def _pr_record(conn, row):
         "base_branch": _optional_branch(row["base_branch"]),
         "fixes_main": bool(row["fixes_main"]),
         "fixes_flaky": bool(row["fixes_flaky"]),
+        "blocked_external": row["blocked_external"],
         "mergeable": row["mergeable"],
         "review_decision": row["review_decision"],
         "unresolved_threads": row["unresolved_threads"],
@@ -390,6 +391,11 @@ def next_to_merge(conn, party_names):
         if entry["action"] == "merge":
             return entry["ref"]
     return None
+
+
+def external_blocked_refs(conn):
+    queue = merge_queue.compute(open_pr_records(conn), load_pins(conn), [])["queue"]
+    return {entry["ref"] for entry in queue if entry["external"] is not None}
 
 
 def main_red_labels(conn, party_names):
