@@ -1,4 +1,8 @@
+import json
 import re
+import shutil
+import subprocess
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -6,7 +10,8 @@ from guild import context, db, paths, timeutil
 from guild.commands import board as board_commands
 from tests.test_party_drift import PartyDriftTestCase
 
-_APP_JS = (Path(__file__).resolve().parent.parent / "guild" / "web" / "app.js").read_text()
+_APP_JS_PATH = Path(__file__).resolve().parent.parent / "guild" / "web" / "app.js"
+_APP_JS = _APP_JS_PATH.read_text()
 
 
 class WebDriftModelTests(PartyDriftTestCase):
@@ -63,3 +68,58 @@ class WebDriftScriptTests(unittest.TestCase):
 
     def test_renders_finding_text(self):
         self.assertTrue(re.search(r'textEl\("li", finding\.text\)', _APP_JS))
+
+
+_HARNESS = Path(__file__).resolve().parent / "web_drift_harness.js"
+_BOARD = {
+    "generated_at": "now", "asks": [], "notices": [], "blocked": [], "merge_queues": [],
+    "dispatcher": {"in_flight": [], "failed": []}, "raids": [{"name": "r", "members": ["c"]}],
+    "parties": [
+        {
+            "name": name, "raids": [], "quests": [], "prs": [], "claims": [], "state": "active", "generation": 1,
+            "status": {"name": "idle", "label": "idle"}, "remaining": {"all_done": True}, "ctx": None,
+            "resume_command": None, "drift": {"findings": [], "more": 0}, "leader_session_name": None,
+        }
+        for name in ("a", "c")
+    ],
+    "drift": [{
+        "project": "p", "scope": "scope: x",
+        "findings": {
+            "rule1": [{"text": "FA", "party": "a"}, {"text": "FC", "party": "c"}, {"text": "FN", "party": None}],
+            "rule2": [{"text": "FC2", "party": "c"}],
+        },
+    }],
+}
+
+
+@unittest.skipIf(shutil.which("node") is None, "node not installed")
+class WebDriftBehaviorTests(unittest.TestCase):
+    def _rendered(self, party_filter, raid_filter):
+        with tempfile.TemporaryDirectory() as tmp:
+            board = Path(tmp) / "board.json"
+            board.write_text(json.dumps(_BOARD))
+            result = subprocess.run(
+                ["node", str(_HARNESS), str(_APP_JS_PATH), str(board), party_filter, raid_filter],
+                capture_output=True, text=True, timeout=30, check=True,
+            )
+        return result.stdout.strip()
+
+    def test_no_filter_shows_every_finding(self):
+        self.assertEqual(self._rendered("all", "all"), "drift p scope: x rule1 (3) FA FC FN rule2 (1) FC2")
+
+    def test_party_filter_keeps_only_that_party(self):
+        self.assertEqual(self._rendered("a", "all"), "drift p scope: x rule1 (1) FA")
+
+    def test_raid_filter_keeps_member_findings_and_drops_empty_rules(self):
+        self.assertEqual(self._rendered("all", "r"), "drift p scope: x rule1 (1) FC rule2 (1) FC2")
+
+    def test_party_without_findings_shows_no_drift(self):
+        board = dict(_BOARD, drift=[{"project": "p", "scope": "scope: x", "findings": {"rule1": [{"text": "FC", "party": "c"}]}}])
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "board.json"
+            path.write_text(json.dumps(board))
+            out = subprocess.run(
+                ["node", str(_HARNESS), str(_APP_JS_PATH), str(path), "a", "all"],
+                capture_output=True, text=True, timeout=30, check=True,
+            ).stdout.strip()
+        self.assertEqual(out, "drift p scope: x no drift")
