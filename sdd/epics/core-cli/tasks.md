@@ -63,3 +63,10 @@ updated: 2026-09-28
 **Status:** [x] done — #107
 
 **What:** `guild quest done` and `guild party close` refresh the SDD snapshot of the quest project before judging drift, once per project on close; when the refresh fails they keep the stored snapshot and say it may be stale.
+
+## T09 — One-line help for every command
+
+**Depends on:** T08
+**Status:** [x] done — #131
+
+**What:** every subcommand and non-obvious flag has a one-line `help=`, so `guild --help` and `guild <command> --help` replace memorizing commands; internal commands are marked as such.
