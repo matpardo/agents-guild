@@ -1,0 +1,174 @@
+import json
+import sqlite3
+import subprocess
+from unittest import mock
+
+from guild.adapters import github
+from tests.testutil import GuildTestCase
+
+_OPEN_VIEW = {
+    "state": "OPEN", "isDraft": False, "headRefName": "feature/other", "title": "t",
+    "statusCheckRollup": [{"conclusion": "SUCCESS"}], "mergeable": "MERGEABLE",
+}
+
+
+def _diff(paths):
+    return {
+        "files": [{"path": path} for path in paths],
+        "additions": 1,
+        "deletions": 1,
+        "createdAt": "2026-09-01T10:00:00Z",
+    }
+
+
+class FileOpenPrCapTestCase(GuildTestCase):
+    def setUp(self):
+        super().setUp()
+        self.repo_dir = self.register_project("acme", ["acme/app"])
+        for command in (
+            ["git", "init", "-q", "-b", "main"],
+            ["git", "config", "user.email", "t@t.com"],
+            ["git", "config", "user.name", "t"],
+            ["git", "commit", "--allow-empty", "-q", "-m", "init"],
+            ["git", "update-ref", "refs/remotes/origin/main", "HEAD"],
+            ["git", "symbolic-ref", "refs/remotes/origin/HEAD", "refs/remotes/origin/main"],
+            ["git", "checkout", "-q", "-b", "feature/mine"],
+        ):
+            subprocess.run(command, cwd=str(self.repo_dir), check=True)
+        self._set_cap(2)
+        self.run_cli(["party", "start", "alpha"], "sess-1", self.repo_dir)
+        self.run_cli(["party", "start", "beta"], "sess-2", self.repo_dir)
+        self.write_gh_fixture("list_feature-mine", [])
+
+    def _set_cap(self, cap):
+        config_file = self.config_home / "guild" / "projects" / "acme.json"
+        data = json.loads(config_file.read_text())
+        if cap is None:
+            data.pop("max_open_prs_per_file", None)
+        else:
+            data["max_open_prs_per_file"] = cap
+        config_file.write_text(json.dumps(data))
+
+    def _track(self, session_id, number, branch, paths):
+        view = dict(_OPEN_VIEW, headRefName=branch)
+        self.write_gh_fixture("view_acme-app_{}".format(number), dict(view, isDraft=True))
+        self.run_cli(
+            ["pr", "track", "acme/app#{}".format(number), "--card", "ACME-{}".format(number), "--what", "x", "--waits", "y"],
+            session_id, self.repo_dir,
+        )
+        self.write_gh_fixture("view_acme-app_{}".format(number), view)
+        self.write_gh_fixture("view_files_acme-app_{}".format(number), _diff(paths))
+
+    def _sync(self):
+        return self.run_cli(["sync", "--source", "gh"], "sess-1", self.repo_dir)
+
+    def _files(self):
+        conn = sqlite3.connect(str(self.data_home / "guild" / "guild.db"))
+        rows = conn.execute("SELECT number, path FROM pr_files ORDER BY number, path").fetchall()
+        conn.close()
+        return rows
+
+    def _commit_file(self, relative_path):
+        target = self.repo_dir / relative_path
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text("change")
+        subprocess.run(["git", "add", relative_path], cwd=str(self.repo_dir), check=True)
+        subprocess.run(["git", "commit", "-q", "-m", "change"], cwd=str(self.repo_dir), check=True)
+
+    def _push(self):
+        return self.run_hook(
+            "pre-push",
+            {
+                "session_id": "sess-1",
+                "tool_input": {"command": "git push origin feature/mine"},
+                "cwd": str(self.repo_dir),
+            },
+        )
+
+
+class SyncStoresFilesTests(FileOpenPrCapTestCase):
+    def test_stores_files_when_configured(self):
+        self._track("sess-2", 2, "feature/b", ["a.yml", "b.yml"])
+        code, out, err = self._sync()
+        self.assertEqual(code, 0, err)
+        self.assertEqual(self._files(), [(2, "a.yml"), (2, "b.yml")])
+
+    def test_resync_replaces_files(self):
+        self._track("sess-2", 2, "feature/b", ["a.yml", "b.yml"])
+        self._sync()
+        self.write_gh_fixture("view_files_acme-app_2", _diff(["c.yml"]))
+        self._sync()
+        self.assertEqual(self._files(), [(2, "c.yml")])
+
+    def test_not_configured_stores_nothing_and_makes_no_diff_call(self):
+        self._set_cap(None)
+        self._track("sess-2", 2, "feature/b", ["a.yml"])
+        with mock.patch.object(github, "pr_diff", wraps=github.pr_diff) as pr_diff:
+            self._sync()
+        self.assertEqual(pr_diff.call_count, 0)
+        self.assertEqual(self._files(), [])
+
+    def test_one_diff_call_per_pr(self):
+        self._track("sess-2", 2, "feature/b", ["a.yml"])
+        with mock.patch.object(github, "pr_diff", wraps=github.pr_diff) as pr_diff:
+            self._sync()
+        self.assertEqual(pr_diff.call_count, 1)
+
+    def test_rebuild_replays_files(self):
+        self._track("sess-2", 2, "feature/b", ["a.yml"])
+        self._sync()
+        code, out, err = self.run_cli(["rebuild"], None, self.repo_dir)
+        self.assertEqual(code, 0, err)
+        self.assertEqual(self._files(), [(2, "a.yml")])
+
+    def test_invalid_cap_is_rejected(self):
+        self._set_cap(0)
+        code, out, err = self._sync()
+        self.assertEqual(code, 1)
+        self.assertIn("max_open_prs_per_file", err)
+
+
+class PrePushFileCapTests(FileOpenPrCapTestCase):
+    def setUp(self):
+        super().setUp()
+        self._track("sess-2", 2, "feature/b", ["a.yml"])
+        self._track("sess-2", 3, "feature/c", ["a.yml", "z.yml"])
+        self._sync()
+
+    def test_warns_at_cap_with_refs(self):
+        self._commit_file("a.yml")
+        code, out, err = self._push()
+        self.assertEqual(code, 0, err)
+        self.assertIn("a.yml: acme/app#2 (beta), acme/app#3 (beta)", out)
+        self.assertIn("merge or rebase", out)
+
+    def test_silent_below_cap(self):
+        self._commit_file("z.yml")
+        code, out, err = self._push()
+        self.assertEqual(code, 0, err)
+        self.assertNotIn("merge or rebase", out)
+
+    def test_own_pr_excluded(self):
+        self._track("sess-1", 4, "feature/mine", ["a.yml"])
+        self._set_cap(3)
+        self._sync()
+        self._commit_file("a.yml")
+        code, out, err = self._push()
+        self.assertNotIn("merge or rebase", out)
+
+    def test_merged_pr_drops_out(self):
+        self.write_gh_fixture("view_acme-app_3", {
+                "state": "MERGED", "isDraft": False, "headRefName": "feature/c", "title": "t",
+                "mergedAt": "2026-01-01T00:00:00Z", "statusCheckRollup": [],
+            })
+        self._sync()
+        self._commit_file("a.yml")
+        code, out, err = self._push()
+        self.assertNotIn("merge or rebase", out)
+
+    def test_feature_off_is_silent(self):
+        self._set_cap(None)
+        self._commit_file("a.yml")
+        code, out, err = self._push()
+        self.assertEqual(code, 0, err)
+        self.assertNotIn("merge or rebase", out)

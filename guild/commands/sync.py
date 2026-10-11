@@ -219,21 +219,26 @@ def _open_pr_change_set(ctx, projects, row, lifecycle, failures):
     if lifecycle in ("merged", "closed"):
         return None
     project = _project_for_repo(projects, row["repo"])
-    if project is None or not project.get("shared_areas"):
+    if project is None:
         return None
-    if not _queue_data_wanted(ctx, project, row):
+    tracks_files = bool(project.get("max_open_prs_per_file"))
+    tracks_globs = bool(project.get("shared_areas")) and _queue_data_wanted(ctx, project, row)
+    if not tracks_files and not tracks_globs:
         return None
     try:
         diff = github.pr_diff(ctx.cwd, row["repo"], row["number"])
     except github.GhCommandError as error:
         failures.append("{}#{}: merge queue data failed: {}".format(row["repo"], row["number"], error))
         return None
-    return {
+    change_set = {
         "additions": diff["additions"],
         "deletions": diff["deletions"],
         "created_at": diff["created_at"],
-        "globs": _touched_shared_areas(project["shared_areas"], diff["paths"]),
+        "globs": _touched_shared_areas(project["shared_areas"], diff["paths"]) if tracks_globs else [],
     }
+    if tracks_files:
+        change_set["paths"] = diff["paths"]
+    return change_set
 
 
 def _shared_areas_line(touched):

@@ -351,6 +351,11 @@ def _store_change_set(conn, repo, number, change_set):
         conn.execute(
             "INSERT INTO pr_shared_areas (repo, number, glob) VALUES (?, ?, ?)", (repo, number, glob)
         )
+    if "paths" not in change_set:
+        return
+    conn.execute("DELETE FROM pr_files WHERE repo = ? AND number = ?", (repo, number))
+    for path in change_set["paths"]:
+        conn.execute("INSERT INTO pr_files (repo, number, path) VALUES (?, ?, ?)", (repo, number, path))
 
 
 def _pr_comments_acknowledged(conn, event):

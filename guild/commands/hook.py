@@ -452,21 +452,53 @@ def _push_diff_paths(target_dir, base_ref):
     return [line for line in result.stdout.splitlines() if line]
 
 
-def _shared_areas_push_result(ctx, target_dir):
+def _push_paths_or_result(target_dir):
     base_ref = localbase.origin_head_ref(target_dir)
     if base_ref is None:
-        return {
+        return None, {
             "blocked": False,
             "message": None,
             "system_message": "guild: could not determine base branch; shared_areas not checked",
         }
     paths = _push_diff_paths(target_dir, base_ref)
     if paths is None:
-        return {
+        return None, {
             "blocked": False,
             "message": None,
             "system_message": "guild: could not diff against {}; shared_areas not checked".format(base_ref),
         }
+    return paths, None
+
+
+def _file_cap_warning(ctx, branch, paths):
+    project = config.resolve_project(ctx.cwd, config.load_all_projects(ctx.projects_dir))
+    if project is None:
+        return None
+    project_data = config.load_project(ctx.projects_dir, project)
+    cap = project_data.get("max_open_prs_per_file")
+    if cap is None:
+        return None
+    lines = []
+    for path in sorted(paths):
+        rows = ctx.conn.execute(
+            "SELECT prs.repo, prs.number, prs.party FROM pr_files JOIN prs"
+            " ON prs.repo = pr_files.repo AND prs.number = pr_files.number"
+            " WHERE pr_files.path = ? AND prs.lifecycle NOT IN ('merged', 'closed')"
+            " AND (prs.branch IS NULL OR prs.branch != ?) ORDER BY prs.repo, prs.number",
+            (path, branch),
+        ).fetchall()
+        rows = [row for row in rows if row["repo"] in project_data["github"]["repos"]]
+        if len(rows) >= cap:
+            refs = ", ".join("{}#{} ({})".format(row["repo"], row["number"], row["party"]) for row in rows)
+            lines.append("{}: {}".format(path, refs))
+    if not lines:
+        return None
+    return "guild: open PRs already touch files of this push (cap {}); merge or rebase on those first\n{}".format(
+        cap, "\n".join(lines)
+    )
+
+
+def _shared_areas_push_result(ctx, target_dir, paths):
     reasons = _claim_shared_areas_or_reasons(ctx.with_cwd(Path(target_dir)), paths)
     if not reasons:
         return None
@@ -513,9 +545,15 @@ def pre_push(ctx, command):
                 ),
                 "system_message": None,
             }
-        shared_areas_result = _shared_areas_push_result(ctx, target_dir)
+        paths, failure = _push_paths_or_result(target_dir)
+        if failure is not None:
+            return failure
+        shared_areas_result = _shared_areas_push_result(ctx, target_dir, paths)
         if shared_areas_result is not None:
             return shared_areas_result
+        warning = _file_cap_warning(ctx.with_cwd(Path(target_dir)), branch, paths)
+        if warning is not None:
+            return {"blocked": False, "message": None, "system_message": warning}
     return {"blocked": False, "message": None, "system_message": None}
 
 
