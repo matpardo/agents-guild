@@ -112,3 +112,10 @@ updated: 2026-10-04
 **Status:** [x] done — #126
 
 **What:** each merge-queue entry has the same Block (asks for a reason) and Unblock controls as the PR card, from one shared renderer, and shows the `blocked: external` reason; queue entries carry their own `blocked_external`.
+
+## T16 — Show the manual block only when a PR has one
+
+**Depends on:** T15
+**Status:** [x] done — #127
+
+**What:** the web treats only a non-empty `blocked_external` as a manual block (a missing field no longer shows Unblock); the pill reads `blocked: manual`, the buttons Block manually and Unblock, queue dependents read `waits on manually blocked <ref>: <reason>` and the blocked PR `manual block: <reason>`; the reason box state is keyed by location and ref.

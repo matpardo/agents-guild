@@ -43,7 +43,7 @@ class PrBlockUiTests(unittest.TestCase):
         self.js = (_WEB_DIR / "app.js").read_text()
 
     def test_pr_card_has_block_and_unblock_actions(self):
-        for token in ('"Block"', '"Unblock"', "/api/prs/", "pr.blocked_external", "BLOCKED_EXTERNAL_TEXT"):
+        for token in ('"Block manually"', '"Unblock"', "/api/prs/", "pr.blocked_external", "BLOCKED_EXTERNAL_TEXT"):
             with self.subTest(token=token):
                 self.assertIn(token, self.js)
 

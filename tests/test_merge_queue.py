@@ -501,8 +501,8 @@ class ExternalBlockTests(unittest.TestCase):
         )["queue"]
         self.assertEqual(_refs(result), [_ref(1), _ref(2)])
         self.assertEqual(result[0]["state"], "blocked")
-        self.assertEqual(result[0]["reasons"], ["external: team meeting"])
-        self.assertEqual(result[0]["action"], "wait: external (team meeting)")
+        self.assertEqual(result[0]["reasons"], ["manual block: team meeting"])
+        self.assertEqual(result[0]["action"], "manual block: team meeting")
         self.assertEqual(result[1]["action"], "merge")
 
     def test_pinned_dependent_is_blocked_and_waits_externally(self):
@@ -511,7 +511,7 @@ class ExternalBlockTests(unittest.TestCase):
         )["queue"]
         self.assertEqual(result[1]["state"], "blocked")
         self.assertEqual(result[1]["reasons"], ["waits on {}".format(_ref(1))])
-        self.assertEqual(result[1]["action"], "wait: external (team meeting)")
+        self.assertEqual(result[1]["action"], "waits on manually blocked {}: team meeting".format(_ref(1)))
         self.assertEqual(result[1]["external"], "team meeting")
 
     def test_cross_repo_pin_propagates(self):

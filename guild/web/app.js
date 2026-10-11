@@ -11,7 +11,7 @@
   var EMPTY_REASON_MESSAGE = "write a reason first";
   var EMPTY_ANSWER_MESSAGE = "write an answer first";
   var DEFAULT_BRANCHES = ["main", "master"];
-  var BLOCKED_EXTERNAL_TEXT = "blocked: external";
+  var BLOCKED_EXTERNAL_TEXT = "blocked: manual";
 var NO_SESSION_MESSAGE = "session token not loaded, reload the page";
   var sessionToken = null;
 
@@ -115,7 +115,7 @@ var NO_SESSION_MESSAGE = "session token not loaded, reload the page";
       "fixes-flaky": "The PR fixes flaky tests; it goes first so the suite stops lying to everyone.",
       "needs-ask-answer": "The PR is stopped on an open ask; answer it so work can resume.",
       "needs-human-pr-review": "The PR touches something sensitive and needs a human review before merging.",
-      "blocked-external": "The PR waits on something outside development; do not try to fix it.",
+      "blocked-external": "A person marked this PR as blocked manually; it waits on something outside development, do not try to fix it.",
     },
     checks: {
       failing: "Number of failing CI checks; red when above zero.",
@@ -142,7 +142,7 @@ var NO_SESSION_MESSAGE = "session token not loaded, reload the page";
       "checks failing": "Some checks of this PR are failing.",
       "checks pending": "Some checks of this PR are still running.",
       "needs ask answer": "The party is stopped on an ask; answer it first.",
-      external: "The PR is blocked by something outside guild.",
+      "manual block": "A person blocked this PR manually; it waits on something outside development.",
       "waits on task": "The PR waits on a task that is not done yet.",
     },
     queueAction: {
@@ -359,96 +359,104 @@ var NO_SESSION_MESSAGE = "session token not loaded, reload the page";
     });
   }
 
-  function postPrAction(ref, action, payload) {
+  function postPrAction(location, ref, action, payload) {
+    var key = location + "|" + ref;
     if (sessionToken === null) {
-      state.prStatuses[ref] = NO_SESSION_MESSAGE;
+      state.prStatuses[key] = NO_SESSION_MESSAGE;
       fetchBoard();
       return;
     }
-    state.prBusy[ref] = true;
-    state.prStatuses[ref] = "sending...";
+    state.prBusy[key] = true;
+    state.prStatuses[key] = "sending...";
     fetchBoard();
     sendPost(prUrl(ref, action), payload).then(function (result) {
-      delete state.prBusy[ref];
+      delete state.prBusy[key];
       if (result.ok) {
-        delete state.prBlockOpen[ref];
-        delete state.prDrafts[ref];
-        delete state.prStatuses[ref];
+        delete state.prBlockOpen[key];
+        delete state.prDrafts[key];
+        delete state.prStatuses[key];
       } else {
-        state.prStatuses[ref] = errorMessage(result.body);
+        state.prStatuses[key] = errorMessage(result.body);
       }
       fetchBoard();
     });
   }
 
-  function submitBlock(ref) {
-    var text = state.prDrafts[ref] || "";
+  function submitBlock(location, ref) {
+    var key = location + "|" + ref;
+    var text = state.prDrafts[key] || "";
     if (text.trim() === "") {
-      state.prStatuses[ref] = EMPTY_REASON_MESSAGE;
+      state.prStatuses[key] = EMPTY_REASON_MESSAGE;
       fetchBoard();
       return;
     }
-    postPrAction(ref, "block", { reason: text });
+    postPrAction(location, ref, "block", { reason: text });
   }
 
-  function prButton(ref, label, handler) {
+  function prButton(location, ref, label, handler) {
     var button = textEl("button", label);
     button.type = "button";
-    button.disabled = state.prBusy[ref] === true;
+    button.disabled = state.prBusy[location + "|" + ref] === true;
     button.addEventListener("click", handler);
     return button;
   }
 
   function renderBlockInput(ref, location) {
+    var key = location + "|" + ref;
     var input = el("input");
     input.type = "text";
     input.className = "block-reason";
     input.placeholder = "reason";
-    input.value = state.prDrafts[ref] || "";
-    input.disabled = state.prBusy[ref] === true;
-    input.dataset.focusKey = location + "|" + ref;
+    input.value = state.prDrafts[key] || "";
+    input.disabled = state.prBusy[key] === true;
+    input.dataset.focusKey = key;
     input.addEventListener("input", function () {
-      state.prDrafts[ref] = input.value;
+      state.prDrafts[key] = input.value;
     });
     return input;
   }
 
   function renderPrBlockControls(ref, blockedExternal, location) {
+    var key = location + "|" + ref;
     var controls = el("span");
     controls.className = "pr-block-controls";
-    if (blockedExternal !== null) {
+    if (isManuallyBlocked(blockedExternal)) {
       controls.appendChild(
-        prButton(ref, "Unblock", function () {
-          postPrAction(ref, "unblock", {});
+        prButton(location, ref, "Unblock", function () {
+          postPrAction(location, ref, "unblock", {});
         })
       );
-    } else if (state.prBlockOpen[ref]) {
+    } else if (state.prBlockOpen[key]) {
       controls.appendChild(renderBlockInput(ref, location));
       controls.appendChild(
-        prButton(ref, "Confirm block", function () {
-          submitBlock(ref);
+        prButton(location, ref, "Confirm block", function () {
+          submitBlock(location, ref);
         })
       );
     } else {
       controls.appendChild(
-        prButton(ref, "Block", function () {
-          state.prBlockOpen[ref] = true;
+        prButton(location, ref, "Block manually", function () {
+          state.prBlockOpen[key] = true;
           fetchBoard();
         })
       );
     }
-    var status = textEl("span", state.prStatuses[ref] || "");
+    var status = textEl("span", state.prStatuses[key] || "");
     status.className = "ask-status";
     controls.appendChild(status);
     return controls;
+  }
+
+  function isManuallyBlocked(reason) {
+    return typeof reason === "string" && reason !== "";
   }
 
   function renderBlockedExternalPill(reason) {
     var pill = textEl("span", BLOCKED_EXTERNAL_TEXT);
     pill.className = "pill lifecycle-blocked-external";
     explain(pill, "flag", "blocked-external");
-    if (reason !== null) {
-      pill.title = pill.title + " Reason: " + reason;
+    if (isManuallyBlocked(reason)) {
+      pill.title = pill.title + " Set by a person. Reason: " + reason;
     }
     return pill;
   }
@@ -1159,7 +1167,7 @@ var NO_SESSION_MESSAGE = "session token not loaded, reload the page";
     entry.labels.forEach(function (label) {
       if (label === "blocked-external") {
         head.appendChild(renderBlockedExternalPill(entry.blocked_external));
-        if (entry.blocked_external !== null) {
+        if (isManuallyBlocked(entry.blocked_external)) {
           head.appendChild(textEl("span", entry.blocked_external));
         }
         return;
@@ -1370,7 +1378,7 @@ var NO_SESSION_MESSAGE = "session token not loaded, reload the page";
       review.className = "pill lifecycle-needs-human-pr-review";
       row.appendChild(explain(review, "flag", "needs-human-pr-review"));
     }
-    if (pr.blocked_external !== null) {
+    if (isManuallyBlocked(pr.blocked_external)) {
       row.appendChild(renderBlockedExternalPill(pr.blocked_external));
       row.appendChild(textEl("span", pr.blocked_external));
     }

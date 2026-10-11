@@ -55,13 +55,13 @@ class ExternalBlockTestCase(MergeQueueTestCase):
         self.pr_set(1, "--blocked-external", "team meeting")
         lines = self.queue().splitlines()
         self.assertIn("acme/app#1", lines[1])
-        self.assertIn("wait: external (team meeting)", lines[1])
+        self.assertIn("manual block: team meeting", lines[1])
         self.assertEqual(merge_queue_commands.next_to_merge(self.conn(), {"alpha"}), "acme/app#2")
 
     def test_pin_dependent_waits_externally(self):
         self.pr_set(1, "--blocked-external", "team meeting")
         self.run_cli(["merge-queue", "pin", "acme/app#1", "--before", "acme/app#2"], "sess-1", self.repo_dir)
-        self.assertIn("wait: external (team meeting)", self.queue().splitlines()[2])
+        self.assertIn("waits on manually blocked acme/app#1: team meeting", self.queue().splitlines()[2])
         self.assertEqual(merge_queue_commands.next_to_merge(self.conn(), {"alpha"}), "acme/app#3")
 
     def conn(self):

@@ -71,6 +71,7 @@ class WebDriftScriptTests(unittest.TestCase):
 
 
 _HARNESS = Path(__file__).resolve().parent / "web_drift_harness.js"
+_MISSING = object()
 _BOARD = {
     "generated_at": "now", "asks": [], "notices": [], "blocked": [], "merge_queues": [],
     "dispatcher": {"in_flight": [], "failed": [], "projects": [], "deferred": [], "recent": []}, "projects": [], "raids": [{"name": "r", "members": ["c"]}],
@@ -146,14 +147,16 @@ class WebDriftBehaviorTests(unittest.TestCase):
 @unittest.skipIf(shutil.which("node") is None, "node not installed")
 class WebQueueBlockBehaviorTests(unittest.TestCase):
     def _queue_text(self, blocked_external):
-        labels = [] if blocked_external is None else ["blocked-external"]
+        labels = [] if blocked_external in (None, _MISSING) else ["blocked-external"]
         entry = {
             "ref": "o/r#1", "repo": "o/r", "number": 1, "party": "a", "task": "q/T1", "lifecycle": "ready",
             "branch": "b", "checks_failing": 0, "checks_passing": 1, "checks_pending": 0, "labels": labels,
-            "blocked_external": blocked_external, "url": "https://example.test/1", "position": 1, "unblocks": 0,
+            "url": "https://example.test/1", "position": 1, "unblocks": 0,
             "state": "ready", "next_action": False, "action": "merge", "why": "ready", "reasons": [], "blockers": [],
             "waits": [], "gates": [],
         }
+        if blocked_external is not _MISSING:
+            entry["blocked_external"] = blocked_external
         queue = {"head": None, "scope": "party:a", "synced_at": "now", "synced_label": "synced now", "main": [], "queue": [entry]}
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "board.json"
@@ -163,12 +166,19 @@ class WebQueueBlockBehaviorTests(unittest.TestCase):
                 capture_output=True, text=True, timeout=30, check=True,
             ).stdout
 
-    def test_queue_entry_offers_block(self):
+    def test_entry_without_the_field_offers_block_manually(self):
+        text = self._queue_text(_MISSING)
+        self.assertIn("Block manually", text)
+        self.assertNotIn("Unblock", text)
+
+    def test_null_entry_offers_block_manually(self):
         text = self._queue_text(None)
-        self.assertIn("Block", text)
+        self.assertIn("Block manually", text)
         self.assertNotIn("Unblock", text)
 
     def test_blocked_queue_entry_offers_unblock_and_shows_the_reason(self):
         text = self._queue_text("waiting on legal")
         self.assertIn("Unblock", text)
         self.assertIn("waiting on legal", text)
+        self.assertIn("blocked: manual", text)
+        self.assertNotIn("Block manually", text)

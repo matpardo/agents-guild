@@ -47,7 +47,7 @@ def _ask_text(text, pr):
 def _blocked_reasons(pr):
     reasons = []
     if pr["blocked_external"] is not None:
-        reasons.append("external: {}".format(pr["blocked_external"]))
+        reasons.append("manual block: {}".format(pr["blocked_external"]))
     if pr["needs_ask_answer"]:
         reasons.append(_ask_text("needs ask answer", pr))
     if pr["checks_failing"] > 0:
@@ -314,8 +314,10 @@ def _state(reasons, waits):
 
 
 def _action(pr, state, reasons, waits, external):
+    if external is not None and external[0] == pr["ref"]:
+        return "manual block: {}".format(external[1])
     if external is not None:
-        return "wait: external ({})".format(external)
+        return "waits on manually blocked {}: {}".format(*external)
     if state == _BLOCKED_STATE:
         return "fix: {} \u2192 {}".format("; ".join(reasons), pr["party"])
     if state == _WAITING_STATE:
@@ -338,7 +340,7 @@ def _queue_entry(pr, unblocks, reasons, waits, why, external):
         waits=waits,
         why=why,
         action=_action(pr, state, reasons, waits, external),
-        external=external,
+        external=None if external is None else external[1],
         blocked_external=pr["blocked_external"],
         next_action=False,
     )
@@ -360,7 +362,7 @@ def _ordered_entries(by_ref, order, edges, unblocks):
         waits = _wait_reasons(pr)
         waits.extend("waits on {}".format(first) for first in before if first in pending_refs)
         state = _state(reasons, waits)
-        external = pr["blocked_external"]
+        external = _own_external(pr)
         if external is None:
             external = next((external_reasons[first] for first in before if first in external_reasons), None)
         if external is not None:
@@ -373,11 +375,17 @@ def _ordered_entries(by_ref, order, edges, unblocks):
     return entries
 
 
+def _own_external(pr):
+    if pr["blocked_external"] is None:
+        return None
+    return (pr["ref"], pr["blocked_external"])
+
+
 def _stuck_entries(by_ref, stuck, unblocks):
     cycle = "ordering cycle between pins and task dependencies: {}".format(", ".join(stuck))
     return [
         _queue_entry(
-            by_ref[ref], unblocks[ref], _blocked_reasons(by_ref[ref]) + [cycle], [], "", by_ref[ref]["blocked_external"]
+            by_ref[ref], unblocks[ref], _blocked_reasons(by_ref[ref]) + [cycle], [], "", _own_external(by_ref[ref])
         )
         for ref in stuck
     ]

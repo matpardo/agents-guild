@@ -64,7 +64,7 @@ class ExternalReadyCheckTests(ReadyCheckTests):
         )
         self.assertEqual(code, 0, err)
         code, out, err = self.check(3)
-        self.assertEqual((code, out.splitlines()), (1, ["acme/app#3 blocked", "- external: team meeting"]))
+        self.assertEqual((code, out.splitlines()), (1, ["acme/app#3 blocked", "- manual block: team meeting"]))
 
 
 class GatesTests(unittest.TestCase):

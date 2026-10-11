@@ -65,7 +65,7 @@ class TooltipCoverageTests(unittest.TestCase):
     def test_queue_reasons(self):
         self.assertCovers(
             "reason",
-            ["checks failing", "checks pending", "needs ask answer", "external", "waits on task"],
+            ["checks failing", "checks pending", "needs ask answer", "manual block", "waits on task"],
         )
 
     def test_task_states(self):
