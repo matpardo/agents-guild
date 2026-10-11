@@ -268,11 +268,16 @@ Deterministic, per-party ranking, evaluated in order:
 4. Own PR `converging` with no activity for longer than the project's
    `next.stale_hours` (skipped entirely when that key is absent — no hidden
    default).
-5. Next queued task of the caller's active quests, ordered by the observed
+5. Own tracker or SDD drift (`PR open, card not started`, `PR merged, card
+   not done`, `task started, card not started`, `task done, SDD not done`),
+   one `update tracker/SDD: <finding>` line per finding, after the PR
+   attention above and before the next task. Reads the DB only; guild never
+   writes to the tracker or the SDD.
+6. Next queued task of the caller's active quests, ordered by the observed
    `tasks.order_idx` (nulls last, then `tid`), whose dependencies (`tasks.deps`)
    all resolve `done` (see resolver below), that has no open ask referencing
    it and is not task-claimed by another party.
-6. Raid lead work, only for a party that is the active lead of a raid: open
+7. Raid lead work, only for a party that is the active lead of a raid: open
    asks from the raid's other member parties (`raid <name>: ask #<id> from
    <party>: "<question>"`), then the raid's merge queue entries for the other
    members' PRs, one line per PR in queue order with its action
@@ -283,7 +288,7 @@ Deterministic, per-party ranking, evaluated in order:
    → fix before anything` for each red main. Without `--all` only
    the first item is printed. Read-only: guild never merges and nothing is
    acknowledged.
-7. Nothing actionable: the exact blockers (pending deps and who says so, open
+8. Nothing actionable: the exact blockers (pending deps and who says so, open
    ask ids, claim holders).
 
 Any disagreement the dependency resolver finds between sources it consulted
@@ -349,6 +354,18 @@ language without a configured list. No opinion anywhere → not done, never
 assumed done. When more than one source has an opinion and they disagree,
 the disagreement is returned and surfaced by `guild next`.
 
+### Session-start drift
+
+The per-session `guild brief` (and so the session-start hook) lists the
+caller's own tracker and SDD drift under a `drift:` header: the findings of
+the four rules `guild next` ranks, for the caller's party only, capped at 5
+with `N more: guild drift` after them. Nothing is printed without drift.
+
+### `guild task start` nudge
+
+When the started task's SDD card is still `new` in the tracker,
+`guild task start` adds a `move <KEY> to In Progress` line to its output.
+
 ### Merge notices (`sync --source gh`)
 
 When `guild sync --source gh` observes a tracked PR whose lifecycle flips to
@@ -362,6 +379,10 @@ as every other notice). The notice's TTL is a fixed 12h and its text is:
 ```
 <repo>#<n> merged in main (<quest>/<tid>: <what>). Parties with open branches: rebase.
 ```
+
+When the PR's linked card is not done, or its SDD task is not marked done,
+the notice ends with `Owner follow-up: move <KEY> to Done; mark <tid> done in
+<epic> tasks.md.` (only the parts that apply).
 
 A PR tracked with `--card` shows `<card>: <what>` in place of `<quest>/<tid>: <what>`;
 a PR with neither (seeded) shows just `<what>`.

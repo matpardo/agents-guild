@@ -2,6 +2,7 @@ import json
 from datetime import timedelta
 
 from guild import config, events, merge_queue, resolve, sanitize, timeutil
+from guild.commands import drift as drift_commands
 from guild.commands import merge_queue as merge_queue_commands
 from guild.commands import pr as pr_commands
 from guild.commands import raid as raid_commands
@@ -276,10 +277,15 @@ def _task_title_display(next_task):
     return next_task["title"]
 
 
-def _render_all(candidates, next_task, disagreements, raid_lines):
+def _drift_line(finding):
+    return "update tracker/SDD: {}".format(finding)
+
+
+def _render_all(candidates, drift, next_task, disagreements, raid_lines):
     lines = []
     for row, reason, _ in candidates:
         lines.append("PR {}: {}".format(_pr_label(row), reason))
+    lines.extend(_drift_line(finding) for finding in drift)
     if next_task is not None:
         lines.append(
             "task {}/{}: {} — ready".format(
@@ -294,12 +300,17 @@ def _render_all(candidates, next_task, disagreements, raid_lines):
     return lines
 
 
-def _render_single(ctx, candidates, next_task, disagreements, blocked, raid_lines, acknowledge):
+def _render_single(ctx, candidates, drift, next_task, disagreements, blocked, raid_lines, acknowledge):
     if candidates:
         row, reason, should_ack = candidates[0]
         if should_ack and acknowledge:
             pr_commands.acknowledge_comments(ctx, row["repo"], row["number"])
         lines = ["PR {}: {}".format(_pr_label(row), reason)]
+        for line in disagreements:
+            lines.append("disagreement: {}".format(line))
+        return lines
+    if drift:
+        lines = [_drift_line(drift[0])]
         for line in disagreements:
             lines.append("disagreement: {}".format(line))
         return lines
@@ -367,6 +378,12 @@ def next_task_item(ctx, binding):
     return _collect(ctx, binding["party"], binding["project"])[1]
 
 
+def _party_drift(ctx, party, project):
+    if project is None:
+        return []
+    return drift_commands.party_findings(ctx.conn, project, party)
+
+
 def run(ctx, binding, show_all, acknowledge):
     party, project = binding["party"], binding["project"]
     paused_rows = raid_commands.paused_member_raids(ctx.conn, ctx.now, party)
@@ -375,7 +392,8 @@ def run(ctx, binding, show_all, acknowledge):
     candidates, next_task, disagreements, blocked = _collect(ctx, party, project)
 
     raid_lines = _lead_raid_lines(ctx.conn, ctx.now, party)
+    drift = _party_drift(ctx, party, project)
 
     if show_all:
-        return _render_all(candidates, next_task, disagreements, raid_lines)
-    return _render_single(ctx, candidates, next_task, disagreements, blocked, raid_lines, acknowledge)
+        return _render_all(candidates, drift, next_task, disagreements, raid_lines)
+    return _render_single(ctx, candidates, drift, next_task, disagreements, blocked, raid_lines, acknowledge)

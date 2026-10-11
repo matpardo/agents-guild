@@ -1,4 +1,5 @@
 from guild import db, events, identity
+from guild.commands import drift as drift_commands
 from guild.commands import quest as quest_commands
 from guild.errors import GuildError
 
@@ -85,7 +86,11 @@ def start(ctx, quest, tid, summary):
             "local",
             {"quest": quest, "tid": tid, "summary": summary},
         )
-    return "task '{}/{}' started".format(quest, tid)
+    message = "task '{}/{}' started".format(quest, tid)
+    card_key = drift_commands.started_card_to_move(ctx.conn, quest, tid)
+    if card_key is None:
+        return message
+    return "{}\nmove {} to In Progress".format(message, card_key)
 
 
 def block(ctx, quest, tid, reason):
