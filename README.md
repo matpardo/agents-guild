@@ -1724,6 +1724,13 @@ against path traversal, not an identity boundary.
 - `max_open_prs` (optional): positive integer. Same, counting the open tracked
   PRs of all parties of the project. Size it to review throughput, e.g. 10.
   Absent → no cap, never defaulted.
+- `max_open_prs_per_file` (optional): positive integer. When a `git push` diff
+  touches a file that this many other open tracked PRs of the project already
+  change, `pre-push` warns (never denies) naming the file and those PRs. Needs
+  `guild sync --source gh`, which then stores the changed files of every open
+  tracked PR (`pr_files`, one `gh pr view` call per PR). Exclusive `area:`
+  claims stay for files that need exclusivity. Absent → no warning, no extra
+  calls, never defaulted.
 - `handoff_retention_days` (optional): positive integer, at most 3650. A closed
   party's last handoff file is deleted by `guild handoff prune` that many days
   after the party closed. Absent → it is kept forever, never defaulted.
@@ -1828,7 +1835,7 @@ not-found keys do not block the write. Any of these failures makes
 Append-only `events` table (SQLite, WAL, `busy_timeout=5000`, writes wrapped
 in `BEGIN IMMEDIATE`) plus projection tables kept in sync in the same
 transaction: `parties`, `leaders`, `quests`, `quest_tasks`, `epics`, `tasks`,
-`prs`, `cards`, `asks`, `notices`, `claims`, `raid_members`, `pr_shared_areas`,
+`prs`, `cards`, `asks`, `notices`, `claims`, `raid_members`, `pr_shared_areas`, `pr_files`,
 `merge_queue_pins`, `cost_samples`, `resource_samples`, `resource_machine`,
 `leader_windows`, `dispatch_decisions`, `cursors`, `transcript_cursors`,
 `dispatch_cursors`. `guild rebuild` drops every projection and replays all
@@ -2115,6 +2122,10 @@ Without a hooks manager, add the same call to the repository's
   (`area:<glob>`), or the push is denied naming the holder when another party
   holds one. If the base branch (`origin/HEAD`) or the diff cannot be
   resolved, it warns via `systemMessage` and does not check `shared_areas`.
+  When the project sets `max_open_prs_per_file` and a file of the push diff is
+  already changed by that many other open tracked PRs (this branch's own PR
+  excluded), it warns via `systemMessage` listing the file and those PRs
+  (`repo#n (party)`); the push is not blocked.
 - `pre-pr-owner`: guards against crossing contexts between parties. On a
   `Bash` call it detects writes to a tracked PR — `git push`/`rebase`/`commit`
   on the branch of an open PR (same wrapper, `-C` and chaining handling as

@@ -3,7 +3,7 @@ epic: raids-in-practice
 type: tasks
 title: Raids that protect parallel work on one epic
 status: active
-updated: 2026-09-29
+updated: 2026-10-11
 ---
 
 # Tasks: Raids that protect parallel work on one epic
@@ -70,3 +70,10 @@ updated: 2026-09-29
 **Status:** [x] done — #29
 
 **What:** `sync --source gh` releases the `area:` claims of the owning party that the merged PR's changed files match, and lists them as `Released:` in the merge notice; claims of other parties and `task:` claims stay.
+
+## T10 — Warn at push when too many open PRs touch the same file
+
+**Depends on:** T09
+**Status:** [x] done — #110
+
+**What:** with `max_open_prs_per_file` set, `sync --source gh` stores the changed files of every open tracked PR and `guild hook pre-push` warns, without denying, when a file of the push is already changed by that many other open PRs; exclusive `area:` claims stay for files that need exclusivity.

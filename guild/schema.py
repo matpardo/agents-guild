@@ -13,6 +13,7 @@ PROJECTION_TABLES = (
     "raid_members",
     "raid_pauses",
     "pr_shared_areas",
+    "pr_files",
     "merge_queue_pins",
     "main_status",
     "session_status",
@@ -194,6 +195,14 @@ _CREATE_STATEMENTS = (
         number INTEGER NOT NULL,
         glob TEXT NOT NULL,
         PRIMARY KEY (repo, number, glob)
+    )
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS pr_files (
+        repo TEXT NOT NULL,
+        number INTEGER NOT NULL,
+        path TEXT NOT NULL,
+        PRIMARY KEY (repo, number, path)
     )
     """,
     """
