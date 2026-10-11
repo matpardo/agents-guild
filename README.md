@@ -141,6 +141,8 @@ guild pr set   <owner/repo>#<n> [--lifecycle draft|converging|ready] [--waits ".
                                [--blocked-external "<reason>" | --no-blocked-external]
 guild pr ready-check <owner/repo>#<n>   # read-only: everything standing between the PR and a merge
 
+guild finding record <owner/repo>#<n> --class <slug>   # count a recurring audit/review finding class once per PR; with finding_guard_threshold set, one project notice asks for an architecture guard when the class repeats that many times
+
 guild ask "<question>" --context "..." [--ref <ref> ...] [--option "..."]   # refs: pr:<owner/repo>#<n>, task:<quest>/<tid>, card:<KEY>; with exactly one task in progress and no task:/card: ref it is added for you
 guild answer <id> "<text>"
 guild dismiss <id>
@@ -1757,6 +1759,10 @@ against path traversal, not an identity boundary.
   tracked PR (`pr_files`, one `gh pr view` call per PR). Exclusive `area:`
   claims stay for files that need exclusivity. Absent → no warning, no extra
   calls, never defaulted.
+- `finding_guard_threshold` (optional): positive integer. When `guild finding record`
+  has counted that many distinct PRs for one finding class in the project, one
+  notice to `project:<name>` asks to make the class an architecture guard. Absent
+  → findings are recorded silently, never defaulted.
 - `handoff_retention_days` (optional): positive integer, at most 3650. A closed
   party's last handoff file is deleted by `guild handoff prune` that many days
   after the party closed. Absent → it is kept forever, never defaulted.
@@ -2056,6 +2062,7 @@ which merges this block and keeps what is already there:
     "allow": [
       "Bash(guild task:*)",
       "Bash(guild pr:*)",
+      "Bash(guild finding:*)",
       "Bash(guild notice:*)",
       "Bash(guild ask:*)",
       "Bash(guild next:*)",

@@ -22,6 +22,7 @@ PROJECTION_TABLES = (
     "resource_machine",
     "leader_windows",
     "dispatch_decisions",
+    "findings",
 )
 
 _RAID_MEMBERS_TABLE = """
@@ -203,6 +204,17 @@ _CREATE_STATEMENTS = (
         number INTEGER NOT NULL,
         path TEXT NOT NULL,
         PRIMARY KEY (repo, number, path)
+    )
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS findings (
+        project TEXT NOT NULL,
+        class TEXT NOT NULL,
+        repo TEXT NOT NULL,
+        number INTEGER NOT NULL,
+        party TEXT,
+        recorded_at TEXT NOT NULL,
+        PRIMARY KEY (project, class, repo, number)
     )
     """,
     """

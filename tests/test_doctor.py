@@ -22,6 +22,7 @@ _ASK_RULES = ["Bash(guild party start:*)", "Bash(guild quest add:*)"]
 _ALLOW_RULES = [
     "Bash(guild task:*)",
     "Bash(guild pr:*)",
+    "Bash(guild finding:*)",
     "Bash(guild notice:*)",
     "Bash(guild ask:*)",
     "Bash(guild next:*)",
