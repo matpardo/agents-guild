@@ -953,8 +953,12 @@ party's own queue, when they exist. `guild web` shows the same queues, see below
 
 `guild board` also prints a `DISPATCHER` section after the notices: one line per
 dispatcher launch in flight (launched, not yet bound) with party, generation,
-age, rule and subject, and one red line per launch that failed in the last 24
-hours with its reason. The section is omitted when there is neither.
+age, rule and subject, one red line per launch or `pr_promote` that failed in
+the last 24 hours with its reason, one line per project with its rules and mode
+and the launches of the last hour against `max_launches_per_hour`, one line per
+deferred dispatch (party, rule, subject, age, reason) and up to 10 `recent:`
+decisions of the last 24 hours, newest first (dry-run decisions show as
+`planned`). The section is omitted when none of these exist.
 `--party` and `--raid` keep only those parties' launches.
 
 ### `guild drift`
@@ -1051,9 +1055,9 @@ label pills (`draft`, `converging`), checks, party, task, state, `unblocks N`, t
 `next action` marker, the reasons as pills, a collapsible ready-check detail per PR (blockers, waits and gates, the same content as `guild pr ready-check`) and a `next to merge: <ref> (<party>)` line, or `no PR ready to merge`, matching `guild merge-queue --head`; blocked PRs in place; read-only, the same order as
 `guild merge-queue`, with `synced N min ago`; the party filter keeps
 only that party's PRs and the raid filter only that raid's card; the model
-key is `merge_queues`), a "dispatcher" section (launches in flight and
-launches that failed in the last 24 hours; hidden when both are empty; the
-model key is `dispatcher`; the party and raid filters keep only their parties),
+key is `merge_queues`), a "dispatcher" section (the same lines as `guild board`: project rules and
+launch cap, launches in flight, failures, deferred dispatches and recent
+decisions; empty parts are hidden; the model key is `dispatcher`; the party and raid filters keep only their parties),
 drift findings for the default scope (grouped by rule, one block per
 project resolved from the parties shown, skipping parties without a
 project), then one collapsible block per party with its quests, tasks and
