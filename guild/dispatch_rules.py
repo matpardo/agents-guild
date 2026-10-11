@@ -55,6 +55,15 @@ def _checks_trigger(project, party, repo, number, head_sha):
     return Trigger(project, "checks_failing", key, party, subject, prompt)
 
 
+def _fix_trigger(project, party, repo, number, head_sha, reasons):
+    subject = "{}#{}".format(repo, number)
+    prompt = "{} Dispatched: the human asked you to fix {}: {}; run guild pr ready-check {}.".format(
+        resume.RESUME_PROMPT, subject, ", ".join(reasons), subject
+    )
+    key = "fix_requested:{}:{}".format(subject, head_sha)
+    return Trigger(project, "fix_requested", key, party, subject, prompt)
+
+
 def _unmergeable_trigger(project, party, repo, number, head_sha, slugs):
     subject = "{}#{}".format(repo, number)
     reasons = ", ".join(slug.replace("_", " ") for slug in slugs)
@@ -118,6 +127,18 @@ def _checks_failing(conn, projects, event):
     if owner is None:
         return None
     return _checks_trigger(owner["project"], owner["party"], repo, number, payload["head_sha"])
+
+
+def _fix_requested(conn, projects, event):
+    if event["kind"] != "pr.fix_requested":
+        return None
+    payload = event["payload"]
+    owner = _owner(conn, projects, payload["repo"], payload["number"])
+    if owner is None:
+        return None
+    return _fix_trigger(
+        owner["project"], owner["party"], payload["repo"], payload["number"], payload["head_sha"], payload["reasons"]
+    )
 
 
 def _pr_unmergeable(conn, projects, event):
@@ -184,6 +205,22 @@ def _deferred_checks(conn, row):
     return _checks_trigger(row["project"], row["party"], repo, int(number), head_sha)
 
 
+def _deferred_fix(conn, row):
+    subject, head_sha = row["key"].split(":", 1)[1].rsplit(":", 1)
+    repo, number = subject.rsplit("#", 1)
+    pr = conn.execute(
+        "SELECT lifecycle, head_sha, checks_failing, mergeable, review_decision, unresolved_threads, merge_state"
+        " FROM prs WHERE repo = ? AND number = ? AND seeded = 0",
+        (repo, int(number)),
+    ).fetchone()
+    if pr is None or pr["lifecycle"] not in _CHECKED_LIFECYCLES or pr["head_sha"] != head_sha:
+        return None
+    reasons = merge_queue.fix_reasons(pr)
+    if not reasons:
+        return None
+    return _fix_trigger(row["project"], row["party"], repo, int(number), head_sha, reasons)
+
+
 def _deferred_unmergeable(conn, row):
     subject, head_sha, slug_list = row["key"].split(":", 1)[1].split(":", 2)
     repo, number = subject.rsplit("#", 1)
@@ -203,6 +240,7 @@ def _deferred_unmergeable(conn, row):
 _DEFERRED = {
     "ask_answered": _deferred_ask,
     "checks_failing": _deferred_checks,
+    "fix_requested": _deferred_fix,
     "pr_unmergeable": _deferred_unmergeable,
 }
 
@@ -214,7 +252,7 @@ def deferred_trigger(conn, row):
     return rebuild(conn, row)
 
 
-RULES = {"ask_answered": _ask_answered, "checks_failing": _checks_failing, "pr_unmergeable": _pr_unmergeable, "pr_promote": _pr_promote}
+RULES = {"ask_answered": _ask_answered, "checks_failing": _checks_failing, "fix_requested": _fix_requested, "pr_unmergeable": _pr_unmergeable, "pr_promote": _pr_promote}
 
 
 def _next_task_triggers(ctx, project_config):

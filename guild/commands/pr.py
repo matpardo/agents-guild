@@ -2,10 +2,12 @@ from guild import config, db, events, identity, merge_queue, refs
 from guild.adapters import github
 from guild.commands import main_status as main_status_commands
 from guild.commands import merge_queue as merge_queue_commands
+from guild.commands import notice as notice_commands
 from guild.errors import GuildError
 
 _CLOSED_LIFECYCLES = ("merged", "closed")
 _TRACK_INITIAL_LIFECYCLE = "draft"
+_FIX_NOTICE_TTL = "12h"
 _DRAFT_READY_HINT = (
     "PR is draft on GitHub; mark it ready there (gh pr ready {}) or the next sync reverts it"
 )
@@ -160,6 +162,43 @@ def block_external(ctx, ref, reason):
 
 def unblock_external(ctx, ref):
     return _set_blocked_external_as_human(ctx, ref, None)
+
+
+def _fix_request_refusal(row, ref):
+    if row["lifecycle"] in _CLOSED_LIFECYCLES:
+        return "PR '{}' is {}: nothing to fix".format(ref, row["lifecycle"])
+    if row["blocked_external"] is not None:
+        return "PR '{}' is manually blocked: unblock it first".format(ref)
+    if not merge_queue.fix_reasons(row):
+        return "PR '{}' has no automatic blockers to fix".format(ref)
+    if row["head_sha"] is None:
+        return "PR '{}' has no synced head commit: run guild sync --source gh first".format(ref)
+    return None
+
+
+def ask_fix(ctx, ref):
+    repo, number = refs.parse_pr_ref(ref)
+    row = _load_pr(ctx, repo, number)
+    ref_text = "{}#{}".format(repo, number)
+    refusal = _fix_request_refusal(row, ref_text)
+    if refusal is not None:
+        raise GuildError(refusal, 1)
+    if row["fix_requested_sha"] == row["head_sha"]:
+        return "fix for '{}' already requested for this commit".format(ref_text)
+    project = merge_queue_commands._project_for_repo(ctx, repo)
+    if project is None:
+        raise GuildError("repo '{}' is not in any project".format(repo), 1)
+    reasons = merge_queue.fix_reasons(row)
+    with db.writing(ctx.conn):
+        events.record(
+            ctx.conn, ctx.now, ctx.origin, None, ctx.session_id, project, "pr.fix_requested", "guild",
+            {"repo": repo, "number": number, "party": row["party"], "reasons": reasons, "head_sha": row["head_sha"]},
+        )
+    notice_commands.create_announcing(
+        ctx, None, "{}: fix {}: {}".format(row["party"], ref_text, ", ".join(reasons)),
+        "project:{}".format(project), _FIX_NOTICE_TTL, "fix_requested:{}:{}".format(ref_text, row["head_sha"]),
+    )
+    return "fix requested from '{}' for '{}'".format(row["party"], ref_text)
 
 
 def set_(

@@ -140,6 +140,7 @@ guild pr set   <owner/repo>#<n> [--lifecycle draft|converging|ready] [--waits ".
                                [--fixes-main | --no-fixes-main]
                                [--fixes-flaky | --no-fixes-flaky]
                                [--blocked-external "<reason>" | --no-blocked-external]
+guild pr ask-fix <owner/repo>#<n>       # human: ask the owning party to fix an automatically blocked PR
 guild pr ready-check <owner/repo>#<n>   # read-only: everything standing between the PR and a merge
 
 guild finding list                              # finding classes of the project with PR counts
@@ -809,6 +810,16 @@ A PR that had the old `needs-human` lifecycle becomes `draft` with
 `needs-ask-answer` set, both in the live database and when events replay in
 `guild rebuild`.
 
+**Ask to fix.** `guild pr ask-fix <owner/repo>#<n>` is for the human, with no bound party: when an open
+PR is blocked automatically (failing checks, merge conflict, changes requested, unresolved review threads
+or a branch behind base) it records a `pr.fix_requested` event and posts a notice to the project,
+`<party>: fix <ref>: <reasons>`, naming the owning party. It refuses a PR with no automatic blocker, a
+manually blocked PR (unblock it first) and a PR that is not open, and answers
+`already requested for this commit` for a second request on the same head commit; a new head commit allows a
+new one. The dispatcher's `fix_requested` rule launches the owner. `guild web` shows an
+Ask <party> to fix button on the PR card and on its merge-queue entry, only for such PRs, and `fix requested`
+(disabled) after the click until the head commit changes.
+
 **Manual block.** `guild pr set --blocked-external "<reason>"` (the flag keeps its name) marks a PR
 that waits on something outside development (a decision, a meeting); sync
 never clears it, `--no-blocked-external` does. `guild web` shows the PR with a `blocked: manual` pill carrying the reason (also on its merge-queue entry), and its Block manually (asks for a reason) and Unblock buttons, on the PR card and on its merge-queue entry, do the same from the browser, recording the same `pr.set` event with no party. In the merge queue the PR is
@@ -1189,8 +1200,8 @@ uses `innerHTML` or any HTML-injecting API, so text coming from agents, SDD,
 GitHub or the tracker is never executed. Every write runs a command function of `guild/commands` as the human actor,
 the one behind the CLI command (`ask.answer`, `ask.dismiss`,
 `notice.mark_seen|mark_unseen|mark_all_seen`; for a PR, `pr.block_external` and
-`pr.unblock_external`, which record `pr set --blocked-external` with no party; an empty
-reason or an untracked PR answers `422`). `guild web` writes nothing else
+`pr.unblock_external`, which record `pr set --blocked-external` with no party, and `pr.ask_fix`; an empty
+reason, a refused fix request or an untracked PR answers `422`). `guild web` writes nothing else
 to the database, and it logs no per-request
 access noise to stderr (server errors still do). Ctrl-C exits cleanly.
 
@@ -1404,6 +1415,7 @@ Rules, each `dry-run` (records what it would do) or `on`:
 |---|---|---|
 | `ask_answered` | `ask.answered` on an ask that is still answered | launches the party that asked |
 | `checks_failing` | `pr.synced` of a draft, converging or ready PR with failing checks, none pending, a known head commit, not seeded, not from a fork, in a repo of the project | launches the party that owns the PR |
+| `fix_requested` | `pr.fix_requested` (`guild pr ask-fix`, or the web button) on a PR still owned by a party of the project, not seeded | launches the party that owns the PR; its key is the PR and the head commit |
 | `pr_unmergeable` | `pr.synced` of a draft, converging or ready PR with a merge conflict, changes requested, unresolved review threads or a branch behind base, a known head commit, not seeded, not from a fork, not blocked externally, in a repo of the project | launches the party that owns the PR |
 | `next_task` | state rule: a party that handed off (keepers excluded) and has a next unblocked task (`guild next`) | launches that party |
 | `merge_head` | state rule, notify only: the head of each merge queue scope (each raid, then each party outside a raid), see `guild merge-queue --head` | notifies the party that owns the head PR |
@@ -1818,7 +1830,7 @@ All keys. The loader rejects a wrong type with a clear error for every key excep
 - `migration_paths` (list of globs, absent: the migration clash check is skipped and no extra `gh` call is made): matched with `fnmatch` against changed file paths, e.g. `db/migrate/*`. See "Migration version clash" under `sync`.
 - `fast_forward_base` (boolean, absent or `false`: no clone is ever modified): `true` makes `sync --source gh` fast-forward the local base branch of merged repos (see "Base branch fast-forward" under `sync`).
 - `lifecycle` (object, absent: no command ever runs): commands run on PR lifecycle events (see "Lifecycle commands"). Keys are `on_pr_merged` and `on_pr_closed`, any other key fails to load. Each value has exactly `command` (non-empty list of non-empty strings, never a shell string) and `timeout_minutes` (integer from 1 to 1440, required).
-- `dispatcher` (object, absent: the project is never dispatched): opts in to `guild dispatch` (see "Dispatcher"). Exactly three keys, all required: `permission_mode` (`manual`, `acceptEdits` or `auto`; `bypassPermissions`, `dontAsk`, `plan` and anything else fail to load), `max_launches_per_hour` (integer from 1 to 20) and `rules` (an object whose keys are `ask_answered`, `checks_failing`, `pr_unmergeable`, `next_task`, `merge_head`, `pr_promote`, `limit_resume` and `sdd_progress` and whose values are `dry-run` or `on`; `off` is rejected, remove the rule to disable it).
+- `dispatcher` (object, absent: the project is never dispatched): opts in to `guild dispatch` (see "Dispatcher"). Exactly three keys, all required: `permission_mode` (`manual`, `acceptEdits` or `auto`; `bypassPermissions`, `dontAsk`, `plan` and anything else fail to load), `max_launches_per_hour` (integer from 1 to 20) and `rules` (an object whose keys are `ask_answered`, `checks_failing`, `fix_requested`, `pr_unmergeable`, `next_task`, `merge_head`, `pr_promote`, `limit_resume` and `sdd_progress` and whose values are `dry-run` or `on`; `off` is rejected, remove the rule to disable it).
 
 ### SDD parsing rules
 
