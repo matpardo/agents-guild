@@ -13,8 +13,6 @@ from guild.commands import notice as notice_commands
 from guild.commands import raid as raid_commands
 from guild.errors import GuildError
 
-_TRACKER_SUPPORTED_KINDS = ("jira-acli",)
-
 _SDD_PATTERN_KEYS = ("task_heading", "key_ref", "deps_line", "status_line")
 _SDD_OPTIONAL_PATTERN_KEYS = ("order_list", "key_line")
 
@@ -637,18 +635,12 @@ def sync_sdd(ctx, project):
 
 
 def _require_tracker_config(project_data, project):
-    tracker_config = project_data.get("tracker")
-    if tracker_config is None:
+    if project_data.get("tracker") is None:
         raise GuildError(
             "project '{}' has no 'tracker' config block: add one to sync tracker cards".format(
                 project
             ),
             1,
-        )
-    kind = tracker_config.get("kind")
-    if kind not in _TRACKER_SUPPORTED_KINDS:
-        raise GuildError(
-            "project '{}' tracker.kind '{}' is not supported".format(project, kind), 1
         )
 
 

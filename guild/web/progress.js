@@ -57,7 +57,7 @@
   }
 
   function isStale(quest, nowMs) {
-    return idleMilliseconds(quest, nowMs) > quest.stale_hours * HOUR_MS;
+    return quest.stale_hours !== null && idleMilliseconds(quest, nowMs) > quest.stale_hours * HOUR_MS;
   }
 
   function cell(child) {

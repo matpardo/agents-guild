@@ -13,7 +13,7 @@ class CardPrViewsTestCase(GuildTestCase):
         self.repo_dir = self.register_project("acme", ["acme/app"])
         config_file = self.config_home / "guild" / "projects" / "acme.json"
         data = json.loads(config_file.read_text())
-        data["tracker"] = {"browse_url": "https://tracker.example/browse/"}
+        data["tracker"] = {"kind": "jira-acli", "browse_url": "https://tracker.example/browse/"}
         config_file.write_text(json.dumps(data))
         self.run_cli(["party", "start", "alpha"], "sess-1", self.repo_dir)
         self.write_gh_fixture("view_acme-app_1", _OPEN_VIEW)

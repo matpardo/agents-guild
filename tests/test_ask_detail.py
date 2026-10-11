@@ -91,7 +91,7 @@ class SddPathTests(AskDetailBase):
 class CardRefTests(AskDetailBase):
     def test_card_with_status_and_url(self):
         self.insert_card("PROJ-12", "In Progress")
-        self.configure(tracker={"kind": "jira", "browse_url": "https://tracker.example.com/browse/"})
+        self.configure(tracker={"kind": "jira-acli", "browse_url": "https://tracker.example.com/browse/"})
         self.ask("card:PROJ-12")
         card = self.model(1)["refs"][0]
         self.assertEqual(card["status"], "In Progress")
@@ -246,7 +246,7 @@ class CliTests(AskDetailBase):
     def test_golden_output(self):
         self.insert_card("PROJ-12", "In Progress")
         self.configure(
-            tracker={"kind": "jira", "browse_url": "https://tracker.example.com/browse/"},
+            tracker={"kind": "jira-acli", "browse_url": "https://tracker.example.com/browse/"},
         )
         self.make_epic_quest()
         self.ask("task:wq/T01", "card:PROJ-12")

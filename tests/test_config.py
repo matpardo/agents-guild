@@ -46,7 +46,7 @@ class ValidateProjectConfigTests(unittest.TestCase):
                 "name": "acme",
                 "paths": ["/tmp/*"],
                 "github": {"repos": []},
-                "tracker": {"browse_url": "https://tracker.example/browse/"},
+                "tracker": {"kind": "jira-acli", "browse_url": "https://tracker.example/browse/"},
             }
         )
 
@@ -57,9 +57,41 @@ class ValidateProjectConfigTests(unittest.TestCase):
                     "name": "acme",
                     "paths": ["/tmp/*"],
                     "github": {"repos": []},
-                    "tracker": {"browse_url": "http://tracker.example/browse/"},
+                    "tracker": {"kind": "jira-acli", "browse_url": "http://tracker.example/browse/"},
                 }
             )
+
+    def test_rejects_tracker_without_kind(self):
+        with self.assertRaises(GuildError):
+            config.validate_project_config(
+                {"name": "acme", "paths": ["/tmp/*"], "github": {"repos": []}, "tracker": {}}
+            )
+
+    def test_rejects_unknown_tracker_kind_listing_the_valid_ones(self):
+        with self.assertRaises(GuildError) as raised:
+            config.validate_project_config(
+                {"name": "acme", "paths": ["/tmp/*"], "github": {"repos": []}, "tracker": {"kind": "jira"}}
+            )
+        self.assertIn("jira-acli", str(raised.exception))
+
+    def _with_next(self, next_config):
+        return {"name": "acme", "paths": ["/tmp/*"], "github": {"repos": []}, "next": next_config}
+
+    def test_accepts_next_without_stale_hours(self):
+        config.validate_project_config(self._with_next({}))
+
+    def test_accepts_positive_integer_stale_hours(self):
+        config.validate_project_config(self._with_next({"stale_hours": 8}))
+
+    def test_rejects_invalid_stale_hours(self):
+        for value in (0, -1, "8", True, 1.5, None):
+            with self.subTest(value=value):
+                with self.assertRaises(GuildError):
+                    config.validate_project_config(self._with_next({"stale_hours": value}))
+
+    def test_rejects_next_that_is_not_an_object(self):
+        with self.assertRaises(GuildError):
+            config.validate_project_config(self._with_next("8"))
 
     def _with_notify(self, notify):
         return {"name": "acme", "paths": ["/tmp/*"], "github": {"repos": []}, "notify": notify}

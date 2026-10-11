@@ -6,6 +6,7 @@ from guild import names, timeutil
 from guild.errors import GuildError
 
 _REQUIRED_KEYS = ("name", "paths", "github")
+TRACKER_KINDS = ("jira-acli",)
 _TRACKER_BROWSE_URL_PREFIX = "https://"
 _LIFECYCLE_EVENTS = ("on_pr_merged", "on_pr_closed")
 _LIFECYCLE_ENTRY_KEYS = {"command", "timeout_minutes"}
@@ -22,6 +23,13 @@ _DISPATCHER_MAX_LAUNCHES_PER_HOUR = 20
 def _validate_tracker_config(tracker_config):
     if not isinstance(tracker_config, dict):
         raise GuildError("project config 'tracker' must be an object", 1)
+    if tracker_config.get("kind") not in TRACKER_KINDS:
+        raise GuildError(
+            "project config 'tracker.kind' is required and must be one of {}".format(
+                ", ".join(TRACKER_KINDS)
+            ),
+            1,
+        )
     browse_url = tracker_config.get("browse_url")
     if browse_url is None:
         return
@@ -82,6 +90,19 @@ def _validate_max_open_prs_config(data, key):
         return
     if isinstance(cap, bool) or not isinstance(cap, int) or cap <= 0:
         raise GuildError("project config '{}' must be a positive integer".format(key), 1)
+
+
+def _validate_next_config(data):
+    next_config = data.get("next")
+    if next_config is None:
+        return
+    if not isinstance(next_config, dict):
+        raise GuildError("project config 'next' must be an object", 1)
+    if "stale_hours" not in next_config:
+        return
+    stale_hours = next_config["stale_hours"]
+    if isinstance(stale_hours, bool) or not isinstance(stale_hours, int) or stale_hours <= 0:
+        raise GuildError("project config 'next.stale_hours' must be a positive integer", 1)
 
 
 def _validate_handoff_retention_config(data):
@@ -232,6 +253,7 @@ def validate_project_config(data):
     _validate_migration_paths_config(data)
     _validate_fast_forward_base_config(data)
     _validate_lifecycle_config(data)
+    _validate_next_config(data)
     _validate_handoff_retention_config(data)
     _validate_max_open_prs_config(data, "max_open_prs")
     _validate_max_open_prs_config(data, "max_open_prs_per_party")

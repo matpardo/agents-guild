@@ -5,7 +5,6 @@ from datetime import timedelta
 from guild import config, party_progress, timeutil
 
 _WEEK = timedelta(days=7)
-_DEFAULT_STALE_HOURS = 48
 
 _KINDS = (
     "quest.added",
@@ -221,14 +220,14 @@ def _percent(done, total):
 
 def _stale_hours(projects_dir, project):
     if project is None:
-        return _DEFAULT_STALE_HOURS
+        return None
     config_file = projects_dir / "{}.json".format(project)
     if not config_file.is_file():
-        return _DEFAULT_STALE_HOURS
+        return None
     next_config = config.load_project_file(config_file).get("next")
     if next_config is None:
-        return _DEFAULT_STALE_HOURS
-    return next_config.get("stale_hours", _DEFAULT_STALE_HOURS)
+        return None
+    return next_config.get("stale_hours")
 
 
 def _latest(timestamps):
