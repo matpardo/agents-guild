@@ -10,7 +10,7 @@ A permanent `agents-guild-live` worktree made the exception look like the normal
 
 ## Decision
 
-The base clone `agents-guild` stays on `main` and is never edited; `~/.local/bin/guild` and `~/.claude/GUILD.md` link into it. Development happens in a `agents-guild-dev` worktree on a feature branch, created for the change and removed after the merge. `update.sh <base-clone>` fast-forwards the base after each merge.
+The base clone `agents-guild` stays on `main` and is never edited; `~/.local/bin/guild` and `~/.claude/GUILD.md` link into it. Development happens in a `agents-guild-dev` worktree on a feature branch, created for the change and removed after the merge. The base clone's own `update.sh` (no arguments; it acts on the clone it lives in) fast-forwards the base after each merge.
 
 ## Consequences
 

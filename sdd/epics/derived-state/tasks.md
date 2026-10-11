@@ -31,3 +31,15 @@ updated: 2026-10-11
 **Acceptance:**
 - [x] A push is refused while main is red, with reason and the way out.
 - [x] A push from a `fixes_main` PR branch is allowed; so is any push when main is green or unknown.
+
+## T03 — Coherence pass over the readme and agent rules
+
+**Depends on:** T01
+**Status:** [x] done — #125
+
+**What:** the README lists every dispatcher rule, project config key, CLI command and web page or write route that the code registers, with no stale statement left by earlier PRs; `GUILD.md` matches the current CLI (external block, derived `needs-ask-answer`, finding record, ready-check, caps, red-main push); a root `CLAUDE.md` holds the rules for developing guild itself.
+
+**Acceptance:**
+- [x] The dispatcher table, the project config list and the command list match `guild/dispatch_rules.py`, `guild/config.py` and `guild/cli.py`.
+- [x] `GUILD.md` names each agent-visible behavior added since it was last revised.
+- [x] `CLAUDE.md` exists and every claim in it is checked against the repo.

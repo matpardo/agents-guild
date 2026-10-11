@@ -12,6 +12,10 @@ prose. Local first. Python 3.10 stdlib only, no runtime dependencies.
 - Broadcast notices between sessions ("pipeline is down, fix is PR #877").
 - A PR registry reconciled against `gh`, not memory.
 - Area claims so two sessions don't step on the same file.
+- A merge queue that says which PR to merge next, and a local web board
+  (`guild web`) with the same data.
+- An opt-in dispatcher that starts fresh sessions when an ask is answered, CI
+  fails or a task is unblocked.
 
 Guild is local and optional per dev: nothing of it is visible outside the
 local CLI. Never put guild, `ask #N`, `notice #N`, party, raid or quest in PR
@@ -36,8 +40,8 @@ are updated in the same PR as the code.
   assistant.
 - **quest** — a party's current assignment: a slice of an epic, a whole epic,
   or a stream with no epic at all (e.g. "fix CI costs").
-- **epic** — a planning unit owned by external docs/trackers (out of scope
-  for phase 1; guild never writes to it).
+- **epic** — a planning unit owned by external docs/trackers; guild reads it
+  and never writes to it.
 - **task** — a step of an epic, or a step of a no-epic quest. Guild tracks
   its work state (queued/active/blocked/done), not its plan.
 - **raid** — a named channel several parties join for a shared concern (e.g.
@@ -66,12 +70,8 @@ add). Before writing it copies the previous file to `settings.json.bak`. It
 refuses, leaving the file untouched, when `settings.json` is not valid JSON.
 
 Hooks run `guild` in every session, so the installed copy must never be a
-checkout you are editing: a half-written change goes live at once. Install
-from the base clone and keep it on `main`, never editing there:
-
-```
-./install.sh
-```
+checkout you are editing: a half-written change goes live at once. Run
+`./install.sh` from the base clone, keep it on `main` and never edit there.
 
 If you develop guild, do it in a temporary `-dev` worktree on a feature
 branch (`main` stays checked out in the base, so a dev worktree never uses it),
@@ -113,6 +113,7 @@ default so `guild doctor` stays fast and offline.
 
 ```
 guild whoami
+guild doctor [--scan-prs]   # read-only checks: hooks, permission rules, GUILD.md, project configs; --scan-prs: guild traces in open PRs
 guild init-project <name> --config <file.json>
 guild wire-settings   # merge guild hooks and permission rules into ~/.claude/settings.json
 
@@ -134,7 +135,7 @@ guild task done  <quest>/<tid> [--summary "..."]   # epic quests: also mark it d
 guild pr track <owner/repo>#<n> (--task <quest>/<tid> | --card <KEY>) --what "..." --waits "..." [--needs-human-pr-review]
                                [--fixes-main] [--fixes-flaky]
 guild pr set   <owner/repo>#<n> [--lifecycle draft|converging|ready] [--waits "..."]
-                               [--needs-ask-answer | --no-needs-ask-answer]
+                               [--needs-ask-answer | --no-needs-ask-answer]   # manual override; an open ask on the PR also counts
                                [--needs-human-pr-review | --no-needs-human-pr-review]
                                [--fixes-main | --no-fixes-main]
                                [--fixes-flaky | --no-fixes-flaky]
@@ -173,7 +174,7 @@ guild handoff --in-flight "..." --learned "..." [--model <m>] [--respawn]
 guild handoff prune [--dry-run]
 
 guild merge-queue [--raid <name> | --party <name>]   # read-only: PRs in the order to merge by hand
-guild merge-queue --head [--raid <name> | --party <name>]   # the PR whose turn it is: <ref> <party> <task>
+guild merge-queue --head [--raid <name> | --party <name>]   # the first PR whose action is merge: <ref> <party> <task>
 guild merge-queue pin   <owner/repo>#<a> --before <owner/repo>#<b>
 guild merge-queue unpin <owner/repo>#<a> --before <owner/repo>#<b>
 guild main red <owner/repo> --reason "<text>"   # mark a repo's main branch red by hand
@@ -185,15 +186,17 @@ guild resources [--project <name>] [--since <dur>]   # read-only: what each proj
 guild resources collect                                # measure and record a resources.sampled event per project
 guild resources-timer install --every <dur> | uninstall | print
 guild board [--party <name> | --raid <name>]
-guild web [--port <n>]
-guild sync --source gh|sdd|tracker [--all-projects]
+guild web [--port <n>]   # local board in a browser: board, in-progress and achievements pages
+guild sync --source gh|sdd|tracker [--all-projects]   # --all-projects: every project config, for timers (sdd and tracker)
 guild sync-timer install --every <dur> | uninstall | print
 guild sync-sdd-timer install --every <dur> | uninstall | print
 guild sync-tracker-timer install --every <dur> | uninstall | print
+guild lifecycle run on_pr_merged|on_pr_closed [--repo <owner/repo>] [--dry-run]   # run a project's lifecycle command by hand
 guild dispatch run [--dry-run]                # react to new events: launch fresh sessions where a project enabled the dispatcher
 guild dispatch status                         # per project: cursor, launches last hour, rules, launches in flight, recent decisions
 guild dispatch-timer install --every <dur> | uninstall | print
 guild drift [--epic <slug> | --all]
+guild revive [--party <name> ...] [--all] [--list]   # relaunch active parties after a reboot
 guild brief [<party>/<quest>/<tid>]   # no argument: per-session view; with a task: read-only, budgeted brief for a fresh session
 guild inbox --since-last
 guild statusline --session <id> [--ctx <pct>]   # bound: [⚔ <raid>[·RL][ ⏸], ...] · g<N> · ⚑<n> asks · <n> notices · ⏸<n> blocked
@@ -205,6 +208,8 @@ guild hook pre-push
 guild hook pre-pr-owner
 guild hook pre-edit
 guild hook pre-commit      # git hook: no stdin, session from CLAUDE_CODE_SESSION_ID
+guild hook notification    # records the session status
+guild hook stop
 
 guild seed <file.json>
 guild rebuild
@@ -269,8 +274,9 @@ Deterministic, per-party ranking, evaluated in order:
 2. Own PR with failing checks, a merge conflict (`mergeable == CONFLICTING`),
    or unseen review comments (`review_comment_count >
    last_notified_comment_count`).
-3. Own PR flagged `needs-ask-answer` that has an ask, referencing it,
-   answered after the PR was last `pr set`.
+3. Own PR carrying the manual `needs-ask-answer` flag that has an ask,
+   referencing it, answered after the PR was last `pr set`. A PR blocked only
+   by an open ask needs no step here: answering the ask unblocks it.
 4. Own PR `converging` with no activity for longer than the project's
    `next.stale_hours` (skipped entirely when that key is absent — no hidden
    default).
@@ -740,8 +746,9 @@ fail with a clear error when the platform is not Linux or `systemctl` is not
 available; use `print` there. Nothing is pushed to running sessions: the timer
 only refreshes the synced state that sessions read.
 
-`guild sync-sdd-timer` and `guild sync-tracker-timer` take the same
-`install --every <dur> | uninstall | print` and manage their own units
+`guild resources-timer` and `guild dispatch-timer` take the same
+`install --every <dur> | uninstall | print` (see "`guild resources`" and
+"Dispatcher"). `guild sync-sdd-timer` and `guild sync-tracker-timer` do too and manage their own units
 (`guild-sync-sdd.*`, `guild-sync-tracker.*`), so `guild drift` and `guild next`
 do not go stale between manual runs. They run `guild sync --source sdd|tracker
 --all-projects`: a timer has no working directory inside a project, so the sync
@@ -788,11 +795,11 @@ is still draft on GitHub prints a hint, and the next sync reverts it.
 
 **Human flags.** Two independent booleans set with `guild pr set` and never
 touched by sync: `--needs-ask-answer` (the PR is stopped until the human
-answers an ask; blocks the PR in the merge queue) and
+answers an ask; blocks the PR in the merge queue; also derived, see below) and
 `--needs-human-pr-review` (the human should review the PR before it is
 merged; does not block). Each has a `--no-...` counterpart to clear it; an
 absent option leaves the flag unchanged. `pr set` needs at least one option.
-`needs-ask-answer` is also derived: a PR counts as needing an answer while the
+A PR counts as needing an answer while the
 manual flag is set or an open ask refs it (`pr:<owner/repo>#<n>`), computed when
 read, so answering or dismissing the ask unblocks the PR with no `pr set`. The
 merge queue, `pr ready-check`, the board and the web PR pill then show
@@ -831,7 +838,8 @@ PR never clears the red mark.
   decision is `CHANGES_REQUESTED`, review threads are unresolved, the merge state
   is `BEHIND`, a task its own
   task depends on (SDD `Depends on`, through the quest's epic) is not done by
-  the same resolver `guild next` uses, it is flagged `needs-ask-answer`, or a PR
+  the same resolver `guild next` uses, it needs an ask answer (manual flag or an
+  open ask), or a PR
   that must come before it (by task dependency or pin, transitively) is
   blocked (`waits on <ref>`). Every reason that applies is listed: `needs ask answer`,
   `checks failing (N)`, `merge conflict`, `changes requested`,
@@ -1068,7 +1076,8 @@ queue; the left one holds notices, drift and the parties. On narrower
 screens it is a single column with asks and the merge queue first.
 
 **What it shows**: open asks (question, party, options,
-refs, how many refs still block it, a collapsible context), active notices,
+refs, how many refs still block it, a collapsible context, a `detail` control
+that loads `GET /api/asks/<id>`, and a collapsed "answered asks" section), active notices,
 the merge queue (one card per raid, plus one per party outside raids that has
 open PRs: a `MAIN RED` row per red main, then numbered PR links with their
 label pills (`draft`, `converging`), checks, party, task, state, `unblocks N`, the action and the
@@ -1147,8 +1156,10 @@ Project `pii_patterns` are those of the project of the party that asked, whereve
 `http.server.ThreadingHTTPServer` — no third-party dependency, no build
 step. Reads are `GET`; the only writes are `POST /api/asks/<id>/answer`
 (body `{"answer": "<text>"}`), `POST /api/asks/<id>/dismiss`,
-`POST /api/notices/<id>/seen`, `POST /api/notices/<id>/unseen` and
-`POST /api/notices/seen-all` (body `{}`), with `<id>` a positive integer
+`POST /api/notices/<id>/seen`, `POST /api/notices/<id>/unseen`,
+`POST /api/notices/seen-all` (body `{}`),
+`POST /api/prs/<owner>/<repo>/<n>/block` (body `{"reason": "<text>"}`) and
+`.../unblock`, with `<id>` and `<n>` positive integers
 (otherwise `404`); every other method,
 including `OPTIONS`, is `405`, and no response ever carries CORS headers, so
 cross-origin preflights fail. Requests whose `Host` header is not exactly
@@ -1172,24 +1183,33 @@ scripts, no external assets), `X-Content-Type-Options: nosniff` and
 no-store`. The page (`guild/web/app.js`) builds every node with
 `document.createElement` and sets text with `textContent` only — it never
 uses `innerHTML` or any HTML-injecting API, so text coming from agents, SDD,
-GitHub or the tracker is never executed. Apart from answering and dismissing
-asks, marking notices seen or unseen and blocking or unblocking a PR externally
-(`POST /api/prs/<owner>/<repo>/<n>/block` with `{"reason": "..."}` and `.../unblock`; an empty reason or an untracked PR answers `422`), `guild web` never writes to the
-database, and it logs no per-request
+GitHub or the tracker is never executed. Every write runs a command function of `guild/commands` as the human actor,
+the one behind the CLI command (`ask.answer`, `ask.dismiss`,
+`notice.mark_seen|mark_unseen|mark_all_seen`; for a PR, `pr.block_external` and
+`pr.unblock_external`, which record `pr set --blocked-external` with no party; an empty
+reason or an untracked PR answers `422`). `guild web` writes nothing else
+to the database, and it logs no per-request
 access noise to stderr (server errors still do). Ctrl-C exits cleanly.
 
-**History page**: `GET /history` serves `guild/web/history.html` (script
-`guild/web/history.js`, same CSS tokens and light/dark support as the board),
-linked from the board header as `history` and back as `board`. It shows a
+**Achievements and in-progress pages**: the board header links three pages,
+`board`, `in progress` and `achievements`, each linking to the others. They
+share the same CSS tokens and light/dark support, read `GET /api/history`
+(the same model as `guild history`, with optional `party`, `raid` and `project`
+query parameters), are read-only and render text with `textContent` only, like
+the board.
+
+`GET /progress` (`guild/web/progress.html`, script `guild/web/progress.js`)
+lists the quests in progress as a table: party, quest, a `<progress>` bar with
+done/total tasks, start and time since the last activity ("nothing in
+progress" when empty). A quest idle for longer than the project's
+`next.stale_hours` (48 when the key is absent) gets a `stale` marker.
+
+`GET /history` (`guild/web/history.html`, script `guild/web/history.js`) shows a
 totals strip (quests, PRs merged, tasks, asks answered with median, handoffs),
-then in-progress cards (`<progress>` bar and task counts; "nothing in progress" when empty),
-completed-quest cards (dates, duration, epic progress bar, SDD tasks, JIRA
+then completed-quest cards (dates, duration, epic progress bar, SDD tasks, JIRA
 cards, PRs, handoffs, asks, accepted drift; legacy quests show a `no snapshot`
 badge and `—` for unknown fields) closed-without-completing cards (reason, tasks not done at marking time) and finished-raid cards (duration, parties
-with the lead marked, quests, PRs, pauses). The data comes from `GET
-/api/history`, the same model as `guild history`; it accepts optional `party`,
-`raid` and `project` query parameters. It is read-only and renders text with
-`textContent` only, like the board.
+with the lead marked, quests, PRs, pauses).
 
 ### `guild handoff` and resuming a party
 
@@ -1377,16 +1397,16 @@ sessions, the way `guild revive` does.
 
 Rules, each `dry-run` (records what it would do) or `on`:
 
-| Rule | Trigger | Launches |
+| Rule | Trigger | Target |
 |---|---|---|
-| `ask_answered` | `ask.answered` on an ask that is still answered | the party that asked |
-| `checks_failing` | `pr.synced` of a draft, converging or ready PR with failing checks, none pending, a known head commit, not seeded, in a repo of the project | the party that owns the PR |
-| `pr_unmergeable` | `pr.synced` of a draft, converging or ready PR with a merge conflict, changes requested, unresolved review threads or a branch behind base, a known head commit, not seeded, in a repo of the project | the party that owns the PR |
-| `pr_promote` | `pr.synced` of a converging draft PR with settled green checks (none failing or pending, at least one passing), no merge conflict, changes requested, unresolved threads or stale branch, no ask pending, not blocked externally, a known head commit, not seeded, in a repo of the project | the party that owns the PR is notified |
-| `next_task` | state rule: a party that handed off and has a next unblocked task (`guild next`) | that party |
-| `limit_resume` | state rule: a party with a live session whose transcript ends in a usage-limit (429) error, one minute after its reset time | that party is nudged, nothing is launched |
-| `sdd_progress` | state rule, notify only: an active task on an epic quest, started over 24 hours ago, whose epic `tasks.md` has no commit in the last 24 hours (needs the project `sdd` block) | the party that owns the task |
-| `merge_head` | state rule, notify only: the head of each merge queue scope (each raid, then each party outside a raid), see `guild merge-queue --head` | the party that owns the head PR |
+| `ask_answered` | `ask.answered` on an ask that is still answered | launches the party that asked |
+| `checks_failing` | `pr.synced` of a draft, converging or ready PR with failing checks, none pending, a known head commit, not seeded, not from a fork, in a repo of the project | launches the party that owns the PR |
+| `pr_unmergeable` | `pr.synced` of a draft, converging or ready PR with a merge conflict, changes requested, unresolved review threads or a branch behind base, a known head commit, not seeded, not from a fork, not blocked externally, in a repo of the project | launches the party that owns the PR |
+| `next_task` | state rule: a party that handed off (keepers excluded) and has a next unblocked task (`guild next`) | launches that party |
+| `merge_head` | state rule, notify only: the head of each merge queue scope (each raid, then each party outside a raid), see `guild merge-queue --head` | notifies the party that owns the head PR |
+| `pr_promote` | `pr.synced` of a converging draft PR with settled green checks (none failing or pending, at least one passing), no merge conflict, changes requested, unresolved threads or stale branch, no ask pending (open ask or manual flag), not blocked externally, a known head commit, not seeded, not from a fork, in a repo of the project | runs `gh pr ready`, notifies the party that owns the PR |
+| `limit_resume` | state rule: a party with a live session whose transcript ends in a usage-limit (429) error, one minute after its reset time | nudges that party, launches nothing |
+| `sdd_progress` | state rule, notify only: an active task on an epic quest, started over 24 hours ago, whose epic `tasks.md` has no commit in the last 24 hours (needs the project `sdd` block) | notifies the party that owns the task |
 
 `merge_head` never launches a session. When the head of a scope is a PR not
 announced before (`merge_head:<scope>:<ref>`), it posts one project notice
@@ -1415,7 +1435,6 @@ the party and `pr-promote`. A PR flagged `--needs-human-pr-review` is never
 marked ready: the notice is `<ref> converged; needs human review before ready`.
 When `gh` fails the decision is recorded as `failed`, with a notice, and the
 head is not retried. In `dry-run` mode it only records a plan.
-
 
 `next_task` is a state rule: it has no cursor and no age limit. Every pass it
 looks at the parties of the project that handed off (keepers excluded) and
@@ -1709,8 +1728,11 @@ it gets refused with a hint to run `guild party start <name>` or
 `guild party resume <party>`. Reads always work.
 
 No session id at all (a plain terminal) resolves to the actor `human`,
-allowed only for `answer`, `dismiss`, `notice create`, `notice close`,
-`notice seen`, `notice unseen`, and all reads.
+allowed for `answer`, `dismiss`, `notice create|close|seen|unseen`,
+`merge-queue pin|unpin`, `main red|green`, `finding record`, the PR block and
+unblock buttons of `guild web`, and all reads. Commands that write a
+party's own work (`task`, `pr track|set`, `claim`, `raid`, `ask`, `handoff`,
+`quest`) refuse it.
 
 A project is resolved from the current working directory against every
 project config's `paths` globs (first match wins, configs read in filename
@@ -1764,119 +1786,36 @@ against path traversal, not an identity boundary.
 }
 ```
 
-`sdd.root` above can instead be `"git_repo": "~/Documents/_projects/acme/sdd-docs", "git_ref": "origin/main"` (see above) to read the same `epics_dir` from a git ref instead of a working copy.
+`sdd.root` above can instead be `"git_repo": "~/Documents/_projects/acme/sdd-docs", "git_ref": "origin/main"` to read the same `epics_dir` from a git ref instead of a working copy.
 
-- `sdd` (optional): drives `guild sync --source sdd`. Three independent,
-  explicit regexes (`task_heading`, `key_ref`, `deps_line`, `status_line`) plus
-  optional `order_list` and `key_line`; no hidden defaults, no fallback shape. A
-  `tasks.md` file with zero `task_heading` matches is reported unparseable
-  and skipped; other files still sync; `guild sync` exits non-zero if any
-  file failed. See "SDD parsing rules" below for exactly how each regex is
-  used.
-  - Two mutually exclusive ways to read `epics_dir`, exactly one required:
-    - `root`: a plain checkout path. `guild` reads `tasks.md` files straight
-      off disk, so the checkout must exist and stay put.
-    - `git_repo` + `git_ref` (e.g. `"origin/main"`), both required together:
-      `guild` runs `git -C <git_repo> fetch --quiet origin`, lists
-      `tasks.md` files at `<git_ref>` with `git ls-tree` and reads each with
-      `git show <git_ref>:<path>` — it never checks out, resets or otherwise
-      touches `git_repo`'s working tree, so it is safe to point at a clone a
-      human or another session is actively using. A failed fetch, an unknown
-      ref, or zero `tasks.md` files under `epics_dir` at that ref is a clear
-      error, never an empty sync. `epics.sdd_path` is stored as
-      `git:<git_ref>:<path>` in this mode. Prefer `git_repo`/`git_ref` for a
-      docs repo shared with other sessions — the worktree guild reads from
-      can otherwise be deleted or switched out from under it by someone
-      else's cleanup, and `sync` would silently read nothing.
-  - `epic_key_field` (optional): the frontmatter key (a plain `key: value`
-    line between the leading `---` markers of the epic's `tasks.md`) that
-    names the epic's own tracker card, e.g. `jira: DEMO-1`. Stored as
-    `epics.jira_key`. Absent field, or no frontmatter at all, gives `NULL` —
-    never guessed from the epic slug.
-  - `epic_status_field` (optional): the frontmatter key that carries the
-    epic's own SDD status, e.g. `status: done`, parsed exactly like
-    `epic_key_field` and stored as `epics.sdd_status`. Absent field, or no
-    frontmatter at all, gives `NULL`.
-- `tracker` (optional): drives `guild sync --source tracker`. `kind` is
-  required when this block exists; only `"jira-acli"` is supported today,
-  anything else is a clear error. See "Tracker sync" below.
-  - `browse_url` (optional, explicit — no hidden default): the base URL
-    `guild web` prepends to a task's tracker key to build its card link
-    (`browse_url + key`, e.g. `https://acme.atlassian.net/browse/DEMO-1`).
-    Validated when the config is loaded: it must start with `https://`,
-    otherwise `guild init-project`/every command that loads the project
-    fails with a clear error. Absent → tasks never carry a `card_url`.
-- `next.stale_hours` (optional): threshold for `guild next` tier 4
-  (`converging` PR with no activity). Absent → that tier is skipped, never
-  defaulted.
-- `handoff_threshold` (optional): context-usage percent (0-100) at or above
-  which `UserPromptSubmit`/`PostToolUse` hooks nudge once per session toward
-  `guild handoff` (`guild handoff --respawn` for keeper parties and sessions
-  running in a window guild launched), and at or
-  above which the board reports the party as context high. The nudge asks the
-  session to start nothing new, let the executions already running finish, hand
-  off and then stop; the next generation continues from the handoff.
-  Recommended: 40, so sessions stay short and each fresh generation starts from the brief.
-  Absent → 80.
-- `max_open_prs_per_party` (optional): positive integer. When the caller's
-  party has that many open tracked PRs, `guild next` (and the dispatcher's
-  new-task wake-up) offers no new task and says to merge the first PR in queue
-  order. Recommended: 3. Absent → no cap, never defaulted.
-- `max_open_prs` (optional): positive integer. Same, counting the open tracked
-  PRs of all parties of the project. Size it to review throughput, e.g. 10.
-  Absent → no cap, never defaulted.
-- `max_open_prs_per_file` (optional): positive integer. When a `git push` diff
-  touches a file that this many other open tracked PRs of the project already
-  change, `pre-push` warns (never denies) naming the file and those PRs. Needs
-  `guild sync --source gh`, which then stores the changed files of every open
-  tracked PR (`pr_files`, one `gh pr view` call per PR). Exclusive `area:`
-  claims stay for files that need exclusivity. Absent → no warning, no extra
-  calls, never defaulted.
-- `finding_guard_threshold` (optional): positive integer. When `guild finding record`
-  has counted that many distinct PRs for one finding class in the project, one
-  notice to `project:<name>` asks to make the class an architecture guard. Absent
-  → findings are recorded silently, never defaulted.
-- `handoff_retention_days` (optional): positive integer, at most 3650. A closed
-  party's last handoff file is deleted by `guild handoff prune` that many days
-  after the party closed. Absent → it is kept forever, never defaulted.
-- `pii_patterns` (optional): list of explicit regexes, no hidden defaults.
-  Checked, in addition to the built-in email pattern, against notice text,
-  ask question/context, answer text and handoff `--in-flight`/`--learned` for
-  the caller's project. A match rejects the command with an error that names
-  the field, never the matched text.
-- `notify` (optional): `{"command": [<argv>...]}`, a non-empty list of
-  non-empty strings run once per blocking wait (see "Session status"). The
-  only allowed key is `command`.
-- `shared_areas` (optional): list of glob strings relative to the repo root
-  (e.g. `config/routes.rb`, `db/migrate/*`, `config/locales/*.yml`), matched
-  with `fnmatch` against POSIX-style relative paths by `guild hook pre-edit`
-  (see "Hooks"). Present → `shared_area_claim_ttl` is required, or the config
-  fails to load.
-- `shared_area_claim_ttl` (required together with `shared_areas`): the TTL
-  (`30m`/`8h`/`3d`) the pre-edit guard claims a matched area for.
-- `migration_paths` (optional): list of glob strings relative to the repo root
-  (e.g. `db/migrate/*`), matched with `fnmatch` against changed file paths.
-  Unset → the migration clash check is skipped and no extra `gh` call is made.
-  Set → see "Migration version clash" under `sync`.
-- `fast_forward_base` (optional): boolean. `true` → `sync --source gh`
-  fast-forwards the local base branch of merged repos (see "Base branch
-  fast-forward" under `sync`). Must be a boolean or the config fails to load.
-  Absent → no clone is ever modified.
-- `lifecycle` (optional): commands run on PR lifecycle events (see
-  "Lifecycle commands"). Keys are `on_pr_merged` and `on_pr_closed`, any
-  other key fails to load. Each value is an object with exactly `command`
-  (non-empty list of non-empty strings, never a shell string) and
-  `timeout_minutes` (integer from 1 to 1440, required: no default). Absent → no
-  command ever runs.
-- `dispatcher` (optional): opts the project in to `guild dispatch` (see
-  "Dispatcher"). An object with exactly three keys, all required, no
-  defaults: `permission_mode` (`manual`, `acceptEdits` or `auto`;
-  `bypassPermissions`, `dontAsk`, `plan` and anything else fail to load),
-  `max_launches_per_hour` (integer from 1 to 20) and `rules` (an object whose
-  keys are `ask_answered`, `checks_failing`, `pr_unmergeable`, `next_task`, `merge_head`, `pr_promote`, `limit_resume` and `sdd_progress` and whose values are `dry-run`
-  or `on`; `off` is rejected, remove the rule to disable it). Absent → the
-  project is never dispatched.
-- Unknown top-level keys are allowed.
+All keys. The loader rejects a wrong type with a clear error for every key except `sdd`, `next`, `handoff_threshold` and `pii_patterns`, which are read where they are used. An optional key is off when absent; the only defaults are the two stated below (`handoff_threshold`, and the web in-progress page under `next.stale_hours`). Unknown top-level keys are allowed.
+
+- `name` (string, required): project name, a valid slug; `guild init-project <name>` requires it to match, and the file is `<name>.json`.
+- `paths` (non-empty list of globs, required): checkouts of the project; `~` is expanded. The project of a command is the first config with a glob matching the cwd or one of its ancestors.
+- `github` (object, required): `repos`, a list of `owner/repo` the project tracks.
+- `sdd` (object, absent: no SDD sync): drives `guild sync --source sdd`. Explicit regexes `task_heading`, `key_ref`, `deps_line` and `status_line`, plus optional `order_list` and `key_line`; no hidden defaults, no fallback shape. A `tasks.md` with zero `task_heading` matches is reported unparseable and skipped; other files still sync; `guild sync` exits non-zero if any file failed. See "SDD parsing rules".
+  - Exactly one way to read `epics_dir`:
+    - `root`: a plain checkout path. `guild` reads `tasks.md` files straight off disk, so the checkout must exist and stay put.
+    - `git_repo` + `git_ref` (e.g. `"origin/main"`), both required together: `guild` runs `git -C <git_repo> fetch --quiet origin`, lists `tasks.md` files at `<git_ref>` with `git ls-tree` and reads each with `git show <git_ref>:<path>`. It never checks out, resets or otherwise touches `git_repo`'s working tree, so it is safe to point at a clone a human or another session is using. A failed fetch, an unknown ref, or zero `tasks.md` files under `epics_dir` at that ref is a clear error, never an empty sync. `epics.sdd_path` is stored as `git:<git_ref>:<path>` in this mode. Prefer it for a docs repo shared with other sessions: a worktree can be deleted or switched out from under `root`, and `sync` would silently read nothing.
+  - `epic_key_field` (string, absent: `epics.jira_key` is `NULL`): the frontmatter key (a `key: value` line between the leading `---` markers of the epic's `tasks.md`) that names the epic's own tracker card, e.g. `jira: DEMO-1`. Never guessed from the epic slug.
+  - `epic_status_field` (string, absent: `epics.sdd_status` is `NULL`): the frontmatter key that carries the epic's own SDD status, e.g. `status: done`, parsed like `epic_key_field`.
+- `tracker` (object, absent: no tracker sync): drives `guild sync --source tracker` (see "Tracker sync"). `kind` is required when the block exists; only `"jira-acli"` is supported, anything else is a clear error.
+  - `browse_url` (string starting with `https://`, absent: tasks carry no `card_url`): the base `guild web` prepends to a task's tracker key to build its card link (`https://acme.atlassian.net/browse/DEMO-1`).
+- `next.stale_hours` (number, absent: `guild next` skips its stale-`converging` step): hours without activity after which a `converging` PR is reported. The web in-progress page uses it as well and falls back to 48 when absent.
+- `handoff_threshold` (integer percent 0-100, default 80): context usage at or above which the `UserPromptSubmit`/`PostToolUse` hooks nudge once per session toward `guild handoff` (`guild handoff --respawn` for keeper parties and sessions in a window guild launched) and the board reports the party as context high. The nudge asks the session to start nothing new, let running executions finish, hand off and stop. Recommended: 40, so sessions stay short and each fresh generation starts from the brief.
+- `max_open_prs_per_party` (positive integer, absent: no cap): open tracked PRs of one party at which `guild next` (and the dispatcher's `next_task`) offers no new task and says to merge the first PR in queue order. Recommended: 3.
+- `max_open_prs` (positive integer, absent: no cap): the same, counting the open tracked PRs of all parties of the project. Size it to review throughput, e.g. 10.
+- `max_open_prs_per_file` (positive integer, absent: no warning, no extra calls): when a `git push` diff touches a file that this many other open tracked PRs of the project already change, `pre-push` warns (never denies) naming the file and those PRs. Needs `guild sync --source gh`, which then stores the changed files of every open tracked PR (`pr_files`, one `gh pr view` call per PR). Exclusive `area:` claims stay for files that need exclusivity.
+- `finding_guard_threshold` (positive integer, absent: findings are recorded silently): when `guild finding record` has counted that many distinct PRs for one finding class, one notice to `project:<name>` asks to make the class an architecture guard.
+- `handoff_retention_days` (positive integer, at most 3650, absent: kept forever): days after a party closes at which `guild handoff prune` deletes its last handoff file.
+- `pii_patterns` (list of regexes, absent: only the built-in email pattern): checked against notice text, ask question/context, answer text and handoff `--in-flight`/`--learned` for the caller's project. A match rejects the command with an error that names the field, never the matched text.
+- `notify` (object, absent: nothing is run): `{"command": [<argv>...]}`, a non-empty list of non-empty strings run once per blocking wait (see "Session status") and by the notify-only dispatcher rules. `command` is the only allowed key.
+- `shared_areas` (list of globs relative to the repo root, absent: no guard): e.g. `config/routes.rb`, `db/migrate/*`; matched with `fnmatch` against POSIX-style relative paths by `guild hook pre-edit`, `pre-commit` and `pre-push` (see "Hooks"). Present: `shared_area_claim_ttl` is required or the config fails to load.
+- `shared_area_claim_ttl` (duration `30m`/`8h`/`3d`, required with `shared_areas`): the TTL the guards claim a matched area for.
+- `migration_paths` (list of globs, absent: the migration clash check is skipped and no extra `gh` call is made): matched with `fnmatch` against changed file paths, e.g. `db/migrate/*`. See "Migration version clash" under `sync`.
+- `fast_forward_base` (boolean, absent or `false`: no clone is ever modified): `true` makes `sync --source gh` fast-forward the local base branch of merged repos (see "Base branch fast-forward" under `sync`).
+- `lifecycle` (object, absent: no command ever runs): commands run on PR lifecycle events (see "Lifecycle commands"). Keys are `on_pr_merged` and `on_pr_closed`, any other key fails to load. Each value has exactly `command` (non-empty list of non-empty strings, never a shell string) and `timeout_minutes` (integer from 1 to 1440, required).
+- `dispatcher` (object, absent: the project is never dispatched): opts in to `guild dispatch` (see "Dispatcher"). Exactly three keys, all required: `permission_mode` (`manual`, `acceptEdits` or `auto`; `bypassPermissions`, `dontAsk`, `plan` and anything else fail to load), `max_launches_per_hour` (integer from 1 to 20) and `rules` (an object whose keys are `ask_answered`, `checks_failing`, `pr_unmergeable`, `next_task`, `merge_head`, `pr_promote`, `limit_resume` and `sdd_progress` and whose values are `dry-run` or `on`; `off` is rejected, remove the rule to disable it).
 
 ### SDD parsing rules
 
@@ -1941,7 +1880,8 @@ Append-only `events` table (SQLite, WAL, `busy_timeout=5000`, writes wrapped
 in `BEGIN IMMEDIATE`) plus projection tables kept in sync in the same
 transaction: `parties`, `leaders`, `quests`, `quest_tasks`, `epics`, `tasks`,
 `prs`, `cards`, `asks`, `notices`, `claims`, `raid_members`, `pr_shared_areas`, `pr_files`,
-`merge_queue_pins`, `cost_samples`, `resource_samples`, `resource_machine`,
+`merge_queue_pins`, `main_status`, `raid_pauses`, `findings`, `session_status`,
+`cost_samples`, `resource_samples`, `resource_machine`,
 `leader_windows`, `dispatch_decisions`, `cursors`, `transcript_cursors`,
 `dispatch_cursors`. `guild rebuild` drops every projection and replays all
 events from scratch — the only exceptions are `cursors`, `transcript_cursors`
@@ -2415,7 +2355,7 @@ python3 -m venv .venv
 Phase 1 (core): identity, party/quest/task/pr/ask/notice/claim, board, brief,
 inbox, statusline, `gh` sync, pre-push guard, hooks, seed/rebuild/export.
 
-Phase 2 (keep moving, this release): `sdd` adapter and `guild sync --source
+Phase 2 (keep moving, done): `sdd` adapter and `guild sync --source
 sdd` (observed `epics`/`tasks`, epic-quest task validation against them),
 gh sync extended with `mergeable`/review comment tracking, `guild next`
 (ranked action queue, dependency resolver with guild > tracker > sdd
@@ -2432,7 +2372,7 @@ tracker opinion, the read-only `guild drift` report, asks ordered by how many
 refs are still blocked right now, and `raid` (`raid join|leave`, `guild
 raids`, notices scoped `--to raid:<name>`) are done.
 
-**Idle-session wake: no-go (spike, this release).** The design considered
+**Idle-session wake: no-go (spike).** The design considered
 having a resumed leader auto-spawn (`claude -n ...`) instead of asking a
 human to run one command. Not built: the mechanism that could plausibly wake
 or drive a specific Claude Code session from the outside is the per-session
@@ -2441,15 +2381,19 @@ per-session private key — not a public contract. Building against it now
 would mean guild's core handoff flow depends on an implementation detail
 that can change without notice. `guild handoff` instead prints the one
 `GUILD_RESUME=<party> claude -n <party>-g<N+1> '...'` command for a human (or an orchestrating
-agent) to run; revisit auto-spawn if a public, documented session-control
+agent) to run; the dispatcher starts fresh sessions the same way and never
+touches a live one. Revisit auto-spawn if a public, documented session-control
 contract appears.
 
-**Phase 4 (planned).** Lessons from the first real raid, specified under
-`sdd/epics/`: `session-liveness` (active: every party shows whether it is
-working, waiting on a permission prompt or stopped with work),
-`cost-metering`, `ask-context`, `session-lifecycle` (active: handoff retention,
-respawn, a Remote Control keeper), `ephemeral-brief` (active: the task brief,
-`idle`/`queued` party status, shorter sessions), `dispatcher` (active: fresh
+**Phase 4 (lessons from the first real raid, specified under
+`sdd/epics/`).** Done: `session-liveness` (every party shows whether it is
+working, waiting on a permission prompt or stopped with work), `cost-metering`,
+`ask-context`, `session-lifecycle` (handoff retention, respawn, a Remote
+Control keeper), `ephemeral-brief` (the task brief, `idle`/`queued` party
+status, shorter sessions), `merge-queue`, `web-board`, `lifecycle-commands`,
+`resource-footprint`, `security-hardening` and `derived-state`. Open:
+`dispatcher` (active: fresh
 sessions only, see `sdd/decisions/20261004_dispatcher-launches-fresh-sessions.md`),
-`derived-state` and `conflict-hotspots`; `execution-profiles`, `budgets`,
-`officers` and `federation` follow as drafts.
+`install-and-update` and `raids-in-practice`. Drafts: `conflict-hotspots`,
+`execution-profiles`, `budgets`, `officers`, `federation` and
+`skill-integration`.
