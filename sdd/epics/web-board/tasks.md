@@ -126,3 +126,10 @@ updated: 2026-10-04
 **Status:** [x] done — #128
 
 **What:** `guild web` reads its pages, scripts and styles once when the server is created and serves those bytes, so a running server never pairs new files with its older in-memory model; a restart picks up an update. T16 is added by the open PR #127.
+
+## T18 — No hidden stale hours default and a validated tracker kind
+
+**Depends on:** T10
+**Status:** [x] done — #129
+
+**What:** the in-progress page shows no stale marker when the project has no `next.stale_hours` (no 48h default, consistent with `guild next`); the config loader rejects a `next.stale_hours` that is not a positive integer and a `tracker` block whose `kind` is missing or not a supported value.
