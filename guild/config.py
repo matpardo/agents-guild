@@ -76,12 +76,12 @@ def _validate_fast_forward_base_config(data):
         raise GuildError("project config 'fast_forward_base' must be a boolean", 1)
 
 
-def _validate_max_open_prs_config(data):
-    cap = data.get("max_open_prs")
+def _validate_max_open_prs_config(data, key):
+    cap = data.get(key)
     if cap is None:
         return
     if isinstance(cap, bool) or not isinstance(cap, int) or cap <= 0:
-        raise GuildError("project config 'max_open_prs' must be a positive integer", 1)
+        raise GuildError("project config '{}' must be a positive integer".format(key), 1)
 
 
 def _validate_handoff_retention_config(data):
@@ -233,7 +233,8 @@ def validate_project_config(data):
     _validate_fast_forward_base_config(data)
     _validate_lifecycle_config(data)
     _validate_handoff_retention_config(data)
-    _validate_max_open_prs_config(data)
+    _validate_max_open_prs_config(data, "max_open_prs")
+    _validate_max_open_prs_config(data, "max_open_prs_per_party")
     _validate_dispatcher_config(data)
 
 

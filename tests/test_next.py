@@ -627,11 +627,37 @@ class MaxOpenPrsTests(NextTestCase):
             "sess-1", self.repo_dir,
         )
 
-    def _set_cap(self, cap):
+    def _set_cap(self, cap, key="max_open_prs_per_party"):
         config_file = self.config_home / "guild" / "projects" / "acme.json"
         data = json.loads(config_file.read_text())
-        data["max_open_prs"] = cap
+        data[key] = cap
         config_file.write_text(json.dumps(data))
+
+    def _hand_prs_to_other_party(self):
+        conn = sqlite3.connect(str(self.data_home / "guild" / "guild.db"))
+        conn.execute("INSERT INTO parties (name, project, generation, state) VALUES ('beta', 'acme', 1, 'active')")
+        conn.execute("UPDATE prs SET party = 'beta'")
+        conn.commit()
+        conn.close()
+
+    def test_project_cap_reached_by_other_parties_blocks_caller(self):
+        self._hand_prs_to_other_party()
+        self._set_cap(2, "max_open_prs")
+        self._set_cap(3)
+        code, out, err = self.run_cli(["next"], "sess-1", self.repo_dir)
+        self.assertEqual(out.strip(), "wait: 2 open PRs in project, merge acme/app#1 first")
+
+    def test_project_cap_not_reached_offers_task(self):
+        self._hand_prs_to_other_party()
+        self._set_cap(3, "max_open_prs")
+        code, out, err = self.run_cli(["next"], "sess-1", self.repo_dir)
+        self.assertIn("task demo/T03", out)
+
+    def test_party_message_wins_when_both_caps_reached(self):
+        self._set_cap(2, "max_open_prs")
+        self._set_cap(2)
+        code, out, err = self.run_cli(["next"], "sess-1", self.repo_dir)
+        self.assertEqual(out.strip(), "wait: 2 open PRs, merge acme/app#1 first")
 
     def test_absent_cap_offers_task(self):
         code, out, err = self.run_cli(["next"], "sess-1", self.repo_dir)

@@ -129,14 +129,43 @@ def _stale_hours(projects_dir, project):
     return next_config.get("stale_hours")
 
 
-def _max_open_prs(projects_dir, project):
-    return config.load_project(projects_dir, project).get("max_open_prs")
+def _cap(projects_dir, project, key):
+    return config.load_project(projects_dir, project).get(key)
 
 
-def _wait_line(conn, party, own_open):
-    queue = merge_queue_commands.load_scoped_queue(conn, {party})["queue"]
-    first = queue[0]["ref"] if queue else _pr_label(own_open[0])
-    return "wait: {} open PRs, merge {} first".format(len(own_open), first)
+def _project_parties(conn, project):
+    rows = conn.execute("SELECT name FROM parties WHERE project = ?", (project,)).fetchall()
+    return {row["name"] for row in rows}
+
+
+def _scope_open_prs(conn, parties):
+    marks = ",".join("?" * len(parties))
+    return conn.execute(
+        "SELECT * FROM prs WHERE party IN ({}) AND lifecycle NOT IN ('merged', 'closed')"
+        " ORDER BY repo ASC, number ASC".format(marks),
+        sorted(parties),
+    ).fetchall()
+
+
+def _wait_line(conn, parties, scope_label, open_prs):
+    queue = merge_queue_commands.load_scoped_queue(conn, parties)["queue"]
+    first = queue[0]["ref"] if queue else _pr_label(open_prs[0])
+    return "wait: {} open PRs{}, merge {} first".format(len(open_prs), scope_label, first)
+
+
+def _cap_wait_line(ctx, party, project):
+    party_cap = _cap(ctx.projects_dir, project, "max_open_prs_per_party")
+    own_open = _own_open_prs(ctx.conn, party)
+    if party_cap is not None and len(own_open) >= party_cap:
+        return _wait_line(ctx.conn, {party}, "", own_open)
+    project_cap = _cap(ctx.projects_dir, project, "max_open_prs")
+    if project_cap is None:
+        return None
+    parties = _project_parties(ctx.conn, project)
+    project_open = _scope_open_prs(ctx.conn, parties)
+    if len(project_open) < project_cap:
+        return None
+    return _wait_line(ctx.conn, parties, " in project", project_open)
 
 
 def _claim_area(item):
@@ -378,11 +407,12 @@ def _collect(ctx, party, project):
     if project is None:
         return candidates, None, None, [], []
     next_task, disagreements, blocked = _evaluate_next_task(ctx.conn, ctx.now, project, party)
-    cap = _max_open_prs(ctx.projects_dir, project)
-    own_open = _own_open_prs(ctx.conn, party)
-    if next_task is None or cap is None or len(own_open) < cap:
+    if next_task is None:
+        return candidates, None, None, disagreements, blocked
+    wait = _cap_wait_line(ctx, party, project)
+    if wait is None:
         return candidates, next_task, None, disagreements, blocked
-    return candidates, None, _wait_line(ctx.conn, party, own_open), disagreements, blocked
+    return candidates, None, wait, disagreements, blocked
 
 
 def has_work(ctx, binding):
