@@ -70,3 +70,10 @@ updated: 2026-09-28
 **Status:** [x] done — #106
 
 **What:** optional project key `max_open_prs`; a party at the cap gets `wait: <n> open PRs, merge <ref> first` from `guild next` instead of a new task, so stacked PRs stop piling conflicts. Overlap with open PRs is not checked: a task's files are unknown before work starts.
+
+## T10 — Project-wide open PR cap
+
+**Depends on:** T09
+**Status:** [x] done — #108
+
+**What:** the per-party cap key is now `max_open_prs_per_party`; `max_open_prs` caps the open tracked PRs of all parties of the project. At either cap `guild next` offers no new task: `wait: <n> open PRs, merge <ref> first` for the party, `wait: <n> open PRs in project, merge <ref> first` for the project (party check first).

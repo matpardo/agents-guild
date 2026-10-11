@@ -358,8 +358,10 @@ class HandoffRetentionConfigTests(unittest.TestCase):
 
 
 class MaxOpenPrsConfigTests(unittest.TestCase):
+    key = "max_open_prs"
+
     def _with(self, value):
-        return {"name": "acme", "paths": ["/tmp/*"], "github": {"repos": []}, "max_open_prs": value}
+        return {"name": "acme", "paths": ["/tmp/*"], "github": {"repos": []}, self.key: value}
 
     def test_absent_is_valid(self):
         config.validate_project_config({"name": "acme", "paths": ["/tmp/*"], "github": {"repos": []}})
@@ -372,6 +374,10 @@ class MaxOpenPrsConfigTests(unittest.TestCase):
             with self.subTest(value=value):
                 with self.assertRaises(GuildError):
                     config.validate_project_config(self._with(value))
+
+
+class MaxOpenPrsPerPartyConfigTests(MaxOpenPrsConfigTests):
+    key = "max_open_prs_per_party"
 
 
 class DispatcherConfigTests(unittest.TestCase):

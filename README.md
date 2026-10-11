@@ -274,10 +274,14 @@ Deterministic, per-party ranking, evaluated in order:
    one `update tracker/SDD: <finding>` line per finding, after the PR
    attention above and before the next task. Reads the DB only; guild never
    writes to the tracker or the SDD.
-6. Open-PR cap: when the project sets `max_open_prs` and the caller's party
-   already has that many open (not merged, not closed) tracked PRs, no new
-   task is offered; the line is `wait: <n> open PRs, merge <ref> first`,
-   naming the party's first PR in merge-queue order. Absent key → no cap.
+6. Open-PR caps: when the project sets `max_open_prs_per_party` and the
+   caller's party already has that many open (not merged, not closed) tracked
+   PRs, no new task is offered; the line is `wait: <n> open PRs, merge <ref>
+   first`, naming the party's first PR in merge-queue order. Then, when the
+   project sets `max_open_prs` and all parties of the project together have
+   that many open tracked PRs, the line is `wait: <n> open PRs in project,
+   merge <ref> first`, naming the first PR of the project-wide queue. Absent
+   keys → no cap.
    Whether a new task would touch files an open PR already changes is not
    checked: a task's files are unknown before work starts.
 7. Next queued task of the caller's active quests, ordered by the observed
@@ -1711,9 +1715,12 @@ against path traversal, not an identity boundary.
   off and then stop; the next generation continues from the handoff.
   Recommended: 40, so sessions stay short and each fresh generation starts from the brief.
   Absent → 80.
-- `max_open_prs` (optional): positive integer. When the caller's party has
-  that many open tracked PRs, `guild next` (and the dispatcher's new-task
-  wake-up) offers no new task and says to merge the first PR in queue order.
+- `max_open_prs_per_party` (optional): positive integer. When the caller's
+  party has that many open tracked PRs, `guild next` (and the dispatcher's
+  new-task wake-up) offers no new task and says to merge the first PR in queue
+  order. Recommended: 3. Absent → no cap, never defaulted.
+- `max_open_prs` (optional): positive integer. Same, counting the open tracked
+  PRs of all parties of the project. Size it to review throughput, e.g. 10.
   Absent → no cap, never defaulted.
 - `handoff_retention_days` (optional): positive integer, at most 3650. A closed
   party's last handoff file is deleted by `guild handoff prune` that many days
