@@ -18,6 +18,17 @@ def pr_view(cwd, repo, number, fields):
     return json.loads(result.stdout)
 
 
+def pr_ready(cwd, repo, number):
+    result = subprocess.run(
+        ["gh", "pr", "ready", str(number), "--repo", repo],
+        cwd=str(cwd),
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode != 0:
+        raise GhCommandError(result.stderr.strip() or "gh pr ready failed")
+
+
 def pr_diff(cwd, repo, number):
     result = subprocess.run(
         [

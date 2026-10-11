@@ -22,6 +22,16 @@ class Trigger:
         self.prompt = prompt
 
 
+class PromoteTrigger(Trigger):
+    def __init__(self, project, key, party, repo, number, needs_human_review):
+        subject = "{}#{}".format(repo, number)
+        verdict = "converged; needs human review before ready" if needs_human_review else "promoted to ready"
+        super().__init__(project, "pr_promote", key, party, subject, "{} {}".format(subject, verdict))
+        self.repo = repo
+        self.number = number
+        self.needs_human_review = needs_human_review
+
+
 def _ask_trigger(project, party, ask_id):
     prompt = "{} Dispatched: ask #{} was answered; read guild asks {}.".format(
         resume.RESUME_PROMPT, ask_id, ask_id
@@ -59,7 +69,7 @@ def _owner(conn, projects, repo, number):
     owner = conn.execute(
         "SELECT prs.party AS party, parties.project AS project, prs.mergeable AS mergeable,"
         " prs.review_decision AS review_decision, prs.unresolved_threads AS unresolved_threads,"
-        " prs.merge_state AS merge_state, prs.blocked_external AS blocked_external FROM prs"
+        " prs.merge_state AS merge_state, prs.blocked_external AS blocked_external, prs.needs_ask_answer AS needs_ask_answer, prs.needs_human_pr_review AS needs_human_pr_review FROM prs"
         " JOIN parties ON parties.name = prs.party WHERE prs.repo = ? AND prs.number = ? AND prs.seeded = 0",
         (repo, number),
     ).fetchone()
@@ -121,6 +131,28 @@ def _pr_unmergeable(conn, projects, event):
     return _unmergeable_trigger(owner["project"], owner["party"], repo, number, payload["head_sha"], slugs)
 
 
+def _pr_promote(conn, projects, event):
+    if event["kind"] != "pr.synced":
+        return None
+    payload = event["payload"]
+    if payload["lifecycle"] != "converging" or payload.get("gh_draft") is not True or not payload.get("head_sha"):
+        return None
+    if payload["checks_failing"] != 0 or payload.get("checks_pending") != 0 or payload["checks_passing"] <= 0:
+        return None
+    if payload.get("cross_repository") is True:
+        return None
+    repo, number = payload["repo"], payload["number"]
+    owner = _owner(conn, projects, repo, number)
+    if owner is None or owner["blocked_external"] is not None or owner["needs_ask_answer"]:
+        return None
+    if _unmergeable_slugs(owner):
+        return None
+    key = "pr_promote:{}#{}:{}".format(repo, number, payload["head_sha"])
+    return PromoteTrigger(
+        owner["project"], key, owner["party"], repo, number, bool(owner["needs_human_pr_review"])
+    )
+
+
 def _deferred_ask(conn, row):
     ask_id = int(row["key"].split(":", 1)[1])
     answered = conn.execute("SELECT 1 FROM asks WHERE id = ? AND state = 'answered'", (ask_id,)).fetchone()
@@ -173,7 +205,7 @@ def deferred_trigger(conn, row):
     return rebuild(conn, row)
 
 
-RULES = {"ask_answered": _ask_answered, "checks_failing": _checks_failing, "pr_unmergeable": _pr_unmergeable}
+RULES = {"ask_answered": _ask_answered, "checks_failing": _checks_failing, "pr_unmergeable": _pr_unmergeable, "pr_promote": _pr_promote}
 
 
 def _next_task_triggers(ctx, project_config):

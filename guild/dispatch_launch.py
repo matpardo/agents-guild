@@ -4,6 +4,7 @@ from datetime import timedelta
 from pathlib import Path
 
 from guild import config, db, events, resume, session_info, timeutil, tmux_windows
+from guild.adapters import github
 from guild.commands import notice as notice_commands
 from guild.commands import raid as raid_commands
 
@@ -23,6 +24,7 @@ _NOTICE_TTL = "12h"
 _WINDOW_FAILURE = "tmux could not create the window"
 _FAILURE_WAIT = "dispatch-failed"
 _MERGE_HEAD_WAIT = "merge-head"
+_PROMOTE_WAIT = "pr-promote"
 _HOUR_FORMAT = "%Y-%m-%dT%H"
 _BIND_DEADLINE = timedelta(minutes=10)
 _DEFER_DEADLINE = timedelta(hours=24)
@@ -86,6 +88,46 @@ class Launcher:
         if self._already_decided(trigger, mode):
             return None
         return "{}would notify {}".format(self._prefix(trigger), trigger.party)
+
+    def promote(self, project_config, trigger, mode):
+        try:
+            return self._promote(project_config, trigger, mode)
+        except Exception as error:
+            return self._record_error(project_config, trigger, mode, error)
+
+    def preview_promote(self, trigger, mode):
+        if self._already_decided(trigger, mode):
+            return None
+        verb = "notify" if trigger.needs_human_review else "promote"
+        return "{}would {} {}".format(self._prefix(trigger), verb, trigger.party)
+
+    def _promote(self, project_config, trigger, mode):
+        if self._already_decided(trigger, mode):
+            return None
+        prefix = self._prefix(trigger)
+        verb = "notify" if trigger.needs_human_review else "promote"
+        if mode == _DRY_RUN_MODE:
+            self._record_decided(trigger, mode, "planned", None, None, None)
+            return "{}planned: {} {}".format(prefix, verb, trigger.party)
+        if not trigger.needs_human_review:
+            try:
+                github.pr_ready(self._ctx.cwd, trigger.repo, trigger.number)
+            except github.GhCommandError as error:
+                return self._promote_failure(project_config, trigger, mode, str(error))
+        outcome = "notified" if trigger.needs_human_review else "promoted"
+        self._record_decided(trigger, mode, outcome, None, None, None)
+        announces = "dispatch:{}:{}:{}".format(trigger.project, trigger.key, outcome)
+        self._post_notice(trigger.project, _Notice(trigger.prompt, announces))
+        self._push(project_config, trigger.party, _PROMOTE_WAIT)
+        return "{}{} {}".format(prefix, outcome, trigger.party)
+
+    def _promote_failure(self, project_config, trigger, mode, reason):
+        self._record_decided(trigger, mode, "failed", None, None, reason)
+        text = "dispatch could not mark {} ready: {}".format(trigger.subject, reason)
+        announces = "dispatch:{}:{}:failed".format(trigger.project, trigger.key)
+        self._post_notice(trigger.project, _Notice(text, announces))
+        self._push(project_config, trigger.party, _FAILURE_WAIT)
+        return "{}failed {}: {}".format(self._prefix(trigger), trigger.party, reason)
 
     def _announce(self, project_config, trigger, mode):
         if self._already_decided(trigger, mode):
