@@ -89,7 +89,7 @@ def refresh_sdd_snapshot(ctx, project):
     if config.load_project(ctx.projects_dir, project).get("sdd") is None:
         return []
     try:
-        failures = sync._sync_sdd(ctx, project)
+        failures = sync.sync_sdd(ctx, project)
     except GuildError as error:
         failures = [error.message]
     if not failures:

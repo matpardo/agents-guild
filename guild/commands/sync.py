@@ -610,7 +610,7 @@ def _sync_epic_file(ctx, project, epic, text, sdd_path, patterns, epic_key_field
         )
 
 
-def _sync_sdd(ctx, project):
+def sync_sdd(ctx, project):
     project_data = config.load_project(ctx.projects_dir, project)
     sdd_config = project_data.get("sdd")
     if sdd_config is None:
@@ -739,7 +739,7 @@ def _sync_tracker(ctx, project):
     return failures
 
 
-_PROJECT_SOURCES = {"sdd": ("sdd", _sync_sdd), "tracker": ("tracker", _sync_tracker)}
+_PROJECT_SOURCES = {"sdd": ("sdd", sync_sdd), "tracker": ("tracker", _sync_tracker)}
 
 
 def _sync_all_projects(ctx, source):
