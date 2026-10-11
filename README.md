@@ -141,6 +141,7 @@ guild pr set   <owner/repo>#<n> [--lifecycle draft|converging|ready] [--waits ".
                                [--blocked-external "<reason>" | --no-blocked-external]
 guild pr ready-check <owner/repo>#<n>   # read-only: everything standing between the PR and a merge
 
+guild finding list                              # finding classes of the project with PR counts
 guild finding record <owner/repo>#<n> --class <slug>   # count a recurring audit/review finding class once per PR; with finding_guard_threshold set, one project notice asks for an architecture guard when the class repeats that many times
 
 guild ask "<question>" --context "..." [--ref <ref> ...] [--option "..."]   # refs: pr:<owner/repo>#<n>, task:<quest>/<tid>, card:<KEY>; with exactly one task in progress and no task:/card: ref it is added for you
@@ -957,6 +958,17 @@ age, rule and subject, and one red line per launch that failed in the last 24
 hours with its reason. The section is omitted when there is neither.
 `--party` and `--raid` keep only those parties' launches.
 
+`guild board` also prints one `project <name>` block per project of the parties
+shown, before the party blocks: `open PRs: N/cap` and the cap `wait:` line
+when `max_open_prs` is set, one `hot file:` line per file touched by at least
+`max_open_prs_per_file` open PRs (same counting as the pre-push warning),
+one `finding class:` line per class (marked `(at threshold)` at or above
+`finding_guard_threshold`) and `sdd synced Xm ago, tracker synced Ym ago`
+(`never` before the first successful sync). Each party block shows
+`open PRs: N/cap` and its `wait:` line when `max_open_prs_per_party` is set.
+`guild finding list` prints the finding classes of the project with their PR
+counts.
+
 ### `guild drift`
 
 `guild drift [--epic <slug> | --all]` reports, for the project resolved from
@@ -1056,7 +1068,16 @@ launches that failed in the last 24 hours; hidden when both are empty; the
 model key is `dispatcher`; the party and raid filters keep only their parties),
 drift findings for the default scope (grouped by rule, one block per
 project resolved from the parties shown, skipping parties without a
-project), then one collapsible block per party with its quests, tasks and
+project), a "projects" section (one card per project of the parties shown,
+model key `projects`: `open PRs N/cap` and the `wait:` text of `guild next`
+when `max_open_prs` is reached, `hot files` touched by at least
+`max_open_prs_per_file` open PRs with their refs, `finding classes` with PR
+count and threshold marking the classes at or above
+`finding_guard_threshold`, and `sdd synced Xm ago, tracker synced Ym ago`
+from the last successful `sync --source sdd|tracker`; the lists are hidden
+when the feature is off or empty; each party also shows `open PRs N/cap`
+and its `wait:` text when `max_open_prs_per_party` is set, model key
+`caps`), then one collapsible block per party with its quests, tasks and
 PRs, plus PRs outside active tasks, raids (each with a `lead` badge when
 that membership is the raid's lead) and claims. A party filter, a state
 filter (`all`/`fixes-main`/`fixes-flaky`/`needs-ask-answer`/`needs-human-pr-review`/`converging`/`ready`/`draft`/`merged`) and a

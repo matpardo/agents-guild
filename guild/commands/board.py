@@ -8,8 +8,10 @@ from guild import sanitize, session_status, timeutil
 from guild.commands import claim as claim_commands
 from guild.commands import drift as drift_commands
 from guild.commands import merge_queue as merge_queue_commands
+from guild.commands import next as next_commands
 from guild.commands import notice as notice_commands
 from guild.commands import party as party_commands
+from guild.commands import project_status
 from guild.commands import raid as raid_commands
 from guild.errors import GuildError
 
@@ -604,6 +606,46 @@ def _remaining_line(painter, remaining):
     return painter.paint(text, "yellow")
 
 
+def _party_caps(ctx, party_row, project_config):
+    if project_config is None:
+        return None
+    status = next_commands.cap_status(ctx.conn, ctx.projects_dir, party_row["name"], party_row["project"])
+    return {"open": status["party_open"], "cap": status["party_cap"], "wait": status["party_wait"]}
+
+
+def _party_cap_lines(painter, caps):
+    lines = []
+    if caps is None:
+        return lines
+    if caps["cap"] is not None:
+        lines.append(painter.paint("  open PRs: {}/{}".format(caps["open"], caps["cap"]), "dim"))
+    if caps["wait"] is not None:
+        lines.append(painter.paint("  {}".format(caps["wait"]), "yellow"))
+    return lines
+
+
+def _project_models(ctx, party_rows, projects_by_name):
+    models = []
+    seen = set()
+    for party_row in party_rows:
+        project = party_row["project"]
+        if project is None or project in seen or project not in projects_by_name:
+            continue
+        seen.add(project)
+        caps = next_commands.cap_status(ctx.conn, ctx.projects_dir, party_row["name"], project)
+        models.append(project_status.project_model(ctx, project, caps))
+    return sorted(models, key=lambda model: model["name"])
+
+
+def _project_lines(ctx, painter, party_rows, projects_by_name):
+    lines = []
+    for model in _project_models(ctx, party_rows, projects_by_name):
+        lines.append("{} {}".format(painter.paint("━━", "cyan"), painter.paint("project " + model["name"], "bold")))
+        lines.extend(project_status.project_lines(model))
+        lines.append("")
+    return lines
+
+
 def _party_section(ctx, painter, party_row, project_config):
     lines = [
         "{} {}  {}".format(
@@ -617,6 +659,7 @@ def _party_section(ctx, painter, party_row, project_config):
         painter.paint("  status: {}".format(party_status.label(ctx, status)), _STATUS_STYLES[status["status"]])
     )
     lines.append(_remaining_line(painter, party_progress.remaining(ctx.conn, party_row["name"])))
+    lines.extend(_party_cap_lines(painter, _party_caps(ctx, party_row, project_config)))
     pressure = _ctx_model(ctx, party_row, project_config)
     if pressure is not None:
         lines.append(
@@ -767,6 +810,7 @@ def render_board(ctx, party_filter, raid_filter, color, width):
     lines.extend(_notices_section(ctx, painter, notice_rows))
     lines.extend(_dispatcher_lines(ctx, painter, party_names))
     projects_by_name = {project["name"]: project for project in config.load_all_projects(ctx.projects_dir)}
+    lines.extend(_project_lines(ctx, painter, party_rows, projects_by_name))
     for party_row in party_rows:
         lines.extend(
             _party_section(ctx, painter, party_row, projects_by_name.get(party_row["project"]))
@@ -924,6 +968,7 @@ def _party_model(ctx, party_row, project_config):
         "status": _status_model(ctx, party_row),
         "remaining": party_progress.remaining(ctx.conn, party_row["name"]),
         "ctx": _ctx_model(ctx, party_row, project_config),
+        "caps": _party_caps(ctx, party_row, project_config),
         "resume_command": _resume_command(ctx, party_row),
         "leader_session_name": _leader_session_name(ctx.conn, party_row["name"]),
         "quests": quest_models,
@@ -980,5 +1025,6 @@ def board_model(ctx):
             ctx.conn, ctx.now, [row["name"] for row in party_rows]
         ),
         "dispatcher": dispatcher_model(ctx, None),
+        "projects": _project_models(ctx, party_rows, projects_by_name),
     }
 

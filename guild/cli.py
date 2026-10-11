@@ -703,6 +703,13 @@ def _handle_finding_record(ctx, args):
     return 0
 
 
+def _handle_finding_list(ctx, args):
+    from guild.commands import finding as finding_commands
+
+    _print(finding_commands.list_classes(ctx))
+    return 0
+
+
 def _add_finding_parser(subparsers):
     parser = subparsers.add_parser("finding")
     actions = parser.add_subparsers(dest="finding_action", required=True)
@@ -711,6 +718,9 @@ def _add_finding_parser(subparsers):
     record.add_argument("ref")
     record.add_argument("--class", dest="finding_class", required=True)
     record.set_defaults(handler=_handle_finding_record)
+
+    list_parser = actions.add_parser("list")
+    list_parser.set_defaults(handler=_handle_finding_list)
 
 
 def _add_pr_parser(subparsers):

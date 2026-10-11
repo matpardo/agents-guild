@@ -160,19 +160,31 @@ def _wait_line(conn, parties, scope_label, open_prs):
     return "wait: {} open PRs{}, merge {} first".format(len(open_prs), scope_label, first)
 
 
-def _cap_wait_line(ctx, party, project):
-    party_cap = _cap(ctx.projects_dir, project, "max_open_prs_per_party")
-    own_open = _own_open_prs(ctx.conn, party)
+def cap_status(conn, projects_dir, party, project):
+    party_cap = _cap(projects_dir, project, "max_open_prs_per_party")
+    project_cap = _cap(projects_dir, project, "max_open_prs")
+    own_open = _own_open_prs(conn, party)
+    parties = _project_parties(conn, project)
+    project_open = _scope_open_prs(conn, parties)
+    party_wait = None
     if party_cap is not None and len(own_open) >= party_cap:
-        return _wait_line(ctx.conn, {party}, "", own_open)
-    project_cap = _cap(ctx.projects_dir, project, "max_open_prs")
-    if project_cap is None:
-        return None
-    parties = _project_parties(ctx.conn, project)
-    project_open = _scope_open_prs(ctx.conn, parties)
-    if len(project_open) < project_cap:
-        return None
-    return _wait_line(ctx.conn, parties, " in project", project_open)
+        party_wait = _wait_line(conn, {party}, "", own_open)
+    project_wait = None
+    if project_cap is not None and len(project_open) >= project_cap:
+        project_wait = _wait_line(conn, parties, " in project", project_open)
+    return {
+        "party_open": len(own_open),
+        "party_cap": party_cap,
+        "party_wait": party_wait,
+        "project_open": len(project_open),
+        "project_cap": project_cap,
+        "project_wait": project_wait,
+    }
+
+
+def _cap_wait_line(ctx, party, project):
+    status = cap_status(ctx.conn, ctx.projects_dir, party, project)
+    return status["party_wait"] or status["project_wait"]
 
 
 def _claim_area(item):

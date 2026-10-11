@@ -796,3 +796,8 @@ main.history-main {
 .queue-detail {
   font-size: 0.85rem;
 }
+
+li.finding-guard {
+  color: #b45309;
+  font-weight: bold;
+}

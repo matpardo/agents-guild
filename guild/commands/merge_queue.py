@@ -434,6 +434,37 @@ def external_blocked_refs(conn):
     return {entry["ref"] for entry in queue if entry["external"] is not None}
 
 
+def file_pr_rows(conn, external, repo, path, exclude_branch):
+    found = conn.execute(
+        "SELECT prs.repo, prs.number, prs.party FROM pr_files JOIN prs"
+        " ON prs.repo = pr_files.repo AND prs.number = pr_files.number"
+        " WHERE prs.repo = ? AND pr_files.path = ? AND prs.lifecycle NOT IN ('merged', 'closed')"
+        " AND (? IS NULL OR prs.branch IS NULL OR prs.branch != ?) ORDER BY prs.number",
+        (repo, path, exclude_branch, exclude_branch),
+    ).fetchall()
+    return [row for row in found if _ref_text(row["repo"], row["number"]) not in external]
+
+
+def hot_files(conn, repos, cap):
+    marks = ",".join("?" * len(repos))
+    paths = conn.execute(
+        "SELECT DISTINCT pr_files.repo, pr_files.path FROM pr_files JOIN prs"
+        " ON prs.repo = pr_files.repo AND prs.number = pr_files.number"
+        " WHERE prs.repo IN ({}) AND prs.lifecycle NOT IN ('merged', 'closed')"
+        " ORDER BY pr_files.repo, pr_files.path".format(marks),
+        sorted(repos),
+    ).fetchall()
+    external = external_blocked_refs(conn)
+    hot = []
+    for row in paths:
+        rows = file_pr_rows(conn, external, row["repo"], row["path"], None)
+        if len(rows) >= cap:
+            hot.append(
+                {"repo": row["repo"], "path": row["path"], "prs": [_ref_text(r["repo"], r["number"]) for r in rows]}
+            )
+    return hot
+
+
 def main_red_labels(conn, party_names):
     return [main_label(row) for row in load_scoped_queue(conn, party_names)["main"]]
 

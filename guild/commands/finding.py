@@ -12,6 +12,37 @@ def _count(conn, project, finding_class):
     return row["total"]
 
 
+def class_models(conn, project, threshold):
+    rows = conn.execute(
+        "SELECT class, COUNT(*) AS total FROM findings WHERE project = ?"
+        " GROUP BY class ORDER BY total DESC, class ASC",
+        (project,),
+    ).fetchall()
+    return [
+        {
+            "class": row["class"],
+            "count": row["total"],
+            "threshold": threshold,
+            "at_threshold": threshold is not None and row["total"] >= threshold,
+        }
+        for row in rows
+    ]
+
+
+def list_classes(ctx):
+    project = config.require_project(ctx.cwd, ctx.projects_dir)
+    threshold = config.load_project(ctx.projects_dir, project).get("finding_guard_threshold")
+    models = class_models(ctx.conn, project, threshold)
+    if not models:
+        return "no finding classes in {}".format(project)
+    return "\n".join(
+        "{}: {} PR(s){}".format(
+            model["class"], model["count"], " (at threshold {})".format(threshold) if model["at_threshold"] else ""
+        )
+        for model in models
+    )
+
+
 def _announce_guard(ctx, party, project, finding_class, total):
     announces = "finding:{}:{}".format(project, finding_class)
     if notice_commands.announced(ctx.conn, announces):
