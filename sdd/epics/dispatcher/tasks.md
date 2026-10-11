@@ -134,12 +134,12 @@ updated: 2026-10-04
 ## T12 — Rule: merged PR tells the next in the queue
 
 **Depends on:** T09
-**Status:** [ ] pending
+**Status:** [x] done — #113
 
-**What:** a merged PR tells the next PR in the merge queue to rebase.
+**What:** when the head of a merge queue scope changes, the party that owns the new head is told once (notice and `notify.command`); notify only, no session is launched.
 
 **Acceptance:**
-- [ ] The next party in the queue is told once per merged PR.
+- [x] The next party in the queue is told once per head change.
 
 ## T13 — Board and web show dispatcher launches
 

@@ -170,6 +170,7 @@ guild handoff --in-flight "..." --learned "..." [--model <m>] [--respawn]
 guild handoff prune [--dry-run]
 
 guild merge-queue [--raid <name> | --party <name>]   # read-only: PRs in the order to merge by hand
+guild merge-queue --head [--raid <name> | --party <name>]   # the PR whose turn it is: <ref> <party> <task>
 guild merge-queue pin   <owner/repo>#<a> --before <owner/repo>#<b>
 guild merge-queue unpin <owner/repo>#<a> --before <owner/repo>#<b>
 guild main red <owner/repo> --reason "<text>"   # mark a repo's main branch red by hand
@@ -756,6 +757,10 @@ network call, no event. **Guild never merges**: the output is advice for a
 human, who merges by hand and re-runs the command after each merge (the
 last line of the output says so).
 
+`guild merge-queue --head` prints only the first entry whose action is `merge`
+(PRs blocked by something outside development are skipped) as
+`<ref> <party> <task>`, or `no PR ready to merge`; it takes the same scope flags.
+
 **Scope.** `--raid` takes the open tracked PRs of the raid's active members,
 `--party` those of one party; the two flags are mutually exclusive. Without a
 flag, a bound session uses its raid when its party is in exactly one, errors
@@ -1328,6 +1333,14 @@ Rules, each `dry-run` (records what it would do) or `on`:
 | `checks_failing` | `pr.synced` of a draft, converging or ready PR with failing checks, none pending, a known head commit, not seeded, in a repo of the project | the party that owns the PR |
 | `pr_unmergeable` | `pr.synced` of a draft, converging or ready PR with a merge conflict, changes requested, unresolved review threads or a branch behind base, a known head commit, not seeded, in a repo of the project | the party that owns the PR |
 | `next_task` | state rule: a party that handed off and has a next unblocked task (`guild next`) | that party |
+| `merge_head` | state rule, notify only: the head of each merge queue scope (each raid, then each party outside a raid), see `guild merge-queue --head` | the party that owns the head PR |
+
+`merge_head` never launches a session. When the head of a scope is a PR not
+announced before (`merge_head:<scope>:<ref>`), it posts one project notice
+`<party>: <ref> is first in the merge queue; run guild pr ready-check <ref>`
+and runs `notify.command` with the party and `merge-head`. In `dry-run` mode
+it only records a plan.
+
 
 `next_task` is a state rule: it has no cursor and no age limit. Every pass it
 looks at the parties of the project that handed off (keepers excluded) and
@@ -1781,7 +1794,7 @@ against path traversal, not an identity boundary.
   defaults: `permission_mode` (`manual`, `acceptEdits` or `auto`;
   `bypassPermissions`, `dontAsk`, `plan` and anything else fail to load),
   `max_launches_per_hour` (integer from 1 to 20) and `rules` (an object whose
-  keys are `ask_answered`, `checks_failing` and `pr_unmergeable` and whose values are `dry-run`
+  keys are `ask_answered`, `checks_failing`, `pr_unmergeable`, `next_task` and `merge_head` and whose values are `dry-run`
   or `on`; `off` is rejected, remove the rule to disable it). Absent → the
   project is never dispatched.
 - Unknown top-level keys are allowed.

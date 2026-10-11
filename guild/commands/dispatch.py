@@ -87,6 +87,14 @@ def _state_triggers(ctx, trigger_for, project_config, lines):
         return []
 
 
+def _state_line(launcher, project_config, rule, trigger, mode, dry_run):
+    if rule not in dispatch_rules.NOTIFY_ONLY_RULES:
+        return _decision_line(launcher, project_config, trigger, mode, dry_run)
+    if dry_run:
+        return launcher.preview_announce(trigger, mode)
+    return launcher.announce(project_config, trigger, mode)
+
+
 def _state_lines(ctx, launcher, enabled, dry_run):
     lines = []
     for project_config in enabled.values():
@@ -95,7 +103,7 @@ def _state_lines(ctx, launcher, enabled, dry_run):
             if mode is None:
                 continue
             for trigger in _state_triggers(ctx, trigger_for, project_config, lines):
-                line = _decision_line(launcher, project_config, trigger, mode, dry_run)
+                line = _state_line(launcher, project_config, rule, trigger, mode, dry_run)
                 if line is not None:
                     lines.append(line)
     return lines

@@ -1,4 +1,5 @@
 from guild import merge_queue, resume
+from guild.commands import merge_queue as merge_queue_commands
 from guild.commands import next as next_commands
 
 
@@ -192,4 +193,21 @@ def _next_task_triggers(ctx, project_config):
     return triggers
 
 
-STATE_RULES = {"next_task": _next_task_triggers}
+def _merge_head_triggers(ctx, project_config):
+    project = project_config["name"]
+    triggers = []
+    for scope, entry in merge_queue_commands.scope_heads(ctx.conn, ctx.now):
+        owner = ctx.conn.execute("SELECT project FROM parties WHERE name = ?", (entry["party"],)).fetchone()
+        if owner is None or owner["project"] != project:
+            continue
+        text = "{}: {} is first in the merge queue; run guild pr ready-check {}".format(
+            entry["party"], entry["ref"], entry["ref"]
+        )
+        triggers.append(
+            Trigger(project, "merge_head", "merge_head:{}:{}".format(scope, entry["ref"]), entry["party"], entry["ref"], text)
+        )
+    return triggers
+
+
+STATE_RULES = {"next_task": _next_task_triggers, "merge_head": _merge_head_triggers}
+NOTIFY_ONLY_RULES = ("merge_head",)
