@@ -470,7 +470,10 @@ def _push_paths_or_result(target_dir):
     return paths, None
 
 
-def _file_cap_warning(ctx, branch, paths):
+def _file_cap_warning(ctx, target_dir, branch, paths):
+    repo = localbase.origin_repo_slug(target_dir)
+    if repo is None:
+        return None
     project = config.resolve_project(ctx.cwd, config.load_all_projects(ctx.projects_dir))
     if project is None:
         return None
@@ -483,11 +486,10 @@ def _file_cap_warning(ctx, branch, paths):
         rows = ctx.conn.execute(
             "SELECT prs.repo, prs.number, prs.party FROM pr_files JOIN prs"
             " ON prs.repo = pr_files.repo AND prs.number = pr_files.number"
-            " WHERE pr_files.path = ? AND prs.lifecycle NOT IN ('merged', 'closed')"
-            " AND (prs.branch IS NULL OR prs.branch != ?) ORDER BY prs.repo, prs.number",
-            (path, branch),
+            " WHERE prs.repo = ? AND pr_files.path = ? AND prs.lifecycle NOT IN ('merged', 'closed')"
+            " AND (prs.branch IS NULL OR prs.branch != ?) ORDER BY prs.number",
+            (repo, path, branch),
         ).fetchall()
-        rows = [row for row in rows if row["repo"] in project_data["github"]["repos"]]
         if len(rows) >= cap:
             refs = ", ".join("{}#{} ({})".format(row["repo"], row["number"], row["party"]) for row in rows)
             lines.append("{}: {}".format(path, refs))
@@ -551,7 +553,7 @@ def pre_push(ctx, command):
         shared_areas_result = _shared_areas_push_result(ctx, target_dir, paths)
         if shared_areas_result is not None:
             return shared_areas_result
-        warning = _file_cap_warning(ctx.with_cwd(Path(target_dir)), branch, paths)
+        warning = _file_cap_warning(ctx.with_cwd(Path(target_dir)), target_dir, branch, paths)
         if warning is not None:
             return {"blocked": False, "message": None, "system_message": warning}
     return {"blocked": False, "message": None, "system_message": None}

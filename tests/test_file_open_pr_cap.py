@@ -24,7 +24,7 @@ def _diff(paths):
 class FileOpenPrCapTestCase(GuildTestCase):
     def setUp(self):
         super().setUp()
-        self.repo_dir = self.register_project("acme", ["acme/app"])
+        self.repo_dir = self.register_project("acme", ["acme/app", "acme/docs"])
         for command in (
             ["git", "init", "-q", "-b", "main"],
             ["git", "config", "user.email", "t@t.com"],
@@ -32,6 +32,7 @@ class FileOpenPrCapTestCase(GuildTestCase):
             ["git", "commit", "--allow-empty", "-q", "-m", "init"],
             ["git", "update-ref", "refs/remotes/origin/main", "HEAD"],
             ["git", "symbolic-ref", "refs/remotes/origin/HEAD", "refs/remotes/origin/main"],
+            ["git", "remote", "add", "origin", "git@github.com:acme/app.git"],
             ["git", "checkout", "-q", "-b", "feature/mine"],
         ):
             subprocess.run(command, cwd=str(self.repo_dir), check=True)
@@ -39,6 +40,7 @@ class FileOpenPrCapTestCase(GuildTestCase):
         self.run_cli(["party", "start", "alpha"], "sess-1", self.repo_dir)
         self.run_cli(["party", "start", "beta"], "sess-2", self.repo_dir)
         self.write_gh_fixture("list_feature-mine", [])
+        self.write_gh_fixture("branch_checks_acme-app_main", {"check_runs": []})
 
     def _set_cap(self, cap):
         config_file = self.config_home / "guild" / "projects" / "acme.json"
@@ -49,15 +51,16 @@ class FileOpenPrCapTestCase(GuildTestCase):
             data["max_open_prs_per_file"] = cap
         config_file.write_text(json.dumps(data))
 
-    def _track(self, session_id, number, branch, paths):
+    def _track(self, session_id, number, branch, paths, repo="acme/app"):
+        slug = repo.replace("/", "-")
         view = dict(_OPEN_VIEW, headRefName=branch)
-        self.write_gh_fixture("view_acme-app_{}".format(number), dict(view, isDraft=True))
+        self.write_gh_fixture("view_{}_{}".format(slug, number), dict(view, isDraft=True))
         self.run_cli(
-            ["pr", "track", "acme/app#{}".format(number), "--card", "ACME-{}".format(number), "--what", "x", "--waits", "y"],
+            ["pr", "track", "{}#{}".format(repo, number), "--card", "ACME-{}".format(number), "--what", "x", "--waits", "y"],
             session_id, self.repo_dir,
         )
-        self.write_gh_fixture("view_acme-app_{}".format(number), view)
-        self.write_gh_fixture("view_files_acme-app_{}".format(number), _diff(paths))
+        self.write_gh_fixture("view_{}_{}".format(slug, number), view)
+        self.write_gh_fixture("view_files_{}_{}".format(slug, number), _diff(paths))
 
     def _sync(self):
         return self.run_cli(["sync", "--source", "gh"], "sess-1", self.repo_dir)
@@ -171,4 +174,31 @@ class PrePushFileCapTests(FileOpenPrCapTestCase):
         self._commit_file("a.yml")
         code, out, err = self._push()
         self.assertEqual(code, 0, err)
+        self.assertNotIn("merge or rebase", out)
+
+    def test_same_path_in_another_repo_does_not_count(self):
+        self._track("sess-2", 5, "feature/d", ["README.md"], "acme/docs")
+        self._track("sess-2", 6, "feature/e", ["README.md"], "acme/docs")
+        self._sync()
+        self._commit_file("README.md")
+        code, out, err = self._push()
+        self.assertNotIn("merge or rebase", out)
+
+    def test_warning_lists_only_prs_of_the_pushed_repo(self):
+        self._track("sess-2", 5, "feature/d", ["a.yml"], "acme/docs")
+        self._track("sess-2", 6, "feature/e", ["a.yml"], "acme/docs")
+        self.write_gh_fixture("branch_checks_acme-docs_main", {"check_runs": []})
+        self._sync()
+        subprocess.run(
+            ["git", "remote", "set-url", "origin", "git@github.com:acme/docs.git"], cwd=str(self.repo_dir), check=True
+        )
+        self._commit_file("a.yml")
+        code, out, err = self._push()
+        self.assertIn("a.yml: acme/docs#5 (beta), acme/docs#6 (beta)", out)
+        self.assertNotIn("acme/app#", out)
+
+    def test_unresolvable_repo_is_silent(self):
+        subprocess.run(["git", "remote", "remove", "origin"], cwd=str(self.repo_dir), check=True)
+        self._commit_file("a.yml")
+        code, out, err = self._push()
         self.assertNotIn("merge or rebase", out)
