@@ -7,6 +7,7 @@ from pathlib import Path
 from guild import config, db, events, handoff_prune, localbase, paths, timeutil
 from guild.adapters import github, jira_acli, sdd
 from guild.commands import claim as claim_commands
+from guild.commands import drift as drift_commands
 from guild.commands import lifecycle as lifecycle_commands
 from guild.commands import notice as notice_commands
 from guild.commands import raid as raid_commands
@@ -33,6 +34,7 @@ _MERGE_NOTICE_TTL = "12h"
 _MERGE_NOTICE_TEMPLATE = "{}#{} merged in main ({}). Parties with open branches: rebase."
 _MERGE_NOTICE_SHARED_AREAS_SUFFIX = " Shared areas touched: {}"
 _MERGE_NOTICE_RELEASED_SUFFIX = " Released: {}."
+_MERGE_NOTICE_MOVES_SUFFIX = " Owner follow-up: {}."
 _AREA_PREFIX = "area:"
 
 _FAST_FORWARD_NOTICE_TTL = "12h"
@@ -246,6 +248,12 @@ def _released_line(released):
     return _MERGE_NOTICE_RELEASED_SUFFIX.format(", ".join(released))
 
 
+def _moves_line(moves):
+    if not moves:
+        return ""
+    return _MERGE_NOTICE_MOVES_SUFFIX.format("; ".join(moves))
+
+
 def _merge_notice_label(row):
     if row["task_quest"] is not None:
         return "{}/{}: {}".format(row["task_quest"], row["task_tid"], row["what"])
@@ -254,9 +262,9 @@ def _merge_notice_label(row):
     return row["what"]
 
 
-def _merge_notice_text(row, shared_line, released_line):
+def _merge_notice_text(row, shared_line, released_line, moves_line):
     base = _MERGE_NOTICE_TEMPLATE.format(row["repo"], row["number"], _merge_notice_label(row))
-    return base + shared_line + released_line
+    return base + shared_line + released_line + moves_line
 
 
 def _release_owned_claims(ctx, project, row, touched):
@@ -297,7 +305,8 @@ def _handle_merge(ctx, projects, row, failures):
             released = _release_owned_claims(ctx, project, row, touched)
     if not raids:
         return
-    text = _merge_notice_text(row, _shared_areas_line(touched), _released_line(released))
+    moves_line = _moves_line(drift_commands.merged_pr_moves(ctx.conn, row))
+    text = _merge_notice_text(row, _shared_areas_line(touched), _released_line(released), moves_line)
     _post_merge_notice(ctx, row, raids, text)
 
 

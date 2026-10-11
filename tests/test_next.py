@@ -212,6 +212,17 @@ class Tier4Tests(NextTestCase):
             "sess-1", self.repo_dir,
         )
 
+    def _sync_all_done(self):
+        self.sync_sdd(
+            self.repo_dir,
+            "sess-1",
+            "acme",
+            "compliance",
+            "## T01 — First task\n\n**Deps:** —\n\n**Status:** [x] done\n\n"
+            "## T02 — Second task\n\n**Deps:** T01\n\n**Status:** [x] done\n\n"
+            "## T03 — Third task\n\n**Deps:** T02\n\n**Status:** [x] done\n",
+        )
+
     def test_next_task_when_deps_done(self):
         code, out, err = self.run_cli(["next"], "sess-1", self.repo_dir)
         self.assertIn('task wave1/T02: "Second task" — ready', out)
@@ -221,6 +232,7 @@ class Tier4Tests(NextTestCase):
         self.run_cli(["task", "done", "wave1/T02"], "sess-1", self.repo_dir)
         self.run_cli(["task", "start", "wave1/T03"], "sess-1", self.repo_dir)
         self.run_cli(["task", "done", "wave1/T03"], "sess-1", self.repo_dir)
+        self._sync_all_done()
         code, out, err = self.run_cli(
             ["task", "add", "wave1/T09", "--title", "Extra"], "sess-1", self.repo_dir
         )
@@ -264,6 +276,7 @@ class Tier4Tests(NextTestCase):
     def test_nothing_queued_reports_nothing_actionable(self):
         self.run_cli(["task", "done", "wave1/T02"], "sess-1", self.repo_dir)
         self.run_cli(["task", "done", "wave1/T03"], "sess-1", self.repo_dir)
+        self._sync_all_done()
         code, out, err = self.run_cli(["next"], "sess-1", self.repo_dir)
         self.assertIn("nothing actionable", out)
 

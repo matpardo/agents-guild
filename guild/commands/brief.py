@@ -1,5 +1,6 @@
 from guild import config, identity, localbase, pii, render
 from guild.commands import claim as claim_commands
+from guild.commands import drift as drift_commands
 from guild.commands import inbox as inbox_commands
 from guild.commands import notice as notice_commands
 from guild.commands import raid as raid_commands
@@ -23,6 +24,19 @@ def targeting_lines(rows, project, raid_member_of):
     matched = notice_commands.targeting(rows, project, True, raid_member_of)
     lines = [notice_commands.format_notice_line(row["id"], row["party"], row["created_at"], row["text"]) for row in matched]
     return inbox_commands.framed(lines)
+
+
+_DRIFT_BRIEF_CAP = 5
+
+
+def _drift_lines(ctx, binding):
+    findings = drift_commands.party_findings(ctx.conn, binding["project"], binding["party"])
+    if not findings:
+        return []
+    lines = ["drift:"] + ["  {}".format(finding) for finding in findings[:_DRIFT_BRIEF_CAP]]
+    if len(findings) > _DRIFT_BRIEF_CAP:
+        lines.append("  {} more: guild drift".format(len(findings) - _DRIFT_BRIEF_CAP))
+    return lines
 
 
 def render_brief(ctx):
@@ -52,6 +66,8 @@ def render_brief(ctx):
     prs = ctx.conn.execute("SELECT * FROM prs WHERE party = ?", (binding["party"],)).fetchall()
     for pr_row in prs:
         lines.append(render.pr_line(pr_row))
+
+    lines.extend(_drift_lines(ctx, binding))
 
     my_open_asks = ctx.conn.execute(
         "SELECT COUNT(*) AS n FROM asks WHERE party = ? AND state = 'open'", (binding["party"],)
