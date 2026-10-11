@@ -93,3 +93,15 @@ updated: 2026-10-04
 **Acceptance:**
 - [x] `test_sdd_docs` passes.
 - [x] The README commands match the CLI.
+
+## T08 — Tmux copies reach the system clipboard
+
+**Depends on:** T05
+**Status:** [x] done — #109
+
+**What:** The `guild` tmux session sets `copy-command` to `wl-copy`, `xclip` or `xsel` when present, and `guild doctor` warns when none is found.
+
+**Acceptance:**
+- [x] `wl-copy` is preferred on Wayland; X11 tools are used only with `DISPLAY` set.
+- [x] With no tool found only OSC 52 remains and no `copy-command` is set.
+- [x] `guild doctor` warns, without failing, when tmux is installed and no clipboard tool is found.
