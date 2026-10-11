@@ -77,3 +77,10 @@ of <total> refs still open (may be stale)` when nothing is blocked anymore.
 **Status:** [x] done — #98
 
 **What:** two drift rules, `task started, card not started` (quest task `active` whose SDD card has `status_category == new`) and `PR merged, card not done`; `PR open, card not started` and the new merged rule also honor PRs tracked with `--card`. Findings name the card and the move to make (In Progress / Done).
+
+## T10 — Timers for SDD and tracker sync
+
+**Depends on:** T08
+**Status:** [x] done — #99
+
+**What:** `guild sync-sdd-timer` and `guild sync-tracker-timer` (`install --every <dur> | uninstall | print`) manage their own systemd units running `sync --source sdd|tracker --all-projects`, which syncs every project with an `sdd`/`tracker` block and skips the others without a failure; a missing `acli` is a reported sync failure.
