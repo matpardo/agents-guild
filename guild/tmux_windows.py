@@ -106,3 +106,7 @@ def window_in_session(tmux, window_id):
 
 def kill_pane(tmux, pane):
     return _ok(tmux, ["kill-pane", "-t", pane])
+
+
+def send_text(tmux, window_id, text):
+    return _ok(tmux, ["send-keys", "-t", window_id, "-l", text]) and _ok(tmux, ["send-keys", "-t", window_id, "Enter"])

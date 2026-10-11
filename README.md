@@ -1345,6 +1345,7 @@ Rules, each `dry-run` (records what it would do) or `on`:
 | `pr_unmergeable` | `pr.synced` of a draft, converging or ready PR with a merge conflict, changes requested, unresolved review threads or a branch behind base, a known head commit, not seeded, in a repo of the project | the party that owns the PR |
 | `pr_promote` | `pr.synced` of a converging draft PR with settled green checks (none failing or pending, at least one passing), no merge conflict, changes requested, unresolved threads or stale branch, no ask pending, not blocked externally, a known head commit, not seeded, in a repo of the project | the party that owns the PR is notified |
 | `next_task` | state rule: a party that handed off and has a next unblocked task (`guild next`) | that party |
+| `limit_resume` | state rule: a party with a live session whose transcript ends in a usage-limit (429) error, one minute after its reset time | that party is nudged, nothing is launched |
 | `merge_head` | state rule, notify only: the head of each merge queue scope (each raid, then each party outside a raid), see `guild merge-queue --head` | the party that owns the head PR |
 
 `merge_head` never launches a session. When the head of a scope is a PR not
@@ -1352,6 +1353,15 @@ announced before (`merge_head:<scope>:<ref>`), it posts one project notice
 `<party>: <ref> is first in the merge queue; run guild pr ready-check <ref>`
 and runs `notify.command` with the party and `merge-head`. In `dry-run` mode
 it only records a plan.
+
+`limit_resume` never launches a session. When the last turn of a live leader's
+transcript is a `rate_limit` API error, one minute after its `resetsAt` it types
+`continue` and Enter into the party's recorded tmux window, once per limit hit
+(`limit_resume:<party>:<resetsAt>`). Only sessions in a guild-launched tmux window can
+be nudged (verify once by hand that Claude Code accepts the keys); with no such
+window the decision is `skipped` and one project notice says to resume the party
+by hand. It ignores the busy check and the hourly launch cap, and keepers are
+nudged too since they are live sessions. In `dry-run` mode it only records a plan.
 
 `pr_promote` never launches a session either. Once per head commit
 (`pr_promote:<repo>#<n>:<head commit>`) it runs `gh pr ready <n> --repo <repo>`,
