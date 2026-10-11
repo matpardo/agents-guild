@@ -91,3 +91,10 @@ updated: 2026-10-04
 **Status:** [x] done — #120
 
 **What:** PR cards show review pills (unresolved threads, changes requested, behind base, merge conflict) and `on <base>` for stacked PRs; merge-queue entries show their reasons as pills and a collapsible ready-check detail (blockers, waits, gates); each queue scope shows `next to merge: <ref> (<party>)` or `no PR ready to merge`. The gate computation is shared with `guild pr ready-check`.
+
+## T13 — Open-PR caps, hot files, finding classes and sync freshness on the web
+
+**Depends on:** T12
+**Status:** [x] done — #122
+
+**What:** party cards show `open PRs N/cap` and the `guild next` wait text when the cap is reached; a per-project card shows the project cap, hot files (files touched by at least `max_open_prs_per_file` open PRs, with their refs), finding classes with PR count and threshold, and `sdd synced Xm ago, tracker synced Ym ago`. `guild board` prints the same and `guild finding list` lists the finding classes. Queue reason pills carry tooltips.

@@ -62,6 +62,12 @@ class TooltipCoverageTests(unittest.TestCase):
     def test_review_reasons(self):
         self.assertCovers("reason", ["threads", "changes requested", "behind base", "merge conflict"])
 
+    def test_queue_reasons(self):
+        self.assertCovers(
+            "reason",
+            ["checks failing", "checks pending", "needs ask answer", "external", "waits on task"],
+        )
+
     def test_task_states(self):
         self.assertCovers("taskState", ["queued", "active", "blocked", "done"])
 

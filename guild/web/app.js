@@ -139,6 +139,11 @@ var NO_SESSION_MESSAGE = "session token not loaded, reload the page";
       "changes requested": "A reviewer asked for changes on this PR.",
       "behind base": "The PR branch is behind its base branch and needs an update.",
       "merge conflict": "The PR conflicts with its base branch and cannot merge until resolved.",
+      "checks failing": "Some checks of this PR are failing.",
+      "checks pending": "Some checks of this PR are still running.",
+      "needs ask answer": "The party is stopped on an ask; answer it first.",
+      external: "The PR is blocked by something outside guild.",
+      "waits on task": "The PR waits on a task that is not done yet.",
     },
     queueAction: {
       merge: "Merge this PR by hand; guild never merges.",
@@ -191,6 +196,12 @@ var NO_SESSION_MESSAGE = "session token not loaded, reload the page";
       unused: "A Docker image that no container uses.",
     },
     ui: {
+      openPrs: "Open PRs of this party against its cap (max_open_prs_per_party); PRs blocked externally are not counted.",
+      projectOpenPrs: "Open PRs of the whole project against its cap (max_open_prs); PRs blocked externally are not counted.",
+      capWait: "The cap is reached: merge the PR named before opening another.",
+      hotFiles: "Files touched by as many open PRs as max_open_prs_per_file allows; expect merge conflicts.",
+      findingClasses: "Review finding classes with the number of distinct PRs; at the threshold the class should become an architecture guard.",
+      syncFreshness: "How long ago the SDD and the tracker were last synced successfully.",
       noticeNew: "You have not marked this notice as seen yet.",
       issued: "When the notice was issued, in local time.",
       timeLeft: "How long until the notice expires.",
@@ -1046,6 +1057,59 @@ var NO_SESSION_MESSAGE = "session token not loaded, reload the page";
     appendAll(section, drift.map(renderDriftEntry));
   }
 
+  function renderProject(project) {
+    var article = el("article");
+    article.className = "card project";
+    article.appendChild(textEl("h3", project.name));
+    if (project.max_open_prs !== null) {
+      article.appendChild(explain(
+        textEl("p", "open PRs " + project.open_prs + "/" + project.max_open_prs),
+        "ui",
+        "projectOpenPrs"
+      ));
+    }
+    if (project.wait !== null) {
+      article.appendChild(explain(classedText("p", project.wait, "queue-reason"), "ui", "capWait"));
+    }
+    if (project.hot_files.length > 0) {
+      article.appendChild(explain(textEl("h4", "hot files (" + project.hot_files.length + ")"), "ui", "hotFiles"));
+      var hot = el("ul");
+      appendAll(hot, project.hot_files.map(function (file) {
+        return textEl("li", file.repo + " " + file.path + ": " + file.prs.join(", "));
+      }));
+      article.appendChild(hot);
+    }
+    if (project.finding_classes.length > 0) {
+      article.appendChild(explain(textEl("h4", "finding classes"), "ui", "findingClasses"));
+      var classes = el("ul");
+      appendAll(classes, project.finding_classes.map(function (entry) {
+        var threshold = entry.threshold === null ? "" : "/" + entry.threshold;
+        var item = textEl("li", entry.class + ": " + entry.count + threshold + " PR(s)" + (entry.at_threshold ? " \u2014 guard" : ""));
+        if (entry.at_threshold) {
+          item.className = "finding-guard";
+        }
+        return item;
+      }));
+      article.appendChild(classes);
+    }
+    var fresh = Object.keys(project.freshness).map(function (name) {
+      var age = project.freshness[name];
+      return name + " synced " + (age === null ? "never" : age + " ago");
+    });
+    article.appendChild(explain(classedText("p", fresh.join(", "), "muted"), "ui", "syncFreshness"));
+    return article;
+  }
+
+  function renderProjects(projects) {
+    var section = document.getElementById("projects");
+    clear(section);
+    if (projects.length === 0) {
+      return;
+    }
+    section.appendChild(textEl("h2", "projects"));
+    appendAll(section, projects.map(renderProject));
+  }
+
   function branchEl(name) {
     var branch = textEl("span", name);
     branch.className = "branch";
@@ -1079,7 +1143,11 @@ var NO_SESSION_MESSAGE = "session token not loaded, reload the page";
     if (reason.indexOf("unresolved thread") !== -1) {
       return "threads";
     }
-    return reason;
+    var base = reason.split(/ \(|: /)[0];
+    if (base.indexOf("waits on task") === 0) {
+      return "waits on task";
+    }
+    return base;
   }
 
   function renderReasonPills(reasons) {
@@ -1407,6 +1475,13 @@ var NO_SESSION_MESSAGE = "session token not loaded, reload the page";
       details.appendChild(explain(resumeLine, "ui", "resumeCommand"));
     }
 
+    if (party.caps !== null && party.caps.cap !== null) {
+      details.appendChild(explain(textEl("p", "open PRs " + party.caps.open + "/" + party.caps.cap), "ui", "openPrs"));
+    }
+    if (party.caps !== null && party.caps.wait !== null) {
+      details.appendChild(explain(classedText("p", party.caps.wait, "queue-reason"), "ui", "capWait"));
+    }
+
     appendAll(details, party.quests.map(renderQuest));
 
     var orphanPrs = renderPrList(party.prs);
@@ -1503,6 +1578,7 @@ var NO_SESSION_MESSAGE = "session token not loaded, reload the page";
         return party.name === state.partyFilter;
       }),
       drift: data.drift,
+      projects: data.projects,
       raids: data.raids,
       merge_queues: filterMergeQueuesByParty(data.merge_queues, state.partyFilter),
       dispatcher: filterDispatcher(data.dispatcher, function (launch) {
@@ -1583,6 +1659,7 @@ var NO_SESSION_MESSAGE = "session token not loaded, reload the page";
         return members.indexOf(party.name) !== -1;
       }),
       drift: data.drift,
+      projects: data.projects,
       raids: data.raids,
       merge_queues: data.merge_queues.filter(function (queue) {
         return queue.scope === "raid:" + state.raidFilter;
@@ -1833,6 +1910,7 @@ var NO_SESSION_MESSAGE = "session token not loaded, reload the page";
     renderDispatcher(filtered.dispatcher);
     renderMergeQueues(filtered.merge_queues);
     renderDrift(filtered.drift);
+    renderProjects(filtered.projects);
     renderParties(filtered.parties);
     restoreFocus();
   }

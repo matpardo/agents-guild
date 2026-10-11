@@ -485,14 +485,7 @@ def _file_cap_warning(ctx, target_dir, branch, paths):
     external = merge_queue_commands.external_blocked_refs(ctx.conn)
     lines = []
     for path in sorted(paths):
-        found = ctx.conn.execute(
-            "SELECT prs.repo, prs.number, prs.party FROM pr_files JOIN prs"
-            " ON prs.repo = pr_files.repo AND prs.number = pr_files.number"
-            " WHERE prs.repo = ? AND pr_files.path = ? AND prs.lifecycle NOT IN ('merged', 'closed')"
-            " AND (prs.branch IS NULL OR prs.branch != ?) ORDER BY prs.number",
-            (repo, path, branch),
-        ).fetchall()
-        rows = [row for row in found if "{}#{}".format(row["repo"], row["number"]) not in external]
+        rows = merge_queue_commands.file_pr_rows(ctx.conn, external, repo, path, branch)
         if len(rows) >= cap:
             refs = ", ".join("{}#{} ({})".format(row["repo"], row["number"], row["party"]) for row in rows)
             lines.append("{}: {}".format(path, refs))
