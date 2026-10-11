@@ -123,3 +123,21 @@ class WebDriftBehaviorTests(unittest.TestCase):
                 capture_output=True, text=True, timeout=30, check=True,
             ).stdout.strip()
         self.assertEqual(out, "drift p scope: x no drift")
+
+    def test_party_filter_renders_a_board_with_a_merge_queue(self):
+        entry = {
+            "ref": "o/r#1", "repo": "o/r", "number": 1, "party": "a", "task": "q/T1", "lifecycle": "ready",
+            "branch": "b", "checks_failing": 0, "checks_passing": 1, "checks_pending": 0, "labels": [],
+            "url": "https://example.test/1", "position": 1, "unblocks": 0, "state": "ready", "next_action": False,
+            "action": "merge", "why": "ready", "reasons": [], "blockers": [], "waits": [], "gates": [],
+        }
+        queue = {"head": None, "scope": "party:a", "synced_at": "now", "synced_label": "synced now", "main": [], "queue": [entry]}
+        board = dict(_BOARD, merge_queues=[queue])
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "board.json"
+            path.write_text(json.dumps(board))
+            out = subprocess.run(
+                ["node", str(_HARNESS), str(_APP_JS_PATH), str(path), "a", "all"],
+                capture_output=True, text=True, timeout=30, check=True,
+            ).stdout.strip()
+        self.assertEqual(out, "drift p scope: x rule1 (1) FA")
