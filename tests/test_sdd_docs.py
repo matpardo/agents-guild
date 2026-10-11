@@ -140,9 +140,10 @@ class DispatcherDocsTests(unittest.TestCase):
         tasks = sdd.parse_tasks_file(epic_dir / "tasks.md", _PATTERNS)
         self.assertEqual([task["tid"] for task in tasks], ["T{:02d}".format(number) for number in range(1, 17)])
         by_tid = {task["tid"]: task["sdd_status"] for task in tasks}
-        for tid in ("T10", "T11", "T13"):
+        for tid in ("T10", "T11"):
             self.assertEqual(by_tid[tid], "pending")
-        self.assertEqual(by_tid["T12"], "done")
+        for tid in ("T12", "T13"):
+            self.assertEqual(by_tid[tid], "done")
 
     def test_decision_is_accepted_and_names_the_guards(self):
         text = self._decision.read_text()
