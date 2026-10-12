@@ -10,7 +10,7 @@ updated: 2026-10-12
 ## T01 — Secret patterns
 
 **Depends on:** —
-**Status:** [ ] pending
+**Status:** [x] done — #136
 
 **What:** `validate_field` refuses common token prefixes and private key headers.
 
