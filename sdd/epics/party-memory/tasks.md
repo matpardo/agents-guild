@@ -2,7 +2,7 @@
 epic: party-memory
 type: tasks
 title: What a party learns survives across generations
-status: draft
+status: done
 updated: 2026-10-12
 ---
 # Tasks: What a party learns survives across generations
@@ -24,6 +24,6 @@ updated: 2026-10-12
 ## T03 — Injection and brief fix
 
 **Depends on:** T01
-**Status:** [ ] pending
+**Status:** [x] done — #143
 
 **What:** SessionStart injects the memory framed with an end marker and a cap; the brief's handoff section keeps In flight and Learned and wraps long lines instead of cutting at 300.

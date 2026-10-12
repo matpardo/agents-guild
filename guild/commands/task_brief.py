@@ -1,8 +1,10 @@
 import json
+import textwrap
 
 from guild import names, pii, render, sanitize, task_context
 from guild.commands import brief as brief_commands
 from guild.commands import claim as claim_commands
+from guild.commands import handoff as handoff_commands
 from guild.commands import next as next_commands
 from guild.commands import notice as notice_commands
 from guild.commands import party as party_commands
@@ -139,14 +141,38 @@ def _claim_lines(ctx, party):
     ]
 
 
+def _section_body(lines, header):
+    marker = "## {}".format(header)
+    if marker not in lines:
+        return []
+    start = lines.index(marker) + 1
+    end = start
+    while end < len(lines) and not lines[end].startswith("## "):
+        end += 1
+    body = lines[start:end]
+    while body and not body[-1].strip():
+        body.pop()
+    return body
+
+
+def _wrapped_section(title, body_lines):
+    text = " ".join(body_lines)
+    wrapped = textwrap.wrap(text, _LINE_MAX) or [""]
+    prefix = "{}: ".format(title)
+    indent = " " * len(prefix)
+    return [
+        _HANDOFF_MARKER + (prefix if index == 0 else indent) + line for index, line in enumerate(wrapped)
+    ]
+
+
 def _handoff_lines(ctx, party, generation):
     content = party_commands.previous_handoff_content(ctx.conn, party, generation)
     if not content:
         return ["handoff: none recorded"]
+    raw_lines = sanitize.strip_control_sequences(content).splitlines()
     lines = ["handoff (generation {}):".format(generation - 1)]
-    lines.extend(
-        _HANDOFF_MARKER + _cut(line) for line in sanitize.strip_control_sequences(content).splitlines()
-    )
+    lines.extend(_wrapped_section(handoff_commands.IN_FLIGHT_TITLE, _section_body(raw_lines, handoff_commands.IN_FLIGHT_TITLE)))
+    lines.extend(_wrapped_section(handoff_commands.LEARNED_TITLE, _section_body(raw_lines, handoff_commands.LEARNED_TITLE)))
     return lines
 
 

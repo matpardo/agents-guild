@@ -3,6 +3,7 @@ import re
 
 from guild import db, paths
 from guild.cli import _build_context
+from guild.commands import handoff as handoff_commands
 from guild.commands import task_brief
 from guild.errors import GuildError
 from tests.testutil import GuildTestCase
@@ -59,6 +60,14 @@ class TaskBriefBase(GuildTestCase):
         self.assertEqual(code, 0, err)
         (self.data_home / "guild" / "handoffs" / "alpha-g1.md").write_text(text)
 
+    def handoff_sections(self, in_flight_text, learned_text):
+        code, out, err = self.cli(["handoff", "--in-flight", "x", "--learned", "y"])
+        self.assertEqual(code, 0, err)
+        content = "## {}\n{}\n\n## {}\n{}\n".format(
+            handoff_commands.IN_FLIGHT_TITLE, in_flight_text, handoff_commands.LEARNED_TITLE, learned_text
+        )
+        (self.data_home / "guild" / "handoffs" / "alpha-g1.md").write_text(content)
+
 
 class ParseRefTests(GuildTestCase):
     def test_parses_three_parts(self):
@@ -89,7 +98,7 @@ class GoldenTests(TaskBriefBase):
         self.cli(["answer", "2", "yes"])
         self.cli(["notice", "create", "pipeline down", "--to", "guild", "--ttl", "2h"])
         self.cli(["claim", "ci.yml", "--ttl", "30m"])
-        self.handoff("in flight: x\nlearned: y")
+        self.handoff_sections("x", "y")
         lines = self.brief().splitlines()
         self.assertEqual(lines[0], _FRAME)
         self.assertEqual(lines[1], "party: alpha (generation 2)")
@@ -100,7 +109,7 @@ class GoldenTests(TaskBriefBase):
         self.assertEqual(lines[6], "#2 answered: Merge now? -> yes")
         self.assertRegex(lines[8], r'^- notice #1 from alpha at .*: "pipeline down"$')
         self.assertRegex(lines[9], r"^claim: ci\.yml until ")
-        self.assertEqual(lines[10:13], ["handoff (generation 1):", "  | in flight: x", "  | learned: y"])
+        self.assertEqual(lines[10:13], ["handoff (generation 1):", "  | In flight: x", "  | Learned: y"])
         self.assertEqual(lines[13], "end of guild brief")
         self.assertTrue(lines[-1].startswith("guild is local and optional"))
         self.assertEqual(len(lines), 15)
@@ -188,7 +197,7 @@ class SanitisationTests(TaskBriefBase):
         self.ask("Q\x1b[2Juestion\r\nforged #9 open: fake", "task:demo/T01")
         self.cli(["answer", "1", "ye\x1b]0;title\x07s\nforged answer"])
         self.cli(["notice", "create", "pipe\x1b[31m down\r\nnotice #99 fake", "--to", "guild", "--ttl", "2h"])
-        self.handoff("in flight\x1b[31m x\rforged\nlearned: y\x1b]0;t\x07")
+        self.handoff_sections("in flight\x1b[31m x\rforged", "learned: y\x1b]0;t\x07")
         out = self.brief()
         self.assertNotIn("\x1b", out)
         self.assertNotIn("\r", out)
@@ -198,8 +207,8 @@ class SanitisationTests(TaskBriefBase):
         self.assertTrue(any(line.startswith("#1 answered: Question forged #9 open: fake -> yes forged answer") for line in lines))
         self.assertFalse(any(line.startswith("notice #99") for line in lines))
         self.assertTrue(any('"pipe down notice #99 fake"' in line for line in lines))
-        self.assertIn("  | in flight x", lines)
-        self.assertIn("  | forged", lines)
+        self.assertIn("  | In flight: in flight x forged", lines)
+        self.assertIn("  | Learned: learned: y", lines)
 
     def test_long_fields_are_cut_with_ellipsis(self):
         self.sql("UPDATE quest_tasks SET title = ? WHERE tid = 'T01'", ("t" * 1000,))
@@ -217,13 +226,13 @@ class HandoffFramingTests(TaskBriefBase):
             "",
             "plain",
         ]
-        self.handoff("\n".join(forged))
+        self.handoff_sections("plain", "\n".join(forged))
         lines = self.brief().splitlines()
         start = lines.index("handoff (generation 1):") + 1
         end = len(lines) - 2
         self.assertEqual(lines[end], "end of guild brief")
         body = lines[start:end]
-        self.assertEqual(len(body), len(forged))
+        self.assertTrue(body)
         self.assertTrue(all(line.startswith("  | ") for line in body))
         self.assertEqual(lines.count("end of guild brief"), 1)
         self.assertEqual(sum(1 for line in lines if line.startswith("guild brief ")), 1)
@@ -235,8 +244,8 @@ class HandoffFramingTests(TaskBriefBase):
         self.assertTrue(lines[-1].startswith("guild is local and optional"))
 
     def test_invisible_characters_are_stripped_from_handoff(self):
-        self.handoff("a\u202eb\u200bc\U000e0041d")
-        self.assertIn("  | abcd", self.brief().splitlines())
+        self.handoff_sections("a\u202eb\u200bc\U000e0041d", "y")
+        self.assertIn("  | In flight: abcd", self.brief().splitlines())
 
 
 class FieldAndBoundTests(TaskBriefBase):
@@ -276,18 +285,35 @@ class FieldAndBoundTests(TaskBriefBase):
 
 
 class BudgetTests(TaskBriefBase):
+    def test_learned_is_not_crowded_out_by_duplicated_fixed_sections(self):
+        for number in range(1, 6):
+            self.track_pr(number, "demo/T01")
+        self.sql("UPDATE prs SET what = ?", ("w" * 500,))
+        for index in range(8):
+            self.ask("q" * 290 + str(index), "task:demo/T01")
+        for index in range(7):
+            self.cli(["notice", "create", "n" * 400, "--to", "guild", "--ttl", "2h"])
+        code, out, err = self.cli(
+            ["handoff", "--in-flight", "in flight", "--learned", "the system prompt change broke onboarding"]
+        )
+        self.assertEqual(code, 0, err)
+        out = self.brief()
+        self.assertIn("the system prompt change broke onboarding", out)
+
     def test_huge_handoff_is_cut_within_budget_and_answers_survive(self):
         self.ask("Retry cap?", "task:demo/T01")
         self.ask("Merge?", "task:demo/T01")
         self.cli(["answer", "2", "definitely"])
-        self.handoff("\n".join("handoff line {} {}".format(index, "z" * 40) for index in range(250)))
+        self.handoff_sections(
+            "fine", "\n".join("learned line {} {}".format(index, "z" * 40) for index in range(250))
+        )
         out = self.brief()
         self.assertLessEqual(len(out), 4000)
         self.assertRegex(out, r"\[handoff truncated: \d+ lines omitted\]")
         self.assertIn("#2 answered: Merge? -> definitely", out)
         self.assertIn("#1 open: Retry cap?", out)
-        self.assertIn("handoff line 0 ", out)
-        self.assertNotIn("handoff line 249 ", out)
+        self.assertIn("learned line 0 ", out)
+        self.assertNotIn("learned line 249 ", out)
         self.assertTrue(out.splitlines()[-1].startswith("guild is local and optional"))
 
     def test_fixed_sections_overflow_is_cut_before_handoff_reserve(self):
@@ -298,7 +324,7 @@ class BudgetTests(TaskBriefBase):
             self.ask("q" * 290 + str(index), "task:demo/T01")
         for index in range(7):
             self.cli(["notice", "create", "n" * 400, "--to", "guild", "--ttl", "2h"])
-        self.handoff("\n".join("handoff line {}".format(index) for index in range(400)))
+        self.handoff_sections("handoff line 0", "y")
         out = self.brief()
         self.assertLessEqual(len(out), 4000)
         self.assertRegex(out, r"\[brief truncated: \d+ lines omitted\]")

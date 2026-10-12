@@ -16,6 +16,9 @@ _PARTY_GONE = "party-gone"
 _WINDOW_GONE = "window-gone"
 _TIMED_OUT = "timed-out"
 
+IN_FLIGHT_TITLE = "In flight"
+LEARNED_TITLE = "Learned"
+
 
 def _section(title, lines):
     return ["## {}".format(title), *lines, ""]
@@ -74,8 +77,8 @@ def _render_handoff(ctx, binding, in_flight, learned):
     lines += _section("Open asks", _ask_lines(ctx.conn, binding["party"]))
     lines += _section("Active notices", _notice_lines(ctx.conn, ctx.now, binding["party"]))
     lines += _section("Claims", _claim_lines(ctx.conn, ctx.now, binding["party"]))
-    lines += _section("In flight", [in_flight])
-    lines += _section("Learned", [learned])
+    lines += _section(IN_FLIGHT_TITLE, [in_flight])
+    lines += _section(LEARNED_TITLE, [learned])
     return "\n".join(lines) + "\n"
 
 

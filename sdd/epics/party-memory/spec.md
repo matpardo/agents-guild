@@ -2,7 +2,7 @@
 epic: party-memory
 type: spec
 title: What a party learns survives across generations
-status: draft
+status: done
 owner: matpardo
 created: 2026-10-12
 updated: 2026-10-12
@@ -22,7 +22,7 @@ Each party keeps a small memory that every later generation receives, for any mo
 
 - Per-party memory as a markdown directory `data_dir/memory/<party>/` (decision del dev, 2026-10-12), contained with `names.ensure_within`, managed by guild: `guild memory add|list|rm` and a web view with delete.
 - `handoff --learned` appends to the memory, skipping identical text.
-- SessionStart injects it framed as local data, newest first, capped at about 1500 characters, with an end marker.
+- SessionStart injects it framed as local data, newest first, capped at about 10000 characters (worst case, ~20 generations of 500-char items), with an end marker.
 - The brief's handoff section keeps only "In flight" and "Learned", wrapped instead of cut.
 
 ## Out of scope
@@ -33,9 +33,9 @@ Each party keeps a small memory that every later generation receives, for any mo
 
 ## Success criteria
 
-- [ ] A learning written in generation 1 reaches generation 3 without being copied by hand.
-- [ ] A human can list and remove any item from the CLI and the web.
-- [ ] Memory never exceeds its cap in the injected text.
+- [x] A learning written in generation 1 reaches generation 3 without being copied by hand.
+- [x] A human can list and remove any item from the CLI and the web.
+- [x] Memory never exceeds its cap in the injected text.
 
 ## Security and data
 
