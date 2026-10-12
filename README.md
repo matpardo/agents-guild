@@ -199,6 +199,8 @@ guild sync-tracker-timer install --every <dur> | uninstall | print
 guild lifecycle run on_pr_merged|on_pr_closed [--repo <owner/repo>] [--dry-run]   # run a project's lifecycle command by hand
 guild dispatch run [--dry-run]                # react to new events: launch fresh sessions where a project enabled the dispatcher
 guild dispatch status                         # per project: cursor, launches last hour, rules, launches in flight, recent decisions
+guild dispatch pause --reason "<text>"        # any session, bound or not, or the human: stop dispatch for every project
+guild dispatch resume                         # human only, outside a session: lift the pause
 guild dispatch-timer install --every <dur> | uninstall | print
 guild drift [--epic <slug> | --all]
 guild revive [--party <name> ...] [--all] [--list]   # relaunch active parties after a reboot
@@ -985,14 +987,16 @@ for each red main and `next to merge: <ref>` (the first PR of the
 queue whose action is `merge`), and each party block of `guild board` shows the same lines for that
 party's own queue, when they exist. `guild web` shows the same queues, see below.
 
-`guild board` also prints a `DISPATCHER` section after the notices: one line per
-dispatcher launch in flight (launched, not yet bound) with party, generation,
-age, rule and subject, one red line per launch or `pr_promote` that failed in
-the last 24 hours with its reason, one line per project with its rules and mode
-and the launches of the last hour against `max_launches_per_hour`, one line per
-deferred dispatch (party, rule, subject, age, reason) and up to 10 `recent:`
-decisions of the last 24 hours, newest first (dry-run decisions show as
-`planned`). The section is omitted when none of these exist.
+`guild board` also prints a `DISPATCHER` section after the notices: a red
+`PAUSED since <age> ago by <party>: <reason>` line when `guild dispatch pause`
+is in effect, one line per dispatcher launch in flight (launched, not yet
+bound) with party, generation, age, rule and subject, one red line per launch
+or `pr_promote` that failed in the last 24 hours with its reason, one line per
+project with its rules and mode and the launches of the last hour against
+`max_launches_per_hour`, one line per deferred dispatch (party, rule, subject,
+age, reason) and up to 10 `recent:` decisions of the last 24 hours, newest
+first (dry-run decisions show as `planned`). The section is omitted only when
+none of these, including the pause, exist.
 `guild dispatch status` leaves out the `gN` generation on decisions that have
 none (notify-only rules such as `merge_head`, `sdd_progress`, `pr_promote`).
 `--party` and `--raid` keep only those parties' launches.
@@ -1106,9 +1110,10 @@ label pills (`draft`, `converging`), checks, party, task, state, `unblocks N`, t
 `next action` marker, the reasons as pills, a collapsible ready-check detail per PR (blockers, waits and gates, the same content as `guild pr ready-check`) and a `next to merge: <ref> (<party>)` line, or `no PR ready to merge`, matching `guild merge-queue --head`; blocked PRs in place; read-only, the same order as
 `guild merge-queue`, with `synced N min ago`; the party filter keeps
 only that party's PRs and the raid filter only that raid's card; the model
-key is `merge_queues`), a "dispatcher" section (the same lines as `guild board`: project rules and
+key is `merge_queues`), a "dispatcher" section (the same lines as `guild board`: a pause pill or form, project rules and
 launch cap, launches in flight, failures, deferred dispatches and recent
-decisions; empty parts are hidden; the model key is `dispatcher`; the party and raid filters keep only their parties),
+decisions; empty parts are hidden, but the section is shown while paused even
+with nothing else to show; the model key is `dispatcher`; the party and raid filters keep only their parties),
 drift findings for the default scope (grouped by rule, one block per
 project resolved from the parties shown, skipping parties without a
 project; each finding carries its owning `party` when known, and the party
@@ -1172,6 +1177,15 @@ length caps answer `422` with the message. `--until` is CLI-only for now.
 /api/raids/<name>/pause` and `/resume` (body `{}`) run `guild raid pause` /
 `resume`. The human is always allowed (no session), like `guild merge-queue
 pin`; a pause by the human is recorded with `paused_by` `human`.
+
+**Dispatch pause**: the dispatcher section shows a `paused` pill with the
+reason and a `Resume dispatch` button while `guild dispatch pause` is in
+effect, or a reason field and a `Pause dispatch` button (disabled until the
+reason is not blank) for any project with a dispatcher configured. `POST
+/api/dispatch/pause` (body `{"reason": "<text>"}`) and `POST
+/api/dispatch/resume` (body `{}`) run `guild dispatch pause` / `resume`; a
+web resume always counts as the human, since the web has no session. An
+empty, over-long or already-paused request answers `422` with the message.
 
 **Answering from the page**: each open ask card has one button per option
 (clicking it only copies the option's text into the answer field), an answer
@@ -1493,12 +1507,29 @@ run gh pr view <n> --repo <repo> and resolve review threads.` Answer text and CI
 never reach the command line.
 
 Nothing is launched for a party that has a live session, an open window in the
-`guild` session, a launch in flight or a paused raid: the trigger is recorded
-as `deferred` with that reason (the key is not consumed, nothing is launched)
-and re-evaluated at the start of every pass, before new events, until the party
-is free. A deferral older than 24 hours is skipped with `deferred too long`
-and one project notice; a deferred ask that was dismissed, or checks that
-turned green, are dropped. The one-hour age guard applies to new events only.
+`guild` session, a launch in flight, a paused raid or a paused dispatch: the
+trigger is recorded as `deferred` with that reason (the key is not consumed,
+nothing is launched) and re-evaluated at the start of every pass, before new
+events, until the party is free. A deferral older than 24 hours is skipped
+with `deferred too long` and one project notice; a deferred ask that was
+dismissed, or checks that turned green, are dropped. The one-hour age guard
+applies to new events only. While dispatch is paused this 24-hour expiry is
+suspended; a deferral already older than 24 hours when dispatch resumes still
+drops on the next pass with `deferred too long` (a known limit).
+
+`guild dispatch pause --reason "<text>"` stops every project's dispatch: any
+session, bound or not, or a human may run it. While paused, launches recorded
+as `dispatch.decided` go through the same defer path with reason `dispatch
+paused`; `promote`, `announce` and `nudge` do nothing and record nothing (no
+`gh` call, no notice, no tmux keys). `reconcile` of in-flight launches keeps
+running, and each project's cursor still advances; events older than one hour
+are ignored and counted the same as always. `guild dispatch resume` lifts the
+pause; only a human, outside a session, may run it. The reason passes
+`validate_field` (300 characters, no email). Recorded as `dispatch.paused`
+(`reason`, `party`: the bound party, `session` when the session is unbound, or
+`human`) and `dispatch.resumed`. `guild dispatch status` starts with `PAUSED
+since <age> ago by <party>: <reason>` when paused, even for a project with no
+dispatcher configured.
 A trigger is skipped once, with
 the reason recorded (`guild dispatch status`), when the party did not hand off
 (a notice asks the human to run `guild revive --party <party>`), is a keeper

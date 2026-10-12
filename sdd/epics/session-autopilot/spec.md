@@ -2,7 +2,7 @@
 epic: session-autopilot
 type: spec
 title: Guild-launched sessions end themselves and hand off
-status: draft
+status: active
 owner: matpardo
 created: 2026-10-12
 updated: 2026-10-12

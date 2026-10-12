@@ -12,6 +12,7 @@ PROJECTION_TABLES = (
     "claims",
     "raid_members",
     "raid_pauses",
+    "dispatch_pause",
     "pr_shared_areas",
     "pr_files",
     "merge_queue_pins",
@@ -188,6 +189,14 @@ _CREATE_STATEMENTS = (
         raid TEXT PRIMARY KEY,
         paused_at TEXT NOT NULL,
         paused_by TEXT NOT NULL
+    )
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS dispatch_pause (
+        id INTEGER PRIMARY KEY CHECK (id = 1),
+        paused_at TEXT NOT NULL,
+        paused_by TEXT NOT NULL,
+        reason TEXT NOT NULL
     )
     """,
     """

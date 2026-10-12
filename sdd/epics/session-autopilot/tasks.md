@@ -2,7 +2,7 @@
 epic: session-autopilot
 type: tasks
 title: Guild-launched sessions end themselves and hand off
-status: draft
+status: active
 updated: 2026-10-12
 ---
 # Tasks: Guild-launched sessions end themselves and hand off
@@ -10,7 +10,7 @@ updated: 2026-10-12
 ## T01 — Global dispatch pause
 
 **Depends on:** —
-**Status:** [ ] pending
+**Status:** [x] done — #135
 
 **What:** events `dispatch.paused` and `dispatch.resumed` with a one-row reducer. `Launcher.evaluate` returns busy "dispatch paused" through the existing defer path; promote, announce and nudge do nothing while paused. `dispatch status` shows it. Resume refuses when a session id is set. Web button and reason field post through `sendPost` to the same functions. README and GUILD.md updated.
 

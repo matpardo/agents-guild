@@ -5,6 +5,7 @@ from pathlib import Path
 
 from guild import config, db, events, resume, session_info, timeutil, tmux_windows
 from guild.adapters import github
+from guild.commands import dispatch_pause as dispatch_pause_commands
 from guild.commands import notice as notice_commands
 from guild.commands import raid as raid_commands
 
@@ -79,23 +80,31 @@ class Launcher:
             return self._record_error(project_config, trigger, mode, error)
 
     def announce(self, project_config, trigger, mode):
+        if self._paused():
+            return None
         try:
             return self._announce(project_config, trigger, mode)
         except Exception as error:
             return self._record_error(project_config, trigger, mode, error)
 
     def preview_announce(self, trigger, mode):
+        if self._paused():
+            return None
         if self._already_decided(trigger, mode):
             return None
         return "{}would notify {}".format(self._prefix(trigger), trigger.party)
 
     def nudge(self, project_config, trigger, mode):
+        if self._paused():
+            return None
         try:
             return self._nudge(trigger, mode)
         except Exception as error:
             return self._record_error(project_config, trigger, mode, error)
 
     def preview_nudge(self, trigger, mode):
+        if self._paused():
+            return None
         if self._already_decided(trigger, mode):
             return None
         return "{}would nudge {}".format(self._prefix(trigger), trigger.party)
@@ -127,12 +136,16 @@ class Launcher:
         return "{}skipped {}: {}".format(prefix, trigger.party, reason)
 
     def promote(self, project_config, trigger, mode):
+        if self._paused():
+            return None
         try:
             return self._promote(project_config, trigger, mode)
         except Exception as error:
             return self._record_error(project_config, trigger, mode, error)
 
     def preview_promote(self, trigger, mode):
+        if self._paused():
+            return None
         if self._already_decided(trigger, mode):
             return None
         verb = "notify" if trigger.needs_human_review else "promote"
@@ -319,8 +332,13 @@ class Launcher:
             return _verdict_without_launch(_SKIP, "party not handed off", notice, generation)
         return None
 
+    def _paused(self):
+        return dispatch_pause_commands.current(self._ctx.conn) is not None
+
     def _busy_reason(self, trigger, party):
         conn, ctx = self._ctx.conn, self._ctx
+        if self._paused():
+            return "dispatch paused"
         if party["leader_session_id"] in session_info.live_session_ids(ctx.sessions_dir):
             return "live session"
         if self._tmux.installed() and trigger.party in tmux_windows.window_names(self._tmux):
@@ -420,7 +438,12 @@ class Launcher:
 
     def retry_deferred(self, project_config, trigger, mode):
         deferred = self._deferred_row(trigger, mode)
-        if deferred is not None and self._ctx.now - timeutil.from_iso(deferred["decided_at"]) > _DEFER_DEADLINE:
+        expired = (
+            deferred is not None
+            and not self._paused()
+            and self._ctx.now - timeutil.from_iso(deferred["decided_at"]) > _DEFER_DEADLINE
+        )
+        if expired:
             return self._expire_deferred(trigger, mode)
         return self.decide(project_config, trigger, mode)
 
