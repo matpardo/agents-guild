@@ -5,6 +5,7 @@ from guild import db, events, paths, timeutil
 from guild.cli import _build_context
 from guild.commands import handoff as handoff_commands
 from guild.commands import memory as memory_commands
+from guild.errors import GuildError
 from tests.testutil import GuildTestCase
 
 
@@ -86,7 +87,7 @@ class RespawnBase(GuildTestCase):
         return FakeTmux(installed, windows, pane_windows, session_up, create_returncode)
 
     def _respawn(self, tmux, pane):
-        return handoff_commands.run(self.ctx, "x", "y", None, True, tmux, pane, self._sleep)
+        return handoff_commands.run(self.ctx, "x", "y", None, True, False, tmux, pane, self._sleep)
 
     def _state(self):
         return self.ctx.conn.execute("SELECT state FROM parties WHERE name = 'alpha'").fetchone()["state"]
@@ -310,7 +311,7 @@ class RespawnCliTests(RespawnBase):
             "os.environ", {"TMUX_PANE": "%9"}
         ):
             self.run_cli(["handoff", "--respawn", "--in-flight", "x", "--learned", "y"], "sess-1", self.repo_dir)
-        self.assertEqual(run.call_args[0][6], "%9")
+        self.assertEqual(run.call_args[0][7], "%9")
         self.assertTrue(run.call_args[0][4])
 
     def test_prune_rejects_respawn(self):
@@ -318,8 +319,85 @@ class RespawnCliTests(RespawnBase):
         self.assertEqual(code, 1)
         self.assertIn("--respawn", err)
 
+    def test_prune_rejects_close(self):
+        code, out, err = self.run_cli(["handoff", "prune", "--close"], None, None)
+        self.assertEqual(code, 1)
+        self.assertIn("--close", err)
+
     def test_dry_run_without_prune_still_rejected_with_respawn(self):
         code, out, err = self.run_cli(
             ["handoff", "--respawn", "--dry-run", "--in-flight", "x", "--learned", "y"], "sess-1", self.repo_dir
         )
         self.assertEqual(code, 1)
+
+
+class HandoffCloseTests(RespawnBase):
+    def _close(self, tmux, pane):
+        return handoff_commands.run(self.ctx, "x", "y", None, False, True, tmux, pane, self._sleep)
+
+    def test_respawn_and_close_together_is_rejected_and_writes_nothing(self):
+        with self.assertRaises(GuildError) as raised:
+            handoff_commands.run(self.ctx, "x", "y", None, True, True, self._fake(), "%5", self._sleep)
+        self.assertIn("--respawn", str(raised.exception))
+        self.assertIn("--close", str(raised.exception))
+        self.assertFalse((paths.handoffs_dir() / "alpha-g1.md").is_file())
+        self.assertIsNone(
+            self.ctx.conn.execute("SELECT 1 FROM events WHERE kind = 'party.handed_off'").fetchone()
+        )
+
+    def test_close_matching_recorded_window_returns_the_pane(self):
+        self._record_window(1, "@1")
+        text, pane_to_close = self._close(self._fake(), "%5")
+        self.assertEqual(pane_to_close, "%5")
+        self.assertIn("handoff written for alpha-g1; closing this pane", text)
+
+    def test_close_without_tmux_pane_closes_nothing(self):
+        self._record_window(1, "@1")
+        text, pane_to_close = self._close(self._fake(), None)
+        self.assertIsNone(pane_to_close)
+        self.assertIn("not a window guild launched, close it yourself", text)
+
+    def test_window_guild_did_not_launch_is_never_closed(self):
+        text, pane_to_close = self._close(self._fake(), "%5")
+        self.assertIsNone(pane_to_close)
+        self.assertIn("not a window guild launched, close it yourself", text)
+
+    def test_close_still_writes_handoff_file_and_event(self):
+        self._close(self._fake(), None)
+        self.assertTrue((paths.handoffs_dir() / "alpha-g1.md").is_file())
+        row = self.ctx.conn.execute(
+            "SELECT payload FROM events WHERE kind = 'party.handed_off' ORDER BY seq DESC LIMIT 1"
+        ).fetchone()
+        self.assertIsNotNone(row)
+
+
+class HandoffCloseCliTests(RespawnBase):
+    def test_cli_invokes_kill_pane_when_run_returns_a_pane(self):
+        with mock.patch("guild.commands.handoff.run", return_value=("closing", "%5")), mock.patch(
+            "guild.tmux_windows.kill_pane"
+        ) as kill:
+            code, out, err = self.run_cli(
+                ["handoff", "--close", "--in-flight", "x", "--learned", "y"], "sess-1", self.repo_dir
+            )
+        self.assertEqual(code, 0, err)
+        kill.assert_called_once_with(mock.ANY, "%5")
+
+    def test_cli_does_not_kill_when_nothing_to_close(self):
+        with mock.patch("guild.commands.handoff.run", return_value=("close it yourself", None)), mock.patch(
+            "guild.tmux_windows.kill_pane"
+        ) as kill:
+            self.run_cli(["handoff", "--close", "--in-flight", "x", "--learned", "y"], "sess-1", self.repo_dir)
+        kill.assert_not_called()
+
+    def test_cli_passes_close_flag_to_run(self):
+        with mock.patch("guild.commands.handoff.run", return_value=("t", None)) as run:
+            self.run_cli(["handoff", "--close", "--in-flight", "x", "--learned", "y"], "sess-1", self.repo_dir)
+        self.assertTrue(run.call_args[0][5])
+
+    def test_cli_rejects_respawn_and_close_together(self):
+        code, out, err = self.run_cli(
+            ["handoff", "--respawn", "--close", "--in-flight", "x", "--learned", "y"], "sess-1", self.repo_dir
+        )
+        self.assertEqual(code, 1)
+        self.assertIn("--respawn", err)
+        self.assertIn("--close", err)

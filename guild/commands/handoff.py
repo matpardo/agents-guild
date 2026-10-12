@@ -187,6 +187,15 @@ def _launch_next_generation(ctx, binding, command, cwd, tmux):
     return window_id
 
 
+def _close(ctx, binding, tmux, tmux_pane):
+    recorded_window = tmux_windows.recorded_window(ctx.conn, binding["party"], binding["generation"])
+    pane = _closable_pane(tmux, tmux_pane, recorded_window)
+    label = "{}-g{}".format(binding["party"], binding["generation"])
+    if pane is None:
+        return _with_reminder("handoff written for {}; not a window guild launched, close it yourself".format(label)), None
+    return _with_reminder("handoff written for {}; closing this pane".format(label)), pane
+
+
 def _respawn(ctx, binding, model, tmux, tmux_pane, sleep):
     party, generation = binding["party"], binding["generation"]
     leader = ctx.conn.execute(
@@ -231,11 +240,13 @@ def _respawn(ctx, binding, model, tmux, tmux_pane, sleep):
     ), pane
 
 
-def run(ctx, in_flight, learned, model, respawn, tmux, tmux_pane, sleep):
+def run(ctx, in_flight, learned, model, respawn, close, tmux, tmux_pane, sleep):
     if not in_flight.strip():
         raise GuildError("--in-flight must not be empty", 1)
     if not learned.strip():
         raise GuildError("--learned must not be empty", 1)
+    if respawn and close:
+        raise GuildError("--respawn and --close cannot be combined", 1)
     binding = identity.require_binding(ctx.conn, ctx.session_id)
     patterns = pii.project_patterns(ctx.projects_dir, binding["project"])
     pii.validate_field(in_flight, "--in-flight", pii.HANDOFF_FIELD_MAX_LENGTH, patterns)
@@ -244,6 +255,8 @@ def run(ctx, in_flight, learned, model, respawn, tmux, tmux_pane, sleep):
     _write_handoff(ctx, binding, in_flight, learned, False)
     if respawn:
         return _respawn(ctx, binding, model, tmux, tmux_pane, sleep)
+    if close:
+        return _close(ctx, binding, tmux, tmux_pane)
     command = resume.fresh_command(
         binding["party"],
         binding["generation"] + 1,

@@ -456,6 +456,7 @@ class HandoffCliPartyFlagTests(GuildTestCase):
             (["handoff", "--party", "alpha", "--model", "opus"], "--model"),
             (["handoff", "--party", "alpha", "--dry-run"], "--dry-run"),
             (["handoff", "--party", "alpha", "--respawn"], "--respawn"),
+            (["handoff", "--party", "alpha", "--close"], "--close"),
         )
         for argv, flag in cases:
             with self.subTest(flag=flag):

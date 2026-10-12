@@ -114,12 +114,12 @@ updated: 2026-10-04
 ## T10 — Close a guild-launched window after handoff
 
 **Depends on:** T09
-**Status:** [ ] pending
+**Status:** [x] done — #147
 
 **What:** `guild handoff --close` closes the session's own pane only when its window is the one guild recorded for that generation.
 
 **Acceptance:**
-- [ ] A window that guild did not launch is never closed.
+- [x] A window that guild did not launch is never closed.
 
 ## T11 — Rule: converged and green PR
 

@@ -179,7 +179,7 @@ guild raid resume <name>              # lifts the pause and posts a notice to ra
 guild raids
 
 guild next [--all]     # ranked action queue for the caller's party
-guild handoff --in-flight "..." --learned "..." [--model <m>] [--respawn]
+guild handoff --in-flight "..." --learned "..." [--model <m>] [--respawn] [--close]
 guild handoff prune [--dry-run]
 guild handoff --party <name>   # terminal only: hand off a party whose leader session is gone
 
@@ -1327,10 +1327,18 @@ when the party is a keeper or guild recorded a window for the current generation
 (`leader_windows`), so a session started by `revive`, `--respawn` or the dispatcher
 hands off inside tmux instead of exiting and closing its window.
 
+`guild handoff --close` writes the handoff like a plain `guild handoff` call but
+closes this same session's pane instead of printing a resume command, only when
+the tmux pane it runs in (`$TMUX_PANE`) is the window guild recorded as
+launching this generation and that window is still in the `guild` session;
+otherwise it prints `not a window guild launched, close it yourself` and closes
+nothing. It cannot be combined with `--respawn` (it launches no next generation,
+it only closes the current one's own window).
+
 `guild handoff --party <name>` hands off a party whose leader session is gone,
 from a terminal only: it refuses from inside a Claude Code session and refuses
 to combine with any other `handoff` flag (`prune`, `--in-flight`, `--learned`,
-`--model`, `--dry-run`, `--respawn`), naming the offending flag. It refuses
+`--model`, `--dry-run`, `--respawn`, `--close`), naming the offending flag. It refuses
 when the party still has a live leader session (`run guild handoff from that
 session instead`). Otherwise it synthesizes `In flight` from the party
 leader's recorded worktree — branch, count of uncommitted files, count of
