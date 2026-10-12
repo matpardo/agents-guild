@@ -2,7 +2,7 @@
 epic: party-memory
 type: spec
 title: What a party learns survives across generations
-status: draft
+status: done
 owner: matpardo
 created: 2026-10-12
 updated: 2026-10-12
@@ -33,9 +33,9 @@ Each party keeps a small memory that every later generation receives, for any mo
 
 ## Success criteria
 
-- [ ] A learning written in generation 1 reaches generation 3 without being copied by hand.
-- [ ] A human can list and remove any item from the CLI and the web.
-- [ ] Memory never exceeds its cap in the injected text.
+- [x] A learning written in generation 1 reaches generation 3 without being copied by hand.
+- [x] A human can list and remove any item from the CLI and the web.
+- [x] Memory never exceeds its cap in the injected text.
 
 ## Security and data
 
