@@ -31,7 +31,7 @@ updated: 2026-10-12
 ## T04 — Dispatcher hands off dead party leader sessions
 
 **Depends on:** T03
-**Status:** [ ] pending
+**Status:** [x] done — #146
 
 **What:** one step in `dispatch._pass` after `reconcile`: party active, recorded window present, party leader session not live, window gone → `write_auto`. Adds an ADR amending `20261004_dispatcher-launches-fresh-sessions`.
 

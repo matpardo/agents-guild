@@ -1611,6 +1611,12 @@ except keeper, closed and the previous-launch block.
   the waits in "Session status"). A window that did not bind is left running, never
   killed, and its party launches again only after a manual
   `guild party resume`.
+- Each pass then hands off a party that is still `active`, has a guild-recorded
+  tmux window for its current generation, whose leader session process is gone
+  and whose window is also gone: `guild handoff` is written for it from guild's
+  own state, moving it to `awaiting-leader` so the next pass can relaunch it. A
+  party a human launched by hand, with no guild-recorded window, keeps today's
+  behavior.
 - `guild dispatch run --dry-run` takes no lock and writes nothing, not even
   the cursor: it prints the same lines with `would ...` and shows the busy
   reasons. `guild dispatch status` prints, per project, the cursor, launches
@@ -1619,7 +1625,9 @@ except keeper, closed and the previous-launch block.
 - A trigger deferred because the party has a live session shows up in that
   session's inbox as `- dispatch <rule>: <subject> needs you (deferred while
   your session is live)`, once. Dry-run and other busy reasons stay silent.
-- A session that ends idle keeps its party out of dispatch until it is closed.
+- A session that ends idle, with its pid and its recorded window still alive,
+  keeps its party out of dispatch until a human closes it; one whose pid and
+  window are both gone is handed off automatically instead, as above.
   Lifecycle commands (`guild lifecycle`) stay in `sync`.
 
 ```
