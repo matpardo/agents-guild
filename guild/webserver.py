@@ -11,6 +11,7 @@ from guild import ask_detail, context, db, origin, paths, timeutil
 from guild.commands import ask as ask_commands
 from guild.commands import board as board_commands
 from guild.commands import dispatch_pause as dispatch_pause_commands
+from guild.commands import handoff as handoff_commands
 from guild.commands import history as history_commands
 from guild.commands import memory as memory_commands
 from guild.commands import notice as notice_commands
@@ -36,6 +37,7 @@ _NOTICE_ACTION_RE = re.compile(r"^/api/notices/([^/]+)/(seen|unseen)$")
 _PR_ACTION_RE = re.compile(r"^/api/prs/([^/]+/[^/]+)/(\d+)/(block|unblock|ask-fix)$")
 _RAID_ACTION_RE = re.compile(r"^/api/raids/([^/]+)/(pause|resume)$")
 _MEMORY_ACTION_RE = re.compile(r"^/api/memory/([^/]+)/([1-9][0-9]*)/rm$")
+_PARTY_HANDOFF_RE = re.compile(r"^/api/parties/([^/]+)/hand-off$")
 _DISPATCH_ACTION_RE = re.compile(r"^/api/dispatch/(pause|resume)$")
 _SEEN_ALL_PATH = "/api/notices/seen-all"
 _NOTICE_CREATE_PATH = "/api/notices/create"
@@ -170,6 +172,14 @@ def _run_memory_action(party, seq):
     ctx = _action_context()
     try:
         return memory_commands.rm(ctx, "{}/{}".format(party, seq))
+    finally:
+        ctx.conn.close()
+
+
+def _run_party_handoff_action(party):
+    ctx = _action_context()
+    try:
+        return handoff_commands.run_for_party(ctx, party)
     finally:
         ctx.conn.close()
 
@@ -331,6 +341,10 @@ class BoardRequestHandler(http_server.BaseHTTPRequestHandler):
         if memory_match is not None:
             party, seq = memory_match.groups()
             return self._post_action("rm", lambda payload: _run_memory_action(party, seq))
+        party_handoff_match = _PARTY_HANDOFF_RE.match(path)
+        if party_handoff_match is not None:
+            party = party_handoff_match.group(1)
+            return self._post_action("hand-off", lambda payload: _run_party_handoff_action(party))
         notice_match = _NOTICE_ACTION_RE.match(path)
         if notice_match is None:
             return self._method_not_allowed()

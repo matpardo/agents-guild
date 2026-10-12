@@ -1091,6 +1091,7 @@ def _party_model(ctx, party_row, project_config):
         "caps": _party_caps(ctx, party_row, project_config),
         "resume_command": _resume_command(ctx, party_row),
         "leader_session_name": _leader_session_name(ctx.conn, party_row["name"]),
+        "has_live_leader": party_status.has_live_leader(ctx, party_row),
         "quests": quest_models,
         "prs": [_pr_model(ctx, pr_row, project_config) for pr_row in orphan_prs],
         "raids": [

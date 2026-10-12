@@ -1,10 +1,17 @@
+import json
 import os
 import sqlite3
 import subprocess
+import tempfile
+import unittest
+from pathlib import Path
 from unittest import mock
 
 from guild import pii
+from guild.cli import _build_context
+from guild.commands import handoff as handoff_commands
 from guild.commands import memory as memory_commands
+from guild.errors import GuildError
 from tests.testutil import GuildTestCase
 
 
@@ -275,3 +282,193 @@ class AutoResumeTests(GuildTestCase):
         code, out, err = self._session_start("sess-2", "../x")
         self.assertEqual(code, 0)
         self.assertIn("GUILD_RESUME=../x not applied", out)
+
+
+def _init_git_repo(root):
+    remote_dir = root / "remote"
+    remote_dir.mkdir()
+    for command in (
+        ["git", "init", "-q", "-b", "main"],
+        ["git", "config", "user.email", "t@t.com"],
+        ["git", "config", "user.name", "t"],
+        ["git", "commit", "--allow-empty", "-q", "-m", "init"],
+    ):
+        subprocess.run(command, cwd=str(remote_dir), check=True)
+    work_dir = root / "work"
+    subprocess.run(["git", "clone", "-q", str(remote_dir), str(work_dir)], check=True)
+    return work_dir
+
+
+class AutoInFlightGitTests(unittest.TestCase):
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self.root = Path(self._tmp.name)
+
+    def tearDown(self):
+        self._tmp.cleanup()
+
+    def _commit(self, repo_dir, message):
+        subprocess.run(["git", "commit", "--allow-empty", "-q", "-m", message], cwd=str(repo_dir), check=True)
+
+    def test_clean_repo_with_upstream_is_all_zero(self):
+        repo_dir = _init_git_repo(self.root)
+        self.assertEqual(
+            handoff_commands._auto_in_flight(repo_dir),
+            "automatic handoff: branch main, 0 uncommitted, 0 unpushed",
+        )
+
+    def test_dirty_worktree_counts_uncommitted(self):
+        repo_dir = _init_git_repo(self.root)
+        (repo_dir / "untracked.txt").write_text("x")
+        self.assertIn("1 uncommitted", handoff_commands._auto_in_flight(repo_dir))
+
+    def test_local_commits_ahead_count_unpushed(self):
+        repo_dir = _init_git_repo(self.root)
+        self._commit(repo_dir, "one")
+        self._commit(repo_dir, "two")
+        self.assertIn("2 unpushed", handoff_commands._auto_in_flight(repo_dir))
+
+    def test_no_upstream_configured_reports_unpushed_unknown(self):
+        repo_dir = self.root / "solo"
+        repo_dir.mkdir()
+        for command in (
+            ["git", "init", "-q", "-b", "main"],
+            ["git", "config", "user.email", "t@t.com"],
+            ["git", "config", "user.name", "t"],
+            ["git", "commit", "--allow-empty", "-q", "-m", "init"],
+        ):
+            subprocess.run(command, cwd=str(repo_dir), check=True)
+        self.assertIn("unpushed unknown", handoff_commands._auto_in_flight(repo_dir))
+
+    def test_detached_head_reports_branch_unknown(self):
+        repo_dir = _init_git_repo(self.root)
+        subprocess.run(["git", "checkout", "-q", "--detach"], cwd=str(repo_dir), check=True)
+        self.assertIn("branch unknown", handoff_commands._auto_in_flight(repo_dir))
+
+    def test_non_git_directory_reports_worktree_unknown(self):
+        plain_dir = self.root / "plain"
+        plain_dir.mkdir()
+        self.assertEqual(handoff_commands._auto_in_flight(plain_dir), "automatic handoff: worktree unknown")
+
+    def test_none_cwd_reports_worktree_unknown_without_crashing(self):
+        self.assertEqual(handoff_commands._auto_in_flight(None), "automatic handoff: worktree unknown")
+
+
+class WriteAutoTests(GuildTestCase):
+    def setUp(self):
+        super().setUp()
+        self.repo_dir = self.register_project("acme", ["acme/app"])
+        for command in (
+            ["git", "init", "-q", "-b", "main"],
+            ["git", "config", "user.email", "t@t.com"],
+            ["git", "config", "user.name", "t"],
+            ["git", "commit", "--allow-empty", "-q", "-m", "init"],
+        ):
+            subprocess.run(command, cwd=str(self.repo_dir), check=True)
+        self.run_cli(["party", "start", "alpha"], "sess-1", self.repo_dir)
+
+    def _binding(self):
+        return {"party": "alpha", "project": "acme", "generation": 1}
+
+    def _write(self):
+        ctx = _build_context(None, None)
+        handoff_commands.write_auto(ctx, self._binding())
+
+    def _handoff_content(self):
+        return (self.data_home / "guild" / "handoffs" / "alpha-g1.md").read_text()
+
+    def test_learned_is_the_fixed_automatic_string(self):
+        self._write()
+        content = self._handoff_content()
+        self.assertIn("## Learned\nnone (automatic handoff)", content)
+
+    def test_in_flight_carries_the_git_summary(self):
+        self._write()
+        content = self._handoff_content()
+        self.assertIn("## In flight\nautomatic handoff: branch main,", content)
+
+    def test_records_an_auto_handed_off_event(self):
+        self._write()
+        conn = sqlite3.connect(str(self.data_home / "guild" / "guild.db"))
+        conn.row_factory = sqlite3.Row
+        row = conn.execute(
+            "SELECT payload FROM events WHERE kind = 'party.handed_off' ORDER BY seq DESC LIMIT 1"
+        ).fetchone()
+        conn.close()
+        self.assertTrue(json.loads(row["payload"])["auto"])
+
+    def test_does_not_create_a_party_memory_item(self):
+        self._write()
+        self.assertEqual(memory_commands.list_items("alpha"), [])
+        self.assertEqual(list((self.data_home / "guild" / "memory").iterdir()), [])
+
+
+class RunForPartyTests(GuildTestCase):
+    def setUp(self):
+        super().setUp()
+        self.repo_dir = self.register_project("acme", ["acme/app"])
+        self.run_cli(["party", "start", "alpha"], "sess-1", self.repo_dir)
+
+    def _party_state(self):
+        conn = sqlite3.connect(str(self.data_home / "guild" / "guild.db"))
+        conn.row_factory = sqlite3.Row
+        row = conn.execute("SELECT state FROM parties WHERE name = 'alpha'").fetchone()
+        conn.close()
+        return row["state"]
+
+    def test_unknown_party_raises(self):
+        ctx = _build_context(None, None)
+        with self.assertRaises(GuildError):
+            handoff_commands.run_for_party(ctx, "nope")
+
+    def test_closed_party_raises(self):
+        self.run_cli(["party", "close", "alpha", "--force"], None, self.repo_dir)
+        ctx = _build_context(None, None)
+        with self.assertRaises(GuildError) as raised:
+            handoff_commands.run_for_party(ctx, "alpha")
+        self.assertIn("closed", raised.exception.message)
+
+    def test_party_with_a_live_leader_raises(self):
+        self.write_session(os.getpid(), "sess-1", "alpha-g1")
+        ctx = _build_context(None, None)
+        with self.assertRaises(GuildError) as raised:
+            handoff_commands.run_for_party(ctx, "alpha")
+        self.assertIn("has a live leader", raised.exception.message)
+
+    def test_party_with_no_live_leader_succeeds_and_becomes_awaiting_leader(self):
+        ctx = _build_context(None, None)
+        message = handoff_commands.run_for_party(ctx, "alpha")
+        self.assertIn("alpha", message)
+        self.assertEqual(self._party_state(), "awaiting-leader")
+
+
+class HandoffCliPartyFlagTests(GuildTestCase):
+    def setUp(self):
+        super().setUp()
+        self.repo_dir = self.register_project("acme", ["acme/app"])
+        self.run_cli(["party", "start", "alpha"], "sess-1", self.repo_dir)
+
+    def test_party_rejects_combination_with_every_other_handoff_flag(self):
+        cases = (
+            (["handoff", "prune", "--party", "alpha"], "prune"),
+            (["handoff", "--party", "alpha", "--in-flight", "x"], "--in-flight"),
+            (["handoff", "--party", "alpha", "--learned", "y"], "--learned"),
+            (["handoff", "--party", "alpha", "--model", "opus"], "--model"),
+            (["handoff", "--party", "alpha", "--dry-run"], "--dry-run"),
+            (["handoff", "--party", "alpha", "--respawn"], "--respawn"),
+        )
+        for argv, flag in cases:
+            with self.subTest(flag=flag):
+                code, out, err = self.run_cli(argv, None, self.repo_dir)
+                self.assertEqual(code, 1)
+                self.assertIn(flag, err)
+
+    def test_party_from_a_bound_session_is_rejected(self):
+        code, out, err = self.run_cli(["handoff", "--party", "alpha"], "sess-1", self.repo_dir)
+        self.assertEqual(code, 1)
+        self.assertIn("cannot be used from inside a Claude Code session", err)
+
+    def test_party_from_no_session_with_no_live_leader_succeeds(self):
+        code, out, err = self.run_cli(["handoff", "--party", "alpha"], None, self.repo_dir)
+        self.assertEqual(code, 0)
+        self.assertIn("handoff written for 'alpha'", out)

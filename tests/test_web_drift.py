@@ -351,3 +351,28 @@ class WebDispatchPauseBehaviorTests(unittest.TestCase):
         self.assertIn("deploy freeze", out)
         self.assertIn("paused", out)
         self.assertNotIn("Pause dispatch", out)
+
+
+@unittest.skipIf(shutil.which("node") is None, "node not installed")
+class WebPartyHandoffBehaviorTests(unittest.TestCase):
+    def _rendered(self, state, has_live_leader):
+        parties = [
+            dict(_BOARD["parties"][0], name="a", state=state, has_live_leader=has_live_leader)
+        ]
+        board = dict(_BOARD, parties=parties)
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "board.json"
+            path.write_text(json.dumps(board))
+            return subprocess.run(
+                ["node", str(_HARNESS), str(_APP_JS_PATH), str(path), "all", "all", "parties"],
+                capture_output=True, text=True, timeout=30, check=True,
+            ).stdout.strip()
+
+    def test_active_party_with_no_live_leader_shows_the_hand_off_button(self):
+        self.assertIn("Hand off", self._rendered("active", False))
+
+    def test_active_party_with_a_live_leader_has_no_hand_off_button(self):
+        self.assertNotIn("Hand off", self._rendered("active", True))
+
+    def test_non_active_party_has_no_hand_off_button(self):
+        self.assertNotIn("Hand off", self._rendered("awaiting-leader", False))

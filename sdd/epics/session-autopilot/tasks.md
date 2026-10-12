@@ -24,7 +24,7 @@ updated: 2026-10-12
 ## T03 — Automatic handoff writer
 
 **Depends on:** —
-**Status:** [ ] pending
+**Status:** [x] done — #145
 
 **What:** `handoff.write_auto(ctx, binding)` reuses `_render_handoff` and `_write_handoff`, adds `auto: true` to the event, and adds git counts (branch, dirty, unpushed) via the existing git helpers. `guild handoff --party <p>` from a terminal only, and a web "Hand off" action for a party whose leader session is gone.
 
