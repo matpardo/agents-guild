@@ -1272,7 +1272,10 @@ renders `$XDG_DATA_HOME/guild/handoffs/<party>-g<N>.md` from the DB (active
 quests, the full `guild next --all` queue, PRs, open asks, active notices and
 claims, plus the two free-text fields), records `party.handed_off` (party →
 `awaiting-leader`, `leaders.handoff_path` set for this generation) and prints
-one command for the human to run. A party that leads a raid gets a `Role`
+one command for the human to run. `--learned` also joins the party's memory
+(`guild memory add`, see "Personal data and length caps" below), trimmed to
+the memory length cap when longer; the handoff file itself keeps the full
+text. A party that leads a raid gets a `Role`
 section in the handoff (`you lead raid <name>`), so the resumed session
 knows it is the lead:
 

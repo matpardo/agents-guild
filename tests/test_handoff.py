@@ -3,6 +3,8 @@ import sqlite3
 import subprocess
 from unittest import mock
 
+from guild import pii
+from guild.commands import memory as memory_commands
 from tests.testutil import GuildTestCase
 
 
@@ -128,6 +130,47 @@ class HandoffTests(GuildTestCase):
         content = (self.data_home / "guild" / "handoffs" / "alpha-g1.md").read_text()
         self.assertIn("failing checks", content)
 
+    def test_learned_text_joins_party_memory(self):
+        self.run_cli(
+            ["handoff", "--in-flight", "x", "--learned", "something new"], "sess-1", self.repo_dir
+        )
+        items = memory_commands.list_items("alpha")
+        self.assertEqual(len(items), 1)
+        self.assertEqual(items[0]["text"], "something new")
+
+    def test_repeating_learned_text_is_deduped_in_memory(self):
+        self.run_cli(["handoff", "--in-flight", "x", "--learned", "same"], "sess-1", self.repo_dir)
+        self.run_cli(["party", "resume", "alpha"], "sess-1", self.repo_dir)
+        self.run_cli(["handoff", "--in-flight", "x", "--learned", "same"], "sess-1", self.repo_dir)
+        self.assertEqual(len(memory_commands.list_items("alpha")), 1)
+
+    def test_different_learned_text_adds_a_second_memory_item_newest_first(self):
+        self.run_cli(["handoff", "--in-flight", "x", "--learned", "first"], "sess-1", self.repo_dir)
+        self.run_cli(["party", "resume", "alpha"], "sess-1", self.repo_dir)
+        self.run_cli(["handoff", "--in-flight", "x", "--learned", "second"], "sess-1", self.repo_dir)
+        items = memory_commands.list_items("alpha")
+        self.assertEqual([item["text"] for item in items], ["second", "first"])
+
+    def test_learned_text_over_memory_cap_is_trimmed_in_memory_but_full_in_handoff_file(self):
+        learned = "y" * 1000
+        self.run_cli(["handoff", "--in-flight", "x", "--learned", learned], "sess-1", self.repo_dir)
+        content = (self.data_home / "guild" / "handoffs" / "alpha-g1.md").read_text()
+        self.assertIn(learned, content)
+        items = memory_commands.list_items("alpha")
+        stored = items[0]["text"]
+        self.assertEqual(len(stored), pii.MEMORY_ITEM_MAX_LENGTH)
+        self.assertEqual(stored, "y" * (pii.MEMORY_ITEM_MAX_LENGTH - 1) + "…")
+
+    def test_rejects_email_in_learned_before_writing_handoff_or_memory(self):
+        code, out, err = self.run_cli(
+            ["handoff", "--in-flight", "x", "--learned", "ping jane.doe@example.com"],
+            "sess-1", self.repo_dir,
+        )
+        self.assertEqual(code, 1)
+        self.assertIn("must not contain an email address", err)
+        self.assertFalse((self.data_home / "guild" / "handoffs" / "alpha-g1.md").exists())
+        self.assertEqual(memory_commands.list_items("alpha"), [])
+
     def test_defense_in_depth_rejects_handoff_path_escaping_handoffs_dir(self):
         malicious_binding = {"party": "../../tmp/evil", "generation": 1, "project": "acme"}
         with mock.patch("guild.identity.require_binding", return_value=malicious_binding):
@@ -135,9 +178,10 @@ class HandoffTests(GuildTestCase):
                 ["handoff", "--in-flight", "x", "--learned", "y"], "sess-1", self.repo_dir
             )
         self.assertEqual(code, 1)
-        self.assertIn("escapes", err)
+        self.assertIn("invalid party name", err)
         escaped_path = self.data_home / "tmp" / "evil-g1.md"
         self.assertFalse(escaped_path.exists())
+        self.assertEqual(list((self.data_home / "guild" / "memory").iterdir()), [])
 
 
 if __name__ == "__main__":
