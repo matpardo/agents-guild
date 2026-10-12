@@ -164,6 +164,10 @@ def _pass(ctx, launcher, dry_run):
     lines = _initialize_cursors(ctx, fresh, dry_run) if fresh else []
     if not dry_run:
         lines.extend(launcher.reconcile(projects))
+    if dry_run:
+        lines.extend(launcher.preview_handoff_abandoned_parties(enabled))
+    else:
+        lines.extend(launcher.handoff_abandoned_parties(enabled))
     lines.extend(_deferred_lines(ctx, launcher, enabled, dry_run))
     lines.extend(_state_lines(ctx, launcher, enabled, dry_run))
     active = {name: known[name] for name in enabled if name in known}
