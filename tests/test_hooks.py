@@ -1,5 +1,6 @@
 import json
 import sqlite3
+import string
 import subprocess
 from unittest import mock
 
@@ -166,15 +167,16 @@ class SessionStartHookTests(GuildTestCase):
     def test_resume_caps_injected_memory_and_drops_oldest_whole(self):
         repo_dir = self.register_project("acme", ["acme/app"])
         self._hand_off_to_generation_two(repo_dir, False)
-        for letter in ("a", "b", "c", "d"):
+        letters = string.ascii_lowercase[:21]
+        for letter in letters:
             self.run_cli(["memory", "add", letter * 500], "sess-2", repo_dir)
         item_lines = memory_commands.framed_memory("alpha")[1:-2]
-        self.assertEqual(item_lines, ["d" * 500, "c" * 500, "b" * 500])
-        self.assertLessEqual(sum(len(line) for line in item_lines), 1500)
+        self.assertEqual(item_lines, [letter * 500 for letter in reversed(letters[1:])])
+        self.assertLessEqual(sum(len(line) for line in item_lines), 10000)
         code, out, err = self.run_hook("session-start", {"session_id": "sess-2", "cwd": str(repo_dir)})
         block = self._memory_block(out)
-        self.assertIn("d" * 500, block)
-        self.assertNotIn("a" * 500, block)
+        self.assertIn(letters[-1] * 500, block)
+        self.assertNotIn(letters[0] * 500, block)
         self.assertNotIn("watch ci flakes", block)
 
     def test_resume_memory_flags_instruction_like_item(self):
