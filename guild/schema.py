@@ -380,6 +380,7 @@ _COLUMN_MIGRATIONS = (
     ("prs", "blocked_external", "TEXT"),
     ("prs", "head_sha", "TEXT"),
     ("prs", "fix_requested_at", "TEXT"),
+    ("notices", "unbound", "INTEGER"),
 )
 
 

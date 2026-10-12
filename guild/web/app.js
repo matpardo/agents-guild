@@ -1011,7 +1011,7 @@ var NO_SESSION_MESSAGE = "session token not loaded, reload the page";
     var head = el("div");
     head.className = "card-head";
     head.appendChild(textEl("span", "#" + notice.id));
-    head.appendChild(textEl("span", notice.party || "human"));
+    head.appendChild(textEl("span", notice.author));
     head.appendChild(explain(textEl("span", notice.issued), "ui", "issued"));
     head.appendChild(explain(textEl("span", notice.scope), "scope", scopeKind(notice.scope)));
     head.appendChild(explain(textEl("span", notice.time_left), "ui", "timeLeft"));

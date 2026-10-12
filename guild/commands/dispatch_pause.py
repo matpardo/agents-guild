@@ -1,24 +1,12 @@
 from guild import config, db, events, identity, pii
 from guild.errors import GuildError
 
-_HUMAN_LABEL = "human"
-_UNBOUND_SESSION_LABEL = "session"
-
 
 def current(conn):
     row = conn.execute("SELECT * FROM dispatch_pause WHERE id = 1").fetchone()
     if row is None:
         return None
     return dict(row)
-
-
-def _actor(ctx):
-    if ctx.session_id is None:
-        return None, _HUMAN_LABEL
-    binding = identity.resolve_binding(ctx.conn, ctx.session_id)
-    if binding is not None:
-        return binding["party"], binding["party"]
-    return None, _UNBOUND_SESSION_LABEL
 
 
 def _validate_reason(ctx, reason):
@@ -38,7 +26,8 @@ def pause(ctx, reason):
     if current(ctx.conn) is not None:
         raise GuildError("dispatch is already paused", 1)
     _validate_reason(ctx, reason)
-    party, actor = _actor(ctx)
+    party, unbound = identity.resolve_actor(ctx.conn, ctx.session_id)
+    actor = identity.actor_label(party, unbound)
     _record(ctx, party, "dispatch.paused", {"reason": reason, "party": actor})
     return "dispatch paused: {}".format(reason)
 

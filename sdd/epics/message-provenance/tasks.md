@@ -24,7 +24,7 @@ updated: 2026-10-12
 ## T03 — Provenance labels
 
 **Depends on:** —
-**Status:** [ ] pending
+**Status:** [x] done — #138
 
 **What:** record whether the author was unbound; label human, party or unbound session in inbox, board and web. Old events read as human.
 

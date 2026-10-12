@@ -33,7 +33,7 @@ class PauseResumeCommandTests(DispatchPauseTestCase):
     def test_unbound_session_pauses_as_session(self):
         code, out, err = self.run_cli(["dispatch", "pause", "--reason", "incident"], "sess-9", self.repo_dir)
         self.assertEqual(code, 0, err)
-        self.assertEqual(self._pause_row()["paused_by"], "session")
+        self.assertEqual(self._pause_row()["paused_by"], "unbound session")
 
     def test_pause_twice_fails(self):
         self.run_cli(["dispatch", "pause", "--reason", "incident"], None, None)

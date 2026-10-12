@@ -552,7 +552,7 @@ class RaidLeadTests(GuildTestCase):
         code, out, err = self.run_cli(["answer", "1", "yes, lead says go"], "sess-1", self.repo_dir)
         self.assertEqual(code, 0, err)
         code, out, err = self.run_cli(["inbox", "--since-last"], "sess-2", self.repo_dir)
-        self.assertIn('- ask #1 answered by human: "yes, lead says go"', out)
+        self.assertIn('- ask #1 answered by alpha: "yes, lead says go"', out)
 
     def test_rebuild_reproduces_lead(self):
         self.run_cli(["raid", "join", "ci", "--ttl", "1h", "--lead"], "sess-1", self.repo_dir)

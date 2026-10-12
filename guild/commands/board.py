@@ -3,7 +3,7 @@ import shlex
 import textwrap
 from datetime import timedelta
 
-from guild import config, ctx_pressure, dispatch_launch, fix_request, links, merge_queue, party_progress, party_status, pr_asks, resume
+from guild import config, ctx_pressure, dispatch_launch, fix_request, identity, links, merge_queue, party_progress, party_status, pr_asks, resume
 from guild import sanitize, session_status, timeutil
 from guild.commands import brief as brief_commands
 from guild.commands import claim as claim_commands
@@ -446,7 +446,7 @@ def _notices_section(ctx, painter, rows):
             "  {}{} {} · {}".format(
                 marker,
                 painter.paint("#{}".format(row["id"]), "yellow"),
-                painter.paint(row["party"] or "human", "cyan"),
+                painter.paint(identity.actor_label(row["party"], bool(row["unbound"])), "cyan"),
                 painter.paint(
                     "{} · {} · {}".format(
                         timeutil.issued_label(row["created_at"]),
@@ -977,6 +977,7 @@ def _notice_model(ctx, row):
     return {
         "id": row["id"],
         "party": row["party"],
+        "author": identity.actor_label(row["party"], bool(row["unbound"])),
         "scope": row["scope"],
         "text": sanitize.strip_control_sequences(row["text"]),
         "issued_at": row["created_at"],

@@ -52,7 +52,10 @@ def new_lines(ctx, binding):
                 continue
             if notice.targeting([payload], project, True, raid_member_of):
                 lines.append(
-                    notice.format_notice_line(payload["id"], payload["party"], event["ts"], payload["text"])
+                    notice.format_notice_line(
+                        payload["id"], payload["party"], event["ts"], payload["text"],
+                        payload.get("unbound", False),
+                    )
                 )
         elif event["kind"] == "ask.created" and caller_party is not None and payload["party"] != caller_party:
             question = sanitize.escape_quotes(sanitize.collapse_to_single_line(payload["question"]))
@@ -100,8 +103,9 @@ def new_lines(ctx, binding):
                 continue
             if event["kind"] == "ask.answered":
                 answer = sanitize.escape_quotes(sanitize.collapse_to_single_line(payload["answer"]))
+                label = identity.actor_label(event["party"], payload.get("unbound", False))
                 ask_lines.append(
-                    (payload["id"], '- ask #{} answered by human: "{}"'.format(payload["id"], answer))
+                    (payload["id"], '- ask #{} answered by {}: "{}"'.format(payload["id"], label, answer))
                 )
             else:
                 ask_lines.append((payload["id"], "- ask #{} dismissed".format(payload["id"])))
