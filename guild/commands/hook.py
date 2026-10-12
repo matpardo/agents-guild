@@ -708,6 +708,50 @@ def pre_pr_owner(ctx, command):
     return None
 
 
+_GUILD_MODULE_INVOKERS = ("python", "python3")
+_DENIED_ANSWER_SUBCOMMANDS = ("answer", "dismiss")
+_ANSWER_DENY_REASON = (
+    "guild: agents cannot answer or dismiss an ask; only a human may run this outside a session"
+)
+
+
+def _guild_subcommand(tokens):
+    if not tokens:
+        return None
+    name = Path(tokens[0]).name
+    if name == "guild":
+        rest = tokens[1:]
+    elif name in _GUILD_MODULE_INVOKERS and tokens[1:3] == ["-m", "guild"]:
+        rest = tokens[3:]
+    else:
+        return None
+    for token in rest:
+        if not token.startswith("-"):
+            return token
+    return None
+
+
+def _answer_deny_result():
+    return {
+        "hookSpecificOutput": {
+            "hookEventName": "PreToolUse",
+            "permissionDecision": "deny",
+            "permissionDecisionReason": _ANSWER_DENY_REASON,
+        }
+    }
+
+
+def pre_answer(command):
+    try:
+        segments = _push_segments(command)
+    except ValueError:
+        return None
+    for tokens in segments:
+        if _guild_subcommand(tokens) in _DENIED_ANSWER_SUBCOMMANDS:
+            return _answer_deny_result()
+    return None
+
+
 def _edit_file_path(tool_name, tool_input):
     field = _EDIT_TOOL_PATH_FIELDS.get(tool_name)
     if field is None:
