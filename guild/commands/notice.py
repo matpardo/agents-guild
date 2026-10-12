@@ -42,8 +42,7 @@ def create(ctx, text, to, ttl, until):
     until_condition = None
     if until is not None:
         until_condition = json.dumps(refs.parse_until(until))
-    binding = identity.resolve_binding(ctx.conn, ctx.session_id)
-    actor_party = binding["party"] if binding is not None else None
+    actor_party, unbound = identity.resolve_actor(ctx.conn, ctx.session_id)
     _reject_duplicate(ctx, actor_party, to, text)
     notice_id = next_id(ctx.conn, "notices")
     with db.writing(ctx.conn):
@@ -64,6 +63,7 @@ def create(ctx, text, to, ttl, until):
                 "until_condition": until_condition,
                 "expires_at": expires_at,
                 "announces": None,
+                "unbound": unbound,
             },
         )
     return "notice #{} created\n{}".format(notice_id, pii.BROADCAST_REMINDER)
@@ -178,8 +178,8 @@ def active_notices(conn, now):
     return result
 
 
-def format_notice_line(notice_id, party, issued_at, text):
-    author = party or "human"
+def format_notice_line(notice_id, party, issued_at, text, unbound):
+    author = identity.actor_label(party, unbound)
     clean_text = sanitize.escape_quotes(sanitize.collapse_to_single_line(text))
     return '- notice #{} from {} at {}: "{}"'.format(
         notice_id, author, timeutil.issued_label(issued_at), clean_text
@@ -199,7 +199,7 @@ def targeting(rows, project, scope_guild_always, raid_member_of):
 
 
 def _list_line(ctx, row):
-    author = row["party"] or "human"
+    author = identity.actor_label(row["party"], bool(row["unbound"]))
     prefix = "new " if is_new(row) else ""
     return "{}#{} [{}] {} ({}, {}, {})".format(
         prefix,

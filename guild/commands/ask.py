@@ -163,8 +163,7 @@ def answer(ctx, ask_id, text):
         raise GuildError("unknown ask #{}".format(ask_id), 1)
     if row["state"] != "open":
         raise GuildError("ask #{} is not open".format(ask_id), 1)
-    binding = identity.resolve_binding(ctx.conn, ctx.session_id)
-    actor_party = binding["party"] if binding is not None else None
+    actor_party, unbound = identity.resolve_actor(ctx.conn, ctx.session_id)
     project = row["project"]
     patterns = pii.project_patterns(ctx.projects_dir, project)
     pii.validate_field(text, "answer", pii.ANSWER_MAX_LENGTH, patterns)
@@ -178,7 +177,7 @@ def answer(ctx, ask_id, text):
             project,
             "ask.answered",
             "local",
-            {"id": ask_id, "answer": text},
+            {"id": ask_id, "answer": text, "unbound": unbound},
         )
     return "ask #{} answered".format(ask_id)
 
@@ -189,8 +188,7 @@ def dismiss(ctx, ask_id):
         raise GuildError("unknown ask #{}".format(ask_id), 1)
     if row["state"] != "open":
         raise GuildError("ask #{} is not open".format(ask_id), 1)
-    binding = identity.resolve_binding(ctx.conn, ctx.session_id)
-    actor_party = binding["party"] if binding is not None else None
+    actor_party, _ = identity.resolve_actor(ctx.conn, ctx.session_id)
     project = config.resolve_project(ctx.cwd, config.load_all_projects(ctx.projects_dir))
     with db.writing(ctx.conn):
         events.record(

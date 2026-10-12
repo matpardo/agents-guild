@@ -209,7 +209,10 @@ class BoardModelShapeTests(BoardModelTestCase):
         ctx.conn.close()
         self.assertEqual(len(model["notices"]), 1)
         notice = model["notices"][0]
-        self.assertEqual(set(notice), {"id", "party", "scope", "text", "issued_at", "issued", "expires_at", "time_left", "seen"})
+        self.assertEqual(
+            set(notice),
+            {"id", "party", "author", "scope", "text", "issued_at", "issued", "expires_at", "time_left", "seen"},
+        )
         self.assertEqual(notice["time_left"], "1h left")
         self.assertIs(notice["seen"], False)
         self.assertEqual(notice["text"], "pipeline down")

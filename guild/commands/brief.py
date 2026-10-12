@@ -22,7 +22,12 @@ def _base_warning_lines(ctx, project_name):
 
 def targeting_lines(rows, project, raid_member_of):
     matched = notice_commands.targeting(rows, project, True, raid_member_of)
-    lines = [notice_commands.format_notice_line(row["id"], row["party"], row["created_at"], row["text"]) for row in matched]
+    lines = [
+        notice_commands.format_notice_line(
+            row["id"], row["party"], row["created_at"], row["text"], bool(row["unbound"])
+        )
+        for row in matched
+    ]
     return inbox_commands.framed(lines)
 
 

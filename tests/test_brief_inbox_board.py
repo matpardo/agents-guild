@@ -165,6 +165,76 @@ class InboxTests(GuildTestCase):
         self.assertEqual(inbox_commands.framed([]), [])
 
 
+class ProvenanceLabelTests(GuildTestCase):
+    def setUp(self):
+        super().setUp()
+        self.repo_dir = self.register_project("acme", ["acme/app"])
+        self.run_cli(["party", "start", "alpha"], "sess-1", self.repo_dir)
+        self.run_cli(["party", "start", "beta"], "sess-2", self.repo_dir)
+
+    def test_notice_from_unbound_session_reads_unbound_session(self):
+        self.run_cli(["notice", "create", "pipeline down", "--to", "guild", "--ttl", "2h"], "sess-9", self.repo_dir)
+        code, out, err = self.run_cli(["inbox", "--since-last"], "sess-2", self.repo_dir)
+        self.assertEqual(code, 0, err)
+        self.assertIn("- notice #1 from unbound session at", out)
+
+    def test_notice_from_human_reads_human(self):
+        self.run_cli(["notice", "create", "pipeline down", "--to", "guild", "--ttl", "2h"], None, None)
+        code, out, err = self.run_cli(["inbox", "--since-last"], "sess-2", self.repo_dir)
+        self.assertEqual(code, 0, err)
+        self.assertIn("- notice #1 from human at", out)
+
+    def test_notice_from_bound_party_reads_its_party(self):
+        self.run_cli(["notice", "create", "pipeline down", "--to", "guild", "--ttl", "2h"], "sess-1", self.repo_dir)
+        code, out, err = self.run_cli(["inbox", "--since-last"], "sess-2", self.repo_dir)
+        self.assertEqual(code, 0, err)
+        self.assertIn("- notice #1 from alpha at", out)
+
+    def _ask_setup(self):
+        self.run_cli(["quest", "add", "demo", "--title", "Demo", "--no-epic"], "sess-1", self.repo_dir)
+        self.run_cli(["task", "add", "demo/T01", "--title", "First"], "sess-1", self.repo_dir)
+        self.run_cli(["ask", "ready?", "--context", "x", "--ref", "task:demo/T01"], "sess-1", self.repo_dir)
+        self.run_cli(["inbox", "--since-last"], "sess-1", self.repo_dir)
+
+    def test_answer_from_unbound_session_reads_answered_by_unbound_session(self):
+        self._ask_setup()
+        self.run_cli(["answer", "1", "yes go"], "sess-9", self.repo_dir)
+        code, out, err = self.run_cli(["inbox", "--since-last"], "sess-1", self.repo_dir)
+        self.assertEqual(code, 0, err)
+        self.assertIn('- ask #1 answered by unbound session: "yes go"', out)
+
+    def test_answer_from_human_reads_answered_by_human(self):
+        self._ask_setup()
+        self.run_cli(["answer", "1", "yes go"], None, None)
+        code, out, err = self.run_cli(["inbox", "--since-last"], "sess-1", self.repo_dir)
+        self.assertEqual(code, 0, err)
+        self.assertIn('- ask #1 answered by human: "yes go"', out)
+
+    def test_answer_from_bound_party_reads_answered_by_its_party(self):
+        self._ask_setup()
+        self.run_cli(["answer", "1", "yes go"], "sess-2", self.repo_dir)
+        code, out, err = self.run_cli(["inbox", "--since-last"], "sess-1", self.repo_dir)
+        self.assertEqual(code, 0, err)
+        self.assertIn('- ask #1 answered by beta: "yes go"', out)
+
+    def test_old_notice_event_without_unbound_key_still_renders_human(self):
+        conn = db.connect(paths.db_path())
+        with db.writing(conn):
+            events.record(
+                conn, timeutil.utcnow(), "test@host", None, None, "acme", "notice.created", "guild",
+                {
+                    "id": 99, "party": None, "scope": "guild", "text": "legacy",
+                    "until_condition": None,
+                    "expires_at": timeutil.expires_at_iso(timeutil.utcnow(), "3650d"),
+                    "announces": None,
+                },
+            )
+        self.run_cli(["rebuild"], None, None)
+        code, out, err = self.run_cli(["notices"], None, None)
+        self.assertEqual(code, 0, err)
+        self.assertIn("[human]", out)
+
+
 class InboxSessionWaitingTests(GuildTestCase):
     def setUp(self):
         super().setUp()

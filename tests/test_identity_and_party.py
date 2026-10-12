@@ -1,4 +1,26 @@
+from guild import db, identity, paths
 from tests.testutil import GuildTestCase
+
+
+class ResolveActorTests(GuildTestCase):
+    def _conn(self):
+        return db.connect(paths.db_path())
+
+    def test_no_session_is_human(self):
+        party, unbound = identity.resolve_actor(self._conn(), None)
+        self.assertEqual((party, unbound), (None, False))
+        self.assertEqual(identity.actor_label(party, unbound), "human")
+
+    def test_bound_session_is_its_party(self):
+        self.run_cli(["party", "start", "alpha"], "sess-1", None)
+        party, unbound = identity.resolve_actor(self._conn(), "sess-1")
+        self.assertEqual((party, unbound), ("alpha", False))
+        self.assertEqual(identity.actor_label(party, unbound), "alpha")
+
+    def test_unbound_session_is_unbound(self):
+        party, unbound = identity.resolve_actor(self._conn(), "sess-9")
+        self.assertEqual((party, unbound), (None, True))
+        self.assertEqual(identity.actor_label(party, unbound), "unbound session")
 
 
 class WhoamiTests(GuildTestCase):
