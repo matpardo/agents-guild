@@ -165,17 +165,6 @@ def _awaiting_bind(conn, tmux, party, generation, old_session_id, new_window_id,
     return _TIMED_OUT
 
 
-def _closable_pane(tmux, tmux_pane, recorded_window):
-    if tmux_pane is None or recorded_window is None:
-        return None
-    own_window = tmux_windows.window_id_of_pane(tmux, tmux_pane)
-    if own_window != recorded_window:
-        return None
-    if not tmux_windows.window_in_session(tmux, own_window):
-        return None
-    return tmux_pane
-
-
 def _launch_next_generation(ctx, binding, command, cwd, tmux):
     session_is_up = tmux_windows.session_exists(tmux)
     window_id = tmux_windows.create_window(tmux, binding["party"], cwd, command, session_is_up)
@@ -189,7 +178,7 @@ def _launch_next_generation(ctx, binding, command, cwd, tmux):
 
 def _close(ctx, binding, tmux, tmux_pane):
     recorded_window = tmux_windows.recorded_window(ctx.conn, binding["party"], binding["generation"])
-    pane = _closable_pane(tmux, tmux_pane, recorded_window)
+    pane = tmux_windows.closable_pane(tmux, tmux_pane, recorded_window)
     label = "{}-g{}".format(binding["party"], binding["generation"])
     if pane is None:
         return _with_reminder("handoff written for {}; not a window guild launched, close it yourself".format(label)), None
@@ -230,7 +219,7 @@ def _respawn(ctx, binding, model, tmux, tmux_pane, sleep):
             )
         ), None
     label = "{}-g{}".format(party, generation + 1)
-    pane = _closable_pane(tmux, tmux_pane, recorded_window)
+    pane = tmux_windows.closable_pane(tmux, tmux_pane, recorded_window)
     if pane is None:
         return _with_reminder(
             "respawned: {} bound; close this window yourself (not a window guild launched)".format(label)

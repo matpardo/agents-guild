@@ -1333,7 +1333,9 @@ the tmux pane it runs in (`$TMUX_PANE`) is the window guild recorded as
 launching this generation and that window is still in the `guild` session;
 otherwise it prints `not a window guild launched, close it yourself` and closes
 nothing. It cannot be combined with `--respawn` (it launches no next generation,
-it only closes the current one's own window).
+it only closes the current one's own window). Running it yourself, on request
+from the `Stop` hook (see "Stop hook wrap-up"), closes the pane on your own
+terms before guild does it for you on the next stop.
 
 `guild handoff --party <name>` hands off a party whose leader session is gone,
 from a terminal only: it refuses from inside a Claude Code session and refuses
@@ -2362,9 +2364,13 @@ Without a hooks manager, add the same call to the repository's
   `agent_type` (null on the main thread), and a `permissionDecisionReason`
   reaches the denied subagent verbatim.
 
-- `notification` and `stop`: record the session status (see "Session
-  status"). They print nothing, ignore unbound sessions and exit 0 whatever
-  the stdin carries.
+- `notification`: records the session status (see "Session status"). It
+  prints nothing, ignores unbound sessions and exits 0 whatever the stdin
+  carries.
+
+- `stop`: records the session status, then wraps up a guild-launched session
+  nobody is attending to (see "Stop hook wrap-up" below). It exits 0
+  whatever the stdin carries.
 
 ### Session status
 
@@ -2470,6 +2476,46 @@ an access boundary.
 
 Any unexpected exception inside a hook is swallowed to a single line
 (`guild hook error: ...`) and exit 0 — hooks never break a session.
+
+### Stop hook wrap-up
+
+The `Stop` hook wraps up a session nobody is attending to, so a guild
+launch that the agent forgets to hand off, or that waits forever on an
+answered ask, is not left stuck. It acts only when every one of these holds:
+the session's `GUILD_RESUME` matches the party it is bound to (so it was a
+guild launch of this generation, not `revive --resume` of a different
+party); the party is not a keeper (Remote Control keeper parties are never
+wrapped up); there are no pending background tasks or scheduled crons;
+nobody has typed a real prompt into the session (see below); the transcript
+shows no usage limit (a missing or unreadable transcript also counts as
+"cannot tell", so it skips); and guild recorded the tmux window of this
+generation and the session's own pane (`$TMUX_PANE`) is still in it, exactly
+like `guild handoff --close` checks. Any failed check is a no-op: nothing is
+printed, nothing is closed, nothing is written.
+
+When all of that holds, the first `Stop` blocks once
+(`{"decision": "block", "reason": "..."}`) asking the agent to finish the
+step and run `guild handoff --close --in-flight "..." --learned "..."`
+itself; a `wrapup-<session>` marker records that the block already
+happened. The next `Stop` — whether Claude Code reports
+`stop_hook_active: true` or the marker alone says so — writes the automatic
+handoff (`handoff.write_auto`, same as a dead-session dispatcher handoff:
+`Learned` reads "none (automatic handoff)", the event carries `auto: true`)
+and closes the session's own pane with `tmux kill-pane`, never the window.
+A session that already ran a plain `guild handoff` (party `awaiting-leader`,
+so this hook sees no binding) and stops with its pane still the one guild
+recorded gets its pane closed the same way, without writing a second
+handoff.
+
+"Nobody has typed a real prompt" is tracked by `prompt-submit`: it marks an
+`attended-<session>` marker the first time the prompt is not one of guild's
+own automatic prompts (the resume prompt, see `fresh_command`, or a
+background subagent's `<task-notification>` report) — a missing, non-string
+or empty prompt counts as attended too, the safe direction. Once that
+marker exists, `Stop` never wraps up the session again, no matter what else
+is true. `attended-` and `wrapup-` markers join `nudge-`, `resumed-`,
+`raid-warn-` and `raid-pause-` in `$XDG_STATE_HOME/guild/hints` and are
+pruned the same way (see `guild handoff prune` above).
 
 ## Development
 

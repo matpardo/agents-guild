@@ -47,6 +47,8 @@ class StatePruneTests(GuildTestCase):
             (self.hints_dir, "resumed-{}-g3".format(_DEAD)),
             (self.hints_dir, "raid-warn-{}-{}".format(_DEAD, _HASH)),
             (self.hints_dir, "raid-pause-{}-{}".format(_DEAD, _HASH)),
+            (self.hints_dir, "attended-" + _DEAD),
+            (self.hints_dir, "wrapup-" + _DEAD),
         ]
         files = [self._marker(directory, name, 2 * _DAY) for directory, name in names]
         actions = self._marker_actions()
@@ -70,6 +72,8 @@ class StatePruneTests(GuildTestCase):
     def test_live_session_marker_is_kept(self):
         self._marker(self.ctx_dir, _LIVE, 5 * _DAY)
         self._marker(self.hints_dir, "nudge-" + _LIVE, 5 * _DAY)
+        self._marker(self.hints_dir, "attended-" + _LIVE, 5 * _DAY)
+        self._marker(self.hints_dir, "wrapup-" + _LIVE, 5 * _DAY)
         self.assertEqual(self._marker_actions(), [])
 
     def test_open_party_leader_marker_is_kept(self):
@@ -86,6 +90,7 @@ class StatePruneTests(GuildTestCase):
         self._marker(self.hints_dir, "something-else", 9 * _DAY)
         self._marker(self.ctx_dir, "not-a-uuid", 9 * _DAY)
         self._marker(self.hints_dir, "nudge-" + _DEAD + "-extra", 9 * _DAY)
+        self._marker(self.hints_dir, "attended-" + _DEAD + "-extra-junk", 9 * _DAY)
         self.assertEqual(self._marker_actions(), [])
 
     def test_no_registry_deletes_nothing_and_says_so(self):

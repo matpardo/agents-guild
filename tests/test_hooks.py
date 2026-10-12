@@ -5,11 +5,16 @@ import subprocess
 from unittest import mock
 
 from guild import ctx_pressure
+from guild import db
+from guild import events
 from guild import paths
 from guild import pii
 from guild import notify
+from guild import resume
+from guild.cli import _build_context
 from guild.commands import memory as memory_commands
 from guild.commands import statusline as statusline_commands
+from tests.test_handoff_respawn import FakeTmux
 from tests.testutil import GuildTestCase
 
 
@@ -231,6 +236,43 @@ class PromptSubmitHookTests(GuildTestCase):
         )
         self.assertRegex(out, r'- notice #1 from human at \d{4}-\d{2}-\d{2} \d{2}:\d{2}: "pipeline down"')
 
+    def _attended_marker(self):
+        return paths.state_dir() / "hints" / "attended-sess-1"
+
+    def test_plain_prompt_marks_attended(self):
+        repo_dir = self.register_project("acme", ["acme/app"])
+        self.run_cli(["party", "start", "alpha"], "sess-1", repo_dir)
+        self.run_hook("prompt-submit", {"session_id": "sess-1", "cwd": str(repo_dir), "prompt": "fix the tests"})
+        self.assertTrue(self._attended_marker().exists())
+
+    def test_resume_prompt_does_not_mark_attended(self):
+        repo_dir = self.register_project("acme", ["acme/app"])
+        self.run_cli(["party", "start", "alpha"], "sess-1", repo_dir)
+        self.run_hook(
+            "prompt-submit", {"session_id": "sess-1", "cwd": str(repo_dir), "prompt": resume.RESUME_PROMPT}
+        )
+        self.assertFalse(self._attended_marker().exists())
+
+    def test_task_notification_prompt_does_not_mark_attended(self):
+        repo_dir = self.register_project("acme", ["acme/app"])
+        self.run_cli(["party", "start", "alpha"], "sess-1", repo_dir)
+        self.run_hook(
+            "prompt-submit",
+            {"session_id": "sess-1", "cwd": str(repo_dir), "prompt": "<task-notification>background report"},
+        )
+        self.assertFalse(self._attended_marker().exists())
+
+    def test_missing_prompt_marks_attended(self):
+        repo_dir = self.register_project("acme", ["acme/app"])
+        self.run_cli(["party", "start", "alpha"], "sess-1", repo_dir)
+        self.run_hook("prompt-submit", {"session_id": "sess-1", "cwd": str(repo_dir)})
+        self.assertTrue(self._attended_marker().exists())
+
+    def test_empty_prompt_marks_attended(self):
+        repo_dir = self.register_project("acme", ["acme/app"])
+        self.run_cli(["party", "start", "alpha"], "sess-1", repo_dir)
+        self.run_hook("prompt-submit", {"session_id": "sess-1", "cwd": str(repo_dir), "prompt": ""})
+        self.assertTrue(self._attended_marker().exists())
 
 
 class CtxNudgeTests(GuildTestCase):
@@ -1435,3 +1477,235 @@ class PreAnswerHookTests(GuildTestCase):
         self.assertEqual(code, 0)
         self.assertIn("guild hook error: boom", out)
         self.assertIn("guild hook error: boom", out)
+
+
+def _rate_limit_line(resets_at):
+    return json.dumps(
+        {
+            "type": "assistant",
+            "isApiErrorMessage": True,
+            "error": "rate_limit",
+            "quotaLimits": {"resetsAt": resets_at},
+        }
+    )
+
+
+class StopHookTests(GuildTestCase):
+    def setUp(self):
+        super().setUp()
+        self.repo_dir = self.register_project("acme", ["acme/app"])
+        self.transcript_path = self.root / "transcript.jsonl"
+        self.transcript_path.touch()
+
+    def _start(self, session_id, keeper=False):
+        args = ["party", "start", "alpha"]
+        if keeper:
+            args.append("--keeper")
+        self.run_cli(args, session_id, self.repo_dir)
+
+    def _record_window(self, generation, window_id):
+        ctx = _build_context(None, self.repo_dir)
+        try:
+            with db.writing(ctx.conn):
+                events.record(
+                    ctx.conn, ctx.now, ctx.origin, "alpha", None, "acme", "leader.window_launched",
+                    "local", {"party": "alpha", "generation": generation, "window_id": window_id},
+                )
+        finally:
+            ctx.conn.close()
+
+    def _fake(self, windows=None, pane_windows=None):
+        return FakeTmux(True, {} if windows is None else windows, {} if pane_windows is None else pane_windows, True, 0)
+
+    def _payload(self, session_id, **overrides):
+        payload = {
+            "session_id": session_id,
+            "cwd": str(self.repo_dir),
+            "stop_hook_active": False,
+            "background_tasks": [],
+            "session_crons": [],
+            "transcript_path": str(self.transcript_path),
+        }
+        payload.update(overrides)
+        return payload
+
+    def _run_stop(self, tmux, env, payload):
+        with mock.patch("guild.tmux_windows.Tmux", return_value=tmux), mock.patch.dict("os.environ", env):
+            return self.run_hook("stop", payload)
+
+    def _stop(self, session_id, tmux, guild_resume, tmux_pane, **overrides):
+        env = {}
+        if guild_resume is not None:
+            env["GUILD_RESUME"] = guild_resume
+        if tmux_pane is not None:
+            env["TMUX_PANE"] = tmux_pane
+        return self._run_stop(tmux, env, self._payload(session_id, **overrides))
+
+    def _verbs(self, tmux):
+        return [call[0] for call in tmux.calls]
+
+    def _party_state(self):
+        ctx = _build_context(None, self.repo_dir)
+        try:
+            return ctx.conn.execute("SELECT state FROM parties WHERE name = 'alpha'").fetchone()["state"]
+        finally:
+            ctx.conn.close()
+
+    def _handed_off_events(self):
+        ctx = _build_context(None, self.repo_dir)
+        try:
+            return ctx.conn.execute(
+                "SELECT payload FROM events WHERE kind = 'party.handed_off' ORDER BY seq"
+            ).fetchall()
+        finally:
+            ctx.conn.close()
+
+    def test_hand_started_session_is_always_a_no_op(self):
+        self._start("sess-1")
+        tmux = self._fake()
+        for stop_hook_active in (False, True):
+            code, out, err = self._stop("sess-1", tmux, None, None, stop_hook_active=stop_hook_active)
+            self.assertEqual(code, 0)
+            self.assertEqual(out, "")
+        self.assertNotIn("kill-pane", self._verbs(tmux))
+        self.assertEqual(self._handed_off_events(), [])
+
+    def test_recorded_window_but_guild_resume_unset_or_mismatched_is_a_no_op(self):
+        self._start("sess-1")
+        self._record_window(1, "@1")
+        tmux = self._fake(windows={"@1": "alpha"}, pane_windows={"%5": "@1"})
+        for resume_party in (None, "other"):
+            code, out, err = self._stop("sess-1", tmux, resume_party, "%5")
+            self.assertEqual(out, "")
+        self.assertNotIn("kill-pane", self._verbs(tmux))
+
+    def test_tmux_pane_unset_or_in_different_window_is_a_no_op(self):
+        self._start("sess-1")
+        self._record_window(1, "@1")
+        tmux = self._fake(windows={"@1": "alpha", "@2": "other"}, pane_windows={"%5": "@2"})
+        code, out, err = self._stop("sess-1", tmux, "alpha", None)
+        self.assertEqual(out, "")
+        code, out, err = self._stop("sess-1", tmux, "alpha", "%5")
+        self.assertEqual(out, "")
+        self.assertNotIn("kill-pane", self._verbs(tmux))
+
+    def test_first_stop_blocks_once_with_wrap_up_reason(self):
+        self._start("sess-1")
+        self._record_window(1, "@1")
+        tmux = self._fake(windows={"@1": "alpha"}, pane_windows={"%5": "@1"})
+        code, out, err = self._stop("sess-1", tmux, "alpha", "%5", stop_hook_active=False)
+        self.assertEqual(code, 0)
+        decision = json.loads(out)
+        self.assertEqual(decision["decision"], "block")
+        self.assertIn("guild handoff --close", decision["reason"])
+        marker = paths.state_dir() / "hints" / "wrapup-sess-1"
+        self.assertTrue(marker.exists())
+        self.assertEqual(self._handed_off_events(), [])
+        self.assertNotIn("kill-pane", self._verbs(tmux))
+
+    def test_second_stop_with_stop_hook_active_writes_auto_handoff_and_closes_pane(self):
+        self._start("sess-1")
+        self._record_window(1, "@1")
+        tmux = self._fake(windows={"@1": "alpha"}, pane_windows={"%5": "@1"})
+        self._stop("sess-1", tmux, "alpha", "%5", stop_hook_active=False)
+        code, out, err = self._stop("sess-1", tmux, "alpha", "%5", stop_hook_active=True)
+        self.assertEqual(code, 0)
+        self.assertEqual(out, "")
+        rows = self._handed_off_events()
+        self.assertEqual(len(rows), 1)
+        self.assertTrue(json.loads(rows[0]["payload"])["auto"])
+        self.assertEqual(self._party_state(), "awaiting-leader")
+        self.assertIn(["kill-pane", "-t", "%5"], tmux.calls)
+
+    def test_marker_alone_is_authoritative_even_if_stop_hook_active_is_false_again(self):
+        self._start("sess-1")
+        self._record_window(1, "@1")
+        tmux = self._fake(windows={"@1": "alpha"}, pane_windows={"%5": "@1"})
+        self._stop("sess-1", tmux, "alpha", "%5", stop_hook_active=False)
+        code, out, err = self._stop("sess-1", tmux, "alpha", "%5", stop_hook_active=False)
+        self.assertEqual(out, "")
+        self.assertEqual(len(self._handed_off_events()), 1)
+        self.assertIn(["kill-pane", "-t", "%5"], tmux.calls)
+
+    def test_first_stop_already_active_skips_the_block_and_closes(self):
+        self._start("sess-1")
+        self._record_window(1, "@1")
+        tmux = self._fake(windows={"@1": "alpha"}, pane_windows={"%5": "@1"})
+        code, out, err = self._stop("sess-1", tmux, "alpha", "%5", stop_hook_active=True)
+        self.assertEqual(out, "")
+        self.assertEqual(len(self._handed_off_events()), 1)
+        self.assertIn(["kill-pane", "-t", "%5"], tmux.calls)
+
+    def test_usage_limit_in_transcript_is_a_no_op(self):
+        self._start("sess-1")
+        self._record_window(1, "@1")
+        tmux = self._fake(windows={"@1": "alpha"}, pane_windows={"%5": "@1"})
+        self.transcript_path.write_text(_rate_limit_line(9999999999) + "\n")
+        code, out, err = self._stop("sess-1", tmux, "alpha", "%5", stop_hook_active=False)
+        self.assertEqual(out, "")
+        self.assertFalse((paths.state_dir() / "hints" / "wrapup-sess-1").exists())
+        self.assertNotIn("kill-pane", self._verbs(tmux))
+
+    def test_missing_transcript_path_is_a_no_op(self):
+        self._start("sess-1")
+        self._record_window(1, "@1")
+        tmux = self._fake(windows={"@1": "alpha"}, pane_windows={"%5": "@1"})
+        code, out, err = self._stop(
+            "sess-1", tmux, "alpha", "%5", stop_hook_active=False,
+            transcript_path=str(self.root / "missing.jsonl"),
+        )
+        self.assertEqual(out, "")
+        self.assertFalse((paths.state_dir() / "hints" / "wrapup-sess-1").exists())
+
+    def test_pending_or_unknown_background_work_is_a_no_op(self):
+        self._start("sess-1")
+        self._record_window(1, "@1")
+        tmux = self._fake(windows={"@1": "alpha"}, pane_windows={"%5": "@1"})
+        base = self._payload("sess-1", stop_hook_active=False)
+        variants = []
+        for key, value in (("background_tasks", ["t1"]), ("session_crons", ["c1"])):
+            variant = dict(base)
+            variant[key] = value
+            variants.append(variant)
+        for key in ("background_tasks", "session_crons"):
+            variant = dict(base)
+            del variant[key]
+            variants.append(variant)
+        for payload in variants:
+            code, out, err = self._run_stop(tmux, {"GUILD_RESUME": "alpha", "TMUX_PANE": "%5"}, payload)
+            self.assertEqual(out, "")
+        self.assertEqual(self._handed_off_events(), [])
+        self.assertNotIn("kill-pane", self._verbs(tmux))
+
+    def test_keeper_party_is_never_wrapped_up(self):
+        self._start("sess-1", keeper=True)
+        self._record_window(1, "@1")
+        tmux = self._fake(windows={"@1": "alpha"}, pane_windows={"%5": "@1"})
+        code, out, err = self._stop("sess-1", tmux, "alpha", "%5", stop_hook_active=True)
+        self.assertEqual(out, "")
+        self.assertEqual(self._handed_off_events(), [])
+        self.assertNotIn("kill-pane", self._verbs(tmux))
+
+    def test_pane_closes_after_a_plain_handoff_without_a_second_event(self):
+        self._start("sess-1")
+        self._record_window(1, "@1")
+        self.run_cli(["handoff", "--in-flight", "x", "--learned", "y"], "sess-1", self.repo_dir)
+        tmux = self._fake(windows={"@1": "alpha"}, pane_windows={"%5": "@1"})
+        code, out, err = self._stop("sess-1", tmux, "alpha", "%5", stop_hook_active=False)
+        self.assertEqual(out, "")
+        self.assertIn(["kill-pane", "-t", "%5"], tmux.calls)
+        rows = self._handed_off_events()
+        self.assertEqual(len(rows), 1)
+        self.assertFalse(json.loads(rows[0]["payload"])["auto"])
+
+    def test_write_auto_exception_is_contained_and_kills_nothing(self):
+        self._start("sess-1")
+        self._record_window(1, "@1")
+        tmux = self._fake(windows={"@1": "alpha"}, pane_windows={"%5": "@1"})
+        self._stop("sess-1", tmux, "alpha", "%5", stop_hook_active=False)
+        with mock.patch("guild.commands.handoff.write_auto", side_effect=RuntimeError("boom")):
+            code, out, err = self._stop("sess-1", tmux, "alpha", "%5", stop_hook_active=True)
+        self.assertEqual(code, 0)
+        self.assertIn("guild hook error: boom", out)
+        self.assertNotIn("kill-pane", self._verbs(tmux))
+        self.assertEqual(self._handed_off_events(), [])

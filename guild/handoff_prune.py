@@ -11,7 +11,7 @@ _NO_REGISTRY_LINE = "markers kept: no session registry"
 _MARKER_MIN_AGE_SECONDS = 86400
 _MARKER_DIRS = ("ctx", "hints")
 _MARKER_NAME_RE = re.compile(
-    r"^(?:nudge-|resumed-|raid-warn-|raid-pause-)?"
+    r"^(?:nudge-|resumed-|raid-warn-|raid-pause-|attended-|wrapup-)?"
     r"([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})"
     r"(?:-g\d+|-[0-9a-f]{16})?$"
 )

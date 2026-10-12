@@ -8,10 +8,12 @@ import subprocess
 import sys
 from pathlib import Path
 
-from guild import config, ctx_pressure, db, identity, localbase, names, session_status, timeutil, tmux_windows
+from guild import config, ctx_pressure, db, identity, localbase, names, resume, session_status, timeutil
+from guild import transcript_usage, tmux_windows
 from guild.adapters import github
 from guild.commands import brief as brief_commands
 from guild.commands import claim as claim_commands
+from guild.commands import handoff as handoff_commands
 from guild.commands import inbox as inbox_commands
 from guild.commands import memory as memory_commands
 from guild.commands import merge_queue as merge_queue_commands
@@ -22,6 +24,13 @@ from guild.commands import statusline as statusline_commands
 from guild.commands import task_brief
 from guild.errors import GuildError
 from guild.identity import UNBOUND_HINT
+
+_AUTOMATIC_PROMPT_PREFIXES = (resume.RESUME_PROMPT, "<task-notification>")
+_WRAP_UP_REASON = (
+    "guild launched this session and nobody has typed into it. Finish the current step, then run"
+    ' guild handoff --close --in-flight "..." --learned "...". If you stop again without it,'
+    " guild writes an automatic handoff and closes this pane."
+)
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 _EDIT_TOOL_PATH_FIELDS = {
@@ -172,14 +181,70 @@ def _mark_working(ctx, binding):
     session_status.record_change(ctx, binding, "session.working", {})
 
 
-def stop(ctx):
+def _attended_marker_path(ctx):
+    return ctx.state_dir / "hints" / "attended-{}".format(identity.cursor_key(ctx.session_id))
+
+
+def _wrap_up_marker_path(ctx):
+    return ctx.state_dir / "hints" / "wrapup-{}".format(identity.cursor_key(ctx.session_id))
+
+
+def _handed_off_row(conn, session_id):
+    return conn.execute(
+        "SELECT parties.name AS party, parties.project AS project, leaders.generation AS generation"
+        " FROM leaders JOIN parties ON parties.name = leaders.party"
+        " WHERE leaders.session_id = ? AND parties.state = 'awaiting-leader'"
+        " AND parties.generation = leaders.generation",
+        (session_id,),
+    ).fetchone()
+
+
+def _usage_limited_or_unverifiable(transcript_path):
+    if not transcript_path or not Path(transcript_path).is_file():
+        return True
+    return transcript_usage.rate_limit_reset(Path(transcript_path)) is not None
+
+
+def _wrap_up_candidate(ctx, row, resume_party, idle, transcript_path, tmux, tmux_pane):
+    if resume_party != row["party"]:
+        return None
+    if party_commands.is_keeper(ctx.conn, row["party"]):
+        return None
+    if not idle:
+        return None
+    if _attended_marker_path(ctx).exists():
+        return None
+    if _usage_limited_or_unverifiable(transcript_path):
+        return None
+    recorded_window = tmux_windows.recorded_window(ctx.conn, row["party"], row["generation"])
+    if recorded_window is None:
+        return None
+    return tmux_windows.closable_pane(tmux, tmux_pane, recorded_window)
+
+
+def stop(ctx, resume_party, stop_hook_active, idle, transcript_path, tmux, tmux_pane):
     binding = identity.resolve_binding(ctx.conn, ctx.session_id)
     if binding is None:
-        return
+        row = _handed_off_row(ctx.conn, ctx.session_id)
+        if row is None:
+            return None, None
+        pane = _wrap_up_candidate(ctx, row, resume_party, idle, transcript_path, tmux, tmux_pane)
+        if pane is None:
+            return None, None
+        return None, pane
     with db.writing(ctx.conn):
-        if not session_status.is_change(ctx.conn, ctx.session_id, "stopped"):
-            return
-        session_status.record_change(ctx, binding, "session.stopped", {})
+        if session_status.is_change(ctx.conn, ctx.session_id, "stopped"):
+            session_status.record_change(ctx, binding, "session.stopped", {})
+    pane = _wrap_up_candidate(ctx, binding, resume_party, idle, transcript_path, tmux, tmux_pane)
+    if pane is None:
+        return None, None
+    marker = _wrap_up_marker_path(ctx)
+    if not stop_hook_active and not marker.exists():
+        marker.parent.mkdir(parents=True, exist_ok=True)
+        marker.touch()
+        return json.dumps({"decision": "block", "reason": _WRAP_UP_REASON}), None
+    handoff_commands.write_auto(ctx, binding)
+    return None, pane
 
 
 _BLOCKING_WAITS = ("permission", "elicitation")
@@ -278,8 +343,21 @@ def _ctx_nudge_lines(ctx, binding):
     ]
 
 
-def prompt_submit(ctx):
+def _mark_attended(ctx, binding, prompt):
+    if binding is None:
+        return
+    if isinstance(prompt, str) and prompt and prompt.startswith(_AUTOMATIC_PROMPT_PREFIXES):
+        return
+    marker = _attended_marker_path(ctx)
+    if marker.exists():
+        return
+    marker.parent.mkdir(parents=True, exist_ok=True)
+    marker.touch()
+
+
+def prompt_submit(ctx, prompt):
     binding = identity.resolve_binding(ctx.conn, ctx.session_id)
+    _mark_attended(ctx, binding, prompt)
     message_lines, seq = inbox_commands.new_lines(ctx, binding)
     lines = inbox_commands.framed(message_lines)
     if binding is None:

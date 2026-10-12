@@ -108,5 +108,16 @@ def kill_pane(tmux, pane):
     return _ok(tmux, ["kill-pane", "-t", pane])
 
 
+def closable_pane(tmux, tmux_pane, recorded_window):
+    if tmux_pane is None or recorded_window is None:
+        return None
+    own_window = window_id_of_pane(tmux, tmux_pane)
+    if own_window != recorded_window:
+        return None
+    if not window_in_session(tmux, own_window):
+        return None
+    return tmux_pane
+
+
 def send_text(tmux, window_id, text):
     return _ok(tmux, ["send-keys", "-t", window_id, "-l", text]) and _ok(tmux, ["send-keys", "-t", window_id, "Enter"])

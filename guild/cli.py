@@ -1254,15 +1254,41 @@ def _run_stateful_hook(hook_name, stdin_data):
                 ctx, stdin_data.get("notification_type"), stdin_data.get("message"), notify.spawn_detached
             )
             text = None
-        elif hook_name == "stop":
-            hook_commands.stop(ctx)
-            text = None
         else:
-            text = hook_commands.prompt_submit(ctx)
+            text = hook_commands.prompt_submit(ctx, stdin_data.get("prompt"))
     except Exception as error:
         sys.stdout.write("guild hook error: {}\n".format(error))
         return 0
     _print(text)
+    return 0
+
+
+def _run_stop_hook(stdin_data):
+    from guild import tmux_windows
+
+    try:
+        session_id = stdin_data.get("session_id")
+        cwd = Path(stdin_data.get("cwd", str(Path.cwd())))
+        ctx = _build_context(session_id, cwd)
+        tmux = tmux_windows.Tmux()
+        idle = stdin_data.get("background_tasks") == [] and stdin_data.get("session_crons") == []
+        text, pane_to_close = hook_commands.stop(
+            ctx,
+            os.environ.get("GUILD_RESUME") or None,
+            stdin_data.get("stop_hook_active") is True,
+            idle,
+            stdin_data.get("transcript_path"),
+            tmux,
+            os.environ.get("TMUX_PANE"),
+        )
+    except Exception as error:
+        sys.stdout.write("guild hook error: {}\n".format(error))
+        return 0
+    if text is not None:
+        _print(text)
+        sys.stdout.flush()
+    if pane_to_close is not None and not tmux_windows.kill_pane(tmux, pane_to_close):
+        sys.stderr.write("guild: could not close pane {}\n".format(pane_to_close))
     return 0
 
 
@@ -1295,6 +1321,8 @@ def _dispatch_hook(args):
         return _run_pre_answer_hook(stdin_data)
     if args.hook_name == "pre-edit":
         return _run_pre_edit_hook(stdin_data)
+    if args.hook_name == "stop":
+        return _run_stop_hook(stdin_data)
     return _run_stateful_hook(args.hook_name, stdin_data)
 
 
