@@ -2,7 +2,7 @@
 epic: session-autopilot
 type: tasks
 title: Guild-launched sessions end themselves and hand off
-status: draft
+status: active
 updated: 2026-10-12
 ---
 # Tasks: Guild-launched sessions end themselves and hand off

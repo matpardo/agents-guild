@@ -1,6 +1,7 @@
 from datetime import timedelta
 
 from guild import config, db, dispatch_launch, dispatch_rules, events, locking, timeutil
+from guild.commands import dispatch_pause as dispatch_pause_commands
 
 _MAX_TRIGGER_AGE = timedelta(hours=1)
 _LOCK_DIR_NAME = "dispatch"
@@ -240,9 +241,20 @@ def _project_status(ctx, project_config, cursors):
     return lines
 
 
+def _pause_line(ctx):
+    row = dispatch_pause_commands.current(ctx.conn)
+    if row is None:
+        return []
+    return [
+        "PAUSED since {} ago by {}: {}".format(
+            timeutil.age_label(ctx.now, row["paused_at"]), row["paused_by"], row["reason"]
+        )
+    ]
+
+
 def status(ctx):
     cursors = _cursors(ctx.conn)
-    lines = []
+    lines = _pause_line(ctx)
     for project_config in config.load_all_projects(ctx.projects_dir):
         if "dispatcher" not in project_config:
             lines.append("{}: dispatcher not configured".format(project_config["name"]))

@@ -10,6 +10,7 @@ from urllib.parse import parse_qs, urlsplit
 from guild import ask_detail, context, db, origin, paths, timeutil
 from guild.commands import ask as ask_commands
 from guild.commands import board as board_commands
+from guild.commands import dispatch_pause as dispatch_pause_commands
 from guild.commands import history as history_commands
 from guild.commands import notice as notice_commands
 from guild.commands import pr as pr_commands
@@ -33,6 +34,7 @@ _ASK_ACTION_RE = re.compile(r"^/api/asks/([^/]+)/(answer|dismiss)$")
 _NOTICE_ACTION_RE = re.compile(r"^/api/notices/([^/]+)/(seen|unseen)$")
 _PR_ACTION_RE = re.compile(r"^/api/prs/([^/]+/[^/]+)/(\d+)/(block|unblock|ask-fix)$")
 _RAID_ACTION_RE = re.compile(r"^/api/raids/([^/]+)/(pause|resume)$")
+_DISPATCH_ACTION_RE = re.compile(r"^/api/dispatch/(pause|resume)$")
 _SEEN_ALL_PATH = "/api/notices/seen-all"
 _NOTICE_CREATE_PATH = "/api/notices/create"
 _ANSWERED_ASKS_PATH = "/api/asks/answered"
@@ -158,6 +160,17 @@ def _run_raid_action(action, raid_name):
         if action == "pause":
             return raid_pause_commands.pause(ctx, raid_name)
         return raid_pause_commands.resume(ctx, raid_name)
+    finally:
+        ctx.conn.close()
+
+
+def _run_dispatch_action(action, payload):
+    ctx = _action_context()
+    try:
+        if action == "pause":
+            reason = payload.get("reason")
+            return dispatch_pause_commands.pause(ctx, reason if isinstance(reason, str) else "")
+        return dispatch_pause_commands.resume(ctx)
     finally:
         ctx.conn.close()
 
@@ -296,6 +309,10 @@ class BoardRequestHandler(http_server.BaseHTTPRequestHandler):
         if raid_match is not None:
             raid_name, action = raid_match.groups()
             return self._post_action(action, lambda payload: _run_raid_action(action, raid_name))
+        dispatch_match = _DISPATCH_ACTION_RE.match(path)
+        if dispatch_match is not None:
+            action = dispatch_match.group(1)
+            return self._post_action(action, lambda payload: _run_dispatch_action(action, payload))
         if path == _NOTICE_CREATE_PATH:
             return self._post_action("create", _run_notice_create)
         if path == _SEEN_ALL_PATH:

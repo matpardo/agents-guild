@@ -7,6 +7,7 @@ from guild import config, ctx_pressure, dispatch_launch, fix_request, links, mer
 from guild import sanitize, session_status, timeutil
 from guild.commands import brief as brief_commands
 from guild.commands import claim as claim_commands
+from guild.commands import dispatch_pause as dispatch_pause_commands
 from guild.commands import drift as drift_commands
 from guild.commands import merge_queue as merge_queue_commands
 from guild.commands import next as next_commands
@@ -790,6 +791,16 @@ def _is_failed(row):
     return row["state"] == "failed" or row["outcome"] == "failed"
 
 
+def _dispatch_pause_model(ctx, pause_row):
+    if pause_row is None:
+        return None
+    return {
+        "reason": sanitize.strip_control_sequences(pause_row["reason"]),
+        "paused_by": pause_row["paused_by"],
+        "age": timeutil.age_label(ctx.now, pause_row["paused_at"]),
+    }
+
+
 def dispatcher_model(ctx, party_names):
     rows = _dispatch_rows(ctx, party_names)
     decided = [row for row in rows if row["outcome"] not in ("launching", "deferred", "failed")]
@@ -799,6 +810,7 @@ def dispatcher_model(ctx, party_names):
             for project_config in config.load_all_projects(ctx.projects_dir)
             if "dispatcher" in project_config
         ],
+        "paused": _dispatch_pause_model(ctx, dispatch_pause_commands.current(ctx.conn)),
         "in_flight": [
             _dispatch_launch_model(ctx, row) for row in rows if row["state"] in ("launching", "launched")
         ],
@@ -846,6 +858,15 @@ def _dispatcher_lines(ctx, painter, party_names):
         )
         for row in model["recent"]
     )
+    if model["paused"] is not None:
+        lines = [
+            painter.paint(
+                "  PAUSED since {} ago by {}: {}".format(
+                    model["paused"]["age"], model["paused"]["paused_by"], model["paused"]["reason"]
+                ),
+                "red",
+            )
+        ] + lines
     if not lines:
         return []
     return [painter.paint("DISPATCHER", "bold")] + lines + [""]

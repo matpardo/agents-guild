@@ -510,6 +510,18 @@ def _raid_resumed(conn, event):
     conn.execute("DELETE FROM raid_pauses WHERE raid = ?", (event["payload"]["raid"],))
 
 
+def _dispatch_paused(conn, event):
+    payload = event["payload"]
+    conn.execute(
+        "INSERT OR REPLACE INTO dispatch_pause (id, paused_at, paused_by, reason) VALUES (1, ?, ?, ?)",
+        (event["ts"], payload["party"], payload["reason"]),
+    )
+
+
+def _dispatch_resumed(conn, event):
+    conn.execute("DELETE FROM dispatch_pause")
+
+
 def _merge_queue_pinned(conn, event):
     payload = event["payload"]
     conn.execute(
@@ -739,6 +751,8 @@ _REDUCERS = {
     "raid.left": _raid_left,
     "raid.paused": _raid_paused,
     "raid.resumed": _raid_resumed,
+    "dispatch.paused": _dispatch_paused,
+    "dispatch.resumed": _dispatch_resumed,
     "merge_queue.pinned": _merge_queue_pinned,
     "merge_queue.unpinned": _merge_queue_unpinned,
     "main.status_synced": _main_status_synced,

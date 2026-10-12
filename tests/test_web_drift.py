@@ -74,7 +74,7 @@ _HARNESS = Path(__file__).resolve().parent / "web_drift_harness.js"
 _MISSING = object()
 _BOARD = {
     "generated_at": "now", "asks": [], "notices": [], "blocked": [], "merge_queues": [],
-    "dispatcher": {"in_flight": [], "failed": [], "projects": [], "deferred": [], "recent": []}, "projects": [], "raids": [{"name": "r", "members": ["c"]}],
+    "dispatcher": {"in_flight": [], "failed": [], "projects": [], "deferred": [], "recent": [], "paused": None}, "projects": [], "raids": [{"name": "r", "members": ["c"]}],
     "parties": [
         {
             "name": name, "raids": [], "quests": [], "prs": [], "claims": [], "state": "active", "generation": 1,
@@ -258,3 +258,33 @@ class WebNoticeAndRaidBehaviorTests(unittest.TestCase):
         paused = self._rendered(self._board(True), "raids")
         self.assertIn("Resume raid", paused)
         self.assertIn("paused", paused)
+
+
+@unittest.skipIf(shutil.which("node") is None, "node not installed")
+class WebDispatchPauseBehaviorTests(unittest.TestCase):
+    def _rendered(self, paused):
+        dispatcher = {
+            "in_flight": [], "failed": [], "deferred": [], "recent": [],
+            "projects": [{"name": "acme", "rules": {"next_task": "on"}, "launches_last_hour": 0, "max_launches_per_hour": 3}],
+            "paused": paused,
+        }
+        board = dict(_BOARD, dispatcher=dispatcher)
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "board.json"
+            path.write_text(json.dumps(board))
+            return subprocess.run(
+                ["node", str(_HARNESS), str(_APP_JS_PATH), str(path), "all", "all", "dispatcher"],
+                capture_output=True, text=True, timeout=30, check=True,
+            ).stdout.strip()
+
+    def test_running_dispatcher_shows_the_pause_form(self):
+        out = self._rendered(None)
+        self.assertIn("Pause dispatch", out)
+        self.assertNotIn("Resume dispatch", out)
+
+    def test_paused_dispatcher_shows_the_pill_and_resume_button(self):
+        out = self._rendered({"reason": "deploy freeze", "paused_by": "human", "age": "5m"})
+        self.assertIn("Resume dispatch", out)
+        self.assertIn("deploy freeze", out)
+        self.assertIn("paused", out)
+        self.assertNotIn("Pause dispatch", out)

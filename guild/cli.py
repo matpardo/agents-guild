@@ -550,9 +550,16 @@ def _handle_timer(ctx, args):
 def _handle_dispatch(ctx, args):
     from guild import tmux_windows
     from guild.commands import dispatch as dispatch_commands
+    from guild.commands import dispatch_pause as dispatch_pause_commands
 
     if args.dispatch_action == "status":
         _print_lines(dispatch_commands.status(ctx))
+        return 0
+    if args.dispatch_action == "pause":
+        _print(dispatch_pause_commands.pause(ctx, args.reason))
+        return 0
+    if args.dispatch_action == "resume":
+        _print(dispatch_pause_commands.resume(ctx))
         return 0
     _print_lines(dispatch_commands.run(ctx, args.dry_run, tmux_windows.Tmux(), notify.spawn_detached))
     return 0
@@ -1002,6 +1009,11 @@ def build_parser():
     dispatch_run.set_defaults(handler=_handle_dispatch)
     dispatch_status = dispatch_actions.add_parser("status", help="show dispatcher cursor, launches, rules and recent decisions")
     dispatch_status.set_defaults(handler=_handle_dispatch)
+    dispatch_pause = dispatch_actions.add_parser("pause", help="stop dispatch for every project until a human resumes it")
+    dispatch_pause.add_argument("--reason", required=True, help="why dispatch is paused")
+    dispatch_pause.set_defaults(handler=_handle_dispatch)
+    dispatch_resume = dispatch_actions.add_parser("resume", help="lift a dispatch pause (human only, outside a session)")
+    dispatch_resume.set_defaults(handler=_handle_dispatch)
 
     _add_timer_parser(subparsers, "sync-timer", "sync-gh")
     _add_timer_parser(subparsers, "sync-sdd-timer", "sync-sdd")
