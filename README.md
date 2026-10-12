@@ -1344,11 +1344,14 @@ the hook falls back to the handoff and adds `guild: task brief unavailable
 (<ExceptionClass>)`.
 
 Every dynamic field is stripped of control sequences and single-lined, and
-cut at 300 characters. The whole brief is capped at 4000 characters: the
-handoff is truncated first, then the tail of the other sections, each with an
-explicit `[... truncated: N lines omitted]` marker. The `SessionStart` hook
-injects this same brief for a resumed generation, so a handoff or `revive`
-starts from the brief and runs no state command.
+cut at 300 characters. The handoff section instead keeps only the previous
+generation's "In flight" and "Learned" text (the only two fields not already
+shown elsewhere in the brief), wrapped at 300 characters per line rather than
+cut. The whole brief is capped at 4000 characters: the handoff is truncated
+first, then the tail of the other sections, each with an explicit
+`[... truncated: N lines omitted]` marker. The `SessionStart` hook injects
+this same brief for a resumed generation, so a handoff or `revive` starts
+from the brief and runs no state command.
 
 The manual path still works: `guild party resume <party>` prints the previous generation's handoff content
 plus a single (read-only, non-acknowledging) `guild next` line. A

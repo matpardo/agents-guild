@@ -13,6 +13,7 @@ from guild.adapters import github
 from guild.commands import brief as brief_commands
 from guild.commands import claim as claim_commands
 from guild.commands import inbox as inbox_commands
+from guild.commands import memory as memory_commands
 from guild.commands import merge_queue as merge_queue_commands
 from guild.commands import next as next_commands
 from guild.commands import party as party_commands
@@ -63,6 +64,7 @@ def _resume_lines(ctx, binding):
     marker = _resume_marker_path(ctx, binding["generation"])
     if marker.exists():
         return []
+    memory_lines = memory_commands.framed_memory(binding["party"])
     failure_lines = []
     try:
         brief_lines = task_brief.render_for_binding(ctx, binding)
@@ -71,19 +73,21 @@ def _resume_lines(ctx, binding):
         failure_lines = ["guild: task brief unavailable ({})".format(type(error).__name__)]
     if brief_lines:
         _touch_marker(marker)
-        return brief_lines + [""] + next_commands.run(ctx, binding, False, False)
+        lines = brief_lines + [""] + next_commands.run(ctx, binding, False, False)
+        return lines + [""] + memory_lines if memory_lines else lines
     handoff_content = party_commands.previous_handoff_content(
         ctx.conn, binding["party"], binding["generation"]
     )
     if handoff_content is None:
         return failure_lines
     _touch_marker(marker)
-    return (
+    lines = (
         party_commands.framed_handoff(handoff_content)
         + [""]
         + next_commands.run(ctx, binding, False, False)
         + failure_lines
     )
+    return lines + [""] + memory_lines if memory_lines else lines
 
 
 def _auto_resume_lines(ctx, resume_party, permission_mode):
