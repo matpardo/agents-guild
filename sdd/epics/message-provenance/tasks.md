@@ -38,6 +38,6 @@ updated: 2026-10-12
 ## T05 — Flag instruction-like text
 
 **Depends on:** T02
-**Status:** [ ] pending
+**Status:** [x] done — #140
 
 **What:** flag patterns in non-human text, shown never blocked; test that "decisión del dev" is not flagged.
