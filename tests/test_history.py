@@ -49,6 +49,13 @@ class HistoryTestCase(GuildTestCase):
             "repo": repo, "number": number, "lifecycle": "merged", "gh_state": "MERGED",
         })
 
+    def _lifecycle_ran(self, hours, project, event_kind, status, exit_code, output_tail):
+        self._event(hours, None, project, "lifecycle.ran", {
+            "project": project, "event": event_kind, "repo": project + "/app", "triggers": ["manual"],
+            "argv": ["true"], "cwd": "/tmp", "status": status, "exit_code": exit_code,
+            "duration_ms": 10, "output_tail": output_tail, "reason": None,
+        })
+
     def _snapshot(self, slug, party, project, started, done):
         return {
             "started_at": _at(started), "done_at": _at(done), "party": party, "project": project,
@@ -486,6 +493,7 @@ class TotalsTests(HistoryTestCase):
         }
         self.assertEqual(self._model(), {
             "quests": [], "active_quests": [], "incomplete_quests": [], "raids": [],
+            "lifecycle_failures": [],
             "totals": empty_totals, "week_totals": empty_totals, "since": None,
         })
 
@@ -564,6 +572,53 @@ class FilterTests(HistoryTestCase):
         self.assertEqual(model["raids"], [])
 
 
+class LifecycleFailureTests(HistoryTestCase):
+    def test_failed_run_is_listed_with_last_output_line(self):
+        self._lifecycle_ran(1, "acme", "on_pr_merged", "failed", 1, "line one\nline two\n")
+        entry = self._model()["lifecycle_failures"][0]
+        self.assertEqual(entry["project"], "acme")
+        self.assertEqual(entry["event"], "on_pr_merged")
+        self.assertEqual(entry["status"], "failed")
+        self.assertEqual(entry["detail"], "exit 1")
+        self.assertEqual(entry["last_line"], "line two")
+
+    def test_trailing_blank_lines_are_skipped(self):
+        self._lifecycle_ran(1, "acme", "on_pr_merged", "timeout", None, "real line\n\n   \n")
+        entry = self._model()["lifecycle_failures"][0]
+        self.assertEqual(entry["last_line"], "real line")
+        self.assertEqual(entry["detail"], "timeout")
+
+    def test_empty_output_renders_as_no_output(self):
+        self._lifecycle_ran(1, "acme", "on_pr_merged", "error", None, "")
+        entry = self._model()["lifecycle_failures"][0]
+        self.assertEqual(entry["last_line"], "")
+        line = history._lifecycle_failure_line(entry)
+        self.assertIn("no output", line)
+
+    def test_ok_and_skipped_are_excluded(self):
+        self._lifecycle_ran(1, "acme", "on_pr_merged", "ok", 0, "all good")
+        self._lifecycle_ran(2, "acme", "on_pr_merged", "skipped", None, "")
+        self.assertEqual(self._model()["lifecycle_failures"], [])
+
+    def test_project_filter_narrows_to_matching_project(self):
+        self._lifecycle_ran(1, "acme", "on_pr_merged", "failed", 1, "a")
+        self._lifecycle_ran(2, "other", "on_pr_merged", "failed", 1, "b")
+        projects = [entry["project"] for entry in self._model(project="acme")["lifecycle_failures"]]
+        self.assertEqual(projects, ["acme"])
+
+    def test_party_filter_does_not_hide_lifecycle_failures(self):
+        self._lifecycle_ran(1, "acme", "on_pr_merged", "failed", 1, "a")
+        self._lifecycle_ran(2, "other", "on_pr_merged", "failed", 1, "b")
+        projects = sorted(entry["project"] for entry in self._model(party="alpha")["lifecycle_failures"])
+        self.assertEqual(projects, ["acme", "other"])
+
+    def test_newest_first(self):
+        self._lifecycle_ran(1, "acme", "on_pr_merged", "failed", 1, "old")
+        self._lifecycle_ran(5, "acme", "on_pr_closed", "error", None, "new")
+        events = [entry["event"] for entry in self._model()["lifecycle_failures"]]
+        self.assertEqual(events, ["on_pr_closed", "on_pr_merged"])
+
+
 class FormatDurationTests(GuildTestCase):
     def test_formats(self):
         self.assertEqual(history.format_duration(2 * 86400 + 3 * 3600 + 59), "2d 3h")
@@ -628,3 +683,10 @@ class HistoryCliTests(LiveHistoryTestCase):
         code, out, err = self.run_cli(["history"], None, self.root)
         self.assertEqual(code, 0, err)
         self.assertIn("Completed quests (0)", out)
+
+    def test_cli_renders_lifecycle_failures(self):
+        self._lifecycle_ran(1, "acme", "on_pr_merged", "failed", 1, "boom\n")
+        code, out, err = self.run_cli(["history"], None, self.root)
+        self.assertEqual(code, 0, err)
+        self.assertIn("Lifecycle failures (1)", out)
+        self.assertIn("acme lifecycle.on_pr_merged failed (exit 1): boom", out)

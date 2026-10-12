@@ -482,7 +482,7 @@ sync --source gh` from a session that supports it.
 
 ### `guild history`
 
-Read-only record of what the guild has achieved. Five sections:
+Read-only record of what the guild has achieved. Six sections:
 
 1. In progress: quests whose projection state is `active`, ordered by creation date (newest first, undated last), with
    party, project, epic, start, age, task counts (done, active, blocked, queued) and
@@ -500,10 +500,14 @@ Read-only record of what the guild has achieved. Five sections:
    `raid.joined`/`raid.left`/`party.closed` events and membership expiry. Each
    shows start (first join), end, parties (lead marked), quests completed and
    PRs merged by member parties inside that window, and the pause count.
-5. Totals: quests done, PRs merged, tasks done, asks answered, median ask answer
+5. Lifecycle failures, newest first: failed, timed-out and errored `lifecycle.ran`
+   events with the project, event, status, exit detail and the last non-empty
+   output line. Narrowed by `--project` only, since a lifecycle run has no party.
+6. Totals: quests done, PRs merged, tasks done, asks answered, median ask answer
    time, handoffs.
 
-`--party`, `--raid` and `--project` narrow every section; they combine.
+`--party`, `--raid` and `--project` narrow every section except lifecycle
+failures; they combine.
 
 ### `guild cost`
 
@@ -1262,8 +1266,9 @@ progress" when empty). A quest idle for longer than the project's
 totals strip (quests, PRs merged, tasks, asks answered with median, handoffs),
 then completed-quest cards (dates, duration, epic progress bar, SDD tasks, JIRA
 cards, PRs, handoffs, asks, accepted drift; legacy quests show a `no snapshot`
-badge and `—` for unknown fields) closed-without-completing cards (reason, tasks not done at marking time) and finished-raid cards (duration, parties
-with the lead marked, quests, PRs, pauses).
+badge and `—` for unknown fields) closed-without-completing cards (reason, tasks not done at marking time), finished-raid cards (duration, parties
+with the lead marked, quests, PRs, pauses) and a lifecycle-failures list (project,
+event, status, detail, last output line).
 
 ### `guild handoff` and resuming a party
 

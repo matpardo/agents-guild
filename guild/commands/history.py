@@ -24,7 +24,9 @@ _KINDS = (
     "raid.joined",
     "raid.left",
     "raid.paused",
+    "lifecycle.ran",
 )
+_LIFECYCLE_FAILURE_STATUSES = ("failed", "timeout", "error")
 _SNAPSHOT_KEYS = (
     "started_at",
     "done_at",
@@ -61,6 +63,9 @@ class _Scope:
         if self._raid_parties is not None and party not in self._raid_parties:
             return False
         return True
+
+    def admits_project(self, project):
+        return self._project is None or project == self._project
 
 
 def _load_events(conn):
@@ -537,6 +542,41 @@ def _totals(by_kind, scope, quests, merged_prs, cutoff):
     }
 
 
+def _last_output_line(output_tail):
+    for line in reversed(output_tail.split("\n")):
+        if line.strip():
+            return line
+    return ""
+
+
+def _lifecycle_failure_detail(payload):
+    if payload["status"] == "failed":
+        return "exit {}".format(payload["exit_code"])
+    return payload["status"]
+
+
+def _lifecycle_failure_entry(event):
+    payload = event["payload"]
+    return {
+        "project": event["project"],
+        "event": payload["event"],
+        "repo": payload["repo"],
+        "status": payload["status"],
+        "ts": event["ts"],
+        "detail": _lifecycle_failure_detail(payload),
+        "last_line": _last_output_line(payload["output_tail"]),
+    }
+
+
+def _lifecycle_failures(by_kind, scope):
+    entries = [
+        _lifecycle_failure_entry(event)
+        for event in by_kind["lifecycle.ran"]
+        if event["payload"]["status"] in _LIFECYCLE_FAILURE_STATUSES and scope.admits_project(event["project"])
+    ]
+    return sorted(entries, key=lambda entry: entry["ts"], reverse=True)
+
+
 def _first_event_ts(by_kind):
     return _earliest(
         [event["ts"] for events in by_kind.values() for event in events]
@@ -562,6 +602,7 @@ def build_model(conn, now, party, raid, project, projects_dir):
         "active_quests": _active_quests(conn, by_kind, now, projects_dir, scope),
         "incomplete_quests": _incomplete_quests(by_kind, scope, finished_quests),
         "raids": _finished_raids(by_kind, now, scope, raid, every_quest, merged_prs),
+        "lifecycle_failures": _lifecycle_failures(by_kind, scope),
         "totals": _totals(by_kind, scope, quests, merged_prs, None),
         "week_totals": _totals(by_kind, scope, quests, merged_prs, now - _WEEK),
         "since": _first_event_ts(by_kind),
@@ -676,6 +717,12 @@ def _raid_lines(raid):
     ]
 
 
+def _lifecycle_failure_line(entry):
+    return "  {} lifecycle.{} {} ({}): {}".format(
+        entry["project"], entry["event"], entry["status"], entry["detail"], entry["last_line"] or "no output"
+    )
+
+
 def _totals_line(totals):
     return "  quests {} | PRs merged {} | tasks {} | asks answered {} (median {}) | handoffs {}".format(
         totals["quests_done"],
@@ -700,6 +747,9 @@ def render_lines(model):
     lines.extend(["", "Finished raids ({})".format(len(model["raids"]))])
     for raid in model["raids"]:
         lines.extend(_raid_lines(raid))
+    lines.extend(["", "Lifecycle failures ({})".format(len(model["lifecycle_failures"]))])
+    for entry in model["lifecycle_failures"]:
+        lines.append(_lifecycle_failure_line(entry))
     lines.extend(["", "Totals", _totals_line(model["totals"])])
     return lines
 
