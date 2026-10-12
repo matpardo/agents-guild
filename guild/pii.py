@@ -22,6 +22,16 @@ LOCAL_ONLY_REMINDER = (
 
 _EMAIL_RE = re.compile(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}")
 
+_SECRET_PATTERNS = (
+    r"\bghp_[A-Za-z0-9]+",
+    r"\bgithub_pat_[A-Za-z0-9_]+",
+    r"\bsk-[A-Za-z0-9]+",
+    r"\bAKIA[A-Z0-9]+",
+    r"\bxox[abp]-[A-Za-z0-9-]+",
+    r"-----BEGIN [A-Z ]*PRIVATE KEY-----",
+)
+_SECRET_RE = re.compile("|".join(_SECRET_PATTERNS))
+
 
 def _enforce_length(value, field_name, max_length):
     if len(value) > max_length:
@@ -35,6 +45,11 @@ def _enforce_no_email(value, field_name):
         raise GuildError("{} must not contain an email address".format(field_name), 1)
 
 
+def _enforce_no_secret(value, field_name):
+    if _SECRET_RE.search(value):
+        raise GuildError("{} must not contain a secret pattern".format(field_name), 1)
+
+
 def _enforce_project_patterns(value, field_name, patterns):
     for pattern in patterns:
         if re.search(pattern, value):
@@ -46,6 +61,7 @@ def _enforce_project_patterns(value, field_name, patterns):
 def validate_field(value, field_name, max_length, patterns):
     _enforce_length(value, field_name, max_length)
     _enforce_no_email(value, field_name)
+    _enforce_no_secret(value, field_name)
     _enforce_project_patterns(value, field_name, patterns)
 
 
