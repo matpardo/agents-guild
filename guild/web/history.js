@@ -470,12 +470,36 @@
     node.appendChild(details);
   }
 
+  function lifecycleFailureLine(entry) {
+    var text = entry.project + " lifecycle." + entry.event + " " + entry.status + " (" + entry.detail + "): " +
+      (entry.last_line || "no output");
+    return textEl("li", text);
+  }
+
+  function renderLifecycleFailures(model) {
+    var node = document.getElementById("lifecycle-failures");
+    clear(node);
+    var details = el("details");
+    details.className = "closed-section";
+    details.appendChild(textEl("summary", "Lifecycle failures (" + model.lifecycle_failures.length + ")"));
+    if (model.lifecycle_failures.length === 0) {
+      details.appendChild(classedText("p", "no lifecycle failures", "muted empty"));
+    } else {
+      var list = el("ul");
+      list.className = "lifecycle-failures-list";
+      appendAll(list, model.lifecycle_failures.map(lifecycleFailureLine));
+      details.appendChild(list);
+    }
+    node.appendChild(details);
+  }
+
   function render(model) {
     var showProject = projectsIn([model.quests, model.incomplete_quests]).length > 1;
     renderTotals(model);
     renderQuests(model, showProject);
     renderRaids(model.raids);
     renderIncompleteQuests(model.incomplete_quests, showProject);
+    renderLifecycleFailures(model);
   }
 
   function showError(message) {

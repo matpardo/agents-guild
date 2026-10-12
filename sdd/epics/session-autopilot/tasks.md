@@ -17,7 +17,7 @@ updated: 2026-10-12
 ## T02 — Lifecycle failures readable
 
 **Depends on:** —
-**Status:** [ ] pending
+**Status:** [x] done — #144
 
 **What:** `guild history` and the web history list failed, timed-out and errored `lifecycle.ran` events with their last non-empty output line on one line. Output never enters notices.
 
