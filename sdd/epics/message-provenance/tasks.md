@@ -17,7 +17,7 @@ updated: 2026-10-12
 ## T02 — Framing
 
 **Depends on:** —
-**Status:** [ ] pending
+**Status:** [x] done — #137
 
 **What:** escape quotes and add an end marker in the inbox; frame and strip the raw handoff in `hook._resume_lines` and `party resume`.
 

@@ -123,6 +123,7 @@ def _notice_lines(ctx, party, project):
     lines = brief_commands.targeting_lines(active, project, raid_member_of)
     if not lines:
         return []
+    lines = lines[:-1]
     shown = [_single(line) for line in lines[: _MAX_NOTICES + 1]]
     omitted = len(lines) - 1 - _MAX_NOTICES
     if omitted > 0:

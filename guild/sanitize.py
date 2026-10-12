@@ -31,6 +31,10 @@ def collapse_to_single_line(text):
     return re.sub(r"[\n\t]", " ", text)
 
 
+def escape_quotes(text):
+    return text.replace('"', '\\"')
+
+
 def sanitize_payload(value):
     if isinstance(value, str):
         return strip_control_sequences(value)
