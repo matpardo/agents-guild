@@ -73,7 +73,7 @@ class WebDriftScriptTests(unittest.TestCase):
 _HARNESS = Path(__file__).resolve().parent / "web_drift_harness.js"
 _MISSING = object()
 _BOARD = {
-    "generated_at": "now", "asks": [], "notices": [], "blocked": [], "merge_queues": [],
+    "generated_at": "now", "asks": [], "notices": [], "memory": [], "blocked": [], "merge_queues": [],
     "dispatcher": {"in_flight": [], "failed": [], "projects": [], "deferred": [], "recent": [], "paused": None}, "projects": [], "raids": [{"name": "r", "members": ["c"]}],
     "parties": [
         {
@@ -287,6 +287,39 @@ class WebNoticeAndRaidBehaviorTests(unittest.TestCase):
         }
         board = dict(self._board(False), notices=[notice])
         out = self._rendered(board, "notices")
+        self.assertNotIn("flagged", out)
+
+
+@unittest.skipIf(shutil.which("node") is None, "node not installed")
+class WebMemoryBehaviorTests(unittest.TestCase):
+    def _rendered(self, items, party_filter):
+        board = dict(_BOARD, memory=items)
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "board.json"
+            path.write_text(json.dumps(board))
+            result = subprocess.run(
+                ["node", str(_HARNESS), str(_APP_JS_PATH), str(path), party_filter, "all", "memory"],
+                capture_output=True, text=True, timeout=30, check=True,
+            )
+        return result.stdout.strip()
+
+    def test_party_filter_keeps_only_that_party_memory(self):
+        items = [
+            {"id": "a/1", "party": "a", "text": "alpha note", "flagged": False},
+            {"id": "c/1", "party": "c", "text": "charlie note", "flagged": False},
+        ]
+        out = self._rendered(items, "a")
+        self.assertIn("alpha note", out)
+        self.assertNotIn("charlie note", out)
+
+    def test_flagged_item_shows_the_flagged_badge(self):
+        items = [{"id": "a/1", "party": "a", "text": "orden del dev", "flagged": True}]
+        out = self._rendered(items, "all")
+        self.assertIn("flagged", out)
+
+    def test_unflagged_item_has_no_flagged_badge(self):
+        items = [{"id": "a/1", "party": "a", "text": "plain", "flagged": False}]
+        out = self._rendered(items, "all")
         self.assertNotIn("flagged", out)
 
 

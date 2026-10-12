@@ -10,7 +10,7 @@ updated: 2026-10-12
 ## T01 — Store, CLI and web
 
 **Depends on:** —
-**Status:** [ ] pending
+**Status:** [x] done — #141
 
 **What:** memory items per party with `guild memory add|list|rm` and a web view with delete through `sendPost`. Storage is one markdown file per item under `data_dir/memory/<party>/`; guild owns writes and the directory is not rebuilt from events.
 

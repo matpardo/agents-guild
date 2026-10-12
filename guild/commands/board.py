@@ -9,6 +9,7 @@ from guild.commands import brief as brief_commands
 from guild.commands import claim as claim_commands
 from guild.commands import dispatch_pause as dispatch_pause_commands
 from guild.commands import drift as drift_commands
+from guild.commands import memory as memory_commands
 from guild.commands import merge_queue as merge_queue_commands
 from guild.commands import next as next_commands
 from guild.commands import notice as notice_commands
@@ -996,6 +997,15 @@ def _notice_model(ctx, row):
     }
 
 
+def _memory_item_model(item):
+    return {
+        "id": item["id"],
+        "party": item["party"],
+        "text": item["text"],
+        "flagged": memory_commands.flagged(item["text"]),
+    }
+
+
 def _task_model(ctx, project, epic, task_row, task_prs, project_config):
     key = _task_card_key(ctx.conn, project, epic, task_row["tid"])
     return {
@@ -1119,11 +1129,17 @@ def board_model(ctx):
     ask_rows = _sorted_open_asks(ctx.conn, None)
     notice_rows = notice_commands.active_notices(ctx.conn, ctx.now)
     project_names = sorted({row["project"] for row in party_rows if row["project"] is not None})
+    live_party_names = {row["name"] for row in party_rows}
     return {
         "generated_at": timeutil.to_iso(ctx.now),
         "asks": [_ask_model(ctx.conn, row) for row in ask_rows],
         "notices": [_notice_model(ctx, row) for row in notice_rows],
         "new_notice_count": notice_commands.count_new(notice_rows),
+        "memory": [
+            _memory_item_model(item)
+            for item in memory_commands.all_items(None)
+            if item["party"] in live_party_names
+        ],
         "parties": [
             _party_model(ctx, party_row, projects_by_name.get(party_row["project"]))
             for party_row in party_rows

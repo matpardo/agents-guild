@@ -34,6 +34,10 @@ def handoffs_dir():
     return data_dir() / "handoffs"
 
 
+def memory_dir():
+    return data_dir() / "memory"
+
+
 def hint_shown_dir():
     return state_dir() / "hints"
 

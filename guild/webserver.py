@@ -12,6 +12,7 @@ from guild.commands import ask as ask_commands
 from guild.commands import board as board_commands
 from guild.commands import dispatch_pause as dispatch_pause_commands
 from guild.commands import history as history_commands
+from guild.commands import memory as memory_commands
 from guild.commands import notice as notice_commands
 from guild.commands import pr as pr_commands
 from guild.commands import raid_pause as raid_pause_commands
@@ -34,6 +35,7 @@ _ASK_ACTION_RE = re.compile(r"^/api/asks/([^/]+)/(answer|dismiss)$")
 _NOTICE_ACTION_RE = re.compile(r"^/api/notices/([^/]+)/(seen|unseen)$")
 _PR_ACTION_RE = re.compile(r"^/api/prs/([^/]+/[^/]+)/(\d+)/(block|unblock|ask-fix)$")
 _RAID_ACTION_RE = re.compile(r"^/api/raids/([^/]+)/(pause|resume)$")
+_MEMORY_ACTION_RE = re.compile(r"^/api/memory/([^/]+)/([1-9][0-9]*)/rm$")
 _DISPATCH_ACTION_RE = re.compile(r"^/api/dispatch/(pause|resume)$")
 _SEEN_ALL_PATH = "/api/notices/seen-all"
 _NOTICE_CREATE_PATH = "/api/notices/create"
@@ -160,6 +162,14 @@ def _run_raid_action(action, raid_name):
         if action == "pause":
             return raid_pause_commands.pause(ctx, raid_name)
         return raid_pause_commands.resume(ctx, raid_name)
+    finally:
+        ctx.conn.close()
+
+
+def _run_memory_action(party, seq):
+    ctx = _action_context()
+    try:
+        return memory_commands.rm(ctx, "{}/{}".format(party, seq))
     finally:
         ctx.conn.close()
 
@@ -317,6 +327,10 @@ class BoardRequestHandler(http_server.BaseHTTPRequestHandler):
             return self._post_action("create", _run_notice_create)
         if path == _SEEN_ALL_PATH:
             return self._post_action("seen-all", lambda payload: _run_seen_all())
+        memory_match = _MEMORY_ACTION_RE.match(path)
+        if memory_match is not None:
+            party, seq = memory_match.groups()
+            return self._post_action("rm", lambda payload: _run_memory_action(party, seq))
         notice_match = _NOTICE_ACTION_RE.match(path)
         if notice_match is None:
             return self._method_not_allowed()

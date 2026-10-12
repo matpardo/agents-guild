@@ -30,6 +30,7 @@ EXPECTED_ALLOW_RULES = (
     "Bash(guild raid:*)",
     "Bash(guild handoff:*)",
     "Bash(guild sync:*)",
+    "Bash(guild memory:*)",
 )
 
 BLANKET_ALLOW_RULES = ("Bash(guild:*)", "Bash(guild *)")
