@@ -31,7 +31,7 @@ updated: 2026-10-12
 ## T04 — Agents cannot answer
 
 **Depends on:** T03
-**Status:** [ ] pending
+**Status:** [x] done — #139
 
 **What:** PreToolUse hook on Bash, built like `pre-pr-owner`, denies `guild answer` and `guild dismiss`.
 
