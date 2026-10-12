@@ -216,6 +216,7 @@ var NO_SESSION_MESSAGE = "session token not loaded, reload the page";
       findingClasses: "Review finding classes with the number of distinct PRs; at the threshold the class should become an architecture guard.",
       syncFreshness: "How long ago the SDD and the tracker were last synced successfully.",
       noticeNew: "You have not marked this notice as seen yet.",
+      noticeFlagged: "Non-human text matching an instruction or command pattern; shown as a caution, never blocked.",
       issued: "When the notice was issued, in local time.",
       timeLeft: "How long until the notice expires.",
       askBlocks: "How many references (tasks, PRs) still wait on this ask; 0 may mean the list is stale.",
@@ -1019,6 +1020,11 @@ var NO_SESSION_MESSAGE = "session token not loaded, reload the page";
       var badge = textEl("span", "new");
       badge.className = "badge notice-new";
       head.appendChild(explain(badge, "ui", "noticeNew"));
+    }
+    if (notice.flagged) {
+      var flagBadge = textEl("span", "flagged");
+      flagBadge.className = "badge notice-flagged";
+      head.appendChild(explain(flagBadge, "ui", "noticeFlagged"));
     }
     article.appendChild(head);
     article.appendChild(textEl("p", notice.text));

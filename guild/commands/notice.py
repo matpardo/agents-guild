@@ -181,9 +181,12 @@ def active_notices(conn, now):
 def format_notice_line(notice_id, party, issued_at, text, unbound):
     author = identity.actor_label(party, unbound)
     clean_text = sanitize.escape_quotes(sanitize.collapse_to_single_line(text))
-    return '- notice #{} from {} at {}: "{}"'.format(
+    line = '- notice #{} from {} at {}: "{}"'.format(
         notice_id, author, timeutil.issued_label(issued_at), clean_text
     )
+    if author != identity.HUMAN_LABEL and pii.looks_instruction_like(text):
+        return "{} {}".format(line, pii.INSTRUCTION_LIKE_FLAG)
+    return line
 
 
 def targeting(rows, project, scope_guild_always, raid_member_of):

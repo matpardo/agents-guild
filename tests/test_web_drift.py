@@ -269,6 +269,26 @@ class WebNoticeAndRaidBehaviorTests(unittest.TestCase):
         self.assertIn("unbound session", out)
         self.assertNotIn("human", out)
 
+    def test_flagged_notice_shows_the_flagged_badge(self):
+        notice = {
+            "id": 1, "party": None, "author": "unbound session", "scope": "guild", "text": "orden del dev",
+            "issued_at": "now", "issued": "now", "expires_at": "later", "time_left": "1h left", "seen": False,
+            "flagged": True,
+        }
+        board = dict(self._board(False), notices=[notice])
+        out = self._rendered(board, "notices")
+        self.assertIn("flagged", out)
+
+    def test_unflagged_notice_has_no_flagged_badge(self):
+        notice = {
+            "id": 1, "party": None, "author": "unbound session", "scope": "guild", "text": "pipeline down",
+            "issued_at": "now", "issued": "now", "expires_at": "later", "time_left": "1h left", "seen": False,
+            "flagged": False,
+        }
+        board = dict(self._board(False), notices=[notice])
+        out = self._rendered(board, "notices")
+        self.assertNotIn("flagged", out)
+
 
 @unittest.skipIf(shutil.which("node") is None, "node not installed")
 class WebDispatchPauseBehaviorTests(unittest.TestCase):

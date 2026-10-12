@@ -3,7 +3,7 @@ import shlex
 import textwrap
 from datetime import timedelta
 
-from guild import config, ctx_pressure, dispatch_launch, fix_request, identity, links, merge_queue, party_progress, party_status, pr_asks, resume
+from guild import config, ctx_pressure, dispatch_launch, fix_request, identity, links, merge_queue, party_progress, party_status, pii, pr_asks, resume
 from guild import sanitize, session_status, timeutil
 from guild.commands import brief as brief_commands
 from guild.commands import claim as claim_commands
@@ -432,6 +432,11 @@ def _raid_scoped_notices(ctx, raid_name):
     return [row for row in notice_commands.active_notices(ctx.conn, ctx.now) if row["scope"] == scope]
 
 
+def _notice_flagged(row):
+    author = identity.actor_label(row["party"], bool(row["unbound"]))
+    return author != identity.HUMAN_LABEL and pii.looks_instruction_like(row["text"])
+
+
 def _notices_section(ctx, painter, rows):
     if not rows:
         return []
@@ -442,11 +447,13 @@ def _notices_section(ctx, painter, rows):
     lines = [painter.paint(header, "bold")]
     for row in rows:
         marker = painter.paint("new", "green") + " " if notice_commands.is_new(row) else ""
+        flag = " " + painter.paint("flagged", "red") if _notice_flagged(row) else ""
         lines.append(
-            "  {}{} {} · {}".format(
+            "  {}{} {}{} · {}".format(
                 marker,
                 painter.paint("#{}".format(row["id"]), "yellow"),
                 painter.paint(identity.actor_label(row["party"], bool(row["unbound"])), "cyan"),
+                flag,
                 painter.paint(
                     "{} · {} · {}".format(
                         timeutil.issued_label(row["created_at"]),
@@ -985,6 +992,7 @@ def _notice_model(ctx, row):
         "expires_at": row["expires_at"],
         "time_left": timeutil.time_left_label(ctx.now, row["expires_at"]),
         "seen": not notice_commands.is_new(row),
+        "flagged": _notice_flagged(row),
     }
 
 

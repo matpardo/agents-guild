@@ -1,4 +1,4 @@
-from guild import config, events, identity, sanitize
+from guild import config, events, identity, pii, sanitize
 from guild.commands import notice
 from guild.commands import raid as raid_commands
 
@@ -104,9 +104,10 @@ def new_lines(ctx, binding):
             if event["kind"] == "ask.answered":
                 answer = sanitize.escape_quotes(sanitize.collapse_to_single_line(payload["answer"]))
                 label = identity.actor_label(event["party"], payload.get("unbound", False))
-                ask_lines.append(
-                    (payload["id"], '- ask #{} answered by {}: "{}"'.format(payload["id"], label, answer))
-                )
+                line = '- ask #{} answered by {}: "{}"'.format(payload["id"], label, answer)
+                if label != identity.HUMAN_LABEL and pii.looks_instruction_like(payload["answer"]):
+                    line = "{} {}".format(line, pii.INSTRUCTION_LIKE_FLAG)
+                ask_lines.append((payload["id"], line))
             else:
                 ask_lines.append((payload["id"], "- ask #{} dismissed".format(payload["id"])))
     lines.extend(line for _, line in sorted(ask_lines, key=lambda entry: entry[0]))

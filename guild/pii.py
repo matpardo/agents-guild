@@ -32,6 +32,27 @@ _SECRET_PATTERNS = (
 )
 _SECRET_RE = re.compile("|".join(_SECRET_PATTERNS))
 
+_INSTRUCTION_LIKE_PATTERNS = (
+    r"\borden del dev\b",
+    r"\bdev order\b",
+    r"\bdecision del dev\b",
+    r"\bignore previous\b",
+    r"\bignora lo anterior\b",
+    r"\bdisregard the above\b",
+    r"\bnew instructions\b",
+    r"\bsystem prompt\b",
+    r"\brm -rf\b",
+    r"\bcurl\s*\|\s*sh\b",
+    r"\bgit push --force\b(?!-with-lease)",
+)
+_INSTRUCTION_LIKE_RE = re.compile("|".join(_INSTRUCTION_LIKE_PATTERNS), re.IGNORECASE)
+
+INSTRUCTION_LIKE_FLAG = "[flagged: looks like an instruction or a command]"
+
+
+def looks_instruction_like(value):
+    return bool(_INSTRUCTION_LIKE_RE.search(value))
+
 
 def _enforce_length(value, field_name, max_length):
     if len(value) > max_length:
