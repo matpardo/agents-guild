@@ -347,6 +347,36 @@ def _handle_claims(ctx, args):
     return 0
 
 
+def _handle_memory_add(ctx, args):
+    from guild.commands import memory as memory_commands
+
+    _print(memory_commands.add(ctx, args.text))
+    return 0
+
+
+def _handle_memory_list(ctx, args):
+    from guild import pii
+    from guild.commands import memory as memory_commands
+
+    items = memory_commands.all_items(args.party)
+    _print_lines(
+        [
+            "{}: {}{}".format(
+                item["id"], item["text"], "  " + pii.INSTRUCTION_LIKE_FLAG if memory_commands.flagged(item["text"]) else ""
+            )
+            for item in items
+        ]
+    )
+    return 0
+
+
+def _handle_memory_rm(ctx, args):
+    from guild.commands import memory as memory_commands
+
+    _print(memory_commands.rm(ctx, args.item_id))
+    return 0
+
+
 def _handle_raid_join(ctx, args):
     from guild.commands import raid as raid_commands
 
@@ -801,6 +831,23 @@ def _add_notice_parser(subparsers):
     unseen.set_defaults(handler=_handle_notice_unseen)
 
 
+def _add_memory_parser(subparsers):
+    parser = subparsers.add_parser("memory", help="add, list or remove items in a party's memory")
+    actions = parser.add_subparsers(dest="memory_action", required=True, metavar="<subcommand>")
+
+    add = actions.add_parser("add", help="add a memory item for your bound party")
+    add.add_argument("text")
+    add.set_defaults(handler=_handle_memory_add)
+
+    list_parser = actions.add_parser("list", help="list memory items")
+    list_parser.add_argument("--party", help="only this party")
+    list_parser.set_defaults(handler=_handle_memory_list)
+
+    rm = actions.add_parser("rm", help="remove a memory item")
+    rm.add_argument("item_id")
+    rm.set_defaults(handler=_handle_memory_rm)
+
+
 def _add_raid_parser(subparsers):
     parser = subparsers.add_parser("raid", help="join, leave, pause or resume a raid")
     actions = parser.add_subparsers(dest="raid_action", required=True, metavar="<subcommand>")
@@ -942,6 +989,8 @@ def build_parser():
 
     claims = subparsers.add_parser("claims", help="list active claims")
     claims.set_defaults(handler=_handle_claims)
+
+    _add_memory_parser(subparsers)
 
     _add_raid_parser(subparsers)
 
@@ -1086,6 +1135,7 @@ def _build_context(session_id, cwd):
     paths.ensure_private_dir(paths.state_dir())
     paths.ensure_private_dir(paths.handoffs_dir())
     paths.ensure_private_dir(paths.projects_config_dir())
+    paths.ensure_private_dir(paths.memory_dir())
     return RunContext(
         conn,
         session_id,

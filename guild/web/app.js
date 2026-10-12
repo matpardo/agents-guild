@@ -46,6 +46,8 @@ var NO_SESSION_MESSAGE = "session token not loaded, reload the page";
     focusedPrRef: null,
     noticeStatuses: {},
     noticeBusy: {},
+    memoryStatuses: {},
+    memoryBusy: {},
     noticeAllStatus: "",
     noticeForm: { text: "", to: "", ttl: "1d" },
     noticeFormStatus: "",
@@ -306,6 +308,10 @@ var NO_SESSION_MESSAGE = "session token not loaded, reload the page";
     return "/api/notices/" + noticeId + "/" + action;
   }
 
+  function memoryUrl(party, seq) {
+    return "/api/memory/" + party + "/" + seq + "/rm";
+  }
+
   function errorMessage(body) {
     if (body && typeof body.error === "string") {
       return body.error;
@@ -352,6 +358,27 @@ var NO_SESSION_MESSAGE = "session token not loaded, reload the page";
         delete state.noticeStatuses[noticeId];
       } else {
         state.noticeStatuses[noticeId] = errorMessage(result.body);
+      }
+      fetchBoard();
+    });
+  }
+
+  function postMemoryAction(party, seq) {
+    var itemId = party + "/" + seq;
+    if (sessionToken === null) {
+      state.memoryStatuses[itemId] = NO_SESSION_MESSAGE;
+      fetchBoard();
+      return;
+    }
+    state.memoryBusy[itemId] = true;
+    state.memoryStatuses[itemId] = "sending...";
+    fetchBoard();
+    sendPost(memoryUrl(party, seq), {}).then(function (result) {
+      delete state.memoryBusy[itemId];
+      if (result.ok) {
+        delete state.memoryStatuses[itemId];
+      } else {
+        state.memoryStatuses[itemId] = errorMessage(result.body);
       }
       fetchBoard();
     });
@@ -1203,6 +1230,45 @@ var NO_SESSION_MESSAGE = "session token not loaded, reload the page";
     section.appendChild(details);
   }
 
+  function renderMemoryItem(item) {
+    var article = el("article");
+    article.className = "card memory";
+    var head = el("div");
+    head.className = "card-head";
+    head.appendChild(textEl("span", item.id));
+    if (item.flagged) {
+      var flagBadge = textEl("span", "flagged");
+      flagBadge.className = "badge memory-flagged";
+      head.appendChild(flagBadge);
+    }
+    article.appendChild(head);
+    article.appendChild(textEl("p", item.text));
+    var actions = el("div");
+    actions.className = "notice-actions";
+    var button = textEl("button", "Remove");
+    button.type = "button";
+    button.disabled = state.memoryBusy[item.id] === true;
+    button.addEventListener("click", function () {
+      postMemoryAction(item.party, item.id.split("/")[1]);
+    });
+    actions.appendChild(button);
+    var status = textEl("span", state.memoryStatuses[item.id] || "");
+    status.className = "ask-status";
+    actions.appendChild(status);
+    article.appendChild(actions);
+    return article;
+  }
+
+  function renderMemory(items) {
+    var section = document.getElementById("memory");
+    clear(section);
+    if (items.length === 0) {
+      return;
+    }
+    section.appendChild(textEl("h2", "memory (" + items.length + ")"));
+    appendAll(section, items.map(renderMemoryItem));
+  }
+
   function renderLaunch(launch, label) {
     var text = label + " " + launch.party + " g" + launch.generation + " " + launch.age + " ago (" + launch.rule + ", " + launch.subject + ")";
     if (launch.reason) {
@@ -1894,6 +1960,9 @@ var NO_SESSION_MESSAGE = "session token not loaded, reload the page";
       notices: data.notices.filter(function (notice) {
         return notice.party === state.partyFilter;
       }),
+      memory: data.memory.filter(function (item) {
+        return item.party === state.partyFilter;
+      }),
       blocked: data.blocked.filter(function (entry) {
         return entry.party === state.partyFilter;
       }),
@@ -1967,6 +2036,9 @@ var NO_SESSION_MESSAGE = "session token not loaded, reload the page";
       }),
       notices: data.notices.filter(function (notice) {
         return notice.scope === scope;
+      }),
+      memory: data.memory.filter(function (item) {
+        return members.indexOf(item.party) !== -1;
       }),
       blocked: data.blocked.filter(function (entry) {
         return members.indexOf(entry.party) !== -1;
@@ -2225,6 +2297,7 @@ var NO_SESSION_MESSAGE = "session token not loaded, reload the page";
     var filtered = applyRaidFilter(applyPartyFilter(data));
     renderAsks(filtered.asks, filtered.blocked, filtered.parties);
     renderNotices(filtered.notices, filtered.projects, filtered.raids);
+    renderMemory(filtered.memory);
     renderRaids(filtered.raids);
     renderDispatcher(filtered.dispatcher);
     renderMergeQueues(filtered.merge_queues);

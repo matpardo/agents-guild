@@ -166,6 +166,10 @@ guild claim check <area>                # read-only, no event; exit 0 free/yours
 guild release <area>
 guild claims
 
+guild memory add "<text>"                     # your bound party's memory; requires binding
+guild memory list [--party <name>]            # read-only; no party: every known party
+guild memory rm <party>/<seq>                 # bound session: only your own party; unbound (terminal or web): any party
+
 guild raid join <name> --ttl <dur>      # the caller's bound party joins; joining again refreshes the TTL
 guild raid join <name> --until-leave    # joins with no expiry; ends only on `raid leave` or `party close`
 guild raid join <name> (--ttl <dur> | --until-leave) --lead  # also becomes the raid's lead
@@ -1991,11 +1995,13 @@ Default paths (all overridable via env, useful for tests):
 - Claude sessions: `$GUILD_CLAUDE_SESSIONS_DIR` (default `~/.claude/sessions`).
 - Claude transcripts: `$GUILD_CLAUDE_PROJECTS_DIR` (default `~/.claude/projects`).
 - Claude scratchpads: `$GUILD_CLAUDE_SCRATCH_DIR` (default `/tmp/claude-<uid>`).
+- Memory: `$XDG_DATA_HOME/guild/memory/<party>/` (default `~/.local/share/guild/`).
 
 `guild` sets `umask 0o077` at CLI entry and explicitly `chmod`s the DB file
-(and its `-wal`/`-shm` siblings) to `0600` and the DB, state, handoffs and
-projects-config directories to `0700` on every `guild` invocation — this
-also repairs a pre-existing world-readable DB from before this hardening.
+(and its `-wal`/`-shm` siblings) to `0600` and the DB, state, handoffs,
+projects-config and memory directories to `0700` on every `guild` invocation
+— this also repairs a pre-existing world-readable DB from before this
+hardening.
 
 ## Personal data and length caps
 
@@ -2031,6 +2037,12 @@ names, Docker object names, compose project names and byte counts in
 `resources.sampled` events and the `resource_samples` and `resource_machine`
 projections. They are local events, never exported, and contain no file
 contents, container commands or environment.
+
+A memory item is capped at 500 characters and checked the same way (email,
+secret patterns, `pii_patterns`). Unlike the broadcast fields above, memory is
+never exported or broadcast: it lives in local files under a party's own
+directory, read by that party's later generations and by the local CLI and
+web board.
 
 ## Seed schema
 
@@ -2156,7 +2168,8 @@ which merges this block and keeps what is already there:
       "Bash(guild release:*)",
       "Bash(guild raid:*)",
       "Bash(guild handoff:*)",
-      "Bash(guild sync:*)"
+      "Bash(guild sync:*)",
+      "Bash(guild memory:*)"
     ]
   }
 }
