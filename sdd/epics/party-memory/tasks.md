@@ -17,7 +17,7 @@ updated: 2026-10-12
 ## T02 — Handoff appends what it learned
 
 **Depends on:** T01
-**Status:** [ ] pending
+**Status:** [x] done — #142
 
 **What:** `guild handoff` adds `--learned` to the party memory, skipping identical text.
 

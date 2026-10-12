@@ -4,6 +4,7 @@ from unittest import mock
 from guild import db, events, paths, timeutil
 from guild.cli import _build_context
 from guild.commands import handoff as handoff_commands
+from guild.commands import memory as memory_commands
 from tests.testutil import GuildTestCase
 
 
@@ -125,6 +126,13 @@ class RespawnSuccessTests(RespawnBase):
         tmux = self._fake(session_up=False, windows={})
         self._respawn(tmux, "%5")
         self.assertEqual(tmux.launch_calls()[0][0], "new-session")
+
+    def test_learned_joins_party_memory_on_respawn(self):
+        self._record_window(1, "@1")
+        self.bind_after = 1
+        self._respawn(self._fake(), "%5")
+        items = memory_commands.list_items("alpha")
+        self.assertEqual([item["text"] for item in items], ["y"])
 
 
 class RespawnManualCloseTests(RespawnBase):

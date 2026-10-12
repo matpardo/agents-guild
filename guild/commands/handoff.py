@@ -2,6 +2,7 @@ import os
 
 from guild import db, events, handoff_prune, identity, names, paths, pii, render, resume, timeutil, tmux_windows
 from guild.commands import claim as claim_commands
+from guild.commands import memory as memory_commands
 from guild.commands import next as next_commands
 from guild.commands import party as party_commands
 from guild.commands import notice as notice_commands
@@ -102,6 +103,12 @@ def _write_handoff(ctx, binding, in_flight, learned):
             "local",
             {"party": party, "generation": generation, "handoff_path": str(handoff_path)},
         )
+
+
+def _for_memory(text):
+    if len(text) <= pii.MEMORY_ITEM_MAX_LENGTH:
+        return text
+    return text[: pii.MEMORY_ITEM_MAX_LENGTH - 1] + "…"
 
 
 def _launch_blocker(tmux, cwd):
@@ -226,6 +233,7 @@ def run(ctx, in_flight, learned, model, respawn, tmux, tmux_pane, sleep):
     patterns = pii.project_patterns(ctx.projects_dir, binding["project"])
     pii.validate_field(in_flight, "--in-flight", pii.HANDOFF_FIELD_MAX_LENGTH, patterns)
     pii.validate_field(learned, "--learned", pii.HANDOFF_FIELD_MAX_LENGTH, patterns)
+    memory_commands.add(ctx, _for_memory(learned))
     _write_handoff(ctx, binding, in_flight, learned)
     if respawn:
         return _respawn(ctx, binding, model, tmux, tmux_pane, sleep)
