@@ -1332,4 +1332,51 @@ class PrePrOwnerHookTests(GuildTestCase):
         with mock.patch("guild.commands.hook.pre_pr_owner", side_effect=RuntimeError("boom")):
             code, out, err = self._bash("sess-2", "git push")
         self.assertEqual(code, 0)
+
+
+class PreAnswerHookTests(GuildTestCase):
+    def _bash(self, session_id, command):
+        return self.run_hook(
+            "pre-answer",
+            {
+                "session_id": session_id,
+                "tool_input": {"command": command},
+            },
+        )
+
+    def _assert_denied(self, session_id, command):
+        code, out, err = self._bash(session_id, command)
+        self.assertEqual(code, 0)
+        decision = json.loads(out)["hookSpecificOutput"]
+        self.assertEqual(decision["hookEventName"], "PreToolUse")
+        self.assertEqual(decision["permissionDecision"], "deny")
+        self.assertIn("agents cannot answer or dismiss", decision["permissionDecisionReason"])
+
+    def _assert_silent(self, session_id, command):
+        code, out, err = self._bash(session_id, command)
+        self.assertEqual((code, out), (0, ""))
+
+    def test_bound_session_answer_is_denied(self):
+        self._assert_denied("sess-1", 'guild answer 42 --answer "do it"')
+
+    def test_unbound_session_dismiss_is_denied(self):
+        self._assert_denied("sess-unbound", "guild dismiss 42")
+
+    def test_no_session_answer_is_denied(self):
+        self._assert_denied(None, 'guild answer 1 --answer "x"')
+
+    def test_mention_in_unrelated_command_is_silent(self):
+        self._assert_silent("sess-1", 'echo "run guild answer later"')
+
+    def test_chained_answer_is_denied(self):
+        self._assert_denied("sess-1", "cd /foo && guild answer 1 --answer x")
+
+    def test_ask_creation_is_silent(self):
+        self._assert_silent("sess-1", 'guild ask "question" --ref task:demo/T01')
+
+    def test_swallows_exceptions_as_system_message(self):
+        with mock.patch("guild.commands.hook.pre_answer", side_effect=RuntimeError("boom")):
+            code, out, err = self._bash("sess-1", "guild answer 1 --answer x")
+        self.assertEqual(code, 0)
+        self.assertIn("guild hook error: boom", out)
         self.assertIn("guild hook error: boom", out)

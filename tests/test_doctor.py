@@ -14,6 +14,7 @@ _ALL_HOOKS = {
         {"matcher": "Bash", "hooks": [{"type": "command", "command": "guild hook pre-push"}]},
         {"matcher": "Edit|Write", "hooks": [{"type": "command", "command": "guild hook pre-edit"}]},
         {"matcher": "Bash", "hooks": [{"type": "command", "command": "guild hook pre-pr-owner"}]},
+        {"matcher": "Bash", "hooks": [{"type": "command", "command": "guild hook pre-answer"}]},
     ],
 }
 
@@ -92,7 +93,7 @@ class DoctorTests(GuildTestCase):
         self._link_rules()
         code, out, err = self.run_cli(["doctor"], None, None)
         self.assertEqual(code, 1)
-        self.assertEqual(out.count("missing hook"), 8)
+        self.assertEqual(out.count("missing hook"), 9)
         self.assertEqual(out.count("missing ask rule"), 2)
 
     def test_missing_notification_and_stop_hooks_fail_and_name_them(self):

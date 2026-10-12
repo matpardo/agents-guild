@@ -213,6 +213,7 @@ guild hook prompt-submit
 guild hook post-tool-use
 guild hook pre-push
 guild hook pre-pr-owner
+guild hook pre-answer
 guild hook pre-edit
 guild hook pre-commit      # git hook: no stdin, session from CLAUDE_CODE_SESSION_ID
 guild hook notification    # records the session status
@@ -2135,6 +2136,10 @@ which merges this block and keeps what is already there:
       {
         "matcher": "Bash",
         "hooks": [{"type": "command", "command": "guild hook pre-pr-owner"}]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [{"type": "command", "command": "guild hook pre-answer"}]
       }
     ]
   },
@@ -2257,6 +2262,15 @@ Without a hooks manager, add the same call to the repository's
   Code asks the human to confirm. Unbound sessions, untracked, merged or
   closed PRs, read-only commands and unparseable commands are allowed
   silently; errors become a `systemMessage` and never block.
+- `pre-answer`: on any `Bash` call running `guild answer` or `guild dismiss`
+  (same wrapper and chaining handling as `pre-push`, so wrapped and chained
+  forms are caught too), it denies it with
+  `{"hookSpecificOutput": {"hookEventName": "PreToolUse",
+  "permissionDecision": "deny", "permissionDecisionReason": "..."}}` —
+  whatever the session's binding, since the point is that only a human
+  answers an ask or dismisses it. A command that only mentions the words, or
+  a different `guild` subcommand, passes silently; errors become a
+  `systemMessage` and never block.
 - `pre-edit`: guards a project's `shared_areas` (see "Project config") on
   `Edit`/`Write`/`MultiEdit`/`NotebookEdit` calls (`tool_input.file_path`, or
   `notebook_path` for `NotebookEdit`). Any other tool, no path, an unbound
