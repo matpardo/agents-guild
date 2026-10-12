@@ -63,6 +63,7 @@ class PartyStartResumeCloseTests(GuildTestCase):
         self.assertIn("shipping T01", out)
         self.assertIn("watch ci flakes", out)
         self.assertIn("task demo/T01", out)
+        self.assertIn("end of guild handoff", out)
 
     def test_resume_without_prior_handoff_has_no_handoff_section(self):
         repo_dir = self.register_project("acme", ["acme/app"])

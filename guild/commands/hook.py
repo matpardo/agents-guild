@@ -78,7 +78,12 @@ def _resume_lines(ctx, binding):
     if handoff_content is None:
         return failure_lines
     _touch_marker(marker)
-    return [handoff_content, ""] + next_commands.run(ctx, binding, False, False) + failure_lines
+    return (
+        party_commands.framed_handoff(handoff_content)
+        + [""]
+        + next_commands.run(ctx, binding, False, False)
+        + failure_lines
+    )
 
 
 def _auto_resume_lines(ctx, resume_party, permission_mode):

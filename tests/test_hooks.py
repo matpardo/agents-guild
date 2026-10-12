@@ -81,6 +81,7 @@ class SessionStartHookTests(GuildTestCase):
         self.assertNotIn("guild brief alpha/", out)
         self.assertIn("shipping T01", out)
         self.assertIn("nothing actionable", out)
+        self.assertIn("end of guild handoff", out)
 
     def test_resumed_generation_without_task_or_handoff_prints_no_resume_block(self):
         repo_dir = self.register_project("acme", ["acme/app"])

@@ -180,7 +180,7 @@ def active_notices(conn, now):
 
 def format_notice_line(notice_id, party, issued_at, text):
     author = party or "human"
-    clean_text = sanitize.collapse_to_single_line(text)
+    clean_text = sanitize.escape_quotes(sanitize.collapse_to_single_line(text))
     return '- notice #{} from {} at {}: "{}"'.format(
         notice_id, author, timeutil.issued_label(issued_at), clean_text
     )

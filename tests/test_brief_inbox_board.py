@@ -3,6 +3,7 @@ import os
 import sqlite3
 
 from guild import ctx_pressure, db, events, paths, timeutil
+from guild.commands import inbox as inbox_commands
 from guild.commands import statusline as statusline_commands
 from tests.testutil import GuildTestCase
 
@@ -122,6 +123,46 @@ class InboxTests(GuildTestCase):
         lines = [line for line in out.splitlines() if line]
         self.assertEqual(len(lines), 1)
         self.assertNotIn("\nnotice #99", out)
+
+    def test_notice_with_quote_is_escaped_not_split(self):
+        repo_dir = self.register_project("acme", ["acme/app"])
+        self.run_cli(["party", "start", "alpha"], "sess-1", repo_dir)
+        self.run_cli(["party", "start", "beta"], "sess-2", repo_dir)
+        self.run_cli(
+            ["notice", "create", 'pipeline "down" now', "--to", "guild", "--ttl", "2h"], None, None
+        )
+
+        code, out, err = self.run_cli(["inbox", "--since-last"], "sess-2", repo_dir)
+        self.assertEqual(code, 0)
+        lines = [line for line in out.splitlines() if line]
+        self.assertEqual(len(lines), 1)
+        self.assertIn('pipeline \\"down\\" now', out)
+
+    def test_answered_ask_with_quote_is_escaped_not_split(self):
+        repo_dir = self.register_project("acme", ["acme/app"])
+        self.run_cli(["party", "start", "alpha"], "sess-1", repo_dir)
+        self.run_cli(["quest", "add", "demo", "--title", "Demo", "--no-epic"], "sess-1", repo_dir)
+        self.run_cli(["task", "add", "demo/T01", "--title", "First"], "sess-1", repo_dir)
+        self.run_cli(
+            ["ask", "ready?", "--context", "x", "--ref", "task:demo/T01"], "sess-1", repo_dir
+        )
+        self.run_cli(["inbox", "--since-last"], "sess-1", repo_dir)
+        self.run_cli(["answer", "1", 'yes "go now"'], None, None)
+
+        code, out, err = self.run_cli(["inbox", "--since-last"], "sess-1", repo_dir)
+        self.assertEqual(code, 0)
+        lines = [line for line in out.splitlines() if line]
+        self.assertEqual(len(lines), 1)
+        self.assertIn('yes \\"go now\\"', out)
+
+    def test_framed_ends_with_messages_end_marker(self):
+        self.assertEqual(
+            inbox_commands.framed(["- notice #1 from alpha at now: \"hi\""])[-1],
+            inbox_commands.MESSAGES_END,
+        )
+
+    def test_framed_of_no_messages_is_empty(self):
+        self.assertEqual(inbox_commands.framed([]), [])
 
 
 class InboxSessionWaitingTests(GuildTestCase):
