@@ -38,7 +38,7 @@ updated: 2026-10-12
 ## T05 — Stop hook wraps up unattended sessions
 
 **Depends on:** T03
-**Status:** [ ] pending
+**Status:** [x] done — #148
 
 **What:** the Stop hook wraps up a session only when `GUILD_RESUME` (or, for a session that already ran a plain `guild handoff`, the leader/party join) names the party it is bound to, the party is not a keeper, there is no pending background work, nobody has typed a real prompt (`attended-<session>` marker, written by `prompt-submit` for anything but guild's own resume prompt or a `<task-notification>` report) and the transcript shows no usage limit. The first stop prints a block decision once and records a `wrapup-<session>` marker; the next stop (by `stop_hook_active` or the marker alone) runs `write_auto` and closes the recorded pane with `tmux_windows.closable_pane` (moved there from `handoff.py`, now shared with `--close`/`--respawn`). A session already `awaiting-leader` from a plain handoff gets its pane closed too, without a second handoff. `attended-` and `wrapup-` markers join the prune pattern.
 
