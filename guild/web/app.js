@@ -55,6 +55,8 @@ var NO_SESSION_MESSAGE = "session token not loaded, reload the page";
     raidPauseOpen: {},
     raidStatuses: {},
     raidBusy: {},
+    partyHandoffStatuses: {},
+    partyHandoffBusy: {},
     dispatchReason: "",
     dispatchStatus: "",
     dispatchBusy: false,
@@ -312,6 +314,10 @@ var NO_SESSION_MESSAGE = "session token not loaded, reload the page";
     return "/api/memory/" + party + "/" + seq + "/rm";
   }
 
+  function partyHandoffUrl(party) {
+    return "/api/parties/" + party + "/hand-off";
+  }
+
   function errorMessage(body) {
     if (body && typeof body.error === "string") {
       return body.error;
@@ -379,6 +385,26 @@ var NO_SESSION_MESSAGE = "session token not loaded, reload the page";
         delete state.memoryStatuses[itemId];
       } else {
         state.memoryStatuses[itemId] = errorMessage(result.body);
+      }
+      fetchBoard();
+    });
+  }
+
+  function postPartyHandoffAction(partyName) {
+    if (sessionToken === null) {
+      state.partyHandoffStatuses[partyName] = NO_SESSION_MESSAGE;
+      fetchBoard();
+      return;
+    }
+    state.partyHandoffBusy[partyName] = true;
+    state.partyHandoffStatuses[partyName] = "sending...";
+    fetchBoard();
+    sendPost(partyHandoffUrl(partyName), {}).then(function (result) {
+      delete state.partyHandoffBusy[partyName];
+      if (result.ok) {
+        delete state.partyHandoffStatuses[partyName];
+      } else {
+        state.partyHandoffStatuses[partyName] = errorMessage(result.body);
       }
       fetchBoard();
     });
@@ -1828,6 +1854,22 @@ var NO_SESSION_MESSAGE = "session token not loaded, reload the page";
     return badge;
   }
 
+  function renderPartyHandoffControls(party) {
+    var controls = el("span");
+    controls.className = "pr-block-controls";
+    var button = textEl("button", "Hand off");
+    button.type = "button";
+    button.disabled = state.partyHandoffBusy[party.name] === true;
+    button.addEventListener("click", function () {
+      postPartyHandoffAction(party.name);
+    });
+    controls.appendChild(button);
+    var status = textEl("span", state.partyHandoffStatuses[party.name] || "");
+    status.className = "ask-status";
+    controls.appendChild(status);
+    return controls;
+  }
+
   function renderParty(party) {
     var details = el("details");
     details.className = "party";
@@ -1858,6 +1900,10 @@ var NO_SESSION_MESSAGE = "session token not loaded, reload the page";
       resumeLine.appendChild(textEl("span", "resume: "));
       resumeLine.appendChild(textEl("code", party.resume_command));
       details.appendChild(explain(resumeLine, "ui", "resumeCommand"));
+    }
+
+    if (party.state === "active" && !party.has_live_leader) {
+      details.appendChild(renderPartyHandoffControls(party));
     }
 
     if (party.caps !== null && party.caps.cap !== null) {

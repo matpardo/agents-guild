@@ -1,6 +1,8 @@
 import os
+import subprocess
 
-from guild import db, events, handoff_prune, identity, names, paths, pii, render, resume, timeutil, tmux_windows
+from guild import db, events, handoff_prune, identity, names, party_status, paths, pii, render, resume
+from guild import timeutil, tmux_windows
 from guild.commands import claim as claim_commands
 from guild.commands import memory as memory_commands
 from guild.commands import next as next_commands
@@ -8,6 +10,8 @@ from guild.commands import party as party_commands
 from guild.commands import notice as notice_commands
 from guild.commands import raid as raid_commands
 from guild.errors import GuildError
+
+_AUTO_LEARNED = "none (automatic handoff)"
 
 _BIND_POLLS = 90
 _BIND_POLL_SECONDS = 1
@@ -86,7 +90,7 @@ def _with_reminder(text):
     return "{}\n{}".format(text, pii.BROADCAST_REMINDER)
 
 
-def _write_handoff(ctx, binding, in_flight, learned):
+def _write_handoff(ctx, binding, in_flight, learned, auto):
     party, generation = binding["party"], binding["generation"]
     content = _render_handoff(ctx, binding, in_flight, learned)
     handoffs_dir = paths.handoffs_dir()
@@ -104,7 +108,7 @@ def _write_handoff(ctx, binding, in_flight, learned):
             binding["project"],
             "party.handed_off",
             "local",
-            {"party": party, "generation": generation, "handoff_path": str(handoff_path)},
+            {"party": party, "generation": generation, "handoff_path": str(handoff_path), "auto": auto},
         )
 
 
@@ -237,7 +241,7 @@ def run(ctx, in_flight, learned, model, respawn, tmux, tmux_pane, sleep):
     pii.validate_field(in_flight, "--in-flight", pii.HANDOFF_FIELD_MAX_LENGTH, patterns)
     pii.validate_field(learned, "--learned", pii.HANDOFF_FIELD_MAX_LENGTH, patterns)
     memory_commands.add(ctx, _for_memory(learned))
-    _write_handoff(ctx, binding, in_flight, learned)
+    _write_handoff(ctx, binding, in_flight, learned, False)
     if respawn:
         return _respawn(ctx, binding, model, tmux, tmux_pane, sleep)
     command = resume.fresh_command(
@@ -271,3 +275,86 @@ def run_prune(ctx, dry_run):
     if dry_run:
         return _dry_run_text(ctx)
     return _real_run_text(ctx)
+
+
+def _run_git(args, cwd):
+    try:
+        result = subprocess.run(["git", "-C", str(cwd)] + list(args), capture_output=True, text=True)
+    except OSError:
+        return None
+    if result.returncode != 0:
+        return None
+    return result.stdout
+
+
+def _is_git_repo(cwd):
+    return _run_git(["rev-parse", "--git-dir"], cwd) is not None
+
+
+def _branch(cwd):
+    out = _run_git(["branch", "--show-current"], cwd)
+    return None if out is None else (out.strip() or None)
+
+
+def _uncommitted_count(cwd):
+    out = _run_git(["status", "--porcelain"], cwd)
+    if out is None:
+        return None
+    return len([line for line in out.splitlines() if line.strip()])
+
+
+def _unpushed_count(cwd):
+    out = _run_git(["rev-list", "--count", "@{u}..HEAD"], cwd)
+    if out is None:
+        return None
+    stripped = out.strip()
+    return int(stripped) if stripped.isdigit() else None
+
+
+def _count_or_unknown(count, noun):
+    if count is None:
+        return "{} unknown".format(noun)
+    return "{} {}".format(count, noun)
+
+
+def _auto_in_flight(cwd):
+    if cwd is None or not os.path.isdir(cwd) or not _is_git_repo(cwd):
+        return "automatic handoff: worktree unknown"
+    return "automatic handoff: branch {}, {}, {}".format(
+        _branch(cwd) or "unknown",
+        _count_or_unknown(_uncommitted_count(cwd), "uncommitted"),
+        _count_or_unknown(_unpushed_count(cwd), "unpushed"),
+    )
+
+
+def write_auto(ctx, binding):
+    leader = ctx.conn.execute(
+        "SELECT cwd FROM leaders WHERE party = ? AND generation = ?",
+        (binding["party"], binding["generation"]),
+    ).fetchone()
+    cwd = None if leader is None else leader["cwd"]
+    in_flight = _auto_in_flight(cwd)
+    patterns = pii.project_patterns(ctx.projects_dir, binding["project"])
+    pii.validate_field(in_flight, "--in-flight", pii.HANDOFF_FIELD_MAX_LENGTH, patterns)
+    _write_handoff(ctx, binding, in_flight, _AUTO_LEARNED, True)
+
+
+def _party_row_for_handoff(conn, party):
+    row = conn.execute("SELECT * FROM parties WHERE name = ?", (party,)).fetchone()
+    if row is None:
+        raise GuildError("unknown party '{}'".format(party), 1)
+    if row["state"] == "closed":
+        raise GuildError("party '{}' is closed".format(party), 1)
+    return row
+
+
+def run_for_party(ctx, party):
+    names.validate_name(party, "party name")
+    party_row = _party_row_for_handoff(ctx.conn, party)
+    if party_status.has_live_leader(ctx, party_row):
+        raise GuildError(
+            "party '{}' has a live leader: run `guild handoff` from that session instead".format(party), 1
+        )
+    binding = {"party": party_row["name"], "project": party_row["project"], "generation": party_row["generation"]}
+    write_auto(ctx, binding)
+    return "handoff written for '{}', generation {}".format(party_row["name"], party_row["generation"])

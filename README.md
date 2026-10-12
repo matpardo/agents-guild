@@ -181,6 +181,7 @@ guild raids
 guild next [--all]     # ranked action queue for the caller's party
 guild handoff --in-flight "..." --learned "..." [--model <m>] [--respawn]
 guild handoff prune [--dry-run]
+guild handoff --party <name>   # terminal only: hand off a party whose leader session is gone
 
 guild merge-queue [--raid <name> | --party <name>]   # read-only: PRs in the order to merge by hand
 guild merge-queue --head [--raid <name> | --party <name>]   # the first PR whose action is merge: <ref> <party> <task>
@@ -1196,6 +1197,14 @@ reason is not blank) for any project with a dispatcher configured. `POST
 web resume always counts as the human, since the web has no session. An
 empty, over-long or already-paused request answers `422` with the message.
 
+**Hand off a party with no leader**: a party card shows a `Hand off` button
+when it is `active` and has no live leader session (model key
+`has_live_leader`). `POST /api/parties/<name>/hand-off` (body `{}`) runs the
+same `guild handoff --party <name>` as the human actor; a party with a live
+leader, an unknown party or a closed party answers `422` with the message. On
+success the party becomes `awaiting-leader` and the button disappears on the
+next refresh.
+
 **Answering from the page**: each open ask card has one button per option
 (clicking it only copies the option's text into the answer field), an answer
 field, an `Answer` button and a `Dismiss` button (which asks for
@@ -1216,6 +1225,7 @@ step. Reads are `GET`; the only writes are `POST /api/asks/<id>/answer`
 `POST /api/notices/<id>/seen`, `POST /api/notices/<id>/unseen`,
 `POST /api/notices/seen-all` (body `{}`), `POST /api/notices/create`,
 `POST /api/raids/<name>/pause`, `POST /api/raids/<name>/resume`,
+`POST /api/parties/<name>/hand-off` (body `{}`),
 `POST /api/prs/<owner>/<repo>/<n>/block` (body `{"reason": "<text>"}`) and
 `.../unblock`, with `<id>` and `<n>` positive integers
 (otherwise `404`); every other method,
@@ -1316,6 +1326,19 @@ any party; only keepers get `--remote-control`. The context nudge asks for it
 when the party is a keeper or guild recorded a window for the current generation
 (`leader_windows`), so a session started by `revive`, `--respawn` or the dispatcher
 hands off inside tmux instead of exiting and closing its window.
+
+`guild handoff --party <name>` hands off a party whose leader session is gone,
+from a terminal only: it refuses from inside a Claude Code session and refuses
+to combine with any other `handoff` flag (`prune`, `--in-flight`, `--learned`,
+`--model`, `--dry-run`, `--respawn`), naming the offending flag. It refuses
+when the party still has a live leader session (`run guild handoff from that
+session instead`). Otherwise it synthesizes `In flight` from the party
+leader's recorded worktree — branch, count of uncommitted files, count of
+unpushed commits, never file names, each falling back to `unknown` on a
+missing cwd, a non-git directory, no upstream or a detached HEAD — sets
+`Learned` to the fixed `none (automatic handoff)` and records
+`party.handed_off` with `auto: true`; unlike a normal handoff, it does not add
+to the party's memory.
 
 ### Task brief
 

@@ -481,6 +481,22 @@ def _handle_handoff(ctx, args):
     from guild import tmux_windows
     from guild.commands import handoff as handoff_commands
 
+    if args.party is not None:
+        provided = (
+            ("prune", args.action is not None),
+            ("--in-flight", args.in_flight is not None),
+            ("--learned", args.learned is not None),
+            ("--model", args.model is not None),
+            ("--dry-run", args.dry_run),
+            ("--respawn", args.respawn),
+        )
+        for flag, given in provided:
+            if given:
+                raise GuildError("--party cannot be combined with {}".format(flag), 1)
+        if ctx.session_id is not None:
+            raise GuildError("--party cannot be used from inside a Claude Code session", 1)
+        _print(handoff_commands.run_for_party(ctx, args.party))
+        return 0
     if args.action == "prune":
         provided = (
             ("--in-flight", args.in_flight is not None),
@@ -1029,6 +1045,7 @@ def build_parser():
     handoff.add_argument("--model", help="model for the next session")
     handoff.add_argument("--dry-run", action="store_true", help="with prune: list what would be deleted")
     handoff.add_argument("--respawn", action="store_true", help="launch the next session in a new tmux window")
+    handoff.add_argument("--party", help="hand off a party whose leader session is gone (terminal only)")
     handoff.set_defaults(handler=_handle_handoff)
 
     sync = subparsers.add_parser("sync", help="refresh state from GitHub, the SDD or the tracker")
