@@ -230,7 +230,7 @@ var NO_SESSION_MESSAGE = "session token not loaded, reload the page";
       remaining: "Tasks not done in the party's active quests plus open PRs outside them; the tooltip lists done/total per quest.",
       allDone: "Every task of the party's active quests is done and no open PR is left outside them.",
       resumeCommand: "Run this to start the next generation of this party; it waits for a new leader.",
-      dispatcherRules: "Dispatcher rules this project enabled with their mode, and launches in the last hour against the hourly cap.",
+      dispatcherRules: "Dispatcher rules this project enabled with their mode.",
       dispatcherDeferred: "A dispatch waiting on a live session, an open window, a paused raid or a paused dispatcher; retried until it expires after 24 hours.",
       dispatcherPlanned: "The rule is in dry-run: it recorded what it would do and did nothing.",
       leader: "The leader session of the party.",
@@ -1295,12 +1295,12 @@ var NO_SESSION_MESSAGE = "session token not loaded, reload the page";
     appendAll(section, items.map(renderMemoryItem));
   }
 
-  function renderLaunch(launch, label) {
-    var text = label + " " + launch.party + " g" + launch.generation + " " + launch.age + " ago (" + launch.rule + ", " + launch.subject + ")";
+  function renderFailed(launch) {
+    var text = "failed " + launch.party + " g" + launch.generation + " " + launch.age + " ago (" + launch.rule + ", " + launch.subject + ")";
     if (launch.reason) {
       text += ": " + launch.reason;
     }
-    return classedText("p", text, label === "failed" ? "queue-main-red" : "muted");
+    return classedText("p", text, "queue-main-red");
   }
 
   function renderDispatchProject(project) {
@@ -1308,7 +1308,7 @@ var NO_SESSION_MESSAGE = "session token not loaded, reload the page";
       return rule + " " + project.rules[rule];
     }).join(", ");
     return explain(
-      classedText("p", project.name + ": " + rules + " | launches last hour " + project.launches_last_hour + "/" + project.max_launches_per_hour, "muted"),
+      classedText("p", project.name + ": " + rules, "muted"),
       "ui",
       "dispatcherRules"
     );
@@ -1321,6 +1321,9 @@ var NO_SESSION_MESSAGE = "session token not loaded, reload the page";
 
   function renderRecent(decision) {
     var text = "recent " + decision.outcome + " " + decision.rule + " " + decision.subject + " " + decision.party + " " + decision.age + " ago";
+    if (decision.action !== null) {
+      text += ": " + decision.action;
+    }
     var node = classedText("p", text, "muted");
     return decision.outcome === "planned" ? explain(node, "ui", "dispatcherPlanned") : node;
   }
@@ -1370,7 +1373,7 @@ var NO_SESSION_MESSAGE = "session token not loaded, reload the page";
   function renderDispatcher(dispatcher) {
     var section = document.getElementById("dispatcher");
     clear(section);
-    var count = dispatcher.projects.length + dispatcher.in_flight.length + dispatcher.failed.length
+    var count = dispatcher.projects.length + dispatcher.failed.length
       + dispatcher.deferred.length + dispatcher.recent.length;
     if (count === 0 && dispatcher.paused === null) {
       return;
@@ -1378,12 +1381,7 @@ var NO_SESSION_MESSAGE = "session token not loaded, reload the page";
     section.appendChild(textEl("h2", "dispatcher"));
     section.appendChild(renderDispatchPauseControls(dispatcher));
     appendAll(section, dispatcher.projects.map(renderDispatchProject));
-    appendAll(section, dispatcher.in_flight.map(function (launch) {
-      return renderLaunch(launch, "in flight");
-    }));
-    appendAll(section, dispatcher.failed.map(function (launch) {
-      return renderLaunch(launch, "failed");
-    }));
+    appendAll(section, dispatcher.failed.map(renderFailed));
     appendAll(section, dispatcher.deferred.map(renderDeferred));
     appendAll(section, dispatcher.recent.map(renderRecent));
   }
@@ -2027,7 +2025,6 @@ var NO_SESSION_MESSAGE = "session token not loaded, reload the page";
 
   function filterDispatcher(dispatcher, keep) {
     return Object.assign({}, dispatcher, {
-      in_flight: dispatcher.in_flight.filter(keep),
       failed: dispatcher.failed.filter(keep),
       deferred: dispatcher.deferred.filter(keep),
       recent: dispatcher.recent.filter(keep),

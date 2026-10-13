@@ -230,3 +230,13 @@ updated: 2026-10-04
 
 **Acceptance:**
 - [x] A partial push keeps the tag, cleared blockers or a merge close it, a stale request can be asked again only with the key set, and a rebuild restores the request time.
+
+## T22 — The dispatcher suggests a relaunch instead of launching
+
+**Depends on:** T21
+**Status:** [x] done — #151
+
+**What:** launch rules record `suggested`, post a project notice that names `guild revive --party <party>` and run `notify.command` with the wait `ready`; `limit_resume` is notify only; the launch code, permission ceiling, rate limit, breaker and reconcile are deleted and the config keys `permission_mode` and `max_launches_per_hour` are removed. Decision `20261012_dispatcher-suggests-human-launches`.
+
+**Acceptance:**
+- [x] An `on` rule creates no tmux window and sends no keys; a second pass suggests nothing new; a busy party is still deferred; config rejects the removed keys.

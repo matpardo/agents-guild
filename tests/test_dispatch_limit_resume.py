@@ -9,7 +9,7 @@ from tests.fake_tmux import FakeTmux
 from tests.testutil import GuildTestCase
 from tests.transcript_fixtures import append_transcript, assistant_line, write_transcript
 
-_NUDGED = "acme: limit_resume {} -> nudged alpha (window @5)"
+_NOTIFIED = "acme: limit_resume {} -> notified alpha"
 
 
 def _limit_line(resets_at):
@@ -43,7 +43,8 @@ class LimitResumeTests(GuildTestCase):
     def write_block(self, rules):
         path = self.config_home / "guild" / "projects" / "acme.json"
         data = json.loads(path.read_text())
-        data["dispatcher"] = {"permission_mode": "acceptEdits", "max_launches_per_hour": 5, "rules": rules}
+        data["dispatcher"] = {"rules": rules}
+        data["notify"] = {"command": ["notify-send", "guild"]}
         path.write_text(json.dumps(data))
 
     def record_window(self, window_id):
@@ -71,23 +72,23 @@ class LimitResumeTests(GuildTestCase):
         code, out, err = self.run_cli(["notices"], "sess-1", self.repo_dir)
         return [line for line in out.splitlines() if "resume alpha by hand" in line]
 
-    def test_nudges_once_after_the_reset_with_literal_text_then_enter(self):
-        self.assertEqual(self.run_pass(), [_NUDGED.format(self.past)])
-        self.assertEqual(
-            self.sends(), [["send-keys", "-t", "@5", "-l", "continue"], ["send-keys", "-t", "@5", "Enter"]]
-        )
+    def test_notifies_once_after_the_reset_and_never_types_into_the_window(self):
+        self.assertEqual(self.run_pass(), [_NOTIFIED.format(self.past)])
+        self.assertEqual(len(self.notices()), 1)
+        self.assertEqual(self.pushes, [["notify-send", "guild", "alpha", "limit-reset"]])
         self.assertEqual(self.run_pass(), ["nothing to dispatch"])
-        self.assertEqual(len(self.sends()), 2)
+        self.assertEqual(self.sends(), [])
+        self.assertEqual(len(self.notices()), 1)
 
     def test_nothing_before_the_grace_after_the_reset(self):
         write_transcript(self.transcript, [_limit_line(int(time.time()) - 30)])
         self.assertEqual(self.run_pass(), ["nothing to dispatch"])
         self.assertEqual(self.sends(), [])
 
-    def test_a_new_limit_hit_nudges_again(self):
+    def test_a_new_limit_hit_notifies_again(self):
         self.run_pass()
         append_transcript(self.transcript, [_limit_line(self.past + 10)])
-        self.assertEqual(self.run_pass(), [_NUDGED.format(self.past + 10)])
+        self.assertEqual(self.run_pass(), [_NOTIFIED.format(self.past + 10)])
 
     def test_later_normal_line_means_nothing(self):
         append_transcript(self.transcript, [assistant_line("m1", "2026-10-11T00:00:00Z", "claude", 1, 0, 0, 1)])
@@ -97,26 +98,19 @@ class LimitResumeTests(GuildTestCase):
         write_transcript(self.transcript, ["{not json", _limit_line(self.past).replace(str(self.past), '"soon"')])
         self.assertEqual(self.run_pass(), ["nothing to dispatch"])
 
-    def test_missing_window_is_skipped_with_one_notice(self):
-        self.tmux.windows.clear()
-        expected = "acme: limit_resume {} -> skipped alpha: no window to nudge".format(self.past)
-        self.assertEqual(self.run_pass(), [expected])
-        self.assertEqual(self.run_pass(), ["nothing to dispatch"])
-        self.assertEqual(self.sends(), [])
-        self.assertEqual(len(self.notices()), 1)
-
     def test_party_without_live_session_means_nothing(self):
         (self.sessions_dir / "{}.json".format(os.getpid())).unlink()
         self.assertEqual(self.run_pass(), ["nothing to dispatch"])
 
-    def test_dry_run_sends_nothing(self):
-        self.assertEqual(self.run_pass(True), ["acme: limit_resume {} -> would nudge alpha".format(self.past)])
+    def test_dry_run_notifies_nothing(self):
+        self.assertEqual(self.run_pass(True), ["acme: limit_resume {} -> would notify alpha".format(self.past)])
         self.assertEqual(self.sends(), [])
 
     def test_dry_run_mode_records_a_plan_only(self):
         self.write_block({"limit_resume": "dry-run"})
-        self.assertEqual(self.run_pass(), ["acme: limit_resume {} -> planned: nudge alpha".format(self.past)])
+        self.assertEqual(self.run_pass(), ["acme: limit_resume {} -> planned: notify alpha".format(self.past)])
         self.assertEqual(self.sends(), [])
+        self.assertEqual(self.notices(), [])
 
     def test_rule_absent_means_nothing(self):
         self.write_block({})

@@ -36,13 +36,13 @@ class DeferWhilePausedTests(DispatchPauseLaunchBase):
         line = self.preview(self.trigger(12, "alpha"), "on")
         self.assertEqual(line, "acme: ask_answered ask #12 -> would defer alpha: dispatch paused")
 
-    def test_resumed_pass_launches_the_deferred_trigger(self):
+    def test_resumed_pass_suggests_for_the_deferred_trigger(self):
         self.pause()
         self.decide(self.trigger(12, "alpha"), "on")
         self.resume()
         line = self.launcher().retry_deferred(self.project_config(), self.trigger(12, "alpha"), "on")
-        self.assertIn("launched alpha g2", line)
-        self.assertEqual(len(self.tmux.launch_calls()), 1)
+        self.assertIn("suggested revive alpha g2", line)
+        self.assertEqual(self.tmux.launch_calls(), [])
 
 
 class DeferralExpiryWhilePausedTests(DispatchPauseLaunchBase):
@@ -95,14 +95,6 @@ class PausedNoopTests(DispatchPauseLaunchBase):
         self.assertEqual(self.notices(), [])
         self.assertEqual(self.pushes, [])
 
-    def test_nudge_is_a_noop_while_paused(self):
-        trigger = dispatch_rules.Trigger("acme", "limit_resume", "limit_resume:alpha:x", "alpha", "subject", "continue")
-        launcher = self.launcher()
-        self.assertIsNone(launcher.nudge(self.project_config(), trigger, "on"))
-        self.assertIsNone(launcher.preview_nudge(trigger, "on"))
-        self.assertEqual(self.decisions(), [])
-        self.assertEqual(self.tmux.calls, [])
-
 
 class WorksAfterResumeTests(DispatchPauseLaunchBase):
     def setUp(self):
@@ -123,12 +115,6 @@ class WorksAfterResumeTests(DispatchPauseLaunchBase):
         self.assertIsNotNone(line)
         self.assertEqual(self.decisions()[0]["outcome"], "notified")
         self.assertEqual(len(self.pushes), 1)
-
-    def test_nudge_records_a_decision_after_resume(self):
-        trigger = dispatch_rules.Trigger("acme", "limit_resume", "limit_resume:alpha:x", "alpha", "subject", "continue")
-        line = self.launcher().nudge(self.project_config(), trigger, "on")
-        self.assertIsNotNone(line)
-        self.assertEqual(self.decisions()[0]["outcome"], "skipped")
 
 
 if __name__ == "__main__":

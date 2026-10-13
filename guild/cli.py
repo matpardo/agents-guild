@@ -1079,10 +1079,10 @@ def build_parser():
     resources_actions = resources.add_subparsers(dest="resources_action", required=False, metavar="<subcommand>")
     resources_actions.add_parser("collect", help="measure and record disk usage per project")
 
-    dispatch = subparsers.add_parser("dispatch", help="launch fresh sessions on new events")
+    dispatch = subparsers.add_parser("dispatch", help="suggest a guild revive on new events")
     dispatch_actions = dispatch.add_subparsers(dest="dispatch_action", required=True, metavar="<subcommand>")
     dispatch_run = dispatch_actions.add_parser("run", help="react to new events and launch sessions where the dispatcher is enabled")
-    dispatch_run.add_argument("--dry-run", action="store_true", help="show decisions without launching")
+    dispatch_run.add_argument("--dry-run", action="store_true", help="show decisions without recording or notifying")
     dispatch_run.set_defaults(handler=_handle_dispatch)
     dispatch_status = dispatch_actions.add_parser("status", help="show dispatcher cursor, launches, rules and recent decisions")
     dispatch_status.set_defaults(handler=_handle_dispatch)

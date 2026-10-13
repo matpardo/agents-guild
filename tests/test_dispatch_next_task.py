@@ -7,7 +7,7 @@ from guild.commands import dispatch as dispatch_commands
 from tests.fake_tmux import FakeTmux
 from tests.testutil import GuildTestCase
 
-_LAUNCHED = "acme: next_task demo/T01 -> launched alpha g2 (window @10, mode acceptEdits)"
+_SUGGESTED = "acme: next_task demo/T01 -> suggested revive alpha g2"
 
 
 class NextTaskTests(GuildTestCase):
@@ -25,7 +25,7 @@ class NextTaskTests(GuildTestCase):
     def write_block(self, rules):
         path = self.config_home / "guild" / "projects" / "acme.json"
         data = json.loads(path.read_text())
-        data["dispatcher"] = {"permission_mode": "acceptEdits", "max_launches_per_hour": 5, "rules": rules}
+        data["dispatcher"] = {"rules": rules}
         path.write_text(json.dumps(data))
 
     def hand_off(self):
@@ -49,23 +49,13 @@ class NextTaskTests(GuildTestCase):
         finally:
             conn.close()
 
-    def test_handed_off_party_is_launched_once_per_task(self):
+    def test_handed_off_party_is_suggested_once_per_task(self):
         self.hand_off()
-        self.assertEqual(self.run_pass(), [_LAUNCHED])
+        self.assertEqual(self.run_pass(), [_SUGGESTED])
         self.assertEqual(self.run_pass(), ["nothing to dispatch"])
-        self.assertEqual(len(self.tmux.launch_calls()), 1)
+        self.assertEqual(self.tmux.launch_calls(), [])
 
-    def test_prompt_names_the_task_and_guild_next(self):
-        self.hand_off()
-        self.run_pass()
-        command = self.tmux.launch_calls()[0][-1]
-        self.assertTrue(
-            command.endswith(
-                "'Continue the work described in the guild brief. Dispatched: next task demo/T01; run guild next.'"
-            )
-        )
-
-    def test_busy_party_is_deferred_once_then_launched(self):
+    def test_busy_party_is_deferred_once_then_suggested(self):
         self.hand_off()
         self.write_session(os.getpid(), "sess-1", "alpha")
         expected = "acme: next_task demo/T01 -> deferred alpha: live session"
@@ -73,10 +63,10 @@ class NextTaskTests(GuildTestCase):
         self.assertEqual(self.run_pass(), ["nothing to dispatch"])
         self.assertEqual(self.decision_rows(), [("next_task:alpha:g1:demo/T01", "deferred")])
         (self.sessions_dir / "{}.json".format(os.getpid())).unlink()
-        self.assertEqual(self.run_pass(), [_LAUNCHED])
+        self.assertEqual(self.run_pass(), [_SUGGESTED])
         self.assertEqual(self.run_pass(), ["nothing to dispatch"])
 
-    def test_a_new_handoff_on_the_same_task_wakes_the_party_again(self):
+    def test_a_new_handoff_on_the_same_task_suggests_again(self):
         self.hand_off()
         self.run_pass()
         code, out, err = self.run_cli(["party", "resume", "alpha"], "sess-2", self.repo_dir)
@@ -84,7 +74,7 @@ class NextTaskTests(GuildTestCase):
         code, out, err = self.run_cli(["handoff", "--in-flight", "x", "--learned", "y"], "sess-2", self.repo_dir)
         self.assertEqual(code, 0, err)
         self.run_pass()
-        self.assertIn(("next_task:alpha:g2:demo/T01", "deferred"), self.decision_rows())
+        self.assertIn(("next_task:alpha:g2:demo/T01", "suggested"), self.decision_rows())
 
     def test_party_that_did_not_hand_off_is_skipped(self):
         self.assertEqual(self.run_pass(), ["nothing to dispatch"])
@@ -102,7 +92,7 @@ class NextTaskTests(GuildTestCase):
         self.hand_off()
         lines = self.run_pass()
         self.assertEqual(len(lines), 1)
-        self.assertIn("planned: launch alpha g2 (dry-run", lines[0])
+        self.assertIn("planned: suggest revive alpha g2 (dry-run)", lines[0])
         self.assertEqual(self.tmux.launch_calls(), [])
 
     def test_rule_absent_from_config_launches_nothing(self):

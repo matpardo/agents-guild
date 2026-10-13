@@ -369,7 +369,8 @@ class LaunchTests(ReviveBase):
 
     def _copy_command_calls(self, env, tools):
         tmux = self._tmux()
-        with mock.patch.dict(os.environ, env, clear=True), mock.patch(
+        isolated = {key: os.environ[key] for key in ("XDG_CONFIG_HOME", "XDG_DATA_HOME", "XDG_STATE_HOME")}
+        with mock.patch.dict(os.environ, dict(env, **isolated), clear=True), mock.patch(
             "guild.tmux_windows.shutil.which", side_effect=lambda name: "/bin/" + name if name in tools else None
         ):
             self._revive([], True, False, tmux, None)

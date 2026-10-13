@@ -74,7 +74,7 @@ _HARNESS = Path(__file__).resolve().parent / "web_drift_harness.js"
 _MISSING = object()
 _BOARD = {
     "generated_at": "now", "asks": [], "notices": [], "memory": [], "blocked": [], "merge_queues": [],
-    "dispatcher": {"in_flight": [], "failed": [], "projects": [], "deferred": [], "recent": [], "paused": None}, "projects": [], "raids": [{"name": "r", "members": ["c"]}],
+    "dispatcher": {"failed": [], "projects": [], "deferred": [], "recent": [], "paused": None}, "projects": [], "raids": [{"name": "r", "members": ["c"]}],
     "parties": [
         {
             "name": name, "raids": [], "quests": [], "prs": [], "claims": [], "state": "active", "generation": 1,
@@ -325,10 +325,10 @@ class WebMemoryBehaviorTests(unittest.TestCase):
 
 @unittest.skipIf(shutil.which("node") is None, "node not installed")
 class WebDispatchPauseBehaviorTests(unittest.TestCase):
-    def _rendered(self, paused):
+    def _rendered(self, paused, recent=()):
         dispatcher = {
-            "in_flight": [], "failed": [], "deferred": [], "recent": [],
-            "projects": [{"name": "acme", "rules": {"next_task": "on"}, "launches_last_hour": 0, "max_launches_per_hour": 3}],
+            "failed": [], "deferred": [], "recent": list(recent),
+            "projects": [{"name": "acme", "rules": {"next_task": "on"}}],
             "paused": paused,
         }
         board = dict(_BOARD, dispatcher=dispatcher)
@@ -351,6 +351,24 @@ class WebDispatchPauseBehaviorTests(unittest.TestCase):
         self.assertIn("deploy freeze", out)
         self.assertIn("paused", out)
         self.assertNotIn("Pause dispatch", out)
+
+    def test_suggested_decision_shows_the_revive_command(self):
+        recent = {
+            "party": "alpha", "generation": 2, "rule": "next_task", "subject": "demo/T01", "reason": None,
+            "decided_at": "2026-10-12T00:00:00Z", "age": "4m", "outcome": "suggested",
+            "action": "run guild revive --party alpha",
+        }
+        out = self._rendered(None, [recent])
+        self.assertIn("recent suggested next_task demo/T01 alpha 4m ago: run guild revive --party alpha", out)
+
+    def test_decision_without_an_action_shows_no_colon_suffix(self):
+        recent = {
+            "party": "alpha", "generation": None, "rule": "merge_head", "subject": "acme/app#1", "reason": None,
+            "decided_at": "2026-10-12T00:00:00Z", "age": "4m", "outcome": "notified", "action": None,
+        }
+        out = self._rendered(None, [recent])
+        self.assertIn("recent notified merge_head acme/app#1 alpha 4m ago", out)
+        self.assertNotIn("ago:", out)
 
 
 @unittest.skipIf(shutil.which("node") is None, "node not installed")
