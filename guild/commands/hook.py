@@ -8,7 +8,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-from guild import config, ctx_pressure, db, identity, localbase, names, session_status, timeutil, tmux_windows
+from guild import config, ctx_pressure, db, identity, localbase, names, session_status, timeutil
 from guild.adapters import github
 from guild.commands import brief as brief_commands
 from guild.commands import claim as claim_commands
@@ -245,12 +245,6 @@ def _nudge_marker_path(ctx):
     return ctx.state_dir / "hints" / "nudge-{}".format(identity.cursor_key(ctx.session_id))
 
 
-def _can_respawn(conn, binding):
-    if party_commands.is_keeper(conn, binding["party"]):
-        return True
-    return tmux_windows.recorded_window(conn, binding["party"], binding["generation"]) is not None
-
-
 def _ctx_nudge_lines(ctx, binding):
     if binding is None or binding["project"] is None:
         return []
@@ -266,7 +260,7 @@ def _ctx_nudge_lines(ctx, binding):
         return []
     marker.parent.mkdir(parents=True, exist_ok=True)
     marker.touch()
-    if _can_respawn(ctx.conn, binding):
+    if party_commands.is_keeper(ctx.conn, binding["party"]):
         return [
             "Context at {}%. Start nothing new; let in-flight runs finish, then run "
             '`guild handoff --respawn --in-flight "..." --learned "..."`. Nothing after it.'.format(pct)

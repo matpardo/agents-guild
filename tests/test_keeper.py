@@ -194,11 +194,12 @@ class KeeperNudgeTests(GuildTestCase):
             out,
         )
 
-    def test_normal_nudge_in_guild_window_names_respawn(self):
+    def test_normal_nudge_in_guild_window_stays_plain(self):
         out = self._nudge_with_windows(["party", "start", "alpha"], [1])
         self.assertIn(
             'Context at 85%. Start nothing new; let in-flight runs finish, then run '
-            '`guild handoff --respawn --in-flight "..." --learned "..."`. Nothing after it.',
+            '`guild handoff --in-flight "..." --learned "..."`. '
+            'Give the human the printed command, then nothing.',
             out,
         )
 
