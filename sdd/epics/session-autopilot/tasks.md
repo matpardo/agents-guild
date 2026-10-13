@@ -80,6 +80,6 @@ updated: 2026-10-12
 ## T11 — Respawn only for keeper parties
 
 **Depends on:** —
-**Status:** [ ] pending
+**Status:** [x] done — #152
 
 **What:** `guild handoff --respawn` is refused for non-keeper parties and the context nudge asks for it only from keepers; every other party gets the plain handoff nudge and the human relaunches with `guild revive`.
