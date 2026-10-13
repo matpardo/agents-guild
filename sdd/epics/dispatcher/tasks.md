@@ -244,9 +244,9 @@ updated: 2026-10-04
 ## T23 — Clear deferred dispatches whose trigger no longer holds
 
 **Depends on:** T22
-**Status:** [ ] todo
+**Status:** [x] done — #155
 
 **What:** a deferred trigger whose cause resolved (PR merged, checks green, ask dismissed) is recorded `skipped` with `no longer holds` instead of staying `deferred` forever; the inbox shows a deferred line only while its decision is still deferred, so a fresh session does not replay old ones.
 
 **Acceptance:**
-- [ ] A merged PR clears its deferred `pr_unmergeable` row on the next pass; a resolved deferral prints no inbox line.
+- [x] A merged PR clears its deferred `pr_unmergeable` row on the next pass; a resolved deferral prints no inbox line.
