@@ -66,6 +66,6 @@ updated: 2026-10-12
 ## T09 — Revive starts handed-off parties
 
 **Depends on:** —
-**Status:** [ ] pending
+**Status:** [x] done — #150
 
 **What:** `guild revive` also lists and launches `awaiting-leader` parties, always with the fresh next-generation command, never `--resume`.
