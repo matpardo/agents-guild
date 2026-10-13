@@ -1,54 +1,49 @@
 ---
 epic: session-autopilot
 type: spec
-title: Guild-launched sessions end themselves and hand off
-status: active
+title: Sessions run in tmux, launched by the human
+status: done
 owner: matpardo
 created: 2026-10-12
-updated: 2026-10-12
+updated: 2026-10-13
 ---
 
-# Spec: Guild-launched sessions end themselves and hand off
+# Spec: Sessions run in tmux, launched by the human
 
 ## Goal
 
-A session that guild launched ends with a handoff even when the agent forgets, crashes or waits, so the dispatcher can always launch the party's next generation. A human can stop all dispatch at once.
+No session starts or wakes on its own. The human launches every session in tmux; guild tells the human which party has something to do, writes handoffs on request, and lets the human stop all dispatch at once.
 
 ## Problem
 
-A party whose session ends without `guild handoff` stays `active`; the dispatcher skips it ("did not hand off") until a human revives it. A dispatched session that finishes its turn sits idle with a live pid, so every trigger for it is deferred and dropped after 24h. There is no way to stop the dispatcher for all projects at once, and lifecycle failures point at a history view that does not show them.
+The dispatcher launched sessions by itself and a Stop hook was planned to close idle ones, but that behavior could not be checked from inside a session, while watching the tmux windows gave the feedback the human needed. A party that handed off could not be started with `guild revive`, `limit_resume` typed into live windows, and lifecycle failures pointed at a history view that did not show them.
 
 ## Scope
 
-- Automatic handoff: guild writes a handoff from its own state (active task, PRs, open asks, notices, claims) and the party leader session's worktree (branch, count of uncommitted files, count of unpushed commits; no file names). `Learned` reads "none (automatic handoff)"; the event carries `auto: true`. A human can hand off a party whose leader session is gone, from a terminal or the web.
-- The dispatcher hands off, before evaluating rules, every active party whose current generation runs in a guild-recorded window, whose party leader session process is gone and whose window is closed.
-- Stop hook, in a guild-recorded window that received no human prompt after its launch prompt: the first stop is blocked once with a request to finish or run `guild handoff --close`; a second stop writes the automatic handoff and closes the pane. Skipped while the transcript shows a usage limit.
-- Breaker: after two automatic handoffs in a row the dispatcher skips the party with a notice until a human revives it.
-- `SessionEnd` records `session.ended`, so the board stops showing a stale status.
-- `guild dispatch pause --reason` and `guild dispatch resume`, and the same in the web: while paused, launches are deferred and promote, announce and nudge do nothing. Any session can pause; only a human (no session) can resume.
+- `guild dispatch pause --reason` and `guild dispatch resume`, and the same in the web.
 - `guild history` and the web history show failed lifecycle runs with their last output line.
+- `guild handoff --party` and the web "Hand off" button write a handoff for a party whose leader session is gone; `guild handoff --close` closes a guild-launched pane after a handoff.
+- `guild revive --party X` starts a party that handed off, as a fresh generation in tmux.
+- The dispatcher suggests instead of launching: a notice and a push say "X ready to resume: run guild revive --party X"; `limit_resume` only notifies.
+- `guild handoff --respawn` only for keeper parties.
 
 ## Out of scope
 
-- Sessions a human started: they keep today's skip and notice.
-- Relaunch on permission waits: they are resolved in the pane; the push notification stays.
-- Deferring on red main: the pre-push hook and ready-check already gate on it.
-- Fixing a project's lifecycle command (environment, outside guild).
-- Depends on dispatcher T10 (`handoff --close`) for the pane close.
+- Automatic handoffs for dead sessions, a Stop hook that blocks or closes panes, an automatic-handoff breaker and a `SessionEnd` record: dropped with the decision below.
 
 ## Success criteria
 
-- [ ] A guild-launched session killed mid-task is relaunched for the same task without a human.
-- [ ] A guild-launched session whose ask is open ends with a handoff and is relaunched when the ask is answered.
-- [ ] A session a human typed into is never closed by guild.
-- [ ] A pause stops every launch and gh write; after resume, deferred triggers launch.
-- [ ] A failed lifecycle run shows its last output line in `guild history`.
+- [x] No guild code path creates a tmux window or types into one without a human command (keeper respawn excepted).
+- [x] A handed-off party starts again with `guild revive --party X`.
+- [x] A pause stops every suggestion and gh write; after resume, deferred triggers are suggested.
+- [x] A failed lifecycle run shows its last output line in `guild history`.
 
 ## Security and data
 
-The automatic handoff holds only guild state and git counts, never tool output or file names; it is a local file framed as data when injected. The pause reason passes `validate_field`. Lifecycle output stays in local events and is never copied into notices, which are broadcast and exportable. A pane is closed only for the window guild recorded for that generation.
+Handoffs written for a party hold only guild state and git counts, never tool output or file names. The pause reason passes `validate_field`. Lifecycle output stays in local events and never enters notices. A pane is closed only for the window guild recorded for that generation.
 
 ## Decisions
 
-- Autopilot applies only to sessions in a guild-recorded window (decisión del dev, 2026-10-12). "Leader" means the party's leader session; a raid lead is a different role and plays no part here.
+- Sessions are launched by the human in tmux; the dispatcher only suggests (decisión del dev, 2026-10-12). See `sdd/decisions/20261012_dispatcher-suggests-human-launches.md`.
+- `--respawn` stays for keeper parties only (decisión del dev, 2026-10-12).
 - No red-main gate on dispatch (decisión del dev, 2026-10-12).
