@@ -9,7 +9,6 @@ _LOCK_FILE_NAME = "dispatch.lock"
 _BUSY_LINE = "another dispatch pass is running"
 _NOTHING_LINE = "nothing to dispatch"
 _RECENT_LIMIT = 10
-_IN_FLIGHT_STATES = ("launching", "launched")
 
 
 def _cursors(conn):
@@ -97,10 +96,6 @@ def _state_triggers(ctx, trigger_for, project_config, lines):
 
 
 def _state_line(launcher, project_config, rule, trigger, mode, dry_run):
-    if rule in dispatch_rules.NUDGE_RULES:
-        if dry_run:
-            return launcher.preview_nudge(trigger, mode)
-        return launcher.nudge(project_config, trigger, mode)
     if rule not in dispatch_rules.NOTIFY_ONLY_RULES:
         return _decision_line(launcher, project_config, trigger, mode, dry_run)
     if dry_run:
@@ -162,8 +157,6 @@ def _pass(ctx, launcher, dry_run):
         _drop_cursors_of_disabled(ctx.conn, known, enabled)
     fresh = sorted(name for name in enabled if name not in known)
     lines = _initialize_cursors(ctx, fresh, dry_run) if fresh else []
-    if not dry_run:
-        lines.extend(launcher.reconcile(projects))
     lines.extend(_deferred_lines(ctx, launcher, enabled, dry_run))
     lines.extend(_state_lines(ctx, launcher, enabled, dry_run))
     active = {name: known[name] for name in enabled if name in known}
@@ -190,21 +183,10 @@ def run(ctx, dry_run, tmux, push_runner):
         return _pass(ctx, launcher, False)
 
 
-def _in_flight_line(ctx, row):
-    return "  in flight: {} g{} window {} launched {} ago ({})".format(
-        row["party"],
-        row["generation"],
-        row["window_id"] or "-",
-        timeutil.age_label(ctx.now, row["decided_at"]),
-        row["subject"],
-    )
-
-
 def _outcome_label(row):
     if row["outcome"] in ("skipped", "deferred", "failed"):
         return "{} {}: {}".format(row["outcome"], row["party"], row["reason"])
-    verb = "launched" if row["outcome"] == "launching" else row["outcome"]
-    label = "{} {}".format(verb, row["party"])
+    label = "{} {}".format(row["outcome"], row["party"])
     if row["generation"] is not None:
         label = "{} g{}".format(label, row["generation"])
     if row["state"] is None:
@@ -222,19 +204,12 @@ def _project_status(ctx, project_config, cursors):
     block = project_config["dispatcher"]
     cursor = cursors.get(name)
     lines = [
-        "{}: cursor {} | launches last hour {}/{} | mode {}".format(
-            name,
-            "not initialized" if cursor is None else cursor,
-            dispatch_launch.launches_last_hour(ctx.conn, ctx.now, name),
-            block["max_launches_per_hour"],
-            block["permission_mode"],
-        )
+        "{}: cursor {}".format(name, "not initialized" if cursor is None else cursor)
     ]
     lines.extend("  {}: {}".format(rule, block["rules"][rule]) for rule in sorted(block["rules"]))
     rows = ctx.conn.execute(
         "SELECT * FROM dispatch_decisions WHERE project = ? ORDER BY decided_at DESC, rowid DESC", (name,)
     ).fetchall()
-    lines.extend(_in_flight_line(ctx, row) for row in rows if row["state"] in _IN_FLIGHT_STATES)
     if rows:
         lines.append("  recent:")
         lines.extend(_recent_line(row) for row in rows[:_RECENT_LIMIT])

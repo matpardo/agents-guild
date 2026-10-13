@@ -668,7 +668,7 @@ def _dispatch_decided(conn, event):
             payload["outcome"],
             payload["party"],
             payload["generation"],
-            payload["permission_mode"],
+            payload.get("permission_mode"),
             payload["subject"],
             payload["reason"],
             event["ts"],

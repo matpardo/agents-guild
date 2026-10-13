@@ -3,7 +3,7 @@ import shlex
 import textwrap
 from datetime import timedelta
 
-from guild import config, ctx_pressure, dispatch_launch, fix_request, identity, links, merge_queue, party_progress, party_status, pii, pr_asks, resume
+from guild import config, ctx_pressure, fix_request, identity, links, merge_queue, party_progress, party_status, pii, pr_asks, resume
 from guild import sanitize, session_status, timeutil
 from guild.commands import brief as brief_commands
 from guild.commands import claim as claim_commands
@@ -756,8 +756,7 @@ def _raid_next_to_merge_lines(ctx, painter, party_names):
 def _dispatch_rows(ctx, party_names):
     cutoff = timeutil.to_iso(ctx.now - _FAILURE_WINDOW)
     rows = ctx.conn.execute(
-        "SELECT * FROM dispatch_decisions WHERE state IN ('launching', 'launched') OR outcome = 'deferred'"
-        " OR (decided_at >= ? AND (state = 'failed' OR outcome != 'launching'))"
+        "SELECT * FROM dispatch_decisions WHERE outcome = 'deferred' OR decided_at >= ?"
         " ORDER BY decided_at DESC, rowid DESC",
         (cutoff,),
     ).fetchall()
@@ -781,6 +780,7 @@ def _dispatch_launch_model(ctx, row):
 def _dispatch_recent_model(ctx, row):
     model = _dispatch_launch_model(ctx, row)
     model["outcome"] = "planned" if row["mode"] == _DRY_RUN_MODE else row["outcome"]
+    model["action"] = "run guild revive --party {}".format(row["party"]) if model["outcome"] == "suggested" else None
     return model
 
 
@@ -790,8 +790,6 @@ def _dispatch_project_model(ctx, project_config):
     return {
         "name": name,
         "rules": dict(sorted(block["rules"].items())),
-        "launches_last_hour": dispatch_launch.launches_last_hour(ctx.conn, ctx.now, name),
-        "max_launches_per_hour": block["max_launches_per_hour"],
     }
 
 
@@ -811,7 +809,7 @@ def _dispatch_pause_model(ctx, pause_row):
 
 def dispatcher_model(ctx, party_names):
     rows = _dispatch_rows(ctx, party_names)
-    decided = [row for row in rows if row["outcome"] not in ("launching", "deferred", "failed")]
+    decided = [row for row in rows if row["outcome"] not in ("deferred", "failed")]
     return {
         "projects": [
             _dispatch_project_model(ctx, project_config)
@@ -819,9 +817,6 @@ def dispatcher_model(ctx, party_names):
             if "dispatcher" in project_config
         ],
         "paused": _dispatch_pause_model(ctx, dispatch_pause_commands.current(ctx.conn)),
-        "in_flight": [
-            _dispatch_launch_model(ctx, row) for row in rows if row["state"] in ("launching", "launched")
-        ],
         "failed": [_dispatch_launch_model(ctx, row) for row in rows if _is_failed(row)],
         "deferred": [_dispatch_launch_model(ctx, row) for row in rows if row["outcome"] == "deferred"],
         "recent": [_dispatch_recent_model(ctx, row) for row in decided[:_RECENT_LIMIT]],
@@ -831,20 +826,11 @@ def dispatcher_model(ctx, party_names):
 def _dispatcher_lines(ctx, painter, party_names):
     model = dispatcher_model(ctx, party_names)
     lines = [
-        "  {}: {} | launches last hour {}/{}".format(
-            project["name"],
-            ", ".join("{} {}".format(rule, mode) for rule, mode in project["rules"].items()),
-            project["launches_last_hour"],
-            project["max_launches_per_hour"],
+        "  {}: {}".format(
+            project["name"], ", ".join("{} {}".format(rule, mode) for rule, mode in project["rules"].items())
         )
         for project in model["projects"]
     ]
-    lines.extend(
-        "  in flight: {} g{} launched {} ago ({}, {})".format(
-            row["party"], row["generation"], row["age"], row["rule"], row["subject"]
-        )
-        for row in model["in_flight"]
-    )
     lines.extend(
         painter.paint(
             "  failed: {} g{} {} ago ({}): {}".format(
@@ -861,8 +847,13 @@ def _dispatcher_lines(ctx, painter, party_names):
         for row in model["deferred"]
     )
     lines.extend(
-        "  recent: {} {} {} {} {} ago".format(
-            row["outcome"], row["rule"], row["subject"], row["party"], row["age"]
+        "  recent: {} {} {} {} {} ago{}".format(
+            row["outcome"],
+            row["rule"],
+            row["subject"],
+            row["party"],
+            row["age"],
+            "" if row["action"] is None else ": {}".format(row["action"]),
         )
         for row in model["recent"]
     )

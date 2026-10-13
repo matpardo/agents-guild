@@ -30,20 +30,14 @@ class UnmergeableTests(ChecksFailingBase):
     def sync_bad(self, head_sha, mergeable, threads):
         self.sync_pr(head_sha, mergeable, threads, {}, "OPEN", True)
 
-    def test_unresolved_threads_launch_the_owner_once_per_head_and_slug_set(self):
+    def test_unresolved_threads_suggest_a_revive_once_per_head_and_slug_set(self):
         self.sync_bad("abc123", "MERGEABLE", 3)
         lines = self.run_pass()
         self.assertEqual(
-            lines, ["acme: pr_unmergeable acme/app#1 -> launched alpha g2 (window @10, mode acceptEdits)"]
+            lines, ["acme: pr_unmergeable acme/app#1 -> suggested revive alpha g2"]
         )
         self.assertEqual(self.decision_keys(), ["pr_unmergeable:acme/app#1:abc123:unresolved_threads"])
-        command = self.tmux.launch_calls()[0][-1]
-        self.assertTrue(
-            command.endswith(
-                "'Continue the work described in the guild brief. Dispatched: acme/app#1 is not mergeable"
-                " (unresolved threads); run gh pr view 1 --repo acme/app and resolve review threads.'"
-            )
-        )
+        self.assertEqual(self.tmux.launch_calls(), [])
 
     def test_thread_count_change_does_not_retrigger(self):
         self.write_block({"pr_unmergeable": "dry-run"})
@@ -111,7 +105,7 @@ class UnmergeableTests(ChecksFailingBase):
         self.sync_pr("abc123", "MERGEABLE", 0, {"statusCheckRollup": _FAILING}, "OPEN", True)
         self.assertEqual(self.run_pass(), ["nothing to dispatch"])
 
-    def test_deferred_trigger_launches_once_the_session_ends(self):
+    def test_deferred_trigger_suggests_once_the_session_ends(self):
         self.write_session(os.getpid(), "sess-1", "alpha")
         self.sync_bad("abc123", "MERGEABLE", 3)
         self.assertEqual(self.run_pass(), ["acme: pr_unmergeable acme/app#1 -> deferred alpha: live session"])

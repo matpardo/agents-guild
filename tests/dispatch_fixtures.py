@@ -16,18 +16,16 @@ class LaunchBase(GuildTestCase):
         self.repo_dir = self.register_project("acme", ["acme/app"])
         self.other_dir = self.root / "elsewhere"
         self.other_dir.mkdir()
-        self.write_block("acceptEdits", 3)
+        self.write_block()
         self.run_cli(["party", "start", "alpha"], "sess-1", self.repo_dir)
         self.run_cli(["handoff", "--in-flight", "x", "--learned", "y"], "sess-1", self.repo_dir)
         self.tmux = FakeTmux(True, True, {}, 0)
         self.pushes = []
 
-    def write_block(self, permission_mode, limit):
+    def write_block(self):
         path = self.config_home / "guild" / "projects" / "acme.json"
         data = json.loads(path.read_text())
         data["dispatcher"] = {
-            "permission_mode": permission_mode,
-            "max_launches_per_hour": limit,
             "rules": {"ask_answered": "on"},
         }
         data["notify"] = self.notify
@@ -65,51 +63,6 @@ class LaunchBase(GuildTestCase):
         ctx = self.ctx()
         with db.writing(ctx.conn):
             events.record(ctx.conn, now, ctx.origin, party, None, "acme", kind, "local", payload)
-
-    def locate(self, party, generation, cwd, permission_mode):
-        self.record(
-            "leader.located",
-            party,
-            {
-                "party": party,
-                "generation": generation,
-                "session_id": "sess-1",
-                "cwd": str(cwd),
-                "permission_mode": permission_mode,
-            },
-            self.ctx().now,
-        )
-
-    def seed_decision(self, key, party, generation, outcome, state, age):
-        now = self.ctx().now - age
-        self.record(
-            "dispatch.decided",
-            party,
-            {
-                "project": "acme", "rule": "ask_answered", "key": key, "mode": "on", "outcome": outcome,
-                "party": party, "generation": generation, "permission_mode": "acceptEdits",
-                "subject": "ask #0", "reason": None,
-            },
-            now,
-        )
-        if state == "failed":
-            self.record(
-                "dispatch.launch_failed", party,
-                {"project": "acme", "key": key, "party": party, "generation": generation,
-                 "reason": "window exited before binding", "window_id": "@1"},
-                now,
-            )
-        if state == "bound":
-            self.record(
-                "dispatch.bound", party,
-                {"project": "acme", "key": key, "party": party, "generation": generation}, now
-            )
-        if state == "launched":
-            self.record(
-                "dispatch.launched", party,
-                {"project": "acme", "key": key, "party": party, "generation": generation, "window_id": "@1"},
-                now,
-            )
 
     def kinds(self):
         rows = self.ctx().conn.execute(

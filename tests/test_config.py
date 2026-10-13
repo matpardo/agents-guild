@@ -415,8 +415,6 @@ class MaxOpenPrsPerPartyConfigTests(MaxOpenPrsConfigTests):
 class DispatcherConfigTests(unittest.TestCase):
     def _block(self):
         return {
-            "permission_mode": "acceptEdits",
-            "max_launches_per_hour": 3,
             "rules": {"ask_answered": "on", "checks_failing": "dry-run"},
         }
 
@@ -434,13 +432,6 @@ class DispatcherConfigTests(unittest.TestCase):
     def test_valid_block_is_accepted(self):
         config.validate_project_config(self._data(self._block()))
 
-    def test_every_allowed_mode_is_accepted(self):
-        for mode in ("manual", "acceptEdits", "auto"):
-            with self.subTest(mode=mode):
-                block = self._block()
-                block["permission_mode"] = mode
-                config.validate_project_config(self._data(block))
-
     def test_empty_rules_object_is_accepted(self):
         block = self._block()
         block["rules"] = {}
@@ -449,38 +440,21 @@ class DispatcherConfigTests(unittest.TestCase):
     def test_block_that_is_not_an_object_is_rejected(self):
         self.assertIn("'dispatcher' must be an object", self._message(["x"]))
 
-    def test_each_missing_key_is_rejected(self):
-        for key in ("permission_mode", "max_launches_per_hour", "rules"):
+    def test_missing_rules_is_rejected(self):
+        self.assertIn("exactly the key 'rules'", self._message({}))
+
+    def test_removed_keys_are_rejected_naming_the_key(self):
+        for key, value in (("permission_mode", "acceptEdits"), ("max_launches_per_hour", 3)):
             with self.subTest(key=key):
                 block = self._block()
-                del block[key]
-                self.assertIn("exactly the keys", self._message(block))
+                block[key] = value
+                message = self._message(block)
+                self.assertIn("'dispatcher.{}' was removed".format(key), message)
 
     def test_extra_key_is_rejected(self):
         block = self._block()
         block["shell"] = True
-        self.assertIn("exactly the keys", self._message(block))
-
-    def test_permissive_or_unknown_modes_are_rejected(self):
-        for mode in ("bypassPermissions", "dontAsk", "plan", "default", "", 3):
-            with self.subTest(mode=mode):
-                block = self._block()
-                block["permission_mode"] = mode
-                self.assertIn("'dispatcher.permission_mode' must be one of", self._message(block))
-
-    def test_max_launches_out_of_range_or_wrong_type_is_rejected(self):
-        for value in (0, -1, 21, True, "3", 1.5):
-            with self.subTest(value=value):
-                block = self._block()
-                block["max_launches_per_hour"] = value
-                self.assertIn("'dispatcher.max_launches_per_hour' must be an integer", self._message(block))
-
-    def test_max_launches_bounds_are_accepted(self):
-        for value in (1, 20):
-            with self.subTest(value=value):
-                block = self._block()
-                block["max_launches_per_hour"] = value
-                config.validate_project_config(self._data(block))
+        self.assertIn("exactly the key", self._message(block))
 
     def test_rules_that_is_not_an_object_is_rejected(self):
         block = self._block()

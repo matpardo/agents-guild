@@ -22,7 +22,7 @@ class MergeHeadTests(MergeQueueTestCase):
     def write_block(self, rules):
         path = self.config_home / "guild" / "projects" / "acme.json"
         data = json.loads(path.read_text())
-        data["dispatcher"] = {"permission_mode": "acceptEdits", "max_launches_per_hour": 5, "rules": rules}
+        data["dispatcher"] = {"rules": rules}
         data["notify"] = {"command": ["notify-send", "guild"]}
         path.write_text(json.dumps(data))
 

@@ -132,7 +132,8 @@ class EphemeralBriefDocsTests(unittest.TestCase):
 
 
 class DispatcherDocsTests(unittest.TestCase):
-    _decision = _DECISIONS_DIR / "20261004_dispatcher-launches-fresh-sessions.md"
+    _decision = _DECISIONS_DIR / "20261012_dispatcher-suggests-human-launches.md"
+    _superseded = _DECISIONS_DIR / "20261004_dispatcher-launches-fresh-sessions.md"
 
     def test_epic_is_active_with_all_its_tasks(self):
         epic_dir = _EPICS_DIR / "dispatcher"
@@ -146,28 +147,29 @@ class DispatcherDocsTests(unittest.TestCase):
     def test_decision_is_accepted_and_names_the_guards(self):
         text = self._decision.read_text()
         self.assertIn("- **Status:** accepted", text)
-        self.assertIn("never exceeds it", text)
-        self.assertIn("more restrictive of the configured mode", text)
+        self.assertIn("- **Supersedes:** 20261004_dispatcher-launches-fresh-sessions", text)
+        self.assertIn("No session starts or wakes on its own.", text)
         self.assertIn("deferred and retried for 24 hours", text)
-        self.assertIn("the intent is recorded before the launch", text)
+        self.assertIn("`20260928_idle-wake-no-go` now holds fully", text)
         self.assertIn("Lifecycle commands stay in `sync`.", text)
+        self.assertIn(
+            "- **Status:** superseded by 20261012_dispatcher-suggests-human-launches", self._superseded.read_text()
+        )
 
     def test_readme_documents_the_dispatcher(self):
         self.assertIn("guild dispatch run [--dry-run]", _README)
         self.assertIn("guild dispatch status", _README)
         self.assertIn("guild dispatch-timer install --every <dur> | uninstall | print", _README)
         self.assertIn("### Dispatcher", _README)
-        self.assertIn('"dispatcher": {"permission_mode": "acceptEdits", "max_launches_per_hour": 3,', _README)
+        self.assertIn('"dispatcher": {"rules": {"ask_answered": "on"', _README)
         self.assertIn("`dispatch-failed`", _README)
         self.assertIn("`deferred`", _README)
-        self.assertIn("set `permission_mode` to `manual`", _README)
         self.assertIn("`NoNewPrivileges=yes` and `Nice=10`", _README)
-        self.assertIn("tmux new -s guild", _README)
-        self.assertIn("`dispatcher` (active: fresh", _README)
+        self.assertIn("`dispatcher` (active: suggests a revive", _README)
 
     def test_guild_md_tells_sessions_how_to_wait_for_the_dispatcher(self):
         self.assertIn("**Blocked on an ask with nothing else to do?**", _GUILD_MD)
-        self.assertIn("where the project enables the dispatcher, a fresh generation starts", _GUILD_MD)
+        self.assertIn("where the project enables the dispatcher, the human is told to run `guild revive --party <party>`", _GUILD_MD)
 
 
 if __name__ == "__main__":

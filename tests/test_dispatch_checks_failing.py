@@ -36,7 +36,7 @@ class ChecksFailingBase(GuildTestCase):
     def write_block(self, rules):
         path = self.config_home / "guild" / "projects" / "acme.json"
         data = json.loads(path.read_text())
-        data["dispatcher"] = {"permission_mode": "acceptEdits", "max_launches_per_hour": 5, "rules": rules}
+        data["dispatcher"] = {"rules": rules}
         path.write_text(json.dumps(data))
 
     def set_repos(self, repos):
@@ -89,33 +89,21 @@ class ChecksFailingBase(GuildTestCase):
 
 
 class FailingChecksTests(ChecksFailingBase):
-    def test_settled_failing_checks_launch_the_pr_owner(self):
+    def test_settled_failing_checks_suggest_a_revive_to_the_pr_owner(self):
         self.sync_open(_FAILING, "abc123")
         lines = self.run_pass()
         self.assertEqual(
-            lines, ["acme: checks_failing acme/app#1 -> launched alpha g2 (window @10, mode acceptEdits)"]
+            lines, ["acme: checks_failing acme/app#1 -> suggested revive alpha g2"]
         )
         self.assertEqual(self.decision_keys(), ["checks_failing:acme/app#1:abc123"])
-        self.assertEqual(len(self.tmux.launch_calls()), 1)
-
-    def test_prompt_names_only_the_pr_and_the_checks_command(self):
-        self.sync_open(_FAILING, "abc123")
-        self.run_pass()
-        command = self.tmux.launch_calls()[0][-1]
-        self.assertTrue(
-            command.endswith(
-                "'Continue the work described in the guild brief."
-                " Dispatched: checks fail on acme/app#1; run gh pr checks 1 --repo acme/app.'"
-            )
-        )
-        self.assertNotIn("abc123", command)
+        self.assertEqual(self.tmux.launch_calls(), [])
 
     def test_pending_checks_launch_nothing_until_they_settle(self):
         self.sync_open(_FAILING_AND_PENDING, "abc123")
         self.assertEqual(self.run_pass(), ["nothing to dispatch"])
         self.sync_open(_FAILING, "abc123")
         self.assertEqual(len(self.run_pass()), 1)
-        self.assertEqual(len(self.tmux.launch_calls()), 1)
+        self.assertEqual(self.tmux.launch_calls(), [])
 
     def test_same_head_decides_once_across_passes(self):
         self.write_block({"checks_failing": "dry-run"})
@@ -173,7 +161,7 @@ class FailingChecksTests(ChecksFailingBase):
         self.sync_cross_repository(False)
         self.assertEqual(len(self.run_pass()), 1)
 
-    def test_deferred_failing_checks_launch_once_the_session_ends(self):
+    def test_deferred_failing_checks_suggest_once_the_session_ends(self):
         self.write_session(os.getpid(), "sess-1", "alpha")
         self.sync_open(_FAILING, "abc123")
         lines = self.run_pass()
@@ -181,7 +169,7 @@ class FailingChecksTests(ChecksFailingBase):
         (self.sessions_dir / "{}.json".format(os.getpid())).unlink()
         lines = self.run_pass()
         self.assertEqual(
-            lines, ["acme: checks_failing acme/app#1 -> launched alpha g2 (window @10, mode acceptEdits)"]
+            lines, ["acme: checks_failing acme/app#1 -> suggested revive alpha g2"]
         )
         self.assertEqual(self.run_pass(), ["nothing to dispatch"])
 

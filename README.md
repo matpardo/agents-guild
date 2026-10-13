@@ -14,8 +14,8 @@ prose. Local first. Python 3.10 stdlib only, no runtime dependencies.
 - Area claims so two sessions don't step on the same file.
 - A merge queue that says which PR to merge next, and a local web board
   (`guild web`) with the same data.
-- An opt-in dispatcher that starts fresh sessions when an ask is answered, CI
-  fails or a task is unblocked.
+- An opt-in dispatcher that tells you which party is ready to resume when an ask
+  is answered, CI fails or a task is unblocked.
 
 Guild is local and optional per dev: nothing of it is visible outside the
 local CLI. Never put guild, `ask #N`, `notice #N`, party, raid or quest in PR
@@ -202,8 +202,8 @@ guild sync-timer install --every <dur> | uninstall | print
 guild sync-sdd-timer install --every <dur> | uninstall | print
 guild sync-tracker-timer install --every <dur> | uninstall | print
 guild lifecycle run on_pr_merged|on_pr_closed [--repo <owner/repo>] [--dry-run]   # run a project's lifecycle command by hand
-guild dispatch run [--dry-run]                # react to new events: launch fresh sessions where a project enabled the dispatcher
-guild dispatch status                         # per project: cursor, launches last hour, rules, launches in flight, recent decisions
+guild dispatch run [--dry-run]                # react to new events: suggest guild revive where a project enabled the dispatcher
+guild dispatch status                         # per project: cursor, rules, recent decisions
 guild dispatch pause --reason "<text>"        # any session, bound or not, or the human: stop dispatch for every project
 guild dispatch resume                         # human only, outside a session: lift the pause
 guild dispatch-timer install --every <dur> | uninstall | print
@@ -837,7 +837,7 @@ gone), until the PR has no automatic blockers left or is merged or closed. While
 with `fix already requested <N>h ago; waiting on <party>` and the web hides the button, even after the party
 pushes a new head commit. With the project key `fix_request_stale_hours` set, a request older than that with
 blockers still present reads `fixing · stale`, the web offers Ask <party> again and `ask-fix` records a new
-request; without the key a request never goes stale. The dispatcher's `fix_requested` rule launches the owner
+request; without the key a request never goes stale. The dispatcher's `fix_requested` rule suggests a revive of the owner
 once per request.
 
 **Manual block.** `guild pr set --blocked-external "<reason>"` (the flag keeps its name) marks a PR
@@ -999,17 +999,15 @@ party's own queue, when they exist. `guild web` shows the same queues, see below
 
 `guild board` also prints a `DISPATCHER` section after the notices: a red
 `PAUSED since <age> ago by <party>: <reason>` line when `guild dispatch pause`
-is in effect, one line per dispatcher launch in flight (launched, not yet
-bound) with party, generation, age, rule and subject, one red line per launch
-or `pr_promote` that failed in the last 24 hours with its reason, one line per
-project with its rules and mode and the launches of the last hour against
-`max_launches_per_hour`, one line per deferred dispatch (party, rule, subject,
-age, reason) and up to 10 `recent:` decisions of the last 24 hours, newest
-first (dry-run decisions show as `planned`). The section is omitted only when
+is in effect, one red line per `pr_promote` that failed in the last 24 hours
+with its reason, one line per project with its rules and mode, one line per
+deferred dispatch (party, rule, subject, age, reason) and up to 10 `recent:`
+decisions of the last 24 hours, newest first (dry-run decisions show as
+`planned`, a `suggested` one ends with `run guild revive --party <party>`). The section is omitted only when
 none of these, including the pause, exist.
 `guild dispatch status` leaves out the `gN` generation on decisions that have
 none (notify-only rules such as `merge_head`, `sdd_progress`, `pr_promote`).
-`--party` and `--raid` keep only those parties' launches.
+`--party` and `--raid` keep only those parties' decisions.
 
 `guild board` also prints one `project <name>` block per project of the parties
 shown, before the party blocks: `open PRs: N/cap` and the cap `wait:` line
@@ -1120,9 +1118,8 @@ label pills (`draft`, `converging`), checks, party, task, state, `unblocks N`, t
 `next action` marker, the reasons as pills, a collapsible ready-check detail per PR (blockers, waits and gates, the same content as `guild pr ready-check`) and a `next to merge: <ref> (<party>)` line, or `no PR ready to merge`, matching `guild merge-queue --head`; blocked PRs in place; read-only, the same order as
 `guild merge-queue`, with `synced N min ago`; the party filter keeps
 only that party's PRs and the raid filter only that raid's card; the model
-key is `merge_queues`), a "dispatcher" section (the same lines as `guild board`: a pause pill or form, project rules and
-launch cap, launches in flight, failures, deferred dispatches and recent
-decisions; empty parts are hidden, but the section is shown while paused even
+key is `merge_queues`), a "dispatcher" section (the same lines as `guild board`: a pause pill or form, project rules,
+failures, deferred dispatches and recent decisions; empty parts are hidden, but the section is shown while paused even
 with nothing else to show; the model key is `dispatcher`; the party and raid filters keep only their parties),
 drift findings for the default scope (grouped by rule, one block per
 project resolved from the parties shown, skipping parties without a
@@ -1324,7 +1321,7 @@ command; if the new generation does not bind in time the old window is kept and
 the new one is left running. Nothing else is ever killed. `--respawn` works for
 any party; only keepers get `--remote-control`. The context nudge asks for it
 when the party is a keeper or guild recorded a window for the current generation
-(`leader_windows`), so a session started by `revive`, `--respawn` or the dispatcher
+(`leader_windows`), so a session started by `revive` or `--respawn`
 hands off inside tmux instead of exiting and closing its window.
 
 `guild handoff --close` writes the handoff like a plain `guild handoff` call but
@@ -1486,78 +1483,73 @@ guild revive --list            # no tmux needed: one copy-paste command per part
 ### Dispatcher
 
 `guild dispatch run` reads the events recorded since its last pass and, for
-the rules a project enabled, launches a fresh session instead of waiting for
-someone to give a party a turn. It never wakes or writes to an existing
-session (see decision `20260928_idle-wake-no-go`); it only starts new `claude`
-sessions, the way `guild revive` does.
+the rules a project enabled, tells the human which party is ready to resume.
+It never starts, wakes or writes to a session (see decisions
+`20261012_dispatcher-suggests-human-launches` and `20260928_idle-wake-no-go`):
+the human launches the session with `guild revive --party <party>`.
 
 Rules, each `dry-run` (records what it would do) or `on`:
 
 | Rule | Trigger | Target |
 |---|---|---|
-| `ask_answered` | `ask.answered` on an ask that is still answered | launches the party that asked |
-| `checks_failing` | `pr.synced` of a draft, converging or ready PR with failing checks, none pending, a known head commit, not seeded, not from a fork, in a repo of the project | launches the party that owns the PR |
-| `fix_requested` | `pr.fix_requested` (`guild pr ask-fix`, or the web button) on a PR still owned by a party of the project, not seeded | launches the party that owns the PR; its key is the PR and the request |
-| `pr_unmergeable` | `pr.synced` of a draft, converging or ready PR with a merge conflict, changes requested, unresolved review threads or a branch behind base, a known head commit, not seeded, not from a fork, not blocked externally, in a repo of the project | launches the party that owns the PR |
-| `next_task` | state rule: a party that handed off (keepers excluded) and has a next unblocked task (`guild next`) | launches that party |
+| `ask_answered` | `ask.answered` on an ask that is still answered | suggests a revive of the party that asked |
+| `checks_failing` | `pr.synced` of a draft, converging or ready PR with failing checks, none pending, a known head commit, not seeded, not from a fork, in a repo of the project | suggests a revive of the party that owns the PR |
+| `fix_requested` | `pr.fix_requested` (`guild pr ask-fix`, or the web button) on a PR still owned by a party of the project, not seeded | suggests a revive of the party that owns the PR; its key is the PR and the request |
+| `pr_unmergeable` | `pr.synced` of a draft, converging or ready PR with a merge conflict, changes requested, unresolved review threads or a branch behind base, a known head commit, not seeded, not from a fork, not blocked externally, in a repo of the project | suggests a revive of the party that owns the PR |
+| `next_task` | state rule: a party that handed off (keepers excluded) and has a next unblocked task (`guild next`) | suggests a revive of that party |
 | `merge_head` | state rule, notify only: the head of each merge queue scope (each raid, then each party outside a raid), see `guild merge-queue --head` | notifies the party that owns the head PR |
 | `pr_promote` | `pr.synced` of a converging draft PR with settled green checks (none failing or pending, at least one passing), no merge conflict, changes requested, unresolved threads or stale branch, no ask pending (open ask or manual flag), not blocked externally, a known head commit, not seeded, not from a fork, in a repo of the project | runs `gh pr ready`, notifies the party that owns the PR |
-| `limit_resume` | state rule: a party with a live session whose transcript ends in a usage-limit (429) error, one minute after its reset time | nudges that party, launches nothing |
+| `limit_resume` | state rule, notify only: a party with a live session whose transcript ends in a usage-limit (429) error, one minute after its reset time | notifies the party that owns the session |
 | `sdd_progress` | state rule, notify only: an active task on an epic quest, started over 24 hours ago, whose epic `tasks.md` has no commit in the last 24 hours (needs the project `sdd` block) | notifies the party that owns the task |
 
-`merge_head` never launches a session. When the head of a scope is a PR not
-announced before (`merge_head:<scope>:<ref>`), it posts one project notice
+A suggestion is one decision, one project notice and one `notify.command` run.
+For `ask_answered`, `checks_failing`, `fix_requested`, `pr_unmergeable` and
+`next_task` the decision is recorded as `suggested`, the notice is
+`<party> ready to resume (<rule> <subject>): run guild revive --party <party>`
+(announced once per trigger as `dispatch:<project>:<key>:suggested`) and the
+command runs with the party and the wait `ready` appended (the same argv shape
+as the waits in "Session status"). `guild board` and the web show a `suggested`
+decision with `run guild revive --party <party>`. In `dry-run` mode it only
+records a plan.
+
+`merge_head`, `sdd_progress` and `limit_resume` are notify only. When the head
+of a scope is a PR not announced before (`merge_head:<scope>:<ref>`),
+`merge_head` posts one project notice
 `<party>: <ref> is first in the merge queue; run guild pr ready-check <ref>`
-and runs `notify.command` with the party and `merge-head`. In `dry-run` mode
-it only records a plan.
+and runs `notify.command` with the party and `merge-head`. Once per day
+(`sdd_progress:<party>:<quest>/<tid>:<UTC date>`) `sdd_progress` posts one
+project notice `<party>: record progress of <tid> in <epic> tasks.md (no SDD update in 24h)`
+and runs `notify.command` with the party and `sdd-progress`; guild never writes
+the SDD, and tasks of epics whose `tasks.md` cannot be read from git are
+skipped. When the last turn of a live leader's transcript is a `rate_limit` API
+error, one minute after its `resetsAt` `limit_resume` posts once per limit hit
+(`limit_resume:<party>:<resetsAt>`) the project notice
+`resume <party> by hand: usage limit reset` and runs `notify.command` with the
+party and `limit-reset`. It never types into a session, ignores the busy check,
+and keepers are notified too since they are live sessions.
 
-`sdd_progress` never launches a session. Once per day (`sdd_progress:<party>:<quest>/<tid>:<UTC date>`)
-it posts one project notice `<party>: record progress of <tid> in <epic> tasks.md (no SDD update in 24h)`
-and runs `notify.command` with the party and `sdd-progress`. Guild never writes the SDD. Tasks of
-epics whose `tasks.md` cannot be read from git are skipped. In `dry-run` mode it only records a plan.
-
-`limit_resume` never launches a session. When the last turn of a live leader's
-transcript is a `rate_limit` API error, one minute after its `resetsAt` it types
-`continue` and Enter into the party's recorded tmux window, once per limit hit
-(`limit_resume:<party>:<resetsAt>`). Only sessions in a guild-launched tmux window can
-be nudged (verify once by hand that Claude Code accepts the keys); with no such
-window the decision is `skipped` and one project notice says to resume the party
-by hand. It ignores the busy check and the hourly launch cap, and keepers are
-nudged too since they are live sessions. In `dry-run` mode it only records a plan.
-
-`pr_promote` never launches a session either. Once per head commit
-(`pr_promote:<repo>#<n>:<head commit>`) it runs `gh pr ready <n> --repo <repo>`,
+`pr_promote` runs `gh pr ready <n> --repo <repo>` once per head commit
+(`pr_promote:<repo>#<n>:<head commit>`),
 posts the project notice `<ref> promoted to ready` and runs `notify.command` with
 the party and `pr-promote`. A PR flagged `--needs-human-pr-review` is never
 marked ready: the notice is `<ref> converged; needs human review before ready`.
-When `gh` fails the decision is recorded as `failed`, with a notice, and the
+When `gh` fails the decision is recorded as `failed`, with a notice and a
+`notify.command` run with the wait `dispatch-failed`, and the
 head is not retried. In `dry-run` mode it only records a plan.
 
 `next_task` is a state rule: it has no cursor and no age limit. Every pass it
 looks at the parties of the project that handed off (keepers excluded) and
-launches the ones whose next task is unblocked, once per task and handoff
+suggests the ones whose next task is unblocked, once per task and handoff
 (`next_task:<party>:g<generation>:<quest>/<tid>`). Paused raids and tasks claimed by another
 party yield nothing. It is opt-in like the others; enable it as `dry-run`
 first and read `guild dispatch run --dry-run` before switching it to `on`.
-Prompt: `Continue the work described in the guild brief. Dispatched: next task
-<quest>/<tid>; run guild next.`
 
-Only a party that handed off (state `awaiting-leader`, see `guild handoff`)
-is launched, as its next generation, in a window named after the party in the
-`guild` tmux session, with `GUILD_RESUME=<party> claude -n <party>-g<N+1>` and
-a prompt that names the trigger by id only: `Continue the work described in
-the guild brief. Dispatched: ask #<id> was answered; read guild asks <id>.` or
-`Continue the work described in the guild brief. Dispatched: checks fail on
-<repo>#<n>; run gh pr checks <n> --repo <repo>.` or `Continue the work
-described in the guild brief. Dispatched: <repo>#<n> is not mergeable (<reasons>);
-run gh pr view <n> --repo <repo> and resolve review threads.` Answer text and CI output
-never reach the command line.
-
-Nothing is launched for a party that has a live session, an open window in the
-`guild` session, a launch in flight, a paused raid or a paused dispatch: the
-trigger is recorded as `deferred` with that reason (the key is not consumed,
-nothing is launched) and re-evaluated at the start of every pass, before new
-events, until the party is free. A deferral older than 24 hours is skipped
+Only a party that handed off (state `awaiting-leader`, see `guild handoff`) is
+suggested. Nothing is suggested for a party that has a live session, an open
+window in the `guild` tmux session or a paused raid, nor while dispatch is
+paused: the trigger is recorded as `deferred` with that reason (the key is not
+consumed) and re-evaluated at the start of every pass, before new events,
+until the party is free. A deferral older than 24 hours is skipped
 with `deferred too long` and one project notice; a deferred ask that was
 dismissed, or checks that turned green, are dropped. The one-hour age guard
 applies to new events only. While dispatch is paused this 24-hour expiry is
@@ -1565,11 +1557,10 @@ suspended; a deferral already older than 24 hours when dispatch resumes still
 drops on the next pass with `deferred too long` (a known limit).
 
 `guild dispatch pause --reason "<text>"` stops every project's dispatch: any
-session, bound or not, or a human may run it. While paused, launches recorded
-as `dispatch.decided` go through the same defer path with reason `dispatch
-paused`; `promote`, `announce` and `nudge` do nothing and record nothing (no
-`gh` call, no notice, no tmux keys). `reconcile` of in-flight launches keeps
-running, and each project's cursor still advances; events older than one hour
+session, bound or not, or a human may run it. While paused, suggestions go
+through the same defer path with reason `dispatch paused`; `promote` and
+`announce` do nothing and record nothing (no `gh` call, no notice). Each
+project's cursor still advances; events older than one hour
 are ignored and counted the same as always. `guild dispatch resume` lifts the
 pause; only a human, outside a session, may run it. The reason passes
 `validate_field` (300 characters, no email). Recorded as `dispatch.paused`
@@ -1580,11 +1571,7 @@ dispatcher configured.
 A trigger is skipped once, with
 the reason recorded (`guild dispatch status`), when the party did not hand off
 (a notice asks the human to run `guild revive --party <party>`), is a keeper
-or is closed, when its recorded cwd is unknown, missing or outside the
-project or contains a `#` (`cwd unsafe`), when the `guild` tmux session is not running, when the project
-already launched `max_launches_per_hour` sessions in the last hour, or when a
-previous launch of that party never bound. Skips post a project notice,
-except keeper, closed and the previous-launch block.
+or is closed. The notice is posted except for keeper and closed.
 
 - Cursor: a project starts at the newest event the first time a pass sees its
   `dispatcher` block, so earlier events decide nothing; removing the block
@@ -1594,65 +1581,42 @@ except keeper, closed and the previous-launch block.
   `pr_unmergeable:<repo>#<n>:<head commit>:<reasons>` with the reasons as
   sorted slugs `behind`, `changes_requested`, `conflict`, `unresolved_threads`,
   so a changing thread count does not trigger again): the decision is recorded as a
-  local `dispatch.decided` event before the launch, so a crash never launches
-  twice. A `dry-run` decision does not block the real one. `sync --source gh`
-  records the head commit of each PR (`head_sha` in `pr.synced`).
-- Permission mode: the launched session gets the more restrictive of
-  `permission_mode` and the party's last recorded mode, ordered `plan` <
-  `manual` < `acceptEdits` < `auto`. A missing or unknown party mode, and
-  `bypassPermissions` or `dontAsk`, use the configured one, so the launched
-  mode is never above it.
-- The window is created detached (`tmux new-window -d`): it never takes the
-  focus of the window you are typing in. The dispatcher does not change the
-  `guild` session's title options; only `guild revive` does.
+  local `dispatch.decided` event before the notice. A `dry-run` decision does not block the real one. `sync --source gh`
+  records the head commit of each PR (`head_sha` in `pr.synced`). Two triggers for the same
+  party suggest twice until the human revives it.
 - `pr_unmergeable` reads the review state from the PR row, not the event, since
   `pr.synced` carries unchanged fields forward; failing checks are left to
   `checks_failing`.
 - `checks_failing` and `pr_unmergeable` ignore PRs from forks (`isCrossRepository`, recorded as
   `cross_repository` in `pr.synced`); when `gh` does not say, the PR counts as
   in-repo.
-- Each pass first confirms earlier launches: a party whose generation reached
-  the launched one is `bound`. A launch whose window vanished, that was
-  interrupted before tmux, or that did not bind within 10 minutes is marked
-  failed, posts one project notice and runs `notify.command` with
-  the party and the wait `dispatch-failed` appended (the same argv shape as
-  the waits in "Session status"). A window that did not bind is left running, never
-  killed, and its party launches again only after a manual
-  `guild party resume`.
 - `guild dispatch run --dry-run` takes no lock and writes nothing, not even
-  the cursor: it prints the same lines with `would ...` and shows the busy
-  reasons. `guild dispatch status` prints, per project, the cursor, launches
-  in the last hour, the rules, launches in flight and the ten latest
-  decisions.
+  the cursor: it prints the same lines with `would ...` (`would suggest revive
+  <party> g<N>`) and shows the busy reasons. `guild dispatch status` prints,
+  per project, the cursor, the rules and the ten latest decisions.
 - A trigger deferred because the party has a live session shows up in that
   session's inbox as `- dispatch <rule>: <subject> needs you (deferred while
   your session is live)`, once. Dry-run and other busy reasons stay silent.
 - A session that ends idle keeps its party out of dispatch until it is closed.
   Lifecycle commands (`guild lifecycle`) stay in `sync`.
+- The keys `permission_mode` and `max_launches_per_hour` of the `dispatcher`
+  block were removed with the launching: a config that still has them fails to
+  load, naming the key.
 
 ```
 acme: cursor initialized at seq 1234
-acme: ask_answered ask #12 -> launched alpha g5 (window @12, mode acceptEdits)
-acme: checks_failing acme/app#7 -> planned: launch beta g3 (dry-run, mode manual)
+acme: ask_answered ask #12 -> suggested revive alpha g5
+acme: checks_failing acme/app#7 -> planned: suggest revive beta g3 (dry-run)
 acme: checks_failing acme/app#9 -> skipped beta: party not handed off
 acme: ask_answered ask #14 -> deferred gamma: live session
-alpha g5 bound
-beta g3 launch failed: did not bind within 10m; window @9 left running
 acme: 2 events older than 1h ignored
 ```
 
-Security: a launched session reads CI output through `gh pr checks`, and that
-output can contain text written by whoever opened the PR. For a repository
-that accepts external pull requests, leave `checks_failing` off (or
-`dry-run`) and set `permission_mode` to `manual`, so a poisoned log can only
-ask for permission, never act on its own.
-
 Run it on a timer: `guild dispatch-timer install --every 5m` (same rules as
 `guild sync-timer`; `print` only prints the units; the service runs with
-`NoNewPrivileges=yes` and `Nice=10`). The dispatcher never
-creates the tmux session, so start it first with `tmux new -s guild` or run
-`guild revive`. To stop it, remove a rule or the whole `dispatcher` block
-from the project config, or run `guild dispatch-timer uninstall`.
+`NoNewPrivileges=yes` and `Nice=10`). To stop it, remove a rule or the whole
+`dispatcher` block from the project config, or run
+`guild dispatch-timer uninstall`.
 
 ### `guild raid`
 
@@ -1890,8 +1854,7 @@ against path traversal, not an identity boundary.
   "tracker": {"kind": "jira-acli", "browse_url": "https://acme.atlassian.net/browse/"},
   "next": {"stale_hours": 8},
   "handoff_threshold": 40,
-  "dispatcher": {"permission_mode": "acceptEdits", "max_launches_per_hour": 3,
-                 "rules": {"ask_answered": "on", "checks_failing": "dry-run",
+  "dispatcher": {"rules": {"ask_answered": "on", "checks_failing": "dry-run",
                            "pr_unmergeable": "dry-run"}},
   "lifecycle": {
     "on_pr_merged": {"command": ["scripts/cleanup-merged.sh", "--dry-run"], "timeout_minutes": 30},
@@ -1924,13 +1887,13 @@ All keys. The loader rejects a wrong type with a clear error for every key excep
 - `finding_guard_threshold` (positive integer, absent: findings are recorded silently): when `guild finding record` has counted that many distinct PRs for one finding class, one notice to `project:<name>` asks to make the class an architecture guard.
 - `handoff_retention_days` (positive integer, at most 3650, absent: kept forever): days after a party closes at which `guild handoff prune` deletes its last handoff file.
 - `pii_patterns` (list of regexes, absent: only the built-in email pattern): checked against notice text, ask question/context, answer text and handoff `--in-flight`/`--learned` for the caller's project. A match rejects the command with an error that names the field, never the matched text.
-- `notify` (object, absent: nothing is run): `{"command": [<argv>...]}`, a non-empty list of non-empty strings run once per blocking wait (see "Session status") and by the notify-only dispatcher rules. `command` is the only allowed key.
+- `notify` (object, absent: nothing is run): `{"command": [<argv>...]}`, a non-empty list of non-empty strings run once per blocking wait (see "Session status") and by the dispatcher. `command` is the only allowed key.
 - `shared_areas` (list of globs relative to the repo root, absent: no guard): e.g. `config/routes.rb`, `db/migrate/*`; matched with `fnmatch` against POSIX-style relative paths by `guild hook pre-edit`, `pre-commit` and `pre-push` (see "Hooks"). Present: `shared_area_claim_ttl` is required or the config fails to load.
 - `shared_area_claim_ttl` (duration `30m`/`8h`/`3d`, required with `shared_areas`): the TTL the guards claim a matched area for.
 - `migration_paths` (list of globs, absent: the migration clash check is skipped and no extra `gh` call is made): matched with `fnmatch` against changed file paths, e.g. `db/migrate/*`. See "Migration version clash" under `sync`.
 - `fast_forward_base` (boolean, absent or `false`: no clone is ever modified): `true` makes `sync --source gh` fast-forward the local base branch of merged repos (see "Base branch fast-forward" under `sync`).
 - `lifecycle` (object, absent: no command ever runs): commands run on PR lifecycle events (see "Lifecycle commands"). Keys are `on_pr_merged` and `on_pr_closed`, any other key fails to load. Each value has exactly `command` (non-empty list of non-empty strings, never a shell string) and `timeout_minutes` (integer from 1 to 1440, required).
-- `dispatcher` (object, absent: the project is never dispatched): opts in to `guild dispatch` (see "Dispatcher"). Exactly three keys, all required: `permission_mode` (`manual`, `acceptEdits` or `auto`; `bypassPermissions`, `dontAsk`, `plan` and anything else fail to load), `max_launches_per_hour` (integer from 1 to 20) and `rules` (an object whose keys are `ask_answered`, `checks_failing`, `fix_requested`, `pr_unmergeable`, `next_task`, `merge_head`, `pr_promote`, `limit_resume` and `sdd_progress` and whose values are `dry-run` or `on`; `off` is rejected, remove the rule to disable it).
+- `dispatcher` (object, absent: the project is never dispatched): opts in to `guild dispatch` (see "Dispatcher"). Exactly one key, `rules` (an object whose keys are `ask_answered`, `checks_failing`, `fix_requested`, `pr_unmergeable`, `next_task`, `merge_head`, `pr_promote`, `limit_resume` and `sdd_progress` and whose values are `dry-run` or `on`; `off` is rejected, remove the rule to disable it). The former keys `permission_mode` and `max_launches_per_hour` were removed and fail to load.
 
 ### SDD parsing rules
 
@@ -2517,8 +2480,8 @@ per-session private key — not a public contract. Building against it now
 would mean guild's core handoff flow depends on an implementation detail
 that can change without notice. `guild handoff` instead prints the one
 `GUILD_RESUME=<party> claude -n <party>-g<N+1> '...'` command for a human (or an orchestrating
-agent) to run; the dispatcher starts fresh sessions the same way and never
-touches a live one. Revisit auto-spawn if a public, documented session-control
+agent) to run; the dispatcher never starts or touches a session, it only
+suggests the revive. Revisit auto-spawn if a public, documented session-control
 contract appears.
 
 **Phase 4 (lessons from the first real raid, specified under
@@ -2528,8 +2491,8 @@ working, waiting on a permission prompt or stopped with work), `cost-metering`,
 Control keeper), `ephemeral-brief` (the task brief, `idle`/`queued` party
 status, shorter sessions), `merge-queue`, `web-board`, `lifecycle-commands`,
 `resource-footprint`, `security-hardening` and `derived-state`. Open:
-`dispatcher` (active: fresh
-sessions only, see `sdd/decisions/20261004_dispatcher-launches-fresh-sessions.md`),
+`dispatcher` (active: suggests a revive,
+see `sdd/decisions/20261012_dispatcher-suggests-human-launches.md`),
 `install-and-update` and `raids-in-practice`. Drafts: `conflict-hotspots`,
 `execution-profiles`, `budgets`, `officers`, `federation` and
 `skill-integration`.

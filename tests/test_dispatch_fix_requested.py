@@ -13,20 +13,15 @@ class FixRequestedTests(ChecksFailingBase):
         code, out, err = self.run_cli(["pr", "ask-fix", "acme/app#1"], None, self.repo_dir)
         self.assertEqual(code, 0, err)
 
-    def test_request_launches_the_owner_with_the_fix_prompt(self):
+    def test_request_suggests_a_revive_to_the_owner(self):
         self.sync_open(_FAILING, "abc123")
         self.ask_fix()
         lines = self.run_pass()
         self.assertEqual(
-            lines, ["acme: fix_requested acme/app#1 -> launched alpha g2 (window @10, mode acceptEdits)"]
+            lines, ["acme: fix_requested acme/app#1 -> suggested revive alpha g2"]
         )
         self.assertRegex(self.decision_keys()[0], r"^fix_requested:acme/app#1:[0-9a-f-]{36}$")
-        self.assertTrue(
-            self.tmux.launch_calls()[0][-1].endswith(
-                "Dispatched: the human asked you to fix acme/app#1: checks failing (1);"
-                " run guild pr ready-check acme/app#1.'"
-            )
-        )
+        self.assertEqual(self.tmux.launch_calls(), [])
 
     def test_live_session_defers_until_it_ends(self):
         self.write_session(os.getpid(), "sess-1", "alpha")
@@ -35,7 +30,7 @@ class FixRequestedTests(ChecksFailingBase):
         self.assertEqual(self.run_pass(), ["acme: fix_requested acme/app#1 -> deferred alpha: live session"])
         (self.sessions_dir / "{}.json".format(os.getpid())).unlink()
         self.assertEqual(
-            self.run_pass(), ["acme: fix_requested acme/app#1 -> launched alpha g2 (window @10, mode acceptEdits)"]
+            self.run_pass(), ["acme: fix_requested acme/app#1 -> suggested revive alpha g2"]
         )
 
     def test_fires_once_per_request(self):

@@ -38,7 +38,7 @@ class DispatchRunBase(GuildTestCase):
     def set_block(self, rules):
         path = self.config_home / "guild" / "projects" / "acme.json"
         data = json.loads(path.read_text())
-        data["dispatcher"] = {"permission_mode": "acceptEdits", "max_launches_per_hour": 3, "rules": rules}
+        data["dispatcher"] = {"rules": rules}
         path.write_text(json.dumps(data))
 
     def remove_block(self):
@@ -117,7 +117,7 @@ class SecondPassTests(DispatchRunBase):
     def test_event_after_cursor_is_decided_and_cursor_advances(self):
         seq = self.answered(7, timedelta(minutes=1))
         lines = self.run_pass(False)
-        self.assertEqual(lines, ["acme: ask_answered ask #7 -> planned: launch alpha g2 (dry-run, mode acceptEdits)"])
+        self.assertEqual(lines, ["acme: ask_answered ask #7 -> planned: suggest revive alpha g2 (dry-run)"])
         self.assertEqual(self.cursor("acme"), seq)
         self.assertEqual([row["key"] for row in self.decisions()], ["ask_answered:7"])
 
@@ -180,7 +180,7 @@ class DryRunTests(DispatchRunBase):
         before = self.event_count()
         cursor_before = self.cursor("acme")
         lines = self.run_pass(True)
-        self.assertEqual(lines, ["acme: ask_answered ask #7 -> would plan launch alpha g2 (mode acceptEdits)"])
+        self.assertEqual(lines, ["acme: ask_answered ask #7 -> would suggest revive alpha g2"])
         self.assertEqual(self.event_count(), before)
         self.assertEqual(self.cursor("acme"), cursor_before)
         self.assertLess(cursor_before, seq)
@@ -212,11 +212,11 @@ class CliTests(DispatchRunBase):
     def test_invalid_dispatcher_block_exits_with_error(self):
         path = self.config_home / "guild" / "projects" / "acme.json"
         data = json.loads(path.read_text())
-        data["dispatcher"]["permission_mode"] = "bypassPermissions"
+        data["dispatcher"]["permission_mode"] = "acceptEdits"
         path.write_text(json.dumps(data))
         code, out, err = self.run_cli(["dispatch", "run"], None, self.repo_dir)
         self.assertEqual(code, 1)
-        self.assertIn("dispatcher.permission_mode", err)
+        self.assertIn("dispatcher.permission_mode' was removed", err)
 
 
 class StatusTests(DispatchRunBase):
@@ -227,7 +227,7 @@ class StatusTests(DispatchRunBase):
                 ctx.conn, ts, ctx.origin, party, None, "acme", "dispatch.decided", "local",
                 {
                     "project": "acme", "rule": key.split(":")[0], "key": key, "mode": mode, "outcome": outcome,
-                    "party": party, "generation": generation, "permission_mode": "acceptEdits",
+                    "party": party, "generation": generation,
                     "subject": subject, "reason": reason,
                 },
             )
@@ -238,25 +238,19 @@ class StatusTests(DispatchRunBase):
         ctx = self.ctx()
         now = ctx.now
         self._decide("checks_failing:acme/app#7:abc", "dry-run", "planned", "beta", 3, "acme/app#7", None, now - timedelta(minutes=30))
-        self._decide("ask_answered:12", "on", "launching", "alpha", 5, "ask #12", None, now - timedelta(minutes=3))
-        with db.writing(ctx.conn):
-            events.record(
-                ctx.conn, now, ctx.origin, "alpha", None, "acme", "dispatch.launched", "local",
-                {"project": "acme", "key": "ask_answered:12", "party": "alpha", "generation": 5, "window_id": "@12"},
-            )
+        self._decide("ask_answered:12", "on", "suggested", "alpha", 5, "ask #12", None, now - timedelta(minutes=3))
         self._decide("ask_answered:13", "on", "skipped", "beta", 3, "ask #13", "party not handed off", now - timedelta(minutes=1))
         lines = dispatch_commands.status(self.ctx())
         stamp = lambda delta: (now - delta).strftime("%Y-%m-%dT%H:%M")
         self.assertEqual(
             lines,
             [
-                "acme: cursor {} | launches last hour 1/3 | mode acceptEdits".format(self.cursor("acme")),
+                "acme: cursor {}".format(self.cursor("acme")),
                 "  ask_answered: on",
                 "  checks_failing: dry-run",
-                "  in flight: alpha g5 window @12 launched 3m ago (ask #12)",
                 "  recent:",
                 "    {} ask_answered ask #13 -> skipped beta: party not handed off".format(stamp(timedelta(minutes=1))),
-                "    {} ask_answered ask #12 -> launched alpha g5 [launched]".format(stamp(timedelta(minutes=3))),
+                "    {} ask_answered ask #12 -> suggested alpha g5".format(stamp(timedelta(minutes=3))),
                 "    {} checks_failing acme/app#7 -> planned beta g3".format(stamp(timedelta(minutes=30))),
                 "beta: dispatcher not configured",
             ],
@@ -289,5 +283,5 @@ class StatusTests(DispatchRunBase):
     def test_status_through_cli(self):
         code, out, err = self.run_cli(["dispatch", "status"], None, self.repo_dir)
         self.assertEqual(code, 0)
-        self.assertIn("acme: cursor not initialized | launches last hour 0/3 | mode acceptEdits", out)
+        self.assertIn("acme: cursor not initialized", out)
         self.assertIn("beta: dispatcher not configured", out)

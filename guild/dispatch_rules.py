@@ -8,7 +8,6 @@ from guild.commands import revive
 
 
 _RESUME_GRACE_SECONDS = 60
-_RESUME_TEXT = "continue"
 _SDD_PROGRESS_SECONDS = 24 * 3600
 _CHECKED_LIFECYCLES = ("draft", "converging", "ready")
 _REASON_SLUGS = (
@@ -304,7 +303,8 @@ def _limit_resume_triggers(ctx, project_config):
         if reset is None or ctx.now.timestamp() < reset + _RESUME_GRACE_SECONDS:
             continue
         key = "limit_resume:{}:{}".format(party["name"], reset)
-        triggers.append(Trigger(project, "limit_resume", key, party["name"], str(reset), _RESUME_TEXT))
+        text = "resume {} by hand: usage limit reset".format(party["name"])
+        triggers.append(Trigger(project, "limit_resume", key, party["name"], str(reset), text))
     return triggers
 
 
@@ -363,5 +363,4 @@ STATE_RULES = {
     "limit_resume": _limit_resume_triggers,
     "sdd_progress": _sdd_progress_triggers,
 }
-NOTIFY_ONLY_RULES = ("merge_head", "sdd_progress")
-NUDGE_RULES = ("limit_resume",)
+NOTIFY_ONLY_RULES = ("merge_head", "sdd_progress", "limit_resume")

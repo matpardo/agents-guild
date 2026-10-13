@@ -1,7 +1,7 @@
 # ADR: The dispatcher launches fresh sessions, never wakes idle ones
 
 - **Date:** 2026-10-04
-- **Status:** accepted
+- **Status:** superseded by 20261012_dispatcher-suggests-human-launches
 
 ## Context
 
