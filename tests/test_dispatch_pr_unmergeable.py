@@ -39,6 +39,17 @@ class UnmergeableTests(ChecksFailingBase):
         self.assertEqual(self.decision_keys(), ["pr_unmergeable:acme/app#1:abc123:unresolved_threads"])
         self.assertEqual(self.tmux.launch_calls(), [])
 
+    def test_merged_pr_clears_its_deferred_trigger(self):
+        self.write_session(os.getpid(), "sess-1", "alpha")
+        self.sync_bad("abc123", "CONFLICTING", 0)
+        self.run_pass()
+        self.sync_pr("abc123", "UNKNOWN", 0, {}, "MERGED", False)
+        self.run_pass()
+        conn = db.connect(paths.db_path())
+        outcomes = [row["outcome"] for row in conn.execute("SELECT outcome FROM dispatch_decisions")]
+        conn.close()
+        self.assertEqual(outcomes, ["skipped"])
+
     def test_thread_count_change_does_not_retrigger(self):
         self.write_block({"pr_unmergeable": "dry-run"})
         self.sync_bad("abc123", "MERGEABLE", 3)

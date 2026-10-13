@@ -602,13 +602,13 @@ class InboxDeferredDispatchTests(GuildTestCase):
         self.run_cli(["party", "start", "alpha"], "sess-1", self.repo_dir)
         self.run_cli(["party", "start", "beta"], "sess-2", self.repo_dir)
 
-    def _decide(self, mode, reason):
+    def _decide(self, mode, outcome, reason):
         payload = {
             "project": "acme",
             "rule": "checks-failing",
             "key": "k",
             "mode": mode,
-            "outcome": "deferred",
+            "outcome": outcome,
             "party": "alpha",
             "generation": 2,
             "permission_mode": None,
@@ -626,19 +626,24 @@ class InboxDeferredDispatchTests(GuildTestCase):
         return out
 
     def test_owner_sees_deferred_line_once(self):
-        self._decide("on", "live session")
+        self._decide("on", "deferred", "live session")
         line = "- dispatch checks-failing: acme/app#7 needs you (deferred while your session is live)"
         self.assertIn(line, self._inbox("sess-1"))
         self.assertNotIn(line, self._inbox("sess-1"))
 
+    def test_deferral_resolved_since_is_silent(self):
+        self._decide("on", "deferred", "live session")
+        self._decide("on", "skipped", "no longer holds")
+        self.assertNotIn("dispatch checks-failing", self._inbox("sess-1"))
+
     def test_other_party_sees_nothing(self):
-        self._decide("on", "live session")
+        self._decide("on", "deferred", "live session")
         self.assertNotIn("dispatch checks-failing", self._inbox("sess-2"))
 
     def test_dry_run_is_silent(self):
-        self._decide("dry-run", "live session")
+        self._decide("dry-run", "deferred", "live session")
         self.assertNotIn("dispatch checks-failing", self._inbox("sess-1"))
 
     def test_other_reasons_are_silent(self):
-        self._decide("on", "raid ci paused")
+        self._decide("on", "deferred", "raid ci paused")
         self.assertNotIn("dispatch checks-failing", self._inbox("sess-1"))

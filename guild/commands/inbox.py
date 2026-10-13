@@ -24,6 +24,14 @@ def _cursor_seq(conn, session_id):
     return row["last_seq"]
 
 
+def _still_deferred(conn, payload):
+    row = conn.execute(
+        "SELECT 1 FROM dispatch_decisions WHERE project = ? AND key = ? AND mode = ? AND outcome = 'deferred'",
+        (payload["project"], payload["key"], payload["mode"]),
+    ).fetchone()
+    return row is not None
+
+
 def advance_cursor(conn, session_id, seq):
     conn.execute(
         "INSERT OR REPLACE INTO cursors (session_id, last_seq) VALUES (?, ?)", (session_id, seq)
@@ -89,6 +97,7 @@ def new_lines(ctx, binding):
             and payload["mode"] == _REAL_DISPATCH_MODE
             and payload["outcome"] == "deferred"
             and payload["reason"] == _LIVE_SESSION_REASON
+            and _still_deferred(ctx.conn, payload)
         ):
             dispatch_lines.append(
                 "- dispatch {}: {} needs you (deferred while your session is live)".format(

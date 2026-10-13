@@ -1,7 +1,7 @@
 import sys
 from datetime import timedelta
 
-from guild import db, events, session_info, timeutil, tmux_windows
+from guild import db, dispatch_rules, events, session_info, timeutil, tmux_windows
 from guild.adapters import github
 from guild.commands import dispatch_pause as dispatch_pause_commands
 from guild.commands import notice as notice_commands
@@ -23,6 +23,7 @@ _SUGGEST_WAIT = "ready"
 _PROMOTE_WAIT = "pr-promote"
 _DEFER_DEADLINE = timedelta(hours=24)
 _DEFERRED_TOO_LONG = "deferred too long"
+_NO_LONGER_HOLDS = "no longer holds"
 
 
 class _Notice:
@@ -244,6 +245,10 @@ class Launcher:
         if expired:
             return self._expire_deferred(trigger, mode)
         return self.decide(project_config, trigger, mode)
+
+    def drop_deferred(self, row):
+        trigger = dispatch_rules.Trigger(row["project"], row["rule"], row["key"], row["party"], row["subject"], None)
+        self._record_decided(trigger, row["mode"], "skipped", row["generation"], _NO_LONGER_HOLDS)
 
     def _expire_deferred(self, trigger, mode):
         self._record_decided(trigger, mode, "skipped", None, _DEFERRED_TOO_LONG)
