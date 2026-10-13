@@ -208,7 +208,7 @@ guild dispatch pause --reason "<text>"        # any session, bound or not, or th
 guild dispatch resume                         # human only, outside a session: lift the pause
 guild dispatch-timer install --every <dur> | uninstall | print
 guild drift [--epic <slug> | --all]
-guild revive [--party <name> ...] [--all] [--list]   # relaunch active parties after a reboot
+guild revive [--party <name> ...] [--all] [--list]   # relaunch active or handed-off parties
 guild brief [<party>/<quest>/<tid>]   # no argument: per-session view; with a task: read-only, budgeted brief for a fresh session
 guild inbox --since-last
 guild statusline --session <id> [--ctx <pct>]   # bound: [⚔ <raid>[·RL][ ⏸], ...] · g<N> · ⚑<n> asks · <n> notices · ⏸<n> blocked
@@ -1442,7 +1442,7 @@ a permission prompt shows up as `session.waiting` and triggers the project
 
 ### `guild revive`
 
-After a reboot, `guild revive` relaunches the active parties. It lists them
+After a reboot, `guild revive` relaunches the active parties and the ones that handed off (`awaiting-leader`: they start the next generation fresh). It lists them
 numbered (party, project, quest progress, status, last activity, leader session
 name, cwd, permission mode, and `resume` or `fresh`) and starts the ones you
 pick, one tmux window per party, in a tmux session called `guild`.
@@ -2417,8 +2417,7 @@ session ends or its context drops; nothing is stored.
 - A party left in `awaiting-leader` by `guild handoff` also gets a
   `resume: cd <cwd> && GUILD_RESUME=<party> claude -n <party>-g<next> …` line,
   so the command to start the next generation survives the session that printed
-  it. `guild revive` lists only `active` parties, so this is the only place it
-  appears.
+  it. `guild revive` starts the same fresh next generation for such a party.
 - `guild web` / `/api/board`: a `context <pct>% / <threshold>%` badge on the
   party and the same counter in the asks heading (`context high (1)`); per party
   the model carries `ctx` (`pct`, `threshold`, `high`, or `null` when not high)

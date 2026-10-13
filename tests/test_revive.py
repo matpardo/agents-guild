@@ -243,6 +243,40 @@ class ListTests(ReviveBase):
         out = self._revive([], False, True, self._tmux(), None)
         self.assertNotIn("beta", out)
 
+    def _hand_off_alpha(self):
+        self._set_leader("alpha", str(self.work_a), "acceptEdits")
+        _write_transcript(self.claude_projects_dir, "-a", "sess-a", [{"cwd": str(self.work_a)}])
+        with db.writing(self.conn):
+            self.conn.execute("UPDATE parties SET state = 'awaiting-leader' WHERE name = 'alpha'")
+
+    def test_list_shows_handed_off_party_with_fresh_next_generation(self):
+        self._hand_off_alpha()
+        out = self._revive([], False, True, self._tmux(), None)
+        self.assertIn("1. alpha (acme) [fresh]", out)
+        self.assertIn("GUILD_RESUME=alpha claude -n alpha-g2 --permission-mode acceptEdits", out)
+        self.assertNotIn("--resume", out)
+
+    def test_handed_off_party_launches_fresh_next_generation(self):
+        self._hand_off_alpha()
+        tmux = self._tmux()
+        out = self._revive(["alpha"], False, False, tmux, None)
+        self.assertIn("launched alpha (fresh)", out)
+        new_session = next(call for call in tmux.calls if call[0] == "new-session")
+        self.assertIn("GUILD_RESUME=alpha claude -n alpha-g2", new_session[-1])
+        self.assertNotIn("--resume", new_session[-1])
+
+    def test_all_includes_handed_off_party(self):
+        self._hand_off_alpha()
+        tmux = self._tmux()
+        out = self._revive([], True, False, tmux, None)
+        self.assertIn("launched alpha (fresh)", out)
+        self.assertIn("launched beta (fresh)", out)
+
+    def test_closed_party_rejected_by_name(self):
+        self.run_cli(["party", "close", "beta"], "sess-b", self.work_b)
+        with self.assertRaises(GuildError):
+            self._revive(["beta"], False, False, self._tmux(), None)
+
     def test_no_active_parties(self):
         self.run_cli(["party", "close", "alpha", "--force"], "sess-a", self.work_a)
         self.run_cli(["party", "close", "beta"], "sess-b", self.work_b)

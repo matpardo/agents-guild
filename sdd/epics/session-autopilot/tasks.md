@@ -62,3 +62,10 @@ updated: 2026-10-12
 **Status:** [x] done — #149
 
 **What:** delete the dispatcher pass that writes an automatic handoff for a dead leader, its tests, the decision amendment and the docs; `write_auto` and `run_for_party` stay.
+
+## T09 — Revive starts handed-off parties
+
+**Depends on:** —
+**Status:** [ ] pending
+
+**What:** `guild revive` also lists and launches `awaiting-leader` parties, always with the fresh next-generation command, never `--resume`.

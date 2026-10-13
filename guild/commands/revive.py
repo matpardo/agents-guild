@@ -137,14 +137,14 @@ def _entry(ctx, transcripts_dir, party):
         last_activity,
         cwd,
         mode,
-        transcript,
+        None if party["state"] == "awaiting-leader" else transcript,
         bool(party["keeper"]),
     )
 
 
 def _entries(ctx, transcripts_dir):
     parties = ctx.conn.execute(
-        "SELECT * FROM parties WHERE state = 'active' ORDER BY name ASC"
+        "SELECT * FROM parties WHERE state IN ('active', 'awaiting-leader') ORDER BY name ASC"
     ).fetchall()
     return [_entry(ctx, transcripts_dir, party) for party in parties]
 
