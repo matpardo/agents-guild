@@ -248,6 +248,10 @@ def run(ctx, in_flight, learned, model, respawn, close, tmux, tmux_pane, sleep):
     if respawn and close:
         raise GuildError("--respawn and --close cannot be combined", 1)
     binding = identity.require_binding(ctx.conn, ctx.session_id)
+    if respawn and not party_commands.is_keeper(ctx.conn, binding["party"]):
+        raise GuildError(
+            "--respawn is only for keeper parties; run guild handoff and the human relaunches with guild revive", 1
+        )
     patterns = pii.project_patterns(ctx.projects_dir, binding["project"])
     pii.validate_field(in_flight, "--in-flight", pii.HANDOFF_FIELD_MAX_LENGTH, patterns)
     pii.validate_field(learned, "--learned", pii.HANDOFF_FIELD_MAX_LENGTH, patterns)

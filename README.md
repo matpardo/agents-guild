@@ -1304,8 +1304,8 @@ for a leader (still active, closed, unknown or an invalid name), nothing is
 bound and the context says why (`GUILD_RESUME=<party> not applied: ...`). A
 session that already leads that party (e.g. after `/clear`) is left alone.
 
-`guild handoff --respawn` (keeper parties, and any session guild launched in a
-tmux window, see below) does not print a command for
+`guild handoff --respawn` (keeper parties only; any other party gets
+`--respawn is only for keeper parties` before anything is written) does not print a command for
 the human: it launches that same fresh command itself in a window of the `guild`
 tmux session (created when absent, named after the party, name pinned like
 `revive`), records the window (`leader.window_launched`, table `leader_windows`
@@ -1318,11 +1318,9 @@ that window is still in the `guild` session; otherwise it prints `close this
 window yourself`. If tmux is missing, the cwd is gone or tmux cannot create the
 window it prints `respawn failed: <reason>; old session kept` plus the manual
 command; if the new generation does not bind in time the old window is kept and
-the new one is left running. Nothing else is ever killed. `--respawn` works for
-any party; only keepers get `--remote-control`. The context nudge asks for it
-when the party is a keeper or guild recorded a window for the current generation
-(`leader_windows`), so a session started by `revive` or `--respawn`
-hands off inside tmux instead of exiting and closing its window.
+the new one is left running. Nothing else is ever killed. The keeper context nudge asks for it, so a keeper stays
+reachable through Remote Control; every other party gets the plain handoff nudge
+and the human relaunches with `guild revive`.
 
 `guild handoff --close` writes the handoff like a plain `guild handoff` call but
 closes this same session's pane instead of printing a resume command, only when

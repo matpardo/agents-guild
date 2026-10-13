@@ -76,3 +76,10 @@ updated: 2026-10-12
 **Status:** [x] done — #151
 
 **What:** the dispatcher tells the human to run `guild revive --party <party>` instead of launching a session, and `limit_resume` posts a notice instead of typing into a window. Decision `20261012_dispatcher-suggests-human-launches`.
+
+## T11 — Respawn only for keeper parties
+
+**Depends on:** —
+**Status:** [ ] pending
+
+**What:** `guild handoff --respawn` is refused for non-keeper parties and the context nudge asks for it only from keepers; every other party gets the plain handoff nudge and the human relaunches with `guild revive`.

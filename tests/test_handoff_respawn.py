@@ -262,13 +262,14 @@ class RespawnBindCheckTests(RespawnBase):
 class RespawnNonKeeperTests(RespawnBase):
     start_args = ["party", "start", "alpha"]
 
-    def test_non_keeper_respawns_without_remote_control(self):
-        self._record_window(1, "@1")
-        self.bind_after = 1
+    def test_non_keeper_respawn_is_rejected_before_writing(self):
         tmux = self._fake()
-        text, pane_to_close = self._respawn(tmux, "%5")
-        self.assertEqual(pane_to_close, "%5")
-        self.assertNotIn("--remote-control", tmux.launch_calls()[0][-1])
+        with self.assertRaises(GuildError) as raised:
+            self._respawn(tmux, "%5")
+        self.assertIn("--respawn is only for keeper parties", str(raised.exception))
+        self.assertEqual(tmux.calls, [])
+        self.assertEqual(self._window_rows(), [])
+        self.assertFalse(list(paths.handoffs_dir().glob("*")) if paths.handoffs_dir().exists() else False)
 
 
 class RespawnCliTests(RespawnBase):
