@@ -69,3 +69,10 @@ updated: 2026-10-12
 **Status:** [x] done — #150
 
 **What:** `guild revive` also lists and launches `awaiting-leader` parties, always with the fresh next-generation command, never `--resume`.
+
+## T10 — Dispatcher suggests instead of launching
+
+**Depends on:** T09
+**Status:** [x] done — #151
+
+**What:** the dispatcher tells the human to run `guild revive --party <party>` instead of launching a session, and `limit_resume` posts a notice instead of typing into a window. Decision `20261012_dispatcher-suggests-human-launches`.

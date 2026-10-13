@@ -139,7 +139,7 @@ class DispatcherDocsTests(unittest.TestCase):
         epic_dir = _EPICS_DIR / "dispatcher"
         self.assertEqual(_frontmatter(epic_dir / "spec.md")["status"], "active")
         tasks = sdd.parse_tasks_file(epic_dir / "tasks.md", _PATTERNS)
-        self.assertEqual([task["tid"] for task in tasks], ["T{:02d}".format(number) for number in range(1, 22)])
+        self.assertEqual([task["tid"] for task in tasks], ["T{:02d}".format(number) for number in range(1, 23)])
         by_tid = {task["tid"]: task["sdd_status"] for task in tasks}
         for tid in ("T10", "T11", "T12", "T13"):
             self.assertEqual(by_tid[tid], "done")
