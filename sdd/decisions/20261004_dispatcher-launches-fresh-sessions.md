@@ -14,7 +14,3 @@ The dispatcher acts only through public interfaces: guild commands, `gh`, and ne
 ## Consequences
 
 Answers, red CI and merges reach work without a human nudge. Each launch costs a fresh context instead of reusing one, which `cost-metering` must show is cheaper than long sessions. `20260928_idle-wake-no-go` stays in force. A session that ends idle keeps its party out of dispatch until it is closed. Lifecycle commands stay in `sync`.
-
-## Amendment 2026-10-12
-
-A party whose leader session process has actually died, and whose guild-recorded tmux window is also gone, is no longer left stuck: the dispatcher writes an automatic handoff for it, moving it to `awaiting-leader` so the next pass can relaunch it (`session-autopilot` T04). This narrows "a session that ends idle keeps its party out of dispatch until it is closed": that sentence still holds for a live pid in a live window, however idle — `20260928_idle-wake-no-go` is unchanged — and for any party a human launched by hand outside dispatch/revive/respawn, which has no guild-recorded window and stays out of scope.

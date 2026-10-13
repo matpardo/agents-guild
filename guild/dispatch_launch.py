@@ -6,7 +6,6 @@ from pathlib import Path
 from guild import config, db, events, resume, session_info, timeutil, tmux_windows
 from guild.adapters import github
 from guild.commands import dispatch_pause as dispatch_pause_commands
-from guild.commands import handoff as handoff_commands
 from guild.commands import notice as notice_commands
 from guild.commands import raid as raid_commands
 
@@ -279,39 +278,6 @@ class Launcher:
         if self._ctx.now - timeutil.from_iso(row["decided_at"]) > _BIND_DEADLINE:
             return "did not bind within 10m; window {} left running".format(row["window_id"])
         return None
-
-    def _abandoned_candidates(self, projects):
-        if not self._tmux.installed():
-            return []
-        rows = self._ctx.conn.execute(
-            "SELECT name, project, generation, leader_session_id FROM parties WHERE state = 'active' AND keeper = 0"
-        ).fetchall()
-        live = session_info.live_session_ids(self._ctx.sessions_dir)
-        return [row for row in rows if self._is_abandoned(row, projects, live)]
-
-    def _is_abandoned(self, row, projects, live):
-        if row["project"] not in projects:
-            return False
-        window_id = tmux_windows.recorded_window(self._ctx.conn, row["name"], row["generation"])
-        if window_id is None:
-            return False
-        if row["leader_session_id"] in live:
-            return False
-        return not tmux_windows.window_in_session(self._tmux, window_id)
-
-    def handoff_abandoned_parties(self, projects):
-        lines = []
-        for row in self._abandoned_candidates(projects):
-            binding = {"party": row["name"], "project": row["project"], "generation": row["generation"]}
-            handoff_commands.write_auto(self._ctx, binding)
-            lines.append("{} g{}: automatic handoff written (leader and window gone)".format(row["name"], row["generation"]))
-        return lines
-
-    def preview_handoff_abandoned_parties(self, projects):
-        return [
-            "{} g{}: would write an automatic handoff (leader and window gone)".format(row["name"], row["generation"])
-            for row in self._abandoned_candidates(projects)
-        ]
 
     def _report_failure(self, project_config, party, generation, key, reason):
         project = project_config["name"]

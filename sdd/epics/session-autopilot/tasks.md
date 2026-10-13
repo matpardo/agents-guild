@@ -55,3 +55,10 @@ updated: 2026-10-12
 **Status:** [ ] pending
 
 **What:** wire `SessionEnd` in `claude_settings.py`, doctor and wire-settings; record `session.ended` with its reducer; remove the outdated README line.
+
+## T08 — Remove the dispatcher automatic handoff
+
+**Depends on:** —
+**Status:** [x] done — #149
+
+**What:** delete the dispatcher pass that writes an automatic handoff for a dead leader, its tests, the decision amendment and the docs; `write_auto` and `run_for_party` stay.
