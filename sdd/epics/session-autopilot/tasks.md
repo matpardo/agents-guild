@@ -62,3 +62,10 @@ updated: 2026-10-13
 **Status:** [x] done — #152
 
 **What:** `guild handoff --respawn` is refused for non-keeper parties and the context nudge asks for it only from keepers; every other party gets the plain handoff nudge and the human relaunches with `guild revive`.
+
+## T12 — Rescope the epic to human-launched sessions
+
+**Depends on:** —
+**Status:** [x] done — #153
+
+**What:** rewrite the spec to "the human launches, guild suggests", drop the Stop-hook wrap-up, breaker and SessionEnd tasks, and close the epic.
