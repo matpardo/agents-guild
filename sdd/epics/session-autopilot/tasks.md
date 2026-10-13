@@ -1,11 +1,11 @@
 ---
 epic: session-autopilot
 type: tasks
-title: Guild-launched sessions end themselves and hand off
-status: active
-updated: 2026-10-12
+title: Sessions run in tmux, launched by the human
+status: done
+updated: 2026-10-13
 ---
-# Tasks: Guild-launched sessions end themselves and hand off
+# Tasks: Sessions run in tmux, launched by the human
 
 ## T01 — Global dispatch pause
 
@@ -34,27 +34,6 @@ updated: 2026-10-12
 **Status:** [x] done — #146
 
 **What:** one step in `dispatch._pass` after `reconcile`: party active, recorded window present, party leader session not live, window gone → `write_auto`. Adds an ADR amending `20261004_dispatcher-launches-fresh-sessions`.
-
-## T05 — Stop hook wraps up unattended sessions
-
-**Depends on:** T03
-**Status:** [ ] pending
-
-**What:** needs dispatcher T10 merged. The Stop hook honors `stop_hook_active` and prints a block decision once; the second stop runs `write_auto` and closes the recorded pane. Marker files for "launch prompt seen" and "attended" join the prune pattern. Skipped on a usage limit.
-
-## T06 — Automatic-handoff breaker
-
-**Depends on:** T04
-**Status:** [ ] pending
-
-**What:** the dispatcher skips with a notice when the party's last two handoffs were automatic, following the existing launch breaker.
-
-## T07 — SessionEnd records the end
-
-**Depends on:** —
-**Status:** [ ] pending
-
-**What:** wire `SessionEnd` in `claude_settings.py`, doctor and wire-settings; record `session.ended` with its reducer; remove the outdated README line.
 
 ## T08 — Remove the dispatcher automatic handoff
 
