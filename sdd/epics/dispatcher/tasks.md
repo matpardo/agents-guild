@@ -240,3 +240,13 @@ updated: 2026-10-04
 
 **Acceptance:**
 - [x] An `on` rule creates no tmux window and sends no keys; a second pass suggests nothing new; a busy party is still deferred; config rejects the removed keys.
+
+## T23 — Clear deferred dispatches whose trigger no longer holds
+
+**Depends on:** T22
+**Status:** [ ] todo
+
+**What:** a deferred trigger whose cause resolved (PR merged, checks green, ask dismissed) is recorded `skipped` with `no longer holds` instead of staying `deferred` forever; the inbox shows a deferred line only while its decision is still deferred, so a fresh session does not replay old ones.
+
+**Acceptance:**
+- [ ] A merged PR clears its deferred `pr_unmergeable` row on the next pass; a resolved deferral prints no inbox line.

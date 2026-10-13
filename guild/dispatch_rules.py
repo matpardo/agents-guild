@@ -244,6 +244,10 @@ _DEFERRED = {
 }
 
 
+def rebuildable(rule):
+    return rule in _DEFERRED
+
+
 def deferred_trigger(conn, row):
     rebuild = _DEFERRED.get(row["rule"])
     if rebuild is None:

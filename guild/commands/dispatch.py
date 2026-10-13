@@ -127,8 +127,12 @@ def _deferred_lines(ctx, launcher, enabled, dry_run):
         if project_config is None:
             continue
         mode = project_config["dispatcher"]["rules"].get(row["rule"])
+        if mode is None:
+            continue
         trigger = dispatch_rules.deferred_trigger(ctx.conn, row)
-        if mode is None or trigger is None:
+        if trigger is None:
+            if not dry_run and dispatch_rules.rebuildable(row["rule"]):
+                launcher.drop_deferred(row)
             continue
         line = _retry_line(launcher, project_config, trigger, mode, dry_run)
         if line is not None:

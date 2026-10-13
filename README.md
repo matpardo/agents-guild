@@ -1549,7 +1549,8 @@ paused: the trigger is recorded as `deferred` with that reason (the key is not
 consumed) and re-evaluated at the start of every pass, before new events,
 until the party is free. A deferral older than 24 hours is skipped
 with `deferred too long` and one project notice; a deferred ask that was
-dismissed, or checks that turned green, are dropped. The one-hour age guard
+dismissed, checks that turned green, or a PR that merged are dropped: the
+decision is recorded as `skipped` with `no longer holds`. The one-hour age guard
 applies to new events only. While dispatch is paused this 24-hour expiry is
 suspended; a deferral already older than 24 hours when dispatch resumes still
 drops on the next pass with `deferred too long` (a known limit).
@@ -1594,7 +1595,8 @@ or is closed. The notice is posted except for keeper and closed.
   per project, the cursor, the rules and the ten latest decisions.
 - A trigger deferred because the party has a live session shows up in that
   session's inbox as `- dispatch <rule>: <subject> needs you (deferred while
-  your session is live)`, once. Dry-run and other busy reasons stay silent.
+  your session is live)`, once, while it is still deferred. Dry-run and other
+  busy reasons stay silent.
 - A session that ends idle keeps its party out of dispatch until it is closed.
   Lifecycle commands (`guild lifecycle`) stay in `sync`.
 - The keys `permission_mode` and `max_launches_per_hour` of the `dispatcher`
