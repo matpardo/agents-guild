@@ -69,3 +69,10 @@ updated: 2026-10-13
 **Status:** [x] done — #153
 
 **What:** rewrite the spec to "the human launches, guild suggests", drop the Stop-hook wrap-up, breaker and SessionEnd tasks, and close the epic.
+
+## T13 — Record why the autopilot was reversed
+
+**Depends on:** —
+**Status:** [x] done — #154
+
+**What:** add a History and a Revisit-when section to the decision that replaced the autopilot.
