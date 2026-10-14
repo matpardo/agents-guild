@@ -213,6 +213,12 @@ class MergeQueuePageTests(MergeQueueTestCase):
         self.assertRegex(self.css, r"(?m)^li\.queue-waiting > \.queue-reason\s*\{")
         self.assertRegex(self.css, r"(?m)^\.checks-pending\s*\{")
 
+    def test_page_tags_ready_entries_with_a_green_ready_pill(self):
+        self.assertIn('entry.state === "ready"', self.js)
+        self.assertIn('entry.labels.indexOf("draft") === -1', self.js)
+        self.assertIn("renderReadyPill()", self.js)
+        self.assertRegex(self.css, r"(?m)^\.lifecycle-ready\s*\{")
+
     def test_page_says_guild_never_merges(self):
         self.assertIn("guild never merges", self.js)
 
