@@ -421,7 +421,7 @@ class RenderForBindingTests(TaskBriefBase):
 
     def test_paused_raid_without_active_task_returns_nothing(self):
         self.cli(["task", "done", "demo/T01"])
-        self.cli(["raid", "join", "ci", "--until-leave", "--lead"])
+        self.cli(["raid", "join", "ci", "--until-leave"])
         self.cli(["raid", "pause", "ci"])
         self.assertEqual(self._render(2), [])
 

@@ -26,7 +26,7 @@ class MergeQueueModelTestCase(MergeQueueTestCase):
         self.track("sess-2", 2, "qb/T02", "ready")
         self.track("sess-2", 3, "qb/T02", "draft")
         self.track("sess-3", 4, "qc/T01", "ready")
-        self.run_cli(["raid", "join", "ci", "--until-leave", "--lead"], "sess-1", self.repo_dir)
+        self.run_cli(["raid", "join", "ci", "--until-leave"], "sess-1", self.repo_dir)
         self.run_cli(["raid", "join", "ci", "--until-leave"], "sess-2", self.repo_dir)
         self.run_cli(["raid", "join", "empty", "--until-leave"], "sess-4", self.repo_dir)
         self.write_gh_fixture("view_files_acme-app_1", diff_fixture([_ES], 9, 1, "2026-09-01T10:00:00Z"))

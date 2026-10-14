@@ -3,7 +3,7 @@ epic: raids-in-practice
 type: tasks
 title: Raids that protect parallel work on one epic
 status: active
-updated: 2026-10-11
+updated: 2026-10-14
 ---
 
 # Tasks: Raids that protect parallel work on one epic
@@ -84,3 +84,13 @@ updated: 2026-10-11
 **Status:** [x] done — #112
 
 **What:** `guild finding record <owner/repo>#<n> --class <slug>` counts each recurring audit or review finding class once per PR; with `finding_guard_threshold` set, one `project:` notice asks to make the class an architecture guard when it repeats that many times.
+
+## T12 — Drop the raid lead role
+
+**Depends on:** T11
+**Status:** [ ] pending
+
+**What:** decision of the dev on 2026-10-14 (`sdd/decisions/20261014_board-shows-waits-no-dispatcher.md`): `raid join` loses `--lead`, members' asks and session waits stop relaying to a lead, any active raid member or the human may pause, resume and pin, and the lead marks leave the CLI, the board, the web, history and the handoff. The `raid_members.lead` column is dropped and old `raid.joined` events replay without it.
+
+**Acceptance:**
+- [ ] `guild raid join --lead` no longer exists, a member's ask reaches only the human, any active member pins and pauses, and a rebuild of an old event log with `lead` in `raid.joined` succeeds.

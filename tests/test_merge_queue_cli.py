@@ -30,7 +30,7 @@ class QueueCliTestCase(MergeQueueTestCase):
         self.track("sess-3", 5, "qc/T01", "ready")
         self.track("sess-3", 6, "qc/T01", "draft")
         self.track("sess-4", 7, "qd/T01", "ready")
-        self.run_cli(["raid", "join", "ci", "--until-leave", "--lead"], "sess-1", self.repo_dir)
+        self.run_cli(["raid", "join", "ci", "--until-leave"], "sess-1", self.repo_dir)
         self.run_cli(["raid", "join", "ci", "--until-leave"], "sess-2", self.repo_dir)
         self.run_cli(["raid", "join", "ci", "--until-leave"], "sess-4", self.repo_dir)
         self.run_cli(["raid", "join", "other", "--until-leave"], "sess-4", self.repo_dir)

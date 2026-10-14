@@ -1,7 +1,7 @@
 import json
 from datetime import timedelta
 
-from guild import config, events, merge_queue, pr_asks, resolve, sanitize, timeutil
+from guild import config, events, merge_queue, pr_asks, resolve, timeutil
 from guild.commands import drift as drift_commands
 from guild.commands import merge_queue as merge_queue_commands
 from guild.commands import pr as pr_commands
@@ -272,59 +272,6 @@ def _evaluate_next_task(conn, now, project, party):
     return None, disagreements, blocked
 
 
-def _led_raid_members(conn, now, party):
-    led = {}
-    for membership in raid_commands.member_raids(conn, now, party):
-        lead = raid_commands.active_lead(conn, now, membership["raid"])
-        if lead is None or lead["party"] != party:
-            continue
-        led[membership["raid"]] = {
-            row["party"] for row in raid_commands.active_members(conn, now, membership["raid"])
-        } - {party}
-    return led
-
-
-def _raid_ask_lines(conn, raid_name, members):
-    rows = conn.execute("SELECT * FROM asks WHERE state = 'open' ORDER BY id ASC").fetchall()
-    return [
-        'raid {}: ask #{} from {}: "{}"'.format(
-            raid_name, row["id"], row["party"], sanitize.collapse_to_single_line(row["question"])
-        )
-        for row in rows
-        if row["party"] in members
-    ]
-
-
-def _raid_queue_entry_line(raid_name, position, entry):
-    prefix = "next action: " if entry["next_action"] else ""
-    return "raid {}: merge queue {}{}. {} {} \u2014 {}".format(
-        raid_name, prefix, position, entry["ref"], entry["party"], entry["action"]
-    )
-
-
-def _raid_queue_lines(conn, raid_name, members):
-    scoped = merge_queue_commands.load_scoped_queue(conn, members)
-    lines = [
-        "raid {}: {}".format(raid_name, merge_queue_commands.main_headline(row))
-        for row in scoped["main"]
-    ]
-    lines.extend(
-        _raid_queue_entry_line(raid_name, position, entry)
-        for position, entry in enumerate(scoped["queue"], start=1)
-    )
-    return lines
-
-
-def _lead_raid_lines(conn, now, party):
-    led = _led_raid_members(conn, now, party)
-    lines = []
-    for raid_name in sorted(led):
-        lines.extend(_raid_ask_lines(conn, raid_name, led[raid_name]))
-    for raid_name in sorted(led):
-        lines.extend(_raid_queue_lines(conn, raid_name, led[raid_name]))
-    return [sanitize.strip_control_sequences(line) for line in lines]
-
-
 def _pr_label(row):
     return "{}#{}".format(row["repo"], row["number"])
 
@@ -339,7 +286,7 @@ def _drift_line(finding):
     return "update tracker/SDD: {}".format(finding)
 
 
-def _render_all(candidates, drift, next_task, wait, disagreements, raid_lines):
+def _render_all(candidates, drift, next_task, wait, disagreements):
     lines = []
     for row, reason, _ in candidates:
         lines.append("PR {}: {}".format(_pr_label(row), reason))
@@ -354,13 +301,12 @@ def _render_all(candidates, drift, next_task, wait, disagreements, raid_lines):
         lines.append(wait)
     for line in disagreements:
         lines.append("disagreement: {}".format(line))
-    lines.extend(raid_lines)
     if not lines:
         lines.append("nothing actionable")
     return lines
 
 
-def _render_single(ctx, candidates, drift, next_task, wait, disagreements, blocked, raid_lines, acknowledge):
+def _render_single(ctx, candidates, drift, next_task, wait, disagreements, blocked, acknowledge):
     if candidates:
         row, reason, should_ack = candidates[0]
         if should_ack and acknowledge:
@@ -385,11 +331,6 @@ def _render_single(ctx, candidates, drift, next_task, wait, disagreements, block
         return lines
     if wait is not None:
         lines = [wait]
-        for line in disagreements:
-            lines.append("disagreement: {}".format(line))
-        return lines
-    if raid_lines:
-        lines = [raid_lines[0]]
         for line in disagreements:
             lines.append("disagreement: {}".format(line))
         return lines
@@ -461,11 +402,10 @@ def run(ctx, binding, show_all, acknowledge):
         return _paused_lines(paused_rows)
     candidates, next_task, wait, disagreements, blocked = _collect(ctx, party, project)
 
-    raid_lines = _lead_raid_lines(ctx.conn, ctx.now, party)
     drift = _party_drift(ctx, party, project)
 
     if show_all:
-        return _render_all(candidates, drift, next_task, wait, disagreements, raid_lines)
+        return _render_all(candidates, drift, next_task, wait, disagreements)
     return _render_single(
-        ctx, candidates, drift, next_task, wait, disagreements, blocked, raid_lines, acknowledge
+        ctx, candidates, drift, next_task, wait, disagreements, blocked, acknowledge
     )

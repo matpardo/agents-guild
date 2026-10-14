@@ -279,7 +279,7 @@ class InboxSessionWaitingTests(GuildTestCase):
         self.run_cli(["party", "start", "alpha"], "sess-1", self.repo_dir)
         self.run_cli(["party", "start", "beta"], "sess-2", self.repo_dir)
         self.run_cli(["party", "start", "gamma"], "sess-3", self.repo_dir)
-        self.run_cli(["raid", "join", "ci", "--until-leave", "--lead"], "sess-1", self.repo_dir)
+        self.run_cli(["raid", "join", "ci", "--until-leave"], "sess-1", self.repo_dir)
         self.run_cli(["raid", "join", "ci", "--until-leave"], "sess-2", self.repo_dir)
         self.run_cli(["raid", "join", "ci", "--until-leave"], "sess-3", self.repo_dir)
 
@@ -299,40 +299,10 @@ class InboxSessionWaitingTests(GuildTestCase):
         self.assertEqual(code, 0, err)
         return out
 
-    def test_lead_sees_member_permission_wait_without_message(self):
+    def test_member_wait_is_not_relayed_to_other_members(self):
         self._notify("sess-2", "permission_prompt", "SECRET-COMMAND rm -rf")
-        out = self._inbox("sess-1")
-        self.assertIn("- beta (raid ci) waiting on permission", out)
-        self.assertNotIn("SECRET-COMMAND", out)
-
-    def test_lead_sees_member_elicitation_wait_as_input(self):
-        self._notify("sess-2", "elicitation_dialog", "pick")
-        self.assertIn("- beta (raid ci) waiting on input", self._inbox("sess-1"))
-
-    def test_idle_wait_is_not_forwarded(self):
-        self._notify("sess-2", "idle_prompt", "idle")
         self.assertNotIn("waiting on", self._inbox("sess-1"))
-
-    def test_non_lead_member_gets_nothing(self):
-        self._notify("sess-2", "permission_prompt", "x")
-        self.assertNotIn("waiting on", self._inbox("sess-3"))
-
-    def test_own_wait_not_forwarded_to_self(self):
-        self._notify("sess-1", "permission_prompt", "x")
-        self.assertNotIn("waiting on", self._inbox("sess-1"))
-
-    def test_non_member_party_wait_not_forwarded(self):
-        self.run_cli(["party", "start", "delta"], "sess-4", self.repo_dir)
-        self._notify("sess-4", "permission_prompt", "x")
-        self.assertNotIn("delta", self._inbox("sess-1"))
-
-    def test_wait_lines_follow_ask_lines(self):
-        self._notify("sess-2", "permission_prompt", "x")
-        self.run_cli(["quest", "add", "bq", "--title", "B", "--no-epic"], "sess-2", self.repo_dir)
-        self.run_cli(["task", "add", "bq/T01", "--title", "First"], "sess-2", self.repo_dir)
-        self.run_cli(["ask", "ready?", "--context", "x", "--ref", "task:bq/T01"], "sess-2", self.repo_dir)
-        out = self._inbox("sess-1")
-        self.assertLess(out.index("ask #1 from beta"), out.index("beta (raid ci) waiting on permission"))
+        self.assertNotIn("SECRET-COMMAND", self._inbox("sess-3"))
 
 
 class BoardTests(GuildTestCase):
@@ -438,12 +408,12 @@ class BoardTests(GuildTestCase):
         code, out, err = self.run_cli(["board"], None, None)
         self.assertIn("(gen 1, active, solo)", out)
 
-    def test_board_header_shows_raid_lead_role(self):
+    def test_board_header_shows_raid_name(self):
         repo_dir = self.register_project("acme", ["acme/app"])
         self.run_cli(["party", "start", "alpha"], "sess-1", repo_dir)
-        self.run_cli(["raid", "join", "infra", "--ttl", "2h", "--lead"], "sess-1", repo_dir)
+        self.run_cli(["raid", "join", "infra", "--ttl", "2h"], "sess-1", repo_dir)
         code, out, err = self.run_cli(["board"], None, None)
-        self.assertIn("(gen 1, active, RL infra)", out)
+        self.assertIn("(gen 1, active, infra)", out)
 
 
 class BoardSessionStatusTests(GuildTestCase):

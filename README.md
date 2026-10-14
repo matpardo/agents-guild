@@ -45,7 +45,6 @@ are updated in the same PR as the code.
   CI), so a notice can reach exactly that audience. Exists while it has at
   least one active (non-expired) member; join/leave with `guild raid
   join|leave`, post to it with `guild notice create ... --to raid:<name>`.
-- **raid lead** — a party coordinating a raid; a normal local session.
 - **brief** — what a fresh session reads: handoff, task, PR and asks.
 
 ## Install
@@ -120,7 +119,7 @@ guild wire-settings   # merge guild hooks and permission rules into ~/.claude/se
 
 guild party start <name>
 guild party resume <party> [--session <name>]   # --session: from a human terminal only
-guild party close [<party>] [--force]  # <party>: from a terminal, or your own party; --force overrides the raid-lead guard and the quest done gate
+guild party close [<party>] [--force]  # <party>: from a terminal, or your own party; --force overrides the quest done gate
 
 guild quest add <slug> --title "..." --epic <slug> --tasks T09,T07b
 guild quest add <slug> --title "..." --no-epic [--tasks A,B [--titles "First,Second"]]
@@ -169,9 +168,8 @@ guild memory rm <party>/<seq>                 # bound session: only your own par
 
 guild raid join <name> --ttl <dur>      # the caller's bound party joins; joining again refreshes the TTL
 guild raid join <name> --until-leave    # joins with no expiry; ends only on `raid leave` or `party close`
-guild raid join <name> (--ttl <dur> | --until-leave) --lead  # also becomes the raid's lead
 guild raid leave <name>
-guild raid pause <name>               # lead only (any member if no lead; the human always): ask every member party to stop
+guild raid pause <name>               # any active member or the human: ask every member party to stop
 guild raid resume <name>              # lifts the pause and posts a notice to raid:<name>
 guild raids
 
@@ -203,7 +201,7 @@ guild drift [--epic <slug> | --all]
 guild revive [--party <name> ...] [--all] [--list]   # relaunch active or handed-off parties
 guild brief [<party>/<quest>/<tid>]   # no argument: per-session view; with a task: read-only, budgeted brief for a fresh session
 guild inbox --since-last
-guild statusline --session <id> [--ctx <pct>]   # bound: [⚔ <raid>[·RL][ ⏸], ...] · g<N> · ⚑<n> asks · <n> notices · ⏸<n> blocked
+guild statusline --session <id> [--ctx <pct>]   # bound: [⚔ <raid>[ ⏸], ...] · g<N> · ⚑<n> asks · <n> notices · ⏸<n> blocked
 
 guild hook session-start   # reads Claude Code hook JSON on stdin
 guild hook prompt-submit
@@ -305,18 +303,7 @@ Deterministic, per-party ranking, evaluated in order:
    `tasks.order_idx` (nulls last, then `tid`), whose dependencies (`tasks.deps`)
    all resolve `done` (see resolver below), that has no open ask referencing
    it and is not task-claimed by another party.
-8. Raid lead work, only for a party that is the active lead of a raid: open
-   asks from the raid's other member parties (`raid <name>: ask #<id> from
-   <party>: "<question>"`), then the raid's merge queue entries for the other
-   members' PRs, one line per PR in queue order with its action
-   (`raid <name>: merge queue <n>. <ref> <party> — merge` / `— promote: gh pr
-   ready → <party>` / `— wait: <reasons>` / `— fix: <reasons> → <party>`,
-   `next action:` before the number on the first blocked PR above one whose
-   action is `merge`), preceded by `raid <name>: MAIN RED <repo> — <reason> (<source>)
-   → fix before anything` for each red main. Without `--all` only
-   the first item is printed. Read-only: guild never merges and nothing is
-   acknowledged.
-9. Nothing actionable: the exact blockers (pending deps and who says so, open
+8. Nothing actionable: the exact blockers (pending deps and who says so, open
    ask ids, claim holders).
 
 Any disagreement the dependency resolver finds between sources it consulted
@@ -334,9 +321,6 @@ read-only: it never fires that event.
 
 `guild party close` closes the caller's party; `guild party close <party>`
 closes any party from a terminal (a session may only name its own party).
-A party that leads a raid cannot be closed while that raid has other active
-members (a member's open asks live and die with its membership): the command
-fails naming the raid and the members, and `guild party close --force` closes anyway.
 Close applies the `guild quest done` gate to each active quest of the party: it
 refuses, listing every quest with tasks not done or epic drift, and `--force`
 closes anyway, reporting each such quest as `closed with unfinished work`.
@@ -468,8 +452,8 @@ a clone. `guild doctor` and `guild brief` warn when a located local base is
 behind its `origin/<base>` ref regardless of the flag (they never fetch, so
 the comparison uses the last fetched state).
 
-`guild` has no daemon, so this only fires when someone runs the sync. A raid
-lead should keep a watcher running for the duration of the raid, e.g.
+`guild` has no daemon, so this only fires when someone runs the sync. Someone
+in the raid should keep a watcher running for the duration of the raid, e.g.
 `watch -n 300 guild sync --source gh` from a terminal, or `/loop 5m guild
 sync --source gh` from a session that supports it.
 
@@ -491,7 +475,7 @@ Read-only record of what the guild has achieved. Six sections:
    marking time. They do not count in totals or in finished raids.
 4. Finished raids, ordered by creation date (newest first, undated last): raids with no active member, derived from
    `raid.joined`/`raid.left`/`party.closed` events and membership expiry. Each
-   shows start (first join), end, parties (lead marked), quests completed and
+   shows start (first join), end, parties, quests completed and
    PRs merged by member parties inside that window, and the pause count.
 5. Lifecycle failures, newest first: failed, timed-out and errored `lifecycle.ran`
    events with the project, event, status, exit detail and the last non-empty
@@ -976,7 +960,7 @@ files,additions,deletions,createdAt` call and stores the matched globs
 rebuilt from the `pr.synced` event). PRs of parties outside raids with no
 claims cost no extra call, and their overlaps are unknown to the queue. A
 failed call is a sync failure (non-zero exit) and keeps the previous rows. A
-raid lead should keep the sync running (see "Merge notices").
+raid member should keep the sync running (see "Merge notices").
 
 **Stacked PRs.** A PR whose base branch is the branch of another open PR of
 the same repo merges after it; the queue shows `after X (stacked on it)` on the stacked PR and
@@ -987,8 +971,8 @@ cannot invert the stack (it is rejected as a cycle).
 `a` merges before `b` (event `merge_queue.pinned`, with the author party or
 `human`; projection `merge_queue_pins`, rebuild-safe); `unpin` removes it
 (`merge_queue.unpinned`). Both PRs must be tracked and open to pin. Who may
-pin: when both PRs belong to members of the same raid, only that raid's lead
-party or the human (also when one party owns both); otherwise only the party
+pin: when both PRs belong to members of the same raid, any active
+member of that raid or the human (also when one party owns both); otherwise only the party
 that owns both PRs, or the human. The human is a session-less terminal; a
 bound session acts as its party and an unbound session is refused. A pin that
 would close a cycle with existing pins, stacks or task dependencies is rejected
@@ -1140,8 +1124,7 @@ and its `wait:` text when `max_open_prs_per_party` is set, model key
 then one collapsible block per party with its own drift (the same
 findings and cap of 5 as the session brief, then `N more`; hidden when
 empty), quests, tasks and
-PRs, plus PRs outside active tasks, raids (each with a `lead` badge when
-that membership is the raid's lead) and claims. A party filter, a state
+PRs, plus PRs outside active tasks, raids and claims. A party filter, a state
 filter (`all`/`fixes-main`/`fixes-flaky`/`needs-ask-answer`/`needs-human-pr-review`/`converging`/`ready`/`draft`/`merged`) and a
 raid filter (`all` plus one option per raid, narrowing parties, asks and
 notices the same way `guild board --raid` does) narrow what is shown; the
@@ -1266,8 +1249,8 @@ progress" when empty). A quest idle for longer than the project's
 totals strip (quests, PRs merged, tasks, asks answered with median, handoffs),
 then completed-quest cards (dates, duration, epic progress bar, SDD tasks, JIRA
 cards, PRs, handoffs, asks, accepted drift; legacy quests show a `no snapshot`
-badge and `—` for unknown fields) closed-without-completing cards (reason, tasks not done at marking time), finished-raid cards (duration, parties
-with the lead marked, quests, PRs, pauses) and a lifecycle-failures list (project,
+badge and `—` for unknown fields) closed-without-completing cards (reason, tasks not done at marking time), finished-raid cards (duration, parties,
+quests, PRs, pauses) and a lifecycle-failures list (project,
 event, status, detail, last output line).
 
 ### `guild handoff` and resuming a party
@@ -1280,9 +1263,7 @@ claims, plus the two free-text fields), records `party.handed_off` (party →
 one command for the human to run. `--learned` also joins the party's memory
 (`guild memory add`, see "Personal data and length caps" below), trimmed to
 the memory length cap when longer; the handoff file itself keeps the full
-text. A party that leads a raid gets a `Role`
-section in the handoff (`you lead raid <name>`), so the resumed session
-knows it is the lead:
+text.:
 
 ```
 GUILD_RESUME=<party> claude -n <party>-g<N+1> 'Continue the work described in the guild brief.'
@@ -1479,7 +1460,7 @@ targeting` is the single place that resolves whether a notice's `project:`,
 
 `guild raid pause <name>` marks the raid paused (events `raid.paused` /
 `raid.resumed`, projection table `raid_pauses`, rebuilt like everything else).
-Only the raid's lead may pause or resume; with no lead any active member may.
+Any active member of the raid, or the human, may pause or resume.
 Pausing an already paused raid, or resuming one that is not paused, is a clear
 error. While paused:
 
@@ -1498,29 +1479,11 @@ error. While paused:
 <name> resumed` to `raid:<name>` (8h TTL), which reaches members through the
 normal notice injection.
 
-### Raid lead
+### Asks inside a raid
 
-`guild raid join <name> (--ttl <dur> | --until-leave) --lead` makes the
-caller's bound party the raid's lead. At most one lead per raid: a second
-party's `--lead` join fails, naming the current lead
-(`raid '<name>' already has a lead: party '<party>'`), while that lead is
-still an active member. The same party re-joining with `--lead` is always
-fine, and a plain renewal (no `--lead`) of an already-lead party keeps its
-lead status — only the lead leaving (`raid leave`), its party closing, or
-its membership expiring clears the raid's lead, after which the next
-`--lead` join succeeds. The lead is shown everywhere raid membership is
-shown: `guild raids` (`alpha (lead, 5h left)`), `guild board`'s party block
-(`raids: ci (lead, until leave)`), `guild web`'s per-party raid list (a
-`lead` badge) and top-level raid filter model, and every member's
-session-start brief (`raid ci — lead: alpha`).
-
-When a party that belongs to a raid creates an ask, the lead of each such
-raid (if any, and not the asker) receives it once in its inbox
-(`prompt-submit`/`post-tool-use`), framed the same way as other
-cross-session messages: `- ask #N from <party> (raid <name>): "<question>"`.
-The ask still goes to the human queue as always. `guild answer` is not
-restricted to the human terminal — any bound session, including the raid
-lead, may answer an ask and the answer reaches the asker through the normal
+A member's ask goes to the human queue only; no other member receives it in
+its inbox. `guild answer` is not restricted to the human terminal: any bound
+session may answer an ask and the answer reaches the asker through the normal
 inbox path.
 
 ### Raid views and clearer project errors
@@ -1532,7 +1495,7 @@ member), and claims held by those parties. An unknown raid name and a raid
 with no active members give the same clear error
 (`raid '<name>' has no active members`). `--raid` and `--party` are
 mutually exclusive. `guild web`'s board model gains a top-level
-`raids: [{name, lead, members}]` list, and the page gains a raid filter
+`raids: [{name, members, paused}]` list, and the page gains a raid filter
 select (`all` plus one option per raid) that narrows parties, asks and
 notices the same way the terminal `--raid` filter does.
 
@@ -2025,7 +1988,7 @@ reads stdin.
 
 Claims taken by either guard are released when the holder's PR that touched
 them is merged, as seen by `guild sync --source gh` (see "Merge notices"), so
-the raid lead's `/loop` sync is what frees the area for other parties before
+a raid member's `/loop` sync is what frees the area for other parties before
 the TTL runs out.
 
 Wire it without touching the project's repository. With husky (it sources a
@@ -2181,9 +2144,6 @@ Surfaces, each with the age of the status (`45s`, `12m`, `3h`, `2d`):
   detail, label) and a `blocked` list in the asks area.
 - `guild statusline`: `⏸<n> blocked`, omitted when zero.
 - `guild revive`: a `status:` line per party in the listing.
-- The raid lead's inbox: `- <party> (raid <raid>) waiting on permission` (or
-  `input` for an elicitation) when a member blocks. Idle waits are not
-  forwarded, and the message text never is.
 
 **Context pressure and the resume command.** A party whose live leader session
 is at or above the project's `handoff_threshold` is *context high*: it is about
@@ -2223,7 +2183,7 @@ pending is ignored, so the party stays `waiting-permission`.
 **Security.** The notification message is text from Claude Code and may quote a
 command. It is sanitized, collapsed to one line, truncated to 200 characters
 and stored with `local` visibility only: it is never exported, never forwarded
-to the raid lead and never passed to the push command, which receives only the
+to other sessions and never passed to the push command, which receives only the
 party name and the wait type.
 
 **Limitations.** The status stays `waiting-permission` until the next

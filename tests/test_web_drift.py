@@ -266,7 +266,7 @@ class WebNoticeAndRaidBehaviorTests(unittest.TestCase):
             ).stdout.strip()
 
     def _board(self, paused):
-        raids = [{"name": "r", "members": ["c"], "paused": paused, "lead": None}]
+        raids = [{"name": "r", "members": ["c"], "paused": paused}]
         return dict(_BOARD, raids=raids, projects=[{"name": "acme"}])
 
     def test_notice_form_lists_project_and_raid_scopes(self):

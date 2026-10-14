@@ -100,7 +100,7 @@ class VocabularyDecisionTests(unittest.TestCase):
     def test_readme_glossary_matches(self):
         glossary = _README.split("## Glossary")[1].split("## Install")[0]
         self.assertIn("the live session of a party: zero or one", glossary)
-        for term in ("generation", "raid lead", "brief"):
+        for term in ("generation", "brief"):
             self.assertIn("- **{}**".format(term), glossary)
 
 

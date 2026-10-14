@@ -20,10 +20,9 @@ def read_ctx(state_dir, session_id):
 
 
 def _raid_label(ctx, row):
-    label = "{}·RL".format(row["raid"]) if row["lead"] else row["raid"]
     if raid_commands.is_paused(ctx.conn, row["raid"]):
-        return "{} ⏸".format(label)
-    return label
+        return "{} ⏸".format(row["raid"])
+    return row["raid"]
 
 
 def _identity_parts(ctx, party, generation):

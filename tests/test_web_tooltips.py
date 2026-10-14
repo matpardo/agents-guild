@@ -81,7 +81,7 @@ class TooltipCoverageTests(unittest.TestCase):
         self.assertCovers("scope", ["guild", "project", "raid"])
 
     def test_roles(self):
-        self.assertCovers("role", ["solo", "lead", "member"])
+        self.assertCovers("role", ["solo", "member"])
 
     def test_blocked_waits(self):
         self.assertCovers("blockedWait", ["permission"])

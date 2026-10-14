@@ -21,7 +21,7 @@ class PinTestCase(MergeQueueTestCase):
         self.track("sess-2", 6, "qb/T02", "ready")
         self.track("sess-3", 4, "qc/T01", "ready")
         self.track("sess-3", 5, "qc/T02", "ready")
-        self.run_cli(["raid", "join", "ci", "--until-leave", "--lead"], "sess-1", self.repo_dir)
+        self.run_cli(["raid", "join", "ci", "--until-leave"], "sess-1", self.repo_dir)
         self.run_cli(["raid", "join", "ci", "--until-leave"], "sess-2", self.repo_dir)
 
     def pin(self, session_id, first, second):
@@ -44,27 +44,31 @@ class PinTestCase(MergeQueueTestCase):
 
 
 class PinAuthorityTests(PinTestCase):
-    def test_raid_lead_pins_prs_of_two_members(self):
+    def test_raid_member_pins_prs_of_two_members(self):
         code, out, err = self.pin("sess-1", 2, 3)
         self.assertEqual(code, 0, err)
         self.assertEqual(self.pins(), [(2, 3, "alpha")])
 
-    def test_raid_lead_pins_its_own_prs(self):
+    def test_raid_member_pins_its_own_prs(self):
         code, out, err = self.pin("sess-1", 1, 2)
         self.assertEqual(code, 0, err)
 
-    def test_raid_member_that_is_not_lead_is_rejected(self):
-        code, out, err = self.pin("sess-2", 3, 2)
-        self.assertEqual(code, 1)
-        self.assertIn("raid 'ci'", err)
-        self.assertIn("lead", err)
-        self.assertIn("alpha", err)
-        self.assertEqual(self.pins(), [])
+    def test_other_raid_member_pins_prs_of_two_members(self):
+        code, out, err = self.pin("sess-2", 3, 1)
+        self.assertEqual(code, 0, err)
+        self.assertEqual(self.pins(), [(3, 1, "beta")])
 
-    def test_member_owning_both_prs_of_a_raid_is_still_rejected(self):
-        code, out, err = self.pin("sess-2", 3, 6)
+    def test_member_of_the_raid_owning_neither_pr_pins(self):
+        self.run_cli(["raid", "join", "ci", "--until-leave"], "sess-3", self.repo_dir)
+        code, out, err = self.pin("sess-3", 2, 3)
+        self.assertEqual(code, 0, err)
+
+    def test_party_outside_the_shared_raid_is_rejected(self):
+        code, out, err = self.pin("sess-3", 2, 3)
         self.assertEqual(code, 1)
         self.assertIn("raid 'ci'", err)
+        self.assertIn("active member", err)
+        self.assertEqual(self.pins(), [])
 
     def test_human_pins_inside_a_raid(self):
         code, out, err = self.pin(None, 3, 2)
@@ -81,7 +85,7 @@ class PinAuthorityTests(PinTestCase):
         self.assertEqual(code, 1)
         self.assertIn("party 'gamma' does not own both PRs", err)
 
-    def test_raid_lead_cannot_pin_across_the_raid_boundary(self):
+    def test_raid_member_cannot_pin_across_the_raid_boundary(self):
         code, out, err = self.pin("sess-1", 1, 4)
         self.assertEqual(code, 1)
         self.assertIn("party 'alpha' does not own both PRs", err)
@@ -97,14 +101,14 @@ class PinAuthorityTests(PinTestCase):
 
     def test_unpin_follows_the_same_authority(self):
         self.pin(None, 3, 2)
-        code, out, err = self.unpin("sess-2", 3, 2)
+        code, out, err = self.unpin("sess-3", 3, 2)
         self.assertEqual(code, 1)
-        self.assertIn("lead", err)
+        self.assertIn("active member", err)
         code, out, err = self.unpin("sess-1", 3, 2)
         self.assertEqual(code, 0, err)
         self.assertEqual(self.pins(), [])
 
-    def test_expired_raid_lead_loses_authority(self):
+    def test_member_that_left_the_raid_loses_authority(self):
         self.run_cli(["raid", "leave", "ci"], "sess-1", self.repo_dir)
         code, out, err = self.pin("sess-1", 2, 3)
         self.assertEqual(code, 1)
