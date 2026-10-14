@@ -7,7 +7,6 @@ from guild.commands import claim as claim_commands
 from guild.commands import memory as memory_commands
 from guild.commands import next as next_commands
 from guild.commands import notice as notice_commands
-from guild.commands import raid as raid_commands
 from guild.errors import GuildError
 
 _AUTO_LEARNED = "none (automatic handoff)"
@@ -56,15 +55,8 @@ def _claim_lines(conn, now, party):
     return ["- {} until {}".format(row["area"], row["expires_at"]) for row in rows]
 
 
-def _role_lines(conn, now, party):
-    return ["- you lead raid {}".format(raid_name) for raid_name in raid_commands.led_raid_names(conn, now, party)]
-
-
 def _render_handoff(ctx, binding, in_flight, learned):
     lines = ["# Handoff: {} (generation {})".format(binding["party"], binding["generation"]), ""]
-    role_lines = _role_lines(ctx.conn, ctx.now, binding["party"])
-    if role_lines:
-        lines += _section("Role", role_lines)
     lines += _section("Quest", _quest_lines(ctx.conn, binding["party"]))
     lines += _section(
         "Next", ["- {}".format(line) for line in next_commands.run(ctx, binding, True, False)]

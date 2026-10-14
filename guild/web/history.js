@@ -388,20 +388,13 @@
     });
   }
 
-  function partyLabel(entry) {
-    if (entry.lead) {
-      return entry.party + " (lead)";
-    }
-    return entry.party;
-  }
-
   function raidDetails(raid) {
     var quests = raid.quests.map(function (quest) {
       return quest.title + " (" + quest.party + ")";
     });
     return nonEmpty([
       field("when", formatDate(raid.started_at) + " → " + formatDate(raid.ended_at)),
-      field("parties", raid.parties.map(partyLabel).join(", ")),
+      field("parties", raid.parties.join(", ")),
       listField("quests", quests),
       prField(raid.prs_merged),
     ]);

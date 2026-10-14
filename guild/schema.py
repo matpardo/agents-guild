@@ -31,7 +31,6 @@ _RAID_MEMBERS_TABLE = """
         raid TEXT NOT NULL,
         party TEXT NOT NULL,
         expires_at TEXT,
-        lead INTEGER,
         PRIMARY KEY (raid, party)
     )
     """
@@ -331,7 +330,6 @@ _COLUMN_MIGRATIONS = (
     ("prs", "last_activity_at", "TEXT"),
     ("notices", "announces", "TEXT"),
     ("notices", "seen_at", "TEXT"),
-    ("raid_members", "lead", "INTEGER"),
     ("prs", "additions", "INTEGER"),
     ("prs", "deletions", "INTEGER"),
     ("prs", "created_at", "TEXT"),
@@ -408,6 +406,23 @@ def _drop_keeper(conn):
     conn.execute("COMMIT")
 
 
+def _raid_members_has_lead(conn):
+    return any(row["name"] == "lead" for row in conn.execute("PRAGMA table_info(raid_members)"))
+
+
+def _drop_raid_lead(conn):
+    if not _raid_members_has_lead(conn):
+        return
+    conn.execute("BEGIN IMMEDIATE")
+    try:
+        if _raid_members_has_lead(conn):
+            conn.execute("ALTER TABLE raid_members DROP COLUMN lead")
+    except Exception:
+        conn.execute("ROLLBACK")
+        raise
+    conn.execute("COMMIT")
+
+
 def _split_needs_human(conn):
     conn.execute(
         "UPDATE prs SET lifecycle = 'draft', needs_ask_answer = 1 WHERE lifecycle = 'needs-human'"
@@ -430,6 +445,7 @@ def create_all(conn):
     for table, column, ddl_type in _COLUMN_MIGRATIONS:
         _add_column_if_missing(conn, table, column, ddl_type)
     _drop_keeper(conn)
+    _drop_raid_lead(conn)
     _split_needs_human(conn)
     _default_fix_marks(conn)
 

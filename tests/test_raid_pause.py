@@ -11,7 +11,7 @@ class RaidPauseTestCase(GuildTestCase):
         self.repo_dir = self.register_project("acme", ["acme/app"])
         self.run_cli(["party", "start", "alpha"], "sess-1", self.repo_dir)
         self.run_cli(["party", "start", "beta"], "sess-2", self.repo_dir)
-        self.run_cli(["raid", "join", "ci", "--ttl", "8h", "--lead"], "sess-1", self.repo_dir)
+        self.run_cli(["raid", "join", "ci", "--ttl", "8h"], "sess-1", self.repo_dir)
         self.run_cli(["raid", "join", "ci", "--ttl", "8h"], "sess-2", self.repo_dir)
 
     def _pause_row(self, raid_name):
@@ -32,22 +32,16 @@ class RaidPauseTestCase(GuildTestCase):
 
 
 class PauseResumeCommandTests(RaidPauseTestCase):
-    def test_lead_pauses_and_state_is_stored(self):
+    def test_member_pauses_and_state_is_stored(self):
         code, out, err = self.run_cli(["raid", "pause", "ci"], "sess-1", self.repo_dir)
         self.assertEqual(code, 0, err)
         self.assertIn("raid 'ci' paused", out)
         self.assertEqual(self._pause_row("ci")["paused_by"], "alpha")
 
-    def test_non_lead_member_cannot_pause_when_lead_exists(self):
-        code, out, err = self.run_cli(["raid", "pause", "ci"], "sess-2", self.repo_dir)
-        self.assertEqual(code, 1)
-        self.assertIn("only the raid lead 'alpha'", err)
-        self.assertIsNone(self._pause_row("ci"))
-
-    def test_any_member_may_pause_when_no_lead(self):
-        self.run_cli(["raid", "leave", "ci"], "sess-1", self.repo_dir)
+    def test_any_member_may_pause(self):
         code, out, err = self.run_cli(["raid", "pause", "ci"], "sess-2", self.repo_dir)
         self.assertEqual(code, 0, err)
+        self.assertEqual(self._pause_row("ci")["paused_by"], "beta")
 
     def test_non_member_cannot_pause(self):
         self.run_cli(["party", "start", "gamma"], "sess-3", self.repo_dir)
@@ -80,12 +74,11 @@ class PauseResumeCommandTests(RaidPauseTestCase):
         code, out, err = self.run_cli(["inbox", "--since-last"], "sess-2", self.repo_dir)
         self.assertIn("raid ci resumed", out)
 
-    def test_resume_by_non_lead_fails(self):
+    def test_any_member_may_resume(self):
         self.run_cli(["raid", "pause", "ci"], "sess-1", self.repo_dir)
         code, out, err = self.run_cli(["raid", "resume", "ci"], "sess-2", self.repo_dir)
-        self.assertEqual(code, 1)
-        self.assertIn("only the raid lead 'alpha'", err)
-        self.assertIsNotNone(self._pause_row("ci"))
+        self.assertEqual(code, 0, err)
+        self.assertIsNone(self._pause_row("ci"))
 
     def test_resume_when_not_paused_fails(self):
         code, out, err = self.run_cli(["raid", "resume", "ci"], "sess-1", self.repo_dir)
@@ -118,7 +111,7 @@ class PauseVisibilityTests(RaidPauseTestCase):
     def test_board_shows_paused_raid_for_party(self):
         self.run_cli(["raid", "pause", "ci"], "sess-1", self.repo_dir)
         code, out, err = self.run_cli(["board"], None, None)
-        self.assertIn("raids: ci (PAUSED, lead,", out)
+        self.assertIn("raids: ci (PAUSED,", out)
 
     def test_raid_board_header_shows_pause(self):
         self.run_cli(["raid", "pause", "ci"], "sess-1", self.repo_dir)

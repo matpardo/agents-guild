@@ -8,23 +8,11 @@ def _join_label(expires_at):
     return "until {}".format(expires_at)
 
 
-def _resolve_lead_flag(conn, now, raid_name, party, lead_requested):
-    current_lead = active_lead(conn, now, raid_name)
-    if lead_requested:
-        if current_lead is not None and current_lead["party"] != party:
-            raise GuildError(
-                "raid '{}' already has a lead: party '{}'".format(raid_name, current_lead["party"]), 1
-            )
-        return True
-    return current_lead is not None and current_lead["party"] == party
-
-
-def join(ctx, name, ttl, until_leave, lead):
+def join(ctx, name, ttl, until_leave):
     names.validate_name(name, "raid name")
     binding = identity.require_binding(ctx.conn, ctx.session_id)
     project = config.resolve_project(ctx.cwd, config.load_all_projects(ctx.projects_dir))
     expires_at = None if until_leave else timeutil.expires_at_iso(ctx.now, ttl)
-    is_lead = _resolve_lead_flag(ctx.conn, ctx.now, name, binding["party"], lead)
     with db.writing(ctx.conn):
         events.record(
             ctx.conn,
@@ -35,7 +23,7 @@ def join(ctx, name, ttl, until_leave, lead):
             project,
             "raid.joined",
             "local",
-            {"raid": name, "party": binding["party"], "expires_at": expires_at, "lead": is_lead},
+            {"raid": name, "party": binding["party"], "expires_at": expires_at},
         )
     return "party '{}' joined raid '{}' {}".format(binding["party"], name, _join_label(expires_at))
 
@@ -72,23 +60,6 @@ def active_members(conn, now, raid_name):
     return [row for row in rows if not timeutil.is_expired(now, row["expires_at"])]
 
 
-def active_lead(conn, now, raid_name):
-    for row in active_members(conn, now, raid_name):
-        if row["lead"]:
-            return row
-    return None
-
-
-def led_raid_names(conn, now, party):
-    rows = conn.execute("SELECT DISTINCT raid FROM raid_members WHERE lead = 1 AND party = ?", (party,)).fetchall()
-    led = []
-    for row in rows:
-        lead_row = active_lead(conn, now, row["raid"])
-        if lead_row is not None and lead_row["party"] == party:
-            led.append(row["raid"])
-    return sorted(led)
-
-
 def require_active_raid(conn, now, raid_name):
     members = active_members(conn, now, raid_name)
     if not members:
@@ -105,24 +76,13 @@ def raid_role_label(raids):
     if not raids:
         return "solo"
     entries = sorted(raids, key=lambda row: row["raid"])
-    return ", ".join(
-        "RL {}".format(row["raid"]) if row["lead"] else row["raid"] for row in entries
-    )
+    return ", ".join(row["raid"] for row in entries)
 
 
 def member_raid_names(conn, now, party):
     if party is None:
         return set()
     return {row["raid"] for row in member_raids(conn, now, party)}
-
-
-def raid_names_led_by_for_member(conn, now, lead_party, member_party):
-    result = []
-    for row in member_raids(conn, now, member_party):
-        lead_row = active_lead(conn, now, row["raid"])
-        if lead_row is not None and lead_row["party"] == lead_party:
-            result.append(row["raid"])
-    return result
 
 
 def pause_row(conn, raid_name):
@@ -141,10 +101,7 @@ def paused_member_raids(conn, now, party):
 
 
 def membership_label(now, row):
-    time_label = timeutil.membership_left_label(now, row["expires_at"])
-    if row["lead"]:
-        return "lead, {}".format(time_label)
-    return time_label
+    return timeutil.membership_left_label(now, row["expires_at"])
 
 
 def active_raids_grouped(conn, now):

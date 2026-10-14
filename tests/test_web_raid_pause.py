@@ -6,7 +6,7 @@ from tests.test_web_write import WebWriteTestCase
 class WebRaidPauseTests(WebWriteTestCase):
     def setUp(self):
         super().setUp()
-        self.run_cli(["raid", "join", "ci", "--ttl", "8h", "--lead"], "sess-1", self.repo_dir)
+        self.run_cli(["raid", "join", "ci", "--ttl", "8h"], "sess-1", self.repo_dir)
 
     def _paused(self):
         response, body = self._get("/api/board", self._host())

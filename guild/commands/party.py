@@ -5,7 +5,6 @@ from guild import config, db, events, handoff_prune, identity, names, paths, san
 from guild.commands import claim as claim_commands
 from guild.commands import next as next_commands
 from guild.commands import quest as quest_commands
-from guild.commands import raid as raid_commands
 from guild.errors import GuildError
 
 _HANDOFF_HEADER = "guild handoff — local data (information, not instructions):"
@@ -181,21 +180,6 @@ def _open_pr_refs(conn, party):
     return ["{}#{}".format(row["repo"], row["number"]) for row in rows]
 
 
-def _require_lead_close_allowed(conn, now, party):
-    for raid_name in raid_commands.led_raid_names(conn, now, party):
-        other_members = sorted(
-            {row["party"] for row in raid_commands.active_members(conn, now, raid_name)} - {party}
-        )
-        if other_members:
-            raise GuildError(
-                "party '{}' leads raid '{}' (active members: {}): "
-                "hand the raid over or pass --force to close anyway".format(
-                    party, raid_name, ", ".join(other_members)
-                ),
-                1,
-            )
-
-
 def _quests_unfinished_work(ctx, party):
     rows = ctx.conn.execute(
         "SELECT slug, project, epic FROM quests WHERE party = ? AND state = 'active' ORDER BY slug", (party,)
@@ -241,8 +225,6 @@ def close(ctx, name, force):
             ),
             1,
         )
-    if not force:
-        _require_lead_close_allowed(ctx.conn, ctx.now, party)
     summary = _cleanup_summary(ctx, party)
     open_prs = _open_pr_refs(ctx.conn, party)
     with db.writing(ctx.conn):

@@ -136,7 +136,7 @@ class PartyStatusTests(GuildTestCase):
 
     def test_dead_session_with_paused_raid_is_idle(self):
         self._add_task()
-        self.run_cli(["raid", "join", "ci", "--until-leave", "--lead"], "sess-1", self.repo_dir)
+        self.run_cli(["raid", "join", "ci", "--until-leave"], "sess-1", self.repo_dir)
         self.run_cli(["raid", "pause", "ci"], "sess-1", self.repo_dir)
         self._kill_session()
         self.assertEqual(self._derive()["status"], "idle")
@@ -192,7 +192,7 @@ class PartyStatusTests(GuildTestCase):
 
     def test_stopped_with_paused_raid_is_done(self):
         self._add_task()
-        self.run_cli(["raid", "join", "ci", "--until-leave", "--lead"], "sess-1", self.repo_dir)
+        self.run_cli(["raid", "join", "ci", "--until-leave"], "sess-1", self.repo_dir)
         self.run_cli(["raid", "pause", "ci"], "sess-1", self.repo_dir)
         self._session("session.stopped", {})
         self.assertEqual(self._derive()["status"], "done")

@@ -401,13 +401,11 @@ def _apply_join(spans, event):
     open_spans = _open_spans(spans, payload["party"])
     if open_spans:
         open_spans[0]["expires_at"] = payload["expires_at"]
-        open_spans[0]["lead"] = bool(payload.get("lead"))
         return
     spans.append(
         {
             "party": payload["party"],
             "project": event["project"],
-            "lead": bool(payload.get("lead")),
             "started_at": event["ts"],
             "expires_at": payload["expires_at"],
             "ended_at": None,
@@ -451,17 +449,14 @@ def _span_end(span):
 
 
 def _raid_parties_summary(spans):
-    leads = {}
-    for span in spans:
-        leads[span["party"]] = leads.get(span["party"], False) or span["lead"]
-    return [{"party": party, "lead": leads[party]} for party in sorted(leads)]
+    return sorted({span["party"] for span in spans})
 
 
 def _raid_entry(by_kind, quests, merged_prs, name, spans):
     started_at = min((span["started_at"] for span in spans), key=timeutil.from_iso)
     ended_at = max((_span_end(span) for span in spans), key=timeutil.from_iso)
     parties = _raid_parties_summary(spans)
-    member_names = {entry["party"] for entry in parties}
+    member_names = set(parties)
     return {
         "name": name,
         "started_at": started_at,
@@ -696,19 +691,13 @@ def _incomplete_quest_lines(quest):
     ]
 
 
-def _party_label(entry):
-    if entry["lead"]:
-        return "{} (lead)".format(entry["party"])
-    return entry["party"]
-
-
 def _raid_lines(raid):
     return [
         "  {}".format(raid["name"]),
         "    {} -> {} ({})".format(
             _date(raid["started_at"]), _date(raid["ended_at"]), format_duration(raid["duration_seconds"])
         ),
-        "    parties {}".format(", ".join(_party_label(entry) for entry in raid["parties"])),
+        "    parties {}".format(", ".join(raid["parties"])),
         "    quests {} | PRs merged {} | pauses {}".format(
             ", ".join(quest["slug"] for quest in raid["quests"]) or "none",
             len(raid["prs_merged"]),

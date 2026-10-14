@@ -222,7 +222,7 @@ class ActiveQuestTests(LiveHistoryTestCase):
         self._live_quest(10, "a", "alpha", "acme", None, ["T01"])
         self._live_quest(11, "b", "beta", "other", None, ["T01"])
         self._event(1, "beta", "other", "raid.joined", {
-            "raid": "docs", "party": "beta", "expires_at": _at(3), "lead": False,
+            "raid": "docs", "party": "beta", "expires_at": _at(3),
         })
         self.assertEqual([q["slug"] for q in self._model(party="alpha")["active_quests"]], ["a"])
         self.assertEqual([q["slug"] for q in self._model(project="other")["active_quests"]], ["b"])
@@ -351,7 +351,7 @@ class IncompleteQuestTests(HistoryTestCase):
 
     def test_marked_quest_is_not_listed_in_raid(self):
         self._event(1, "alpha", "acme", "raid.joined", {
-            "raid": "ci", "party": "alpha", "expires_at": _at(100), "lead": True,
+            "raid": "ci", "party": "alpha", "expires_at": _at(100),
         })
         self._quest_done(10, "q1", "alpha", "acme", self._snapshot("q1", "alpha", "acme", 0, 10))
         self._marked(11, "q1", "alpha", "acme", "x")
@@ -386,14 +386,14 @@ class IncompleteQuestTests(HistoryTestCase):
 
 
 class FinishedRaidTests(HistoryTestCase):
-    def _join(self, hours, party, raid, expires_at, lead):
+    def _join(self, hours, party, raid, expires_at):
         self._event(hours, party, "acme", "raid.joined", {
-            "raid": raid, "party": party, "expires_at": expires_at, "lead": lead,
+            "raid": raid, "party": party, "expires_at": expires_at,
         })
 
     def _seed_ci_raid(self):
-        self._join(1, "alpha", "ci", None, True)
-        self._join(2, "beta", "ci", _at(100), False)
+        self._join(1, "alpha", "ci", None)
+        self._join(2, "beta", "ci", _at(100))
         self._event(3, "alpha", "acme", "raid.paused", {"raid": "ci", "party": "alpha"})
         self._event(4, "alpha", "acme", "raid.resumed", {"raid": "ci", "party": "alpha"})
         self._event(5, "alpha", "acme", "raid.paused", {"raid": "ci", "party": "alpha"})
@@ -416,47 +416,45 @@ class FinishedRaidTests(HistoryTestCase):
         self.assertEqual(raid["started_at"], _at(1))
         self.assertEqual(raid["ended_at"], _at(30))
         self.assertEqual(raid["duration_seconds"], 29 * 3600)
-        self.assertEqual(
-            raid["parties"], [{"party": "alpha", "lead": True}, {"party": "beta", "lead": False}]
-        )
+        self.assertEqual(raid["parties"], ["alpha", "beta"])
         self.assertEqual([quest["slug"] for quest in raid["quests"]], ["inside"])
         self.assertEqual(raid["prs_merged"], ["acme/app#1"])
         self.assertEqual(raid["pauses"], 2)
 
     def test_raid_with_active_member_is_excluded(self):
-        self._join(1, "alpha", "live", None, False)
-        self._join(2, "beta", "live", _at(3), False)
+        self._join(1, "alpha", "live", None)
+        self._join(2, "beta", "live", _at(3))
         self._event(4, "beta", "acme", "raid.left", {"raid": "live", "party": "beta"})
         self.assertEqual(self._model()["raids"], [])
 
     def test_raid_with_unexpired_member_is_excluded(self):
-        self._join(1, "alpha", "live", (_NOW + timedelta(hours=1)).isoformat(), False)
+        self._join(1, "alpha", "live", (_NOW + timedelta(hours=1)).isoformat())
         self.assertEqual(self._model()["raids"], [])
 
     def test_expiry_ends_raid_at_expires_at(self):
-        self._join(1, "alpha", "short", _at(9), False)
+        self._join(1, "alpha", "short", _at(9))
         self.assertEqual(self._model()["raids"][0]["ended_at"], _at(9))
 
     def test_leave_after_expiry_ends_at_expiry(self):
-        self._join(1, "alpha", "short", _at(9), False)
+        self._join(1, "alpha", "short", _at(9))
         self._event(20, "alpha", "acme", "raid.left", {"raid": "short", "party": "alpha"})
         self.assertEqual(self._model()["raids"][0]["ended_at"], _at(9))
 
     def test_rejoin_refreshes_membership(self):
-        self._join(1, "alpha", "r", _at(3), False)
-        self._join(2, "alpha", "r", _at(50), True)
+        self._join(1, "alpha", "r", _at(3))
+        self._join(2, "alpha", "r", _at(50))
         raid = self._model()["raids"][0]
         self.assertEqual(raid["ended_at"], _at(50))
-        self.assertEqual(raid["parties"], [{"party": "alpha", "lead": True}])
+        self.assertEqual(raid["parties"], ["alpha"])
 
     def test_raids_are_newest_created_first(self):
-        self._join(1, "alpha", "first", _at(50), False)
-        self._join(3, "alpha", "second", _at(9), False)
+        self._join(1, "alpha", "first", _at(50))
+        self._join(3, "alpha", "second", _at(9))
         self.assertEqual([raid["name"] for raid in self._model()["raids"]], ["second", "first"])
 
     def test_raids_with_same_creation_are_alphabetical(self):
         for name in ("zeta", "alpha-r", "mid"):
-            self._join(1, "alpha", name, _at(5), False)
+            self._join(1, "alpha", name, _at(5))
         self.assertEqual([raid["name"] for raid in self._model()["raids"]], ["alpha-r", "mid", "zeta"])
 
 
@@ -540,10 +538,10 @@ class FilterTests(HistoryTestCase):
         self._quest_done(10, "a", "alpha", "acme", self._snapshot("a", "alpha", "acme", 0, 10))
         self._quest_done(20, "b", "beta", "other", self._snapshot("b", "beta", "other", 0, 20))
         self._event(1, "alpha", "acme", "raid.joined", {
-            "raid": "ci", "party": "alpha", "expires_at": _at(2), "lead": True,
+            "raid": "ci", "party": "alpha", "expires_at": _at(2),
         })
         self._event(1, "beta", "other", "raid.joined", {
-            "raid": "docs", "party": "beta", "expires_at": _at(3), "lead": False,
+            "raid": "docs", "party": "beta", "expires_at": _at(3),
         })
         self._task_done(1, "a", "T01", "alpha", "acme")
         self._task_done(1, "b", "T01", "beta", "other")
@@ -635,7 +633,7 @@ class HistoryCliTests(LiveHistoryTestCase):
         self._quest_added(1, "old", "beta", "acme", None, ["T01"])
         self._quest_done(30, "old", "beta", "acme", None)
         self._event(1, "alpha", "acme", "raid.joined", {
-            "raid": "ci", "party": "alpha", "expires_at": _at(9), "lead": True,
+            "raid": "ci", "party": "alpha", "expires_at": _at(9),
         })
         code, out, err = self.run_cli(["history"], None, self.root)
         self.assertEqual(code, 0, err)
@@ -645,7 +643,7 @@ class HistoryCliTests(LiveHistoryTestCase):
         self.assertIn("50% (2/4)", out)
         self.assertIn("no snapshot", out)
         self.assertIn("Finished raids (1)", out)
-        self.assertIn("alpha (lead)", out)
+        self.assertIn("parties alpha", out)
         self.assertIn("Totals", out)
 
     def test_cli_filters(self):

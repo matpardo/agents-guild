@@ -49,16 +49,10 @@ class HandoffTests(GuildTestCase):
     def _handoff_content(self):
         return (self.data_home / "guild" / "handoffs" / "alpha-g1.md").read_text()
 
-    def test_handoff_states_lead_role_and_raids_led(self):
-        self.run_cli(["raid", "join", "ci", "--until-leave", "--lead"], "sess-1", self.repo_dir)
-        code, out, err = self.run_cli(["handoff", "--in-flight", "x", "--learned", "y"], "sess-1", self.repo_dir)
-        self.assertEqual(code, 0, err)
-        self.assertIn("you lead raid ci", self._handoff_content())
-
-    def test_handoff_omits_role_when_not_lead(self):
+    def test_handoff_has_no_role_section(self):
         self.run_cli(["raid", "join", "ci", "--until-leave"], "sess-1", self.repo_dir)
         self.run_cli(["handoff", "--in-flight", "x", "--learned", "y"], "sess-1", self.repo_dir)
-        self.assertNotIn("you lead", self._handoff_content())
+        self.assertNotIn("## Role", self._handoff_content())
 
     def test_prints_broadcast_reminder(self):
         code, out, err = self.run_cli(

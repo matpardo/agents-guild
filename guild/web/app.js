@@ -172,7 +172,6 @@ var NO_SESSION_MESSAGE = "session token not loaded, reload the page";
     },
     role: {
       solo: "The party is not in any raid.",
-      lead: "The party leads the raid listed (RL = raid lead).",
       member: "The party is a member of the raid listed.",
     },
     partyWait: {
@@ -1728,10 +1727,7 @@ var NO_SESSION_MESSAGE = "session token not loaded, reload the page";
 
   function renderRoleBadge(raids) {
     var badge = el("span");
-    var isLead = raids.some(function (raid) {
-      return raid.lead;
-    });
-    var modifier = raids.length === 0 ? "role-solo" : isLead ? "role-lead" : "role-member";
+    var modifier = raids.length === 0 ? "role-solo" : "role-member";
     badge.className = "role-badge " + modifier;
     explain(badge, "role", modifier.slice("role-".length));
     badge.textContent =
@@ -1743,7 +1739,7 @@ var NO_SESSION_MESSAGE = "session token not loaded, reload the page";
               return a.raid < b.raid ? -1 : a.raid > b.raid ? 1 : 0;
             })
             .map(function (raid) {
-              return raid.lead ? "RL " + raid.raid : raid.raid;
+              return raid.raid;
             })
             .join(", ");
     return badge;
@@ -1880,11 +1876,6 @@ var NO_SESSION_MESSAGE = "session token not loaded, reload the page";
     var item = el("li");
     item.className = "raid";
     item.appendChild(textEl("span", raid.raid));
-    if (raid.lead) {
-      var badge = textEl("span", "lead");
-      badge.className = "badge";
-      item.appendChild(explain(badge, "role", "lead"));
-    }
     return item;
   }
 

@@ -124,19 +124,19 @@ class RoleBadgeTests(unittest.TestCase):
         self.css = (_WEB_DIR / "app.css").read_text()
 
     def test_app_js_renders_role_badge_with_modifiers(self):
-        for token in ("role-badge", "role-lead", "role-member", "role-solo"):
+        for token in ("role-badge", "role-member", "role-solo"):
             with self.subTest(token=token):
                 self.assertIn(token, self.js)
 
     def test_app_css_defines_role_rules(self):
-        for name in ("role-badge", "role-lead", "role-member", "role-solo"):
+        for name in ("role-badge", "role-member", "role-solo"):
             with self.subTest(name=name):
                 self.assertRegex(self.css, r"(?m)^\.{}\s*\{{".format(name))
 
     def test_role_colors_defined_in_both_themes(self):
         dark = _dark_block(self.css)
         light = self.css[:self.css.index("prefers-color-scheme: dark")]
-        for role in ("lead", "member", "solo"):
+        for role in ("member", "solo"):
             for suffix in ("fg", "bg"):
                 variable = "--role-{}-{}:".format(role, suffix)
                 with self.subTest(variable=variable):

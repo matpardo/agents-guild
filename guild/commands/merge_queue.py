@@ -149,22 +149,13 @@ def _shared_raid_names(ctx, first, second):
     return sorted(first_raids & second_raids)
 
 
-def _lead_party(ctx, raid_name):
-    lead = raid_commands.active_lead(ctx.conn, ctx.now, raid_name)
-    if lead is None:
-        return None
-    return lead["party"]
-
-
 def _require_raid_authority(ctx, actor, raid_names):
-    leads = {raid_name: _lead_party(ctx, raid_name) for raid_name in raid_names}
-    if actor in leads.values():
+    if set(raid_names) & raid_commands.member_raid_names(ctx.conn, ctx.now, actor):
         return
-    described = ", ".join(
-        "'{}' (lead: {})".format(raid_name, leads[raid_name] or "none") for raid_name in raid_names
-    )
     raise GuildError(
-        "both PRs belong to members of raid {}: only the raid lead or the human may pin".format(described),
+        "both PRs belong to members of raid {}: only an active member of that raid or the human may pin".format(
+            ", ".join("'{}'".format(raid_name) for raid_name in raid_names)
+        ),
         1,
     )
 
@@ -334,7 +325,7 @@ def main_label(row):
     return "{} \u2014 {} ({})".format(row["repo"], row["reason"], row["source"])
 
 
-def main_headline(row):
+def _main_headline(row):
     if row["external"] is not None:
         return "MAIN BLOCKED ({}) {} \u2192 re-run main once {} is fixed".format(
             row["external"], row["repo"], row["external"]
@@ -343,7 +334,7 @@ def main_headline(row):
 
 
 def _main_line(row):
-    return "0. {}".format(main_headline(row))
+    return "0. {}".format(_main_headline(row))
 
 
 def _action_text(entry):

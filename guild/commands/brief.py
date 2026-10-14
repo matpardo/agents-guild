@@ -85,10 +85,6 @@ def render_brief(ctx):
     raids = raid_commands.member_raids(ctx.conn, ctx.now, binding["party"])
     raid_member_of = {row["raid"] for row in raids}
     lines.extend(targeting_lines(active, binding["project"], raid_member_of))
-    for raid_row in raids:
-        lead_row = raid_commands.active_lead(ctx.conn, ctx.now, raid_row["raid"])
-        if lead_row is not None:
-            lines.append("raid {} — lead: {}".format(raid_row["raid"], lead_row["party"]))
 
     lines.extend(_base_warning_lines(ctx, binding["project"]))
 

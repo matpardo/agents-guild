@@ -380,7 +380,7 @@ def _handle_memory_rm(ctx, args):
 def _handle_raid_join(ctx, args):
     from guild.commands import raid as raid_commands
 
-    _print(raid_commands.join(ctx, args.name, args.ttl, args.until_leave, args.lead))
+    _print(raid_commands.join(ctx, args.name, args.ttl, args.until_leave))
     return 0
 
 
@@ -680,7 +680,7 @@ def _add_party_parser(subparsers):
 
     close = actions.add_parser("close", help="close a party; refuses while its quests are unfinished unless --force")
     close.add_argument("name", nargs="?")
-    close.add_argument("--force", action="store_true", help="override the raid-lead guard and the quest done gate")
+    close.add_argument("--force", action="store_true", help="override the quest done gate")
     close.set_defaults(handler=_handle_party_close)
 
 
@@ -853,12 +853,11 @@ def _add_raid_parser(subparsers):
     parser = subparsers.add_parser("raid", help="join, leave, pause or resume a raid")
     actions = parser.add_subparsers(dest="raid_action", required=True, metavar="<subcommand>")
 
-    join = actions.add_parser("join", help="join a raid, optionally as its lead")
+    join = actions.add_parser("join", help="join a raid")
     join.add_argument("name")
     join_mode = join.add_mutually_exclusive_group(required=True)
     join_mode.add_argument("--ttl", help="membership lifetime, e.g. 8h")
     join_mode.add_argument("--until-leave", action="store_true", help="stay until raid leave or party close")
-    join.add_argument("--lead", action="store_true", help="become the raid lead")
     join.set_defaults(handler=_handle_raid_join)
 
     leave = actions.add_parser("leave", help="leave a raid")

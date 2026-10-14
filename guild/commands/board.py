@@ -967,7 +967,6 @@ def _party_model(ctx, party_row, project_config):
             {
                 "raid": row["raid"],
                 "expires_at": row["expires_at"],
-                "lead": bool(row["lead"]),
                 "paused": raid_commands.is_paused(ctx.conn, row["raid"]),
             }
             for row in raids
@@ -977,10 +976,8 @@ def _party_model(ctx, party_row, project_config):
 
 
 def _raid_model(conn, raid_name, members):
-    lead_row = next((row for row in members if row["lead"]), None)
     return {
         "name": raid_name,
-        "lead": lead_row["party"] if lead_row is not None else None,
         "members": [row["party"] for row in members],
         "paused": raid_commands.is_paused(conn, raid_name),
     }

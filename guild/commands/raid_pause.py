@@ -24,11 +24,6 @@ def _require_authorized_party(ctx, raid_name, party):
     members = raid_commands.require_active_raid(ctx.conn, ctx.now, raid_name)
     if party not in {row["party"] for row in members}:
         raise GuildError("party '{}' is not a member of raid '{}'".format(party, raid_name), 1)
-    lead_row = raid_commands.active_lead(ctx.conn, ctx.now, raid_name)
-    if lead_row is not None and lead_row["party"] != party:
-        raise GuildError(
-            "only the raid lead '{}' can pause or resume raid '{}'".format(lead_row["party"], raid_name), 1
-        )
 
 
 def _record(ctx, party, kind, raid_name):

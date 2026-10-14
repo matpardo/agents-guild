@@ -65,19 +65,15 @@ class StatuslineIdentityTests(GuildTestCase):
         self.run_cli(["raid", "join", "infra", "--ttl", "2h"], "sess-1", self.repo_dir)
         self.assertEqual(self._statusline("sess-1"), "⚔ infra · g1")
 
-    def test_lead_shows_lead_marker(self):
-        self.run_cli(["raid", "join", "infra", "--ttl", "2h", "--lead"], "sess-1", self.repo_dir)
-        self.assertEqual(self._statusline("sess-1"), "⚔ infra·RL · g1")
-
     def test_paused_raid_shows_pause_marker(self):
-        self.run_cli(["raid", "join", "infra", "--ttl", "2h", "--lead"], "sess-1", self.repo_dir)
+        self.run_cli(["raid", "join", "infra", "--ttl", "2h"], "sess-1", self.repo_dir)
         self.run_cli(["raid", "pause", "infra"], "sess-1", self.repo_dir)
-        self.assertEqual(self._statusline("sess-1"), "⚔ infra·RL ⏸ · g1")
+        self.assertEqual(self._statusline("sess-1"), "⚔ infra ⏸ · g1")
 
     def test_multiple_raids_are_sorted_and_comma_joined(self):
         self.run_cli(["raid", "join", "zeta", "--ttl", "2h"], "sess-1", self.repo_dir)
-        self.run_cli(["raid", "join", "infra", "--ttl", "2h", "--lead"], "sess-1", self.repo_dir)
-        self.assertEqual(self._statusline("sess-1"), "⚔ infra·RL, zeta · g1")
+        self.run_cli(["raid", "join", "infra", "--ttl", "2h"], "sess-1", self.repo_dir)
+        self.assertEqual(self._statusline("sess-1"), "⚔ infra, zeta · g1")
 
     def test_unbound_session_is_unchanged(self):
         self.assertEqual(self._statusline("sess-unbound"), "")

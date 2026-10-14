@@ -5,7 +5,7 @@ title: Raids that protect parallel work on one epic
 status: active
 owner: matpardo
 created: 2026-09-29
-updated: 2026-09-29
+updated: 2026-10-14
 ---
 
 # Spec: Raids that protect parallel work on one epic
@@ -24,7 +24,7 @@ Preparing the first real raid (three parties running `/epic-auto-full` under `/g
 - Automatic raid notices when a tracked PR is merged, listing shared areas it touched.
 - Raid membership that lasts until leave, or an explicit TTL, with a warning before expiry.
 - No overlapping task lists: `quest add` rejects taken tasks; `claim check` for orchestrators.
-- A raid lead, visible everywhere, who also receives members' asks.
+- A raid lead, visible everywhere, who also receives members' asks. Retired on 2026-10-14 (`sdd/decisions/20261014_board-shows-waits-no-dispatcher.md`): members' asks go to the human, and pins and pause belong to every active member.
 - Terminal and web board filtered by raid; better unknown-project errors.
 
 ## Out of scope
