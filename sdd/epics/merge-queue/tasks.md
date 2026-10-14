@@ -84,3 +84,10 @@ updated: 2026-09-29
 **Status:** [x] done — #111
 
 **What:** `guild pr set --blocked-external "<reason>"` marks a PR that waits on a decision outside development; the queue blocks it and its dependents with `wait: external`, `guild next`, the queue head and `ready-check` skip them, and they do not count against the open-PR caps or `pr_unmergeable`.
+
+## T12 — Human-review PRs can head the queue
+
+**Depends on:** T11
+**Status:** [x] done — #157
+
+**What:** a ready PR whose action is `review: human, then merge` is the queue head, so `merge-queue --head`, the board and the next-to-merge lines no longer say `no PR ready to merge` while it waits for the human.
