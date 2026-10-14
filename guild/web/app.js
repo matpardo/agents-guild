@@ -1512,6 +1512,16 @@ var NO_SESSION_MESSAGE = "session token not loaded, reload the page";
     return branch;
   }
 
+  function isReadyToMerge(entry) {
+    return entry.state === "ready" && entry.labels.indexOf("draft") === -1 && entry.labels.indexOf("converging") === -1;
+  }
+
+  function renderReadyPill() {
+    var pill = textEl("span", "ready");
+    pill.className = "pill lifecycle-ready";
+    return explainLabel(pill, "ready");
+  }
+
   function renderQueueEntryHead(entry) {
     var head = el("div");
     head.className = "queue-entry-head";
@@ -1531,6 +1541,9 @@ var NO_SESSION_MESSAGE = "session token not loaded, reload the page";
       pill.className = "pill lifecycle-" + label;
       head.appendChild(explainLabel(pill, label));
     });
+    if (isReadyToMerge(entry)) {
+      head.appendChild(renderReadyPill());
+    }
     if (entry.fix_request) {
       head.appendChild(renderFixingPill(entry));
     }

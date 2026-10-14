@@ -140,3 +140,10 @@ updated: 2026-10-04
 **Status:** [x] done — #133
 
 **What:** a form in the notices section creates a notice (text, project or raid target, ttl) through `POST /api/notices/create`, and each raid has a pause/resume button (inline confirm on pause) through `POST /api/raids/<name>/pause` and `/resume`; the human may pause without a session. `--until` stays CLI-only.
+
+## T20 — Green ready tag on merge queue entries
+
+**Depends on:** T10
+**Status:** [x] done — #156
+
+**What:** a merge queue entry whose state is `ready` and that is not a draft shows a green `ready` pill in its head, next to the other tags, so the PRs with green checks and nothing pending stand out.
