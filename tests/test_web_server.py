@@ -154,6 +154,22 @@ class BoardEndpointTests(WebServerTestCase):
         self.assertEqual(payload["blocked"], [])
 
 
+class _HungUpClient:
+    def write(self, data):
+        raise BrokenPipeError(32, "Broken pipe")
+
+
+class ClientHangUpTests(GuildTestCase):
+    def test_a_client_that_hung_up_is_not_an_error(self):
+        handler = webserver.BoardRequestHandler.__new__(webserver.BoardRequestHandler)
+        handler.request_version = "HTTP/1.1"
+        handler.requestline = "GET /api/board HTTP/1.1"
+        handler.command = "GET"
+        handler.client_address = ("127.0.0.1", 0)
+        handler.wfile = _HungUpClient()
+        handler._write(200, b"{}", "application/json", "no-store")
+
+
 class ServeForeverTests(GuildTestCase):
     def test_prints_url_and_returns_0_on_keyboard_interrupt(self):
         stdout = io.StringIO()

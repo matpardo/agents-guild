@@ -17,3 +17,14 @@ updated: 2026-10-14
 
 **Acceptance:**
 - [x] Each wait kind has a test; the board and the web model carry `waits`.
+
+## T02 — Fast board and quiet client hang-ups
+
+**Depends on:** T01
+**Status:** [x] done — #163
+
+**What:** the unseen waits read only `ask.answered` and `notice.created` events from SQL instead of decoding every event after each cursor, and `guild web` drops a response quietly when the browser has already hung up.
+
+**Acceptance:**
+- [x] An event of another kind is never decoded by the waits.
+- [x] A client that hung up prints no traceback.

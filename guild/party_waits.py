@@ -1,6 +1,7 @@
+import json
 from datetime import datetime
 
-from guild import events, fix_request, identity, merge_queue, paths, session_info, transcript_usage
+from guild import fix_request, identity, merge_queue, paths, session_info, transcript_usage
 from guild.commands import merge_queue as merge_queue_commands
 from guild.commands import notice as notice_commands
 from guild.commands import raid as raid_commands
@@ -90,13 +91,17 @@ def _cursor_seq(conn, session_id):
 def _unseen_waits(ctx, party_row):
     if party_row["leader_session_id"] is None:
         return []
-    new_events = events.events_after(ctx.conn, _cursor_seq(ctx.conn, party_row["leader_session_id"]))
+    new_events = ctx.conn.execute(
+        "SELECT kind, payload FROM events WHERE seq > ? AND kind IN ('ask.answered', 'notice.created')"
+        " ORDER BY seq ASC",
+        (_cursor_seq(ctx.conn, party_row["leader_session_id"]),),
+    ).fetchall()
     name = party_row["name"]
     active_ids = {row["id"] for row in notice_commands.active_notices(ctx.conn, ctx.now)}
     raids = raid_commands.member_raid_names(ctx.conn, ctx.now, name)
     waits = []
     for event in new_events:
-        payload = event["payload"]
+        payload = json.loads(event["payload"])
         if event["kind"] == "ask.answered":
             ask = ctx.conn.execute("SELECT party FROM asks WHERE id = ?", (payload["id"],)).fetchone()
             if ask is not None and ask["party"] == name:

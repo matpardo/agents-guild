@@ -106,6 +106,16 @@ class PartyWaitsTests(MergeQueueTestCase):
         self.assertIn(("notices-unread", "notice #1", "notice #1 unread"), self.waits())
         self.assertNotIn("notices-unread", [kind for kind, subject, label in self.waits("beta")])
 
+    def test_unseen_waits_skip_events_of_other_kinds(self):
+        conn = sqlite3.connect(str(self.data_home / "guild" / "guild.db"))
+        conn.execute(
+            "INSERT INTO events (id, ts, origin, kind, visibility, payload)"
+            " VALUES ('evt-x', '2026-10-14T00:00:00Z', 'test', 'other.kind', 'project', 'not json')"
+        )
+        conn.commit()
+        conn.close()
+        self.assertNotIn("notices-unread", self.kinds())
+
     def test_usage_limit_reset_of_a_live_leader(self):
         self.write_session(os.getpid(), "sess-1", "alpha")
         transcript = self.claude_projects_dir / "p" / "sess-1.jsonl"

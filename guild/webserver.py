@@ -223,8 +223,11 @@ class BoardRequestHandler(http_server.BaseHTTPRequestHandler):
             self.send_header("Cache-Control", cache_control)
         for name, value in _SECURITY_HEADERS:
             self.send_header(name, value)
-        self.end_headers()
-        self.wfile.write(body)
+        try:
+            self.end_headers()
+            self.wfile.write(body)
+        except (BrokenPipeError, ConnectionResetError):
+            return
 
     def _write_json(self, status, payload):
         body = json.dumps(payload).encode("utf-8")
