@@ -334,8 +334,16 @@ def main_label(row):
     return "{} \u2014 {} ({})".format(row["repo"], row["reason"], row["source"])
 
 
+def main_headline(row):
+    if row["external"] is not None:
+        return "MAIN BLOCKED ({}) {} \u2192 re-run main once {} is fixed".format(
+            row["external"], row["repo"], row["external"]
+        )
+    return "MAIN RED {} \u2192 fix before anything".format(main_label(row))
+
+
 def _main_line(row):
-    return "0. MAIN RED {} \u2192 fix before anything".format(main_label(row))
+    return "0. {}".format(main_headline(row))
 
 
 def _action_text(entry):
@@ -470,8 +478,14 @@ def hot_files(conn, repos, cap):
     return hot
 
 
-def main_red_labels(conn, party_names):
-    return [main_label(row) for row in load_scoped_queue(conn, party_names)["main"]]
+def main_board_texts(conn, party_names):
+    return [_main_board_text(row) for row in load_scoped_queue(conn, party_names)["main"]]
+
+
+def _main_board_text(row):
+    if row["external"] is not None:
+        return "MAIN BLOCKED ({}): {}".format(row["external"], row["repo"])
+    return "MAIN RED: {}".format(main_label(row))
 
 
 def _entry_model(projects_dir, now, entry):
@@ -499,10 +513,14 @@ def gates(entry, red_rows):
         found.append("draft (gh pr ready {})".format(entry["number"]))
     if "needs-human-pr-review" in entry["labels"]:
         found.append("needs human review")
-    found.extend(
-        "main red {}".format(main_label(row)) for row in red_rows if row["repo"] == entry["repo"]
-    )
+    found.extend(_main_gate(row) for row in red_rows if row["repo"] == entry["repo"])
     return found
+
+
+def _main_gate(row):
+    if row["external"] is not None:
+        return "main blocked: {}".format(row["external"])
+    return "main red {}".format(main_label(row))
 
 
 def _queue_entry_model(projects_dir, now, position, entry, main_rows):
@@ -527,6 +545,7 @@ def _main_model(row):
         "repo": row["repo"],
         "source": row["source"],
         "reason": sanitize.strip_control_sequences(row["reason"]),
+        "external": row["external"],
     }
 
 

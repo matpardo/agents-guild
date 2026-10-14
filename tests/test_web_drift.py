@@ -185,6 +185,30 @@ class WebQueueBlockBehaviorTests(unittest.TestCase):
 
 
 @unittest.skipIf(shutil.which("node") is None, "node not installed")
+class WebMainRowBehaviorTests(unittest.TestCase):
+    def _text(self, external):
+        row = {"repo": "o/r", "source": "gh", "reason": "checks failing: lint", "external": external}
+        queue = {"head": None, "scope": "party:a", "synced_at": "now", "synced_label": "synced now", "main": [row], "queue": []}
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "board.json"
+            path.write_text(json.dumps(dict(_BOARD, merge_queues=[queue])))
+            return subprocess.run(
+                ["node", str(_HARNESS), str(_APP_JS_PATH), str(path), "all", "all", "merge-queues"],
+                capture_output=True, text=True, timeout=30, check=True,
+            ).stdout
+
+    def test_red_main_row_says_fix_before_anything(self):
+        text = self._text(None)
+        self.assertIn("MAIN RED o/r", text)
+        self.assertIn("fix before anything", text)
+
+    def test_billing_blocked_main_row_says_rerun_once_fixed(self):
+        text = self._text("billing")
+        self.assertIn("MAIN BLOCKED (billing) o/r \u2192 re-run main once billing is fixed", text)
+        self.assertNotIn("MAIN RED", text)
+
+
+@unittest.skipIf(shutil.which("node") is None, "node not installed")
 class WebQueueAskFixBehaviorTests(unittest.TestCase):
     def _queue_text(self, blocked_external, fix_reasons, fix_request):
         entry = {

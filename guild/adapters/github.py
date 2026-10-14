@@ -84,9 +84,26 @@ def branch_checks(cwd, repo, branch):
     if result.returncode != 0:
         raise GhCommandError(result.stderr.strip() or "gh api check-runs failed")
     return [
-        {"name": run["name"], "conclusion": (run.get("conclusion") or "").upper()}
+        {
+            "id": run.get("id"),
+            "name": run["name"],
+            "conclusion": (run.get("conclusion") or "").upper(),
+            "annotations_count": (run.get("output") or {}).get("annotations_count") or 0,
+        }
         for run in json.loads(result.stdout)["check_runs"]
     ]
+
+
+def check_run_annotation_messages(cwd, repo, check_run_id):
+    result = subprocess.run(
+        ["gh", "api", "repos/{}/check-runs/{}/annotations".format(repo, check_run_id)],
+        cwd=str(cwd),
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode != 0:
+        raise GhCommandError(result.stderr.strip() or "gh api annotations failed")
+    return [annotation.get("message") or "" for annotation in json.loads(result.stdout)]
 
 
 _UNRESOLVED_THREADS_QUERY = (

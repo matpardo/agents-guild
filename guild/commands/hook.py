@@ -499,7 +499,7 @@ def _red_main_push_result(ctx, target_dir, branch):
     if repo is None:
         return None
     red = ctx.conn.execute(
-        "SELECT source, reason, updated_at FROM main_status WHERE repo = ? AND red = 1 ORDER BY source",
+        "SELECT source, reason, updated_at FROM main_status WHERE repo = ? AND red = 1 AND external IS NULL ORDER BY source",
         (repo,),
     ).fetchall()
     if not red:
@@ -520,6 +520,18 @@ def _red_main_push_result(ctx, target_dir, branch):
         "fix main first, or flag your PR with `guild pr set <ref> --fixes-main` if it repairs main"
     ).format(repo, checks)
     return {"blocked": True, "message": message, "system_message": None}
+
+
+def _billing_blocked_main_warning(ctx, target_dir):
+    repo = localbase.origin_repo_slug(target_dir)
+    if repo is None:
+        return None
+    blocked = ctx.conn.execute(
+        "SELECT 1 FROM main_status WHERE repo = ? AND red = 1 AND external = 'billing'", (repo,)
+    ).fetchone()
+    if blocked is None:
+        return None
+    return "guild: main of {} is blocked by billing: CI will not run".format(repo)
 
 
 def _shared_areas_push_result(ctx, target_dir, paths):
@@ -578,9 +590,16 @@ def pre_push(ctx, command):
         shared_areas_result = _shared_areas_push_result(ctx, target_dir, paths)
         if shared_areas_result is not None:
             return shared_areas_result
-        warning = _file_cap_warning(ctx.with_cwd(Path(target_dir)), target_dir, branch, paths)
-        if warning is not None:
-            return {"blocked": False, "message": None, "system_message": warning}
+        warnings = [
+            warning
+            for warning in (
+                _billing_blocked_main_warning(ctx, target_dir),
+                _file_cap_warning(ctx.with_cwd(Path(target_dir)), target_dir, branch, paths),
+            )
+            if warning is not None
+        ]
+        if warnings:
+            return {"blocked": False, "message": None, "system_message": "\n".join(warnings)}
     return {"blocked": False, "message": None, "system_message": None}
 
 

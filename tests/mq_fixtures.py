@@ -48,6 +48,15 @@ def diff_fixture(paths, additions, deletions, created_at):
 
 
 class MergeQueueTestCase(GuildTestCase):
+    def mark_billing_blocked(self):
+        conn = sqlite3.connect(str(self.data_home / "guild" / "guild.db"))
+        conn.execute(
+            "INSERT INTO main_status (repo, source, red, reason, external, updated_at)"
+            " VALUES ('acme/app', 'gh', 1, 'checks failing: lint', 'billing', '2026-01-01T00:00:00Z')"
+        )
+        conn.commit()
+        conn.close()
+
     def setUp(self):
         super().setUp()
         self.repo_dir = self.register_project("acme", ["acme/app"])

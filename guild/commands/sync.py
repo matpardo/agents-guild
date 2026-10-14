@@ -435,6 +435,10 @@ def _close_met_notices(ctx):
             )
 
 
+_BILLING_EXTERNAL = "billing"
+_BILLING_FAILURE_TEXT = "recent account payments have failed"
+
+
 def _branch_red_reason(checks):
     failing = [check["name"] for check in checks if check["conclusion"] in _FAILING_CONCLUSIONS]
     if not failing:
@@ -442,16 +446,27 @@ def _branch_red_reason(checks):
     return "checks failing: {}".format(", ".join(sorted(failing)))
 
 
+def _billing_blocked(ctx, repo, checks):
+    failing = [check for check in checks if check["conclusion"] in _FAILING_CONCLUSIONS]
+    for check in failing:
+        if check["annotations_count"] == 0:
+            return False
+        messages = github.check_run_annotation_messages(ctx.cwd, repo, check["id"])
+        if not any(_BILLING_FAILURE_TEXT in message.lower() for message in messages):
+            return False
+    return bool(failing)
+
+
 def _recorded_gh_status(ctx, repo):
     row = ctx.conn.execute(
-        "SELECT red, reason FROM main_status WHERE repo = ? AND source = 'gh'", (repo,)
+        "SELECT red, reason, external FROM main_status WHERE repo = ? AND source = 'gh'", (repo,)
     ).fetchone()
     if row is None:
-        return False, None
-    return bool(row["red"]), row["reason"]
+        return False, None, None
+    return bool(row["red"]), row["reason"], row["external"]
 
 
-def _record_main_status(ctx, project, repo, reason):
+def _record_main_status(ctx, project, repo, reason, external):
     with db.writing(ctx.conn):
         events.record(
             ctx.conn,
@@ -462,20 +477,21 @@ def _record_main_status(ctx, project, repo, reason):
             project["name"],
             "main.status_synced",
             "guild",
-            {"repo": repo, "red": reason is not None, "reason": reason},
+            {"repo": repo, "red": reason is not None, "reason": reason, "external": external},
         )
 
 
 def _sync_repo_main_status(ctx, project, repo, base, failures):
     try:
         checks = github.branch_checks(ctx.cwd, repo, base)
+        external = _BILLING_EXTERNAL if _billing_blocked(ctx, repo, checks) else None
     except github.GhCommandError as error:
         failures.append("{}: main status check failed: {}".format(repo, error))
         return
     reason = _branch_red_reason(checks)
-    if _recorded_gh_status(ctx, repo) == (reason is not None, reason):
+    if _recorded_gh_status(ctx, repo) == (reason is not None, reason, external):
         return
-    _record_main_status(ctx, project, repo, reason)
+    _record_main_status(ctx, project, repo, reason, external)
 
 
 def _sync_main_status(ctx, projects, failures):
