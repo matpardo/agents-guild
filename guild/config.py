@@ -12,10 +12,6 @@ _LIFECYCLE_EVENTS = ("on_pr_merged", "on_pr_closed")
 _LIFECYCLE_ENTRY_KEYS = {"command", "timeout_minutes"}
 _LIFECYCLE_MAX_TIMEOUT_MINUTES = 1440
 _HANDOFF_RETENTION_MAX_DAYS = 3650
-_DISPATCHER_KEYS = {"rules"}
-_DISPATCHER_REMOVED_KEYS = ("permission_mode", "max_launches_per_hour")
-_DISPATCHER_RULES = ("ask_answered", "checks_failing", "fix_requested", "pr_unmergeable", "next_task", "merge_head", "pr_promote", "limit_resume", "sdd_progress")
-_DISPATCHER_RULE_MODES = ("dry-run", "on")
 
 
 def _validate_tracker_config(tracker_config):
@@ -174,45 +170,6 @@ def _validate_lifecycle_config(data):
         _validate_lifecycle_entry(event, entry)
 
 
-def _validate_dispatcher_rules(rules):
-    if not isinstance(rules, dict):
-        raise GuildError("project config 'dispatcher.rules' must be an object", 1)
-    for rule, mode in rules.items():
-        if rule not in _DISPATCHER_RULES:
-            raise GuildError(
-                "project config 'dispatcher.rules' has unknown rule '{}': allowed are {}".format(
-                    rule, ", ".join(_DISPATCHER_RULES)
-                ),
-                1,
-            )
-        if mode == "off":
-            raise GuildError(
-                "project config 'dispatcher.rules.{}' cannot be 'off': remove the rule to disable it".format(rule),
-                1,
-            )
-        if mode not in _DISPATCHER_RULE_MODES:
-            raise GuildError(
-                "project config 'dispatcher.rules.{}' must be 'dry-run' or 'on'".format(rule), 1
-            )
-
-
-def _validate_dispatcher_config(data):
-    dispatcher = data.get("dispatcher")
-    if dispatcher is None:
-        return
-    if not isinstance(dispatcher, dict):
-        raise GuildError("project config 'dispatcher' must be an object", 1)
-    for key in _DISPATCHER_REMOVED_KEYS:
-        if key in dispatcher:
-            raise GuildError(
-                "project config 'dispatcher.{}' was removed: the dispatcher no longer launches sessions".format(key),
-                1,
-            )
-    if set(dispatcher) != _DISPATCHER_KEYS:
-        raise GuildError("project config 'dispatcher' must have exactly the key 'rules'", 1)
-    _validate_dispatcher_rules(dispatcher["rules"])
-
-
 def validate_project_config(data):
     for key in _REQUIRED_KEYS:
         if key not in data:
@@ -241,7 +198,6 @@ def validate_project_config(data):
     _validate_max_open_prs_config(data, "max_open_prs_per_file")
     _validate_max_open_prs_config(data, "finding_guard_threshold")
     _validate_max_open_prs_config(data, "fix_request_stale_hours")
-    _validate_dispatcher_config(data)
 
 
 def load_project_file(config_file):

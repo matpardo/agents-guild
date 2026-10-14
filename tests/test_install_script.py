@@ -14,9 +14,17 @@ class InstallScriptTests(unittest.TestCase):
         self.tmp = tempfile.TemporaryDirectory()
         self.addCleanup(self.tmp.cleanup)
         self.home = Path(self.tmp.name)
+        self.fake_bin = self.home / "fake-bin"
+        self.fake_bin.mkdir()
+        self.systemctl_log = self.home / "systemctl.log"
+        fake = self.fake_bin / "systemctl"
+        fake.write_text('#!/bin/sh\necho "$@" >> "{}"\n'.format(self.systemctl_log))
+        fake.chmod(0o755)
+        self.unit_dir = self.home / ".config" / "systemd" / "user"
 
     def _run(self):
-        env = dict(os.environ, HOME=str(self.home))
+        env = dict(os.environ, HOME=str(self.home), PATH="{}:{}".format(self.fake_bin, os.environ["PATH"]))
+        env.pop("XDG_CONFIG_HOME", None)
         return subprocess.run(["bash", str(_SCRIPT)], capture_output=True, text=True, env=env)
 
     def test_links_and_wires_settings(self):
@@ -34,3 +42,25 @@ class InstallScriptTests(unittest.TestCase):
         result = self._run()
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("settings: already wired", result.stdout)
+
+    def test_removes_retired_dispatcher_timer(self):
+        self.unit_dir.mkdir(parents=True)
+        (self.unit_dir / "guild-dispatch.timer").write_text("")
+        (self.unit_dir / "guild-dispatch.service").write_text("")
+        (self.unit_dir / "guild-sync-gh.timer").write_text("")
+        result = self._run()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertFalse((self.unit_dir / "guild-dispatch.timer").exists())
+        self.assertFalse((self.unit_dir / "guild-dispatch.service").exists())
+        self.assertTrue((self.unit_dir / "guild-sync-gh.timer").exists())
+        self.assertEqual(
+            self.systemctl_log.read_text().splitlines(),
+            ["--user disable --now guild-dispatch.timer", "--user daemon-reload"],
+        )
+        self.assertIn("removed the retired dispatcher timer", result.stdout)
+
+    def test_leaves_systemd_alone_without_retired_timer(self):
+        result = self._run()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertFalse(self.systemctl_log.exists())
+        self.assertNotIn("retired dispatcher", result.stdout)

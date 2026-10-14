@@ -511,18 +511,6 @@ def _raid_resumed(conn, event):
     conn.execute("DELETE FROM raid_pauses WHERE raid = ?", (event["payload"]["raid"],))
 
 
-def _dispatch_paused(conn, event):
-    payload = event["payload"]
-    conn.execute(
-        "INSERT OR REPLACE INTO dispatch_pause (id, paused_at, paused_by, reason) VALUES (1, ?, ?, ?)",
-        (event["ts"], payload["party"], payload["reason"]),
-    )
-
-
-def _dispatch_resumed(conn, event):
-    conn.execute("DELETE FROM dispatch_pause")
-
-
 def _merge_queue_pinned(conn, event):
     payload = event["payload"]
     conn.execute(
@@ -653,56 +641,6 @@ def _resources_sampled(conn, event):
     )
 
 
-def _dispatch_decided(conn, event):
-    payload = event["payload"]
-    state = "launching" if payload["outcome"] == "launching" else None
-    conn.execute(
-        "INSERT OR REPLACE INTO dispatch_decisions (project, key, mode, rule, outcome, party, generation,"
-        " permission_mode, subject, reason, decided_at, window_id, state)"
-        " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?)",
-        (
-            payload["project"],
-            payload["key"],
-            payload["mode"],
-            payload["rule"],
-            payload["outcome"],
-            payload["party"],
-            payload["generation"],
-            payload.get("permission_mode"),
-            payload["subject"],
-            payload["reason"],
-            event["ts"],
-            state,
-        ),
-    )
-
-
-def _dispatch_launched(conn, event):
-    payload = event["payload"]
-    conn.execute(
-        "UPDATE dispatch_decisions SET state = 'launched', window_id = ?"
-        " WHERE project = ? AND key = ? AND mode = 'on'",
-        (payload["window_id"], payload["project"], payload["key"]),
-    )
-
-
-def _dispatch_launch_failed(conn, event):
-    payload = event["payload"]
-    conn.execute(
-        "UPDATE dispatch_decisions SET state = 'failed', reason = ?, window_id = ?"
-        " WHERE project = ? AND key = ? AND mode = 'on'",
-        (payload["reason"], payload["window_id"], payload["project"], payload["key"]),
-    )
-
-
-def _dispatch_bound(conn, event):
-    payload = event["payload"]
-    conn.execute(
-        "UPDATE dispatch_decisions SET state = 'bound' WHERE project = ? AND key = ? AND mode = 'on'",
-        (payload["project"], payload["key"]),
-    )
-
-
 def _dump(value):
     return json.dumps(value)
 
@@ -752,8 +690,6 @@ _REDUCERS = {
     "raid.left": _raid_left,
     "raid.paused": _raid_paused,
     "raid.resumed": _raid_resumed,
-    "dispatch.paused": _dispatch_paused,
-    "dispatch.resumed": _dispatch_resumed,
     "merge_queue.pinned": _merge_queue_pinned,
     "merge_queue.unpinned": _merge_queue_unpinned,
     "main.status_synced": _main_status_synced,
@@ -764,11 +700,16 @@ _REDUCERS = {
     "cost.sampled": _cost_sampled,
     "lifecycle.ran": _lifecycle_ran,
     "resources.sampled": _resources_sampled,
-    "dispatch.decided": _dispatch_decided,
-    "dispatch.launched": _dispatch_launched,
-    "dispatch.launch_failed": _dispatch_launch_failed,
-    "dispatch.bound": _dispatch_bound,
 }
+
+
+def _retired(conn, event):
+    return None
+
+
+_REDUCERS.update(
+    {kind: _retired for kind in ("dispatch.paused", "dispatch.resumed", "dispatch.decided", "dispatch.launched", "dispatch.launch_failed", "dispatch.bound")}
+)
 
 
 def apply(conn, event):

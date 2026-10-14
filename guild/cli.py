@@ -603,24 +603,6 @@ def _handle_timer(ctx, args):
     return 0
 
 
-def _handle_dispatch(ctx, args):
-    from guild import tmux_windows
-    from guild.commands import dispatch as dispatch_commands
-    from guild.commands import dispatch_pause as dispatch_pause_commands
-
-    if args.dispatch_action == "status":
-        _print_lines(dispatch_commands.status(ctx))
-        return 0
-    if args.dispatch_action == "pause":
-        _print(dispatch_pause_commands.pause(ctx, args.reason))
-        return 0
-    if args.dispatch_action == "resume":
-        _print(dispatch_pause_commands.resume(ctx))
-        return 0
-    _print_lines(dispatch_commands.run(ctx, args.dry_run, tmux_windows.Tmux(), notify.spawn_detached))
-    return 0
-
-
 def _handle_drift(ctx, args):
     from guild import config
     from guild.commands import drift as drift_commands
@@ -1079,24 +1061,10 @@ def build_parser():
     resources_actions = resources.add_subparsers(dest="resources_action", required=False, metavar="<subcommand>")
     resources_actions.add_parser("collect", help="measure and record disk usage per project")
 
-    dispatch = subparsers.add_parser("dispatch", help="suggest a guild revive on new events")
-    dispatch_actions = dispatch.add_subparsers(dest="dispatch_action", required=True, metavar="<subcommand>")
-    dispatch_run = dispatch_actions.add_parser("run", help="react to new events and launch sessions where the dispatcher is enabled")
-    dispatch_run.add_argument("--dry-run", action="store_true", help="show decisions without recording or notifying")
-    dispatch_run.set_defaults(handler=_handle_dispatch)
-    dispatch_status = dispatch_actions.add_parser("status", help="show dispatcher cursor, launches, rules and recent decisions")
-    dispatch_status.set_defaults(handler=_handle_dispatch)
-    dispatch_pause = dispatch_actions.add_parser("pause", help="stop dispatch for every project until a human resumes it")
-    dispatch_pause.add_argument("--reason", required=True, help="why dispatch is paused")
-    dispatch_pause.set_defaults(handler=_handle_dispatch)
-    dispatch_resume = dispatch_actions.add_parser("resume", help="lift a dispatch pause (human only, outside a session)")
-    dispatch_resume.set_defaults(handler=_handle_dispatch)
-
     _add_timer_parser(subparsers, "sync-timer", "sync-gh")
     _add_timer_parser(subparsers, "sync-sdd-timer", "sync-sdd")
     _add_timer_parser(subparsers, "sync-tracker-timer", "sync-tracker")
     _add_timer_parser(subparsers, "resources-timer", "resources-collect")
-    _add_timer_parser(subparsers, "dispatch-timer", "dispatch")
 
     drift = subparsers.add_parser("drift", help="check SDD drift of epics")
     drift_scope = drift.add_mutually_exclusive_group()

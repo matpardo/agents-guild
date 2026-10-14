@@ -294,3 +294,14 @@ class PageFilesTests(WebWriteTestCase):
             with self.subTest(name=name):
                 response, body = self._get("/" + name, self._host())
                 self.assertNotIn(token.encode("utf-8"), body)
+
+
+class RetiredDispatchRouteTests(WebWriteTestCase):
+    def test_dispatch_paths_are_not_routed(self):
+        for action in ("pause", "resume"):
+            path = "/api/dispatch/" + action
+            with self.subTest(action=action):
+                response, payload = self._post_json(path, self._good_headers(), {"reason": "x"})
+                self.assertEqual(response.status, 405)
+                response, body = self._get(path, self._host())
+                self.assertEqual(response.status, 404)

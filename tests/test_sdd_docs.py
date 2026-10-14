@@ -131,45 +131,35 @@ class EphemeralBriefDocsTests(unittest.TestCase):
         )
 
 
-class DispatcherDocsTests(unittest.TestCase):
-    _decision = _DECISIONS_DIR / "20261012_dispatcher-suggests-human-launches.md"
-    _superseded = _DECISIONS_DIR / "20261004_dispatcher-launches-fresh-sessions.md"
+class DispatcherRetirementDocsTests(unittest.TestCase):
+    _decision = _DECISIONS_DIR / "20261014_board-shows-waits-no-dispatcher.md"
+    _previous = _DECISIONS_DIR / "20261012_dispatcher-suggests-human-launches.md"
+    _oldest = _DECISIONS_DIR / "20261004_dispatcher-launches-fresh-sessions.md"
 
-    def test_epic_is_active_with_all_its_tasks(self):
+    def test_epic_is_archived_with_the_retirement_task(self):
         epic_dir = _EPICS_DIR / "dispatcher"
-        self.assertEqual(_frontmatter(epic_dir / "spec.md")["status"], "active")
+        self.assertEqual(_frontmatter(epic_dir / "spec.md")["status"], "archived")
         tasks = sdd.parse_tasks_file(epic_dir / "tasks.md", _PATTERNS)
-        self.assertEqual([task["tid"] for task in tasks], ["T{:02d}".format(number) for number in range(1, 24)])
-        by_tid = {task["tid"]: task["sdd_status"] for task in tasks}
-        for tid in ("T10", "T11", "T12", "T13"):
-            self.assertEqual(by_tid[tid], "done")
+        self.assertEqual([task["tid"] for task in tasks], ["T{:02d}".format(number) for number in range(1, 25)])
+        self.assertEqual({task["tid"]: task["sdd_status"] for task in tasks}["T24"], "done")
 
-    def test_decision_is_superseded_and_names_the_guards(self):
-        text = self._decision.read_text()
-        self.assertIn("- **Status:** superseded by 20261014_board-shows-waits-no-dispatcher", text)
-        self.assertIn("- **Supersedes:** 20261004_dispatcher-launches-fresh-sessions", text)
-        self.assertIn("No session starts or wakes on its own.", text)
-        self.assertIn("deferred and retried for 24 hours", text)
-        self.assertIn("`20260928_idle-wake-no-go` now holds fully", text)
-        self.assertIn("Lifecycle commands stay in `sync`.", text)
+    def test_decisions_chain_ends_in_the_accepted_one(self):
+        self.assertIn("- **Status:** accepted", self._decision.read_text())
         self.assertIn(
-            "- **Status:** superseded by 20261012_dispatcher-suggests-human-launches", self._superseded.read_text()
+            "- **Status:** superseded by 20261014_board-shows-waits-no-dispatcher", self._previous.read_text()
+        )
+        self.assertIn(
+            "- **Status:** superseded by 20261012_dispatcher-suggests-human-launches", self._oldest.read_text()
         )
 
-    def test_readme_documents_the_dispatcher(self):
-        self.assertIn("guild dispatch run [--dry-run]", _README)
-        self.assertIn("guild dispatch status", _README)
-        self.assertIn("guild dispatch-timer install --every <dur> | uninstall | print", _README)
-        self.assertIn("### Dispatcher", _README)
-        self.assertIn('"dispatcher": {"rules": {"ask_answered": "on"', _README)
-        self.assertIn("`dispatch-failed`", _README)
-        self.assertIn("`deferred`", _README)
-        self.assertIn("`NoNewPrivileges=yes` and `Nice=10`", _README)
-        self.assertIn("`dispatcher` (active: suggests a revive", _README)
+    def test_docs_no_longer_mention_the_dispatcher_commands(self):
+        for text in (_README, _GUILD_MD):
+            self.assertNotIn("guild dispatch", text)
+            self.assertNotIn("dispatch-timer", text)
 
-    def test_guild_md_tells_sessions_how_to_wait_for_the_dispatcher(self):
+    def test_guild_md_tells_sessions_how_to_wait(self):
         self.assertIn("**Blocked on an ask with nothing else to do?**", _GUILD_MD)
-        self.assertIn("where the project enables the dispatcher, the human is told to run `guild revive --party <party>`", _GUILD_MD)
+        self.assertIn("the board shows what the party waits on and the human relaunches with `guild revive --party <party>`", _GUILD_MD)
 
 
 if __name__ == "__main__":

@@ -12,7 +12,6 @@ PROJECTION_TABLES = (
     "claims",
     "raid_members",
     "raid_pauses",
-    "dispatch_pause",
     "pr_shared_areas",
     "pr_files",
     "merge_queue_pins",
@@ -22,9 +21,10 @@ PROJECTION_TABLES = (
     "resource_samples",
     "resource_machine",
     "leader_windows",
-    "dispatch_decisions",
     "findings",
 )
+
+_RETIRED_TABLES = ("dispatch_pause", "dispatch_decisions", "dispatch_cursors")
 
 _RAID_MEMBERS_TABLE = """
     CREATE TABLE IF NOT EXISTS raid_members (
@@ -192,14 +192,6 @@ _CREATE_STATEMENTS = (
     )
     """,
     """
-    CREATE TABLE IF NOT EXISTS dispatch_pause (
-        id INTEGER PRIMARY KEY CHECK (id = 1),
-        paused_at TEXT NOT NULL,
-        paused_by TEXT NOT NULL,
-        reason TEXT NOT NULL
-    )
-    """,
-    """
     CREATE TABLE IF NOT EXISTS pr_shared_areas (
         repo TEXT NOT NULL,
         number INTEGER NOT NULL,
@@ -312,30 +304,6 @@ _CREATE_STATEMENTS = (
     )
     """,
     """
-    CREATE TABLE IF NOT EXISTS dispatch_decisions (
-        project TEXT NOT NULL,
-        key TEXT NOT NULL,
-        mode TEXT NOT NULL,
-        rule TEXT NOT NULL,
-        outcome TEXT NOT NULL,
-        party TEXT,
-        generation INTEGER,
-        permission_mode TEXT,
-        subject TEXT NOT NULL,
-        reason TEXT,
-        decided_at TEXT NOT NULL,
-        window_id TEXT,
-        state TEXT,
-        PRIMARY KEY (project, key, mode)
-    )
-    """,
-    """
-    CREATE TABLE IF NOT EXISTS dispatch_cursors (
-        project TEXT PRIMARY KEY,
-        last_seq INTEGER NOT NULL
-    )
-    """,
-    """
     CREATE TABLE IF NOT EXISTS transcript_cursors (
         path TEXT PRIMARY KEY,
         offset INTEGER NOT NULL
@@ -437,6 +405,8 @@ def _default_fix_marks(conn):
 
 
 def create_all(conn):
+    for table in _RETIRED_TABLES:
+        conn.execute("DROP TABLE IF EXISTS {}".format(table))
     for statement in _CREATE_STATEMENTS:
         conn.execute(statement)
     _relax_raid_expiry(conn)
