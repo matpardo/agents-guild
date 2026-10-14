@@ -188,14 +188,24 @@ def _rule_pr_open_card_not_started(conn, project, epics, party_scope):
 
 
 def _rule_pr_merged_card_not_done(conn, project, epics, party_scope):
-    return _pr_card_findings(
+    rows = _pr_card_findings(
         conn, project, epics, party_scope,
         "prs.lifecycle = 'merged'", "cards.status_category != 'done'",
-        lambda row: "pr:{}#{}: merged, {}card {} not done ({}): move {} to Done".format(
-            row["repo"], row["number"], _pr_task_ref(row),
-            row["card_key"], row["status"], row["card_key"],
-        ),
+        lambda row: row,
     )
+    by_card = {}
+    for row in sorted(rows, key=lambda row: (row["card_key"], row["repo"], row["number"])):
+        by_card.setdefault(row["card_key"], []).append(row)
+    return [
+        "card {} not done ({}): move {} to Done; merged {}".format(
+            key, card_rows[0]["status"], key,
+            ", ".join(
+                "pr:{}#{} {}".format(row["repo"], row["number"], _pr_task_ref(row)).strip()
+                for row in card_rows
+            ),
+        )
+        for key, card_rows in by_card.items()
+    ]
 
 
 def _rule_task_started_card_not_started(conn, project, epics, party_scope):

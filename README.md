@@ -1038,7 +1038,7 @@ naming the refs and what each source says:
 | `SDD task without card` | the epic has a `jira_key` but the task has none (only for keyed epics) |
 | `card not under its epic` | the epic has a `jira_key` and the task's synced card has `parent_key IS NULL` |
 | `PR open, card not started` | a tracked PR is not merged/closed and its linked card (the task's SDD card, or the `--card` key of `pr track`) has `status_category == new`; names the card and says to move it to In Progress |
-| `PR merged, card not done` | a tracked PR has lifecycle `merged` and its linked card (task's SDD card or `--card` key) has `status_category != done`; says to move it to Done |
+| `PR merged, card not done` | a tracked PR has lifecycle `merged` and its linked card (task's SDD card or `--card` key) has `status_category != done`; one finding per card, listing its merged PRs, says to move it to Done |
 | `task started, card not started` | a quest task is `active` in guild and its SDD card has `status_category == new`; says to move the card to In Progress |
 | `PR closed unmerged` | a tracked PR has lifecycle `closed` |
 | `party has no running leader` | an `active` party's `leader_session_id` is not the id of any session file under the Claude sessions dir (`awaiting-leader` parties are not findings) |
