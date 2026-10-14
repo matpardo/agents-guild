@@ -342,7 +342,6 @@ _COLUMN_MIGRATIONS = (
     ("asks", "snapshot", "TEXT"),
     ("asks", "answered_at", "TEXT"),
     ("leaders", "handoff_consumed_at", "TEXT"),
-    ("parties", "keeper", "INTEGER"),
     ("prs", "fixes_main", "INTEGER"),
     ("prs", "fixes_flaky", "INTEGER"),
     ("prs", "blocked_external", "TEXT"),
@@ -391,6 +390,23 @@ def _relax_raid_expiry(conn):
     conn.execute("COMMIT")
 
 
+def _parties_has_keeper(conn):
+    return any(row["name"] == "keeper" for row in conn.execute("PRAGMA table_info(parties)"))
+
+
+def _drop_keeper(conn):
+    if not _parties_has_keeper(conn):
+        return
+    conn.execute("BEGIN IMMEDIATE")
+    try:
+        if _parties_has_keeper(conn):
+            conn.execute("ALTER TABLE parties DROP COLUMN keeper")
+    except Exception:
+        conn.execute("ROLLBACK")
+        raise
+    conn.execute("COMMIT")
+
+
 def _split_needs_human(conn):
     conn.execute(
         "UPDATE prs SET lifecycle = 'draft', needs_ask_answer = 1 WHERE lifecycle = 'needs-human'"
@@ -412,6 +428,7 @@ def create_all(conn):
     _relax_raid_expiry(conn)
     for table, column, ddl_type in _COLUMN_MIGRATIONS:
         _add_column_if_missing(conn, table, column, ddl_type)
+    _drop_keeper(conn)
     _split_needs_human(conn)
     _default_fix_marks(conn)
 

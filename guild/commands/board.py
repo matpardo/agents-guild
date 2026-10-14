@@ -11,7 +11,6 @@ from guild.commands import memory as memory_commands
 from guild.commands import merge_queue as merge_queue_commands
 from guild.commands import next as next_commands
 from guild.commands import notice as notice_commands
-from guild.commands import party as party_commands
 from guild.commands import project_status
 from guild.commands import raid as raid_commands
 from guild.errors import GuildError
@@ -597,7 +596,6 @@ def _resume_command(ctx, party_row):
         party_row["generation"] + 1,
         None,
         None if leader is None else leader["permission_mode"],
-        party_commands.is_keeper(ctx.conn, party_row["name"]),
         resume.RESUME_PROMPT,
     )
     if leader is None or leader["cwd"] is None:

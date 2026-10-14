@@ -260,11 +260,6 @@ def _ctx_nudge_lines(ctx, binding):
         return []
     marker.parent.mkdir(parents=True, exist_ok=True)
     marker.touch()
-    if party_commands.is_keeper(ctx.conn, binding["party"]):
-        return [
-            "Context at {}%. Start nothing new; let in-flight runs finish, then run "
-            '`guild handoff --respawn --in-flight "..." --learned "..."`. Nothing after it.'.format(pct)
-        ]
     return [
         "Context at {}%. Start nothing new; let in-flight runs finish, then run "
         '`guild handoff --in-flight "..." --learned "..."`. '

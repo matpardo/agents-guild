@@ -105,3 +105,14 @@ updated: 2026-10-04
 - [x] `wl-copy` is preferred on Wayland; X11 tools are used only with `DISPLAY` set.
 - [x] With no tool found only OSC 52 remains and no `copy-command` is set.
 - [x] `guild doctor` warns, without failing, when tmux is installed and no clipboard tool is found.
+
+## T09 — Remove keeper parties
+
+**Depends on:** T06
+**Status:** [x] done — #160
+
+**What:** `party start --keeper`, the `--remote-control` launch flag and `handoff --respawn` are removed; the `parties.keeper` column is dropped and old events still replay.
+
+**Acceptance:**
+- [x] No command or flag mentions keeper or respawn.
+- [x] Rebuilding a log with `keeper: true` events succeeds and the column is gone.

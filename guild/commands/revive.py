@@ -24,7 +24,6 @@ class _Entry:
         cwd,
         mode,
         transcript,
-        keeper,
     ):
         self.party = party
         self.project = project
@@ -37,7 +36,6 @@ class _Entry:
         self.cwd = cwd
         self.mode = mode
         self.transcript = transcript
-        self.keeper = keeper
 
     def resumable(self):
         return self.transcript is not None
@@ -52,10 +50,8 @@ class _Entry:
 
     def command(self):
         if self.resumable():
-            return resume.resume_command(self.session_id, self.party, self.generation, self.mode, self.keeper)
-        return resume.fresh_command(
-            self.party, self.generation + 1, None, self.mode, self.keeper, resume.RESUME_PROMPT
-        )
+            return resume.resume_command(self.session_id, self.party, self.generation, self.mode)
+        return resume.fresh_command(self.party, self.generation + 1, None, self.mode, resume.RESUME_PROMPT)
 
 
 def find_transcript(projects_dir, session_id):
@@ -138,7 +134,6 @@ def _entry(ctx, transcripts_dir, party):
         cwd,
         mode,
         None if party["state"] == "awaiting-leader" else transcript,
-        bool(party["keeper"]),
     )
 
 

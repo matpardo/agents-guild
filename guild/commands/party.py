@@ -65,12 +65,7 @@ def locate_if_changed(ctx, binding, permission_mode):
         )
 
 
-def is_keeper(conn, party):
-    row = conn.execute("SELECT keeper FROM parties WHERE name = ?", (party,)).fetchone()
-    return row is not None and bool(row["keeper"])
-
-
-def start(ctx, name, keeper):
+def start(ctx, name):
     names.validate_name(name, "party name")
     if ctx.session_id is None:
         raise GuildError("party start requires a Claude Code session", 1)
@@ -92,13 +87,9 @@ def start(ctx, name, keeper):
             project,
             "party.started",
             "local",
-            {"party": name, "session_name": session_name, "keeper": keeper},
+            {"party": name, "session_name": session_name},
         )
         record_location(ctx, name, project, 1, ctx.session_id, None)
-    if keeper:
-        return "party '{}' started, generation 1 (keeper)\nclose this session and run: guild revive --party {}".format(
-            name, name
-        )
     return "party '{}' started, generation 1".format(name)
 
 

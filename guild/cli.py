@@ -80,7 +80,7 @@ def _handle_init_project(ctx, args):
 def _handle_party_start(ctx, args):
     from guild.commands import party as party_commands
 
-    _print(party_commands.start(ctx, args.name, args.keeper))
+    _print(party_commands.start(ctx, args.name))
     return 0
 
 
@@ -476,8 +476,6 @@ def _handle_board(ctx, args):
 
 
 def _handle_handoff(ctx, args):
-    import time
-
     from guild import tmux_windows
     from guild.commands import handoff as handoff_commands
 
@@ -488,7 +486,6 @@ def _handle_handoff(ctx, args):
             ("--learned", args.learned is not None),
             ("--model", args.model is not None),
             ("--dry-run", args.dry_run),
-            ("--respawn", args.respawn),
             ("--close", args.close),
         )
         for flag, given in provided:
@@ -503,7 +500,6 @@ def _handle_handoff(ctx, args):
             ("--in-flight", args.in_flight is not None),
             ("--learned", args.learned is not None),
             ("--model", args.model is not None),
-            ("--respawn", args.respawn),
             ("--close", args.close),
         )
         for flag, given in provided:
@@ -523,11 +519,9 @@ def _handle_handoff(ctx, args):
         args.in_flight,
         args.learned,
         args.model,
-        args.respawn,
         args.close,
         tmux,
         os.environ.get("TMUX_PANE"),
-        time.sleep,
     )
     _print(text)
     sys.stdout.flush()
@@ -677,7 +671,6 @@ def _add_party_parser(subparsers):
 
     start = actions.add_parser("start", help="start a party and bind this session to it")
     start.add_argument("name")
-    start.add_argument("--keeper", action="store_true", help="mark a Remote Control keeper party")
     start.set_defaults(handler=_handle_party_start)
 
     resume = actions.add_parser("resume", help="resume a party in this session")
@@ -1036,7 +1029,6 @@ def build_parser():
     handoff.add_argument("--learned", help="what the next session should know")
     handoff.add_argument("--model", help="model for the next session")
     handoff.add_argument("--dry-run", action="store_true", help="with prune: list what would be deleted")
-    handoff.add_argument("--respawn", action="store_true", help="launch the next session in a new tmux window")
     handoff.add_argument("--close", action="store_true", help="close this pane if it is the window guild launched")
     handoff.add_argument("--party", help="hand off a party whose leader session is gone (terminal only)")
     handoff.set_defaults(handler=_handle_handoff)

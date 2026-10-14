@@ -35,8 +35,6 @@ are updated in the same PR as the code.
   `party`, not a command of its own.
 - **generation** — one session of a party; a handoff or `guild revive` starts
   the next.
-- **keeper** — a party whose sessions run with Remote Control; only the guild
-  assistant.
 - **quest** — a party's current assignment: a slice of an epic, a whole epic,
   or a stream with no epic at all (e.g. "fix CI costs").
 - **epic** — a planning unit owned by external docs/trackers; guild reads it
@@ -120,7 +118,7 @@ guild doctor [--scan-prs]   # read-only checks: hooks, permission rules, GUILD.m
 guild init-project <name> --config <file.json>
 guild wire-settings   # merge guild hooks and permission rules into ~/.claude/settings.json
 
-guild party start <name> [--keeper]   # --keeper: mark a Remote Control keeper party
+guild party start <name>
 guild party resume <party> [--session <name>]   # --session: from a human terminal only
 guild party close [<party>] [--force]  # <party>: from a terminal, or your own party; --force overrides the raid-lead guard and the quest done gate
 
@@ -178,7 +176,7 @@ guild raid resume <name>              # lifts the pause and posts a notice to ra
 guild raids
 
 guild next [--all]     # ranked action queue for the caller's party
-guild handoff --in-flight "..." --learned "..." [--model <m>] [--respawn] [--close]
+guild handoff --in-flight "..." --learned "..." [--model <m>] [--close]
 guild handoff prune [--dry-run]
 guild handoff --party <name>   # terminal only: hand off a party whose leader session is gone
 
@@ -1284,36 +1282,17 @@ for a leader (still active, closed, unknown or an invalid name), nothing is
 bound and the context says why (`GUILD_RESUME=<party> not applied: ...`). A
 session that already leads that party (e.g. after `/clear`) is left alone.
 
-`guild handoff --respawn` (keeper parties only; any other party gets
-`--respawn is only for keeper parties` before anything is written) does not print a command for
-the human: it launches that same fresh command itself in a window of the `guild`
-tmux session (created when absent, named after the party, name pinned like
-`revive`), records the window (`leader.window_launched`, table `leader_windows`
-per party and generation) and waits up to 90 seconds for the new generation to
-bind (aborting early if the new window disappears or the party is gone). Once the new
-generation itself is bound it closes its own pane with `tmux kill-pane` (never the
-window, so panes you split into it survive), only when the tmux pane it runs in
-(`$TMUX_PANE`) is the window guild recorded as launching this generation and
-that window is still in the `guild` session; otherwise it prints `close this
-window yourself`. If tmux is missing, the cwd is gone or tmux cannot create the
-window it prints `respawn failed: <reason>; old session kept` plus the manual
-command; if the new generation does not bind in time the old window is kept and
-the new one is left running. Nothing else is ever killed. The keeper context nudge asks for it, so a keeper stays
-reachable through Remote Control; every other party gets the plain handoff nudge
-and the human relaunches with `guild revive`.
-
 `guild handoff --close` writes the handoff like a plain `guild handoff` call but
 closes this same session's pane instead of printing a resume command, only when
 the tmux pane it runs in (`$TMUX_PANE`) is the window guild recorded as
 launching this generation and that window is still in the `guild` session;
 otherwise it prints `not a window guild launched, close it yourself` and closes
-nothing. It cannot be combined with `--respawn` (it launches no next generation,
-it only closes the current one's own window).
+nothing.
 
 `guild handoff --party <name>` hands off a party whose leader session is gone,
 from a terminal only: it refuses from inside a Claude Code session and refuses
 to combine with any other `handoff` flag (`prune`, `--in-flight`, `--learned`,
-`--model`, `--dry-run`, `--respawn`, `--close`), naming the offending flag. It refuses
+`--model`, `--dry-run`, `--close`), naming the offending flag. It refuses
 when the party still has a live leader session (`run guild handoff from that
 session instead`). Otherwise it synthesizes `In flight` from the party
 leader's recorded worktree — branch, count of uncommitted files, count of
@@ -1402,19 +1381,6 @@ handoffs directory are skipped. Prune also runs at the end of every
 `sync --source gh` pass (so on each `SessionStart`) and on `party close`, which
 reports `pruned N handoff file(s)` when N is above zero.
 
-### Keeper parties
-
-`guild party start <name> --keeper` marks the party (`parties.keeper`, kept
-across generations and replays) and prints the hint `close this session and
-run: guild revive --party <name>`: a keeper must be launched with Remote
-Control, which only `revive` (or the handoff command) does. For a keeper,
-`guild revive` and the printed handoff command add `--remote-control
-<party>-g<N>` (resume form: after the other flags; fresh form: right before the
-prompt), and the context nudge asks for `guild handoff --respawn --in-flight
-"..." --learned "..."` instead of plain `guild handoff`. A keeper that waits on
-a permission prompt shows up as `session.waiting` and triggers the project
-`notify` command like any other party, so no extra setup is needed to be told.
-
 ### `guild revive`
 
 After a reboot, `guild revive` relaunches the active parties and the ones that handed off (`awaiting-leader`: they start the next generation fresh). It lists them
@@ -1431,7 +1397,7 @@ guild revive --list            # no tmux needed: one copy-paste command per part
 
 - `resume` (the leader transcript exists under `~/.claude/projects`) runs
   `claude --resume <session-id> --name <party>-g<N> [--permission-mode <mode>]`
-  (plus `--remote-control <party>-g<N>` for keeper parties) in the recorded cwd. `fresh` runs the handoff resume command
+  in the recorded cwd. `fresh` runs the handoff resume command
   (`GUILD_RESUME=<party> claude -n <party>-g<N+1> ...`) from the same cwd.
 - cwd and permission mode come from the leader row (recorded by the
   `SessionStart` hook); when missing, the first lines of the transcript are
@@ -1717,7 +1683,7 @@ All keys. The loader rejects a wrong type with a clear error for every key excep
 - `tracker` (object, absent: no tracker sync): drives `guild sync --source tracker` (see "Tracker sync"). `kind` is required when the block exists; only `"jira-acli"` is supported, anything else is rejected when the config loads.
   - `browse_url` (string starting with `https://`, absent: tasks carry no `card_url`): the base `guild web` prepends to a task's tracker key to build its card link (`https://acme.atlassian.net/browse/DEMO-1`).
 - `next.stale_hours` (positive integer, absent: `guild next` skips its stale-`converging` step and the web in-progress page shows no stale marker): hours without activity after which a `converging` PR is reported and a quest is marked stale.
-- `handoff_threshold` (integer percent 0-100, default 80): context usage at or above which the `UserPromptSubmit`/`PostToolUse` hooks nudge once per session toward `guild handoff` (`guild handoff --respawn` for keeper parties and sessions in a window guild launched) and the board reports the party as context high. The nudge asks the session to start nothing new, let running executions finish, hand off and stop. Recommended: 40, so sessions stay short and each fresh generation starts from the brief.
+- `handoff_threshold` (integer percent 0-100, default 80): context usage at or above which the `UserPromptSubmit`/`PostToolUse` hooks nudge once per session toward `guild handoff` and the board reports the party as context high. The nudge asks the session to start nothing new, let running executions finish, hand off and stop. Recommended: 40, so sessions stay short and each fresh generation starts from the brief.
 - `max_open_prs_per_party` (positive integer, absent: no cap): open tracked PRs of one party at which `guild next` offers no new task and says to merge the first PR in queue order. Recommended: 3.
 - `max_open_prs` (positive integer, absent: no cap): the same, counting the open tracked PRs of all parties of the project. Size it to review throughput, e.g. 10.
 - `max_open_prs_per_file` (positive integer, absent: no warning, no extra calls): when a `git push` diff touches a file that this many other open tracked PRs of the project already change, `pre-push` warns (never denies) naming the file and those PRs. Needs `guild sync --source gh`, which then stores the changed files of every open tracked PR (`pr_files`, one `gh pr view` call per PR). Exclusive `area:` claims stay for files that need exclusivity.
@@ -2324,8 +2290,8 @@ contract appears.
 **Phase 4 (lessons from the first real raid, specified under
 `sdd/epics/`).** Done: `session-liveness` (every party shows whether it is
 working, waiting on a permission prompt or stopped with work), `cost-metering`,
-`ask-context`, `session-lifecycle` (handoff retention, respawn, a Remote
-Control keeper), `ephemeral-brief` (the task brief, `idle`/`queued` party
+`ask-context`, `session-lifecycle` (handoff retention; its respawn and keeper parts were
+removed), `ephemeral-brief` (the task brief, `idle`/`queued` party
 status, shorter sessions), `merge-queue`, `web-board`, `lifecycle-commands`,
 `resource-footprint`, `security-hardening` and `derived-state`. Open:
 `install-and-update` and `raids-in-practice`. Drafts: `conflict-hotspots`,
