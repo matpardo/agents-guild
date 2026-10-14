@@ -360,6 +360,17 @@ class BoardTests(GuildTestCase):
         code, out, err = self.run_cli(["board"], None, None)
         self.assertIn("remaining: all done", out)
 
+    def test_board_shows_what_the_party_waits_on(self):
+        repo_dir = self.register_project("acme", ["acme/app"])
+        self.run_cli(["party", "start", "alpha"], "sess-1", repo_dir)
+        code, out, err = self.run_cli(["board"], None, None)
+        self.assertNotIn("waits on:", out)
+        self.run_cli(["quest", "add", "demo", "--title", "Demo", "--no-epic", "--tasks", "A"], "sess-1", repo_dir)
+        code, out, err = self.run_cli(["ask", "which?", "--context", "c", "--ref", "task:demo/A"], "sess-1", repo_dir)
+        self.assertEqual(code, 0, err)
+        code, out, err = self.run_cli(["board"], None, None)
+        self.assertIn("\n  waits on: ask #1 open\n", out)
+
     def test_board_puts_open_asks_first_with_answer_hint(self):
         repo_dir = self.register_project("acme", ["acme/app"])
         self.run_cli(["party", "start", "alpha"], "sess-1", repo_dir)

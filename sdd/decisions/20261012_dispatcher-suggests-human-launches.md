@@ -1,7 +1,7 @@
 # ADR: The dispatcher suggests a relaunch, the human launches
 
 - **Date:** 2026-10-12
-- **Status:** accepted
+- **Status:** superseded by 20261014_board-shows-waits-no-dispatcher
 - **Supersedes:** 20261004_dispatcher-launches-fresh-sessions
 
 ## Context

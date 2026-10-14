@@ -79,7 +79,7 @@ _BOARD = {
         {
             "name": name, "raids": [], "quests": [], "prs": [], "claims": [], "state": "active", "generation": 1,
             "status": {"name": "idle", "label": "idle"}, "remaining": {"all_done": True}, "ctx": None,
-            "resume_command": None, "caps": None, "drift": {"findings": [], "more": 0}, "leader_session_name": None,
+            "resume_command": None, "caps": None, "drift": {"findings": [], "more": 0}, "leader_session_name": None, "waits": [],
         }
         for name in ("a", "c")
     ],
@@ -394,3 +394,29 @@ class WebPartyHandoffBehaviorTests(unittest.TestCase):
 
     def test_non_active_party_has_no_hand_off_button(self):
         self.assertNotIn("Hand off", self._rendered("awaiting-leader", False))
+
+
+@unittest.skipIf(shutil.which("node") is None, "node not installed")
+class WebPartyWaitsBehaviorTests(unittest.TestCase):
+    def _rendered(self, waits):
+        parties = [dict(_BOARD["parties"][0], name="a", waits=waits)]
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "board.json"
+            path.write_text(json.dumps(dict(_BOARD, parties=parties)))
+            return subprocess.run(
+                ["node", str(_HARNESS), str(_APP_JS_PATH), str(path), "all", "all", "parties"],
+                capture_output=True, text=True, timeout=30, check=True,
+            ).stdout.strip()
+
+    def test_each_wait_renders_one_pill(self):
+        waits = [
+            {"kind": "checks-pending", "subject": "o/r#1", "label": "checks pending (2)"},
+            {"kind": "ask-open", "subject": "ask #3", "label": "ask #3 open"},
+        ]
+        out = self._rendered(waits)
+        self.assertIn("waits on:", out)
+        self.assertIn("checks pending (2)", out)
+        self.assertIn("ask #3 open", out)
+
+    def test_party_without_waits_has_no_waits_line(self):
+        self.assertNotIn("waits on:", self._rendered([]))

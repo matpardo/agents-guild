@@ -179,6 +179,22 @@ var NO_SESSION_MESSAGE = "session token not loaded, reload the page";
       lead: "The party leads the raid listed (RL = raid lead).",
       member: "The party is a member of the raid listed.",
     },
+    partyWait: {
+      "checks-pending": "A PR of this party is waiting for its checks to finish.",
+      "checks-failing": "Checks fail on a PR of this party; the leader must fix them.",
+      conflict: "A PR of this party has a merge conflict.",
+      behind: "A PR of this party is behind its base branch.",
+      "changes-requested": "A reviewer requested changes on a PR of this party.",
+      threads: "A PR of this party has unresolved review threads.",
+      "human-review": "A PR of this party needs a human review before merging.",
+      "human-merge": "A PR of this party is ready to merge; merge it by hand.",
+      "draft-green": "A draft PR of this party has green checks; mark it ready for review.",
+      "fix-requested": "You asked for a fix on a PR of this party and it is not resolved yet.",
+      "ask-open": "The party has an open ask waiting for your answer.",
+      "ask-answered-unseen": "An ask of this party was answered and its leader has not read the answer yet.",
+      "notices-unread": "A notice for this party was issued and its leader has not read it yet.",
+      "limit-reset": "The leader hit its usage limit; resume it by hand once the limit resets.",
+    },
     blockedWait: {
       permission: "The session is blocked on a Claude Code permission prompt; approve or deny it in that session.",
     },
@@ -1881,6 +1897,22 @@ var NO_SESSION_MESSAGE = "session token not loaded, reload the page";
     return controls;
   }
 
+  function renderPartyWaits(waits) {
+    if (waits.length === 0) {
+      return null;
+    }
+    var line = el("p");
+    line.className = "party-waits";
+    line.appendChild(textEl("span", "waits on: "));
+    waits.forEach(function (wait) {
+      var pill = textEl("span", wait.label);
+      pill.className = "pill lifecycle-converging";
+      pill.dataset.waitKind = wait.kind;
+      line.appendChild(explain(pill, "partyWait", wait.kind));
+    });
+    return line;
+  }
+
   function renderParty(party) {
     var details = el("details");
     details.className = "party";
@@ -1904,6 +1936,11 @@ var NO_SESSION_MESSAGE = "session token not loaded, reload the page";
     var leaderKey = party.leader_session_name ? "leader" : "noLeader";
     summary.appendChild(explain(textEl("span", party.leader_session_name || "no leader"), "ui", leaderKey));
     details.appendChild(summary);
+
+    var partyWaits = renderPartyWaits(party.waits);
+    if (partyWaits) {
+      details.appendChild(partyWaits);
+    }
 
     if (party.resume_command !== null) {
       var resumeLine = el("p");
