@@ -45,6 +45,6 @@ Handoffs written for a party hold only guild state and git counts, never tool ou
 ## Decisions
 
 - Sessions are launched by the human in tmux; the dispatcher only suggests (decisión del dev, 2026-10-12). See `sdd/decisions/20261012_dispatcher-suggests-human-launches.md`.
-- `--respawn` stays for keeper parties only (decisión del dev, 2026-10-12).
+- `--respawn` stays for keeper parties only (decisión del dev, 2026-10-12). Superseded: `--respawn` and keeper parties were removed (decisión del dev, 2026-10-14; see `sdd/decisions/20261014_board-shows-waits-no-dispatcher.md`).
 - No red-main gate on dispatch (decisión del dev, 2026-10-12).
 - Dispatch pause was removed together with the dispatcher (decisión del dev, 2026-10-14). See `sdd/decisions/20261014_board-shows-waits-no-dispatcher.md`.

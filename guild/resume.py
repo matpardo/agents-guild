@@ -13,29 +13,21 @@ def _generation_name(party, generation):
     return shlex.quote("{}-g{}".format(party, generation))
 
 
-def _remote_control_flag(remote_control, party, generation):
-    if not remote_control:
-        return ""
-    return " --remote-control {}".format(_generation_name(party, generation))
-
-
-def resume_command(session_id, party, generation, permission_mode, remote_control):
-    return "claude --resume {} --name {}{}{}".format(
+def resume_command(session_id, party, generation, permission_mode):
+    return "claude --resume {} --name {}{}".format(
         shlex.quote(session_id),
         _generation_name(party, generation),
         _mode_flag(permission_mode),
-        _remote_control_flag(remote_control, party, generation),
     )
 
 
-def fresh_command(party, next_generation, model, permission_mode, remote_control, prompt):
+def fresh_command(party, next_generation, model, permission_mode, prompt):
     model_flag = "" if model is None else " --model {}".format(shlex.quote(model))
-    return "GUILD_RESUME={} claude -n {}{}{}{} {}".format(
+    return "GUILD_RESUME={} claude -n {}{}{} {}".format(
         shlex.quote(party),
         _generation_name(party, next_generation),
         model_flag,
         _mode_flag(permission_mode),
-        _remote_control_flag(remote_control, party, next_generation),
         shlex.quote(prompt),
     )
 

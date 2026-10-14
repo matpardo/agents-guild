@@ -193,6 +193,41 @@ class MigrationTests(GuildTestCase):
         conn.close()
         self.assertEqual((pr_row["task_tid"], pr_row["card"]), ("T01", None))
 
+    def test_rebuild_replays_a_keeper_party_started_event_and_drops_the_column(self):
+        conn = db.connect(paths.db_path())
+        events.record(
+            conn, timeutil.utcnow(), "tester@host", "alpha", "sess-1", "acme", "party.started", "local",
+            {"party": "alpha", "session_name": "s", "keeper": True},
+        )
+        conn.commit()
+        conn.close()
+        code, out, err = self.run_cli(["rebuild"], None, None)
+        self.assertEqual(code, 0, err)
+        conn = db.connect(paths.db_path())
+        columns = {row["name"] for row in conn.execute("PRAGMA table_info(parties)").fetchall()}
+        party = conn.execute("SELECT * FROM parties WHERE name = 'alpha'").fetchone()
+        conn.close()
+        self.assertNotIn("keeper", columns)
+        self.assertEqual(party["state"], "active")
+
+    def test_db_with_the_keeper_column_loses_it_and_keeps_its_rows(self):
+        db_path = self.data_home / "guild.db"
+        conn = db.connect(db_path)
+        conn.execute("ALTER TABLE parties ADD COLUMN keeper INTEGER")
+        conn.execute(
+            "INSERT INTO parties (name, project, leader_session_id, generation, state, keeper)"
+            " VALUES ('alpha', 'acme', 'sess-1', 1, 'active', 1)"
+        )
+        conn.commit()
+        conn.close()
+
+        again = db.connect(db_path)
+        columns = {row["name"] for row in again.execute("PRAGMA table_info(parties)").fetchall()}
+        party = again.execute("SELECT * FROM parties WHERE name = 'alpha'").fetchone()
+        again.close()
+        self.assertNotIn("keeper", columns)
+        self.assertEqual(party["leader_session_id"], "sess-1")
+
     def test_old_schema_db_gains_cards_table(self):
         db_path = self.data_home / "guild.db"
         _make_old_schema_db(db_path)

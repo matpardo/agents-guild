@@ -6,19 +6,11 @@ from guild import timeutil, tmux_windows
 from guild.commands import claim as claim_commands
 from guild.commands import memory as memory_commands
 from guild.commands import next as next_commands
-from guild.commands import party as party_commands
 from guild.commands import notice as notice_commands
 from guild.commands import raid as raid_commands
 from guild.errors import GuildError
 
 _AUTO_LEARNED = "none (automatic handoff)"
-
-_BIND_POLLS = 90
-_BIND_POLL_SECONDS = 1
-_BOUND = "bound"
-_PARTY_GONE = "party-gone"
-_WINDOW_GONE = "window-gone"
-_TIMED_OUT = "timed-out"
 
 IN_FLIGHT_TITLE = "In flight"
 LEARNED_TITLE = "Learned"
@@ -118,53 +110,6 @@ def _for_memory(text):
     return text[: pii.MEMORY_ITEM_MAX_LENGTH - 1] + "…"
 
 
-def _launch_blocker(tmux, cwd):
-    if not tmux.installed():
-        return "tmux not found"
-    if cwd is None:
-        return "cwd unknown"
-    if not os.path.isdir(cwd):
-        return "cwd missing ({})".format(cwd)
-    return None
-
-
-def _record_launch(ctx, binding, window_id):
-    with db.writing(ctx.conn):
-        events.record(
-            ctx.conn,
-            ctx.now,
-            ctx.origin,
-            binding["party"],
-            ctx.session_id,
-            binding["project"],
-            "leader.window_launched",
-            "local",
-            {"party": binding["party"], "generation": binding["generation"] + 1, "window_id": window_id},
-        )
-
-
-def _bind_status(conn, tmux, party, generation, old_session_id, new_window_id):
-    row = conn.execute(
-        "SELECT generation, leader_session_id, state FROM parties WHERE name = ?", (party,)
-    ).fetchone()
-    if row is None or row["state"] == "closed":
-        return _PARTY_GONE
-    if row["generation"] >= generation and row["leader_session_id"] != old_session_id:
-        return _BOUND
-    if not tmux_windows.window_in_session(tmux, new_window_id):
-        return _WINDOW_GONE
-    return None
-
-
-def _awaiting_bind(conn, tmux, party, generation, old_session_id, new_window_id, sleep):
-    for _ in range(_BIND_POLLS):
-        status = _bind_status(conn, tmux, party, generation, old_session_id, new_window_id)
-        if status is not None:
-            return status
-        sleep(_BIND_POLL_SECONDS)
-    return _TIMED_OUT
-
-
 def _closable_pane(tmux, tmux_pane, recorded_window):
     if tmux_pane is None or recorded_window is None:
         return None
@@ -176,17 +121,6 @@ def _closable_pane(tmux, tmux_pane, recorded_window):
     return tmux_pane
 
 
-def _launch_next_generation(ctx, binding, command, cwd, tmux):
-    session_is_up = tmux_windows.session_exists(tmux)
-    window_id = tmux_windows.create_window(tmux, binding["party"], cwd, command, session_is_up)
-    if window_id is None:
-        return None
-    tmux_windows.pin_window_name(tmux, window_id)
-    tmux_windows.set_session_options(tmux)
-    _record_launch(ctx, binding, window_id)
-    return window_id
-
-
 def _close(ctx, binding, tmux, tmux_pane):
     recorded_window = tmux_windows.recorded_window(ctx.conn, binding["party"], binding["generation"])
     pane = _closable_pane(tmux, tmux_pane, recorded_window)
@@ -196,69 +130,17 @@ def _close(ctx, binding, tmux, tmux_pane):
     return _with_reminder("handoff written for {}; closing this pane".format(label)), pane
 
 
-def _respawn(ctx, binding, model, tmux, tmux_pane, sleep):
-    party, generation = binding["party"], binding["generation"]
-    leader = ctx.conn.execute(
-        "SELECT cwd, permission_mode FROM leaders WHERE party = ? AND generation = ?", (party, generation)
-    ).fetchone()
-    command = resume.fresh_command(
-        party,
-        generation + 1,
-        model,
-        leader["permission_mode"],
-        party_commands.is_keeper(ctx.conn, party),
-        resume.RESUME_PROMPT,
-    )
-    blocker = _launch_blocker(tmux, leader["cwd"])
-    if blocker is None:
-        recorded_window = tmux_windows.recorded_window(ctx.conn, party, generation)
-        window_id = _launch_next_generation(ctx, binding, command, leader["cwd"], tmux)
-        blocker = "tmux could not create the window" if window_id is None else None
-    if blocker is not None:
-        return _with_reminder("respawn failed: {}; old session kept\n{}".format(blocker, command)), None
-    status = _awaiting_bind(
-        ctx.conn, tmux, party, generation + 1, ctx.session_id, window_id, sleep
-    )
-    if status == _PARTY_GONE:
-        return _with_reminder("respawn: party '{}' is gone or closed; old session kept".format(party)), None
-    if status == _WINDOW_GONE:
-        return _with_reminder("respawn: new window exited before binding; old session kept"), None
-    if status == _TIMED_OUT:
-        return _with_reminder(
-            "respawn: next generation did not bind within {}s; old window kept; new window {} left running".format(
-                _BIND_POLLS * _BIND_POLL_SECONDS, window_id
-            )
-        ), None
-    label = "{}-g{}".format(party, generation + 1)
-    pane = _closable_pane(tmux, tmux_pane, recorded_window)
-    if pane is None:
-        return _with_reminder(
-            "respawned: {} bound; close this window yourself (not a window guild launched)".format(label)
-        ), None
-    return _with_reminder(
-        "respawned: {} bound in window {}; closing this pane".format(label, recorded_window)
-    ), pane
-
-
-def run(ctx, in_flight, learned, model, respawn, close, tmux, tmux_pane, sleep):
+def run(ctx, in_flight, learned, model, close, tmux, tmux_pane):
     if not in_flight.strip():
         raise GuildError("--in-flight must not be empty", 1)
     if not learned.strip():
         raise GuildError("--learned must not be empty", 1)
-    if respawn and close:
-        raise GuildError("--respawn and --close cannot be combined", 1)
     binding = identity.require_binding(ctx.conn, ctx.session_id)
-    if respawn and not party_commands.is_keeper(ctx.conn, binding["party"]):
-        raise GuildError(
-            "--respawn is only for keeper parties; run guild handoff and the human relaunches with guild revive", 1
-        )
     patterns = pii.project_patterns(ctx.projects_dir, binding["project"])
     pii.validate_field(in_flight, "--in-flight", pii.HANDOFF_FIELD_MAX_LENGTH, patterns)
     pii.validate_field(learned, "--learned", pii.HANDOFF_FIELD_MAX_LENGTH, patterns)
     memory_commands.add(ctx, _for_memory(learned))
     _write_handoff(ctx, binding, in_flight, learned, False)
-    if respawn:
-        return _respawn(ctx, binding, model, tmux, tmux_pane, sleep)
     if close:
         return _close(ctx, binding, tmux, tmux_pane)
     command = resume.fresh_command(
@@ -266,7 +148,6 @@ def run(ctx, in_flight, learned, model, respawn, close, tmux, tmux_pane, sleep):
         binding["generation"] + 1,
         model,
         None,
-        party_commands.is_keeper(ctx.conn, binding["party"]),
         resume.RESUME_PROMPT,
     )
     return _with_reminder(command), None

@@ -51,23 +51,23 @@ def _write_transcript(projects_dir, encoded, session_id, lines):
 class ResumeHelperTests(GuildTestCase):
     def test_resume_command_names_party_and_mode(self):
         self.assertEqual(
-            resume.resume_command("sess-1", "alpha", 3, "acceptEdits", False),
+            resume.resume_command("sess-1", "alpha", 3, "acceptEdits"),
             "claude --resume sess-1 --name alpha-g3 --permission-mode acceptEdits",
         )
 
     def test_resume_command_omits_unknown_mode(self):
         self.assertEqual(
-            resume.resume_command("sess-1", "alpha", 3, None, False), "claude --resume sess-1 --name alpha-g3"
+            resume.resume_command("sess-1", "alpha", 3, None), "claude --resume sess-1 --name alpha-g3"
         )
 
     def test_fresh_command_keeps_generation_name_and_adds_mode(self):
-        command = resume.fresh_command("alpha", 3, None, "plan", False, resume.RESUME_PROMPT)
+        command = resume.fresh_command("alpha", 3, None, "plan", resume.RESUME_PROMPT)
         self.assertTrue(
             command.startswith("GUILD_RESUME=alpha claude -n alpha-g3 --permission-mode plan ")
         )
 
     def test_fresh_command_without_mode_or_model(self):
-        command = resume.fresh_command("alpha", 2, None, None, False, resume.RESUME_PROMPT)
+        command = resume.fresh_command("alpha", 2, None, None, resume.RESUME_PROMPT)
         self.assertNotIn("--permission-mode", command)
         self.assertNotIn("--model", command)
 
@@ -200,7 +200,7 @@ class ListTests(ReviveBase):
         expected = resume.tab_command(
             "alpha",
             str(self.work_a),
-            resume.resume_command("sess-a", "alpha", 1, "acceptEdits", False),
+            resume.resume_command("sess-a", "alpha", 1, "acceptEdits"),
         )
         self.assertIn(expected, out)
 

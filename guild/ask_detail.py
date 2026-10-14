@@ -3,7 +3,6 @@ from pathlib import Path
 
 from guild import links, paths, resume, sanitize, task_context, timeutil
 from guild.commands import ask as ask_commands
-from guild.commands import party as party_commands
 from guild.commands import revive
 
 _EVENT_KINDS = (
@@ -94,7 +93,6 @@ def _resume(ctx, ask_row, origin):
         ask_row["party"],
         leader["generation"],
         leader["permission_mode"],
-        party_commands.is_keeper(ctx.conn, ask_row["party"]),
     )
     if revive.find_transcript(paths.claude_projects_dir(), session_id) is None:
         return "{} (transcript not found)".format(command)
