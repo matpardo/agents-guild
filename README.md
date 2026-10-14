@@ -184,7 +184,7 @@ guild handoff prune [--dry-run]
 guild handoff --party <name>   # terminal only: hand off a party whose leader session is gone
 
 guild merge-queue [--raid <name> | --party <name>]   # read-only: PRs in the order to merge by hand
-guild merge-queue --head [--raid <name> | --party <name>]   # the first PR whose action is merge: <ref> <party> <task>
+guild merge-queue --head [--raid <name> | --party <name>]   # the first PR whose action is merge or review: <ref> <party> <task>
 guild merge-queue pin   <owner/repo>#<a> --before <owner/repo>#<b>
 guild merge-queue unpin <owner/repo>#<a> --before <owner/repo>#<b>
 guild main red <owner/repo> --reason "<text>"   # mark a repo's main branch red by hand
@@ -784,7 +784,7 @@ network call, no event. **Guild never merges**: the output is advice for a
 human, who merges by hand and re-runs the command after each merge (the
 last line of the output says so).
 
-`guild merge-queue --head` prints only the first entry whose action is `merge`
+`guild merge-queue --head` prints only the first entry whose action is `merge` or `review: human, then merge`
 (PRs blocked by something outside development are skipped) as
 `<ref> <party> <task>`, or `no PR ready to merge`; it takes the same scope flags.
 
