@@ -14,6 +14,7 @@ _BLOCKED_STATE = "blocked"
 _MERGE_ACTION = "merge"
 _PROMOTE_ACTION = "promote"
 _REVIEW_ACTION = "review: human, then merge"
+MERGEABLE_ACTIONS = (_MERGE_ACTION, _REVIEW_ACTION)
 _ASK_LABEL = "needs-ask-answer"
 _REVIEW_LABEL = "needs-human-pr-review"
 _FIXES_MAIN_LABEL = "fixes-main"

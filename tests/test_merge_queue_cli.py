@@ -335,6 +335,11 @@ class HeadTests(QueueCliTestCase):
         code, out, err = self.head(["--party", "alpha"])
         self.assertEqual(out.strip(), "acme/app#3 alpha qa/T03")
 
+    def test_ready_human_review_pr_is_the_head(self):
+        self.run_cli(["pr", "set", "acme/app#3", "--needs-human-pr-review"], "sess-1", self.repo_dir)
+        code, out, err = self.head(["--party", "alpha"])
+        self.assertEqual(out.strip(), "acme/app#3 alpha qa/T03")
+
     def test_empty_queue_says_no_pr_is_ready(self):
         self.start_party("eps", "sess-9")
         code, out, err = self.head(["--party", "eps"])

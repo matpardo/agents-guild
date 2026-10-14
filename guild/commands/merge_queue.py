@@ -393,7 +393,7 @@ def run(ctx, raid, party):
 
 def _first_to_merge(scoped):
     for entry in scoped["queue"]:
-        if entry["action"] == "merge":
+        if entry["action"] in merge_queue.MERGEABLE_ACTIONS:
             return entry
     return None
 
