@@ -88,7 +88,7 @@ updated: 2026-10-14
 ## T12 — Drop the raid lead role
 
 **Depends on:** T11
-**Status:** [ ] pending
+**Status:** [x] done — #161
 
 **What:** decision of the dev on 2026-10-14 (`sdd/decisions/20261014_board-shows-waits-no-dispatcher.md`): `raid join` loses `--lead`, members' asks and session waits stop relaying to a lead, any active raid member or the human may pause, resume and pin, and the lead marks leave the CLI, the board, the web, history and the handoff. The `raid_members.lead` column is dropped and old `raid.joined` events replay without it.
 
