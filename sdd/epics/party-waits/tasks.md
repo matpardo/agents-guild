@@ -11,9 +11,9 @@ updated: 2026-10-14
 ## T01 — Waits per party on the board
 
 **Depends on:** —
-**Status:** [ ] pending
+**Status:** [x] done — #158
 
 **What:** `guild/party_waits.py` derives each party's waits from the projections; `guild board` prints a `waits on:` line and the web board renders one pill per wait.
 
 **Acceptance:**
-- [ ] Each wait kind has a test; the board and the web model carry `waits`.
+- [x] Each wait kind has a test; the board and the web model carry `waits`.
