@@ -21,7 +21,7 @@ updated: 2026-10-14
 ## T02 — Fast board and quiet client hang-ups
 
 **Depends on:** T01
-**Status:** [ ] pending
+**Status:** [x] done — #163
 
 **What:** the unseen waits read only `ask.answered` and `notice.created` events from SQL instead of decoding every event after each cursor, and `guild web` drops a response quietly when the browser has already hung up.
 
