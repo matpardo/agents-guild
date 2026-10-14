@@ -115,7 +115,6 @@ class TooltipCoverageTests(unittest.TestCase):
                 "generation", "leader", "noLeader", "claims", "synced",
                 "ctxHigh", "resumeCommand", "remaining", "allDone",
                 "baseBranch", "nextToMerge", "noMergeReady", "queueDetail",
-                "dispatcherRules", "dispatcherDeferred", "dispatcherPlanned",
             ],
         )
 

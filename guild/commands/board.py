@@ -1,13 +1,11 @@
 import json
 import shlex
 import textwrap
-from datetime import timedelta
 
 from guild import config, ctx_pressure, fix_request, identity, links, merge_queue, party_progress, party_status, party_waits, pii, pr_asks, resume
 from guild import sanitize, session_status, timeutil
 from guild.commands import brief as brief_commands
 from guild.commands import claim as claim_commands
-from guild.commands import dispatch_pause as dispatch_pause_commands
 from guild.commands import drift as drift_commands
 from guild.commands import memory as memory_commands
 from guild.commands import merge_queue as merge_queue_commands
@@ -19,9 +17,6 @@ from guild.commands import raid as raid_commands
 from guild.errors import GuildError
 
 _ANSWERED_PAGE_SIZE = 10
-_FAILURE_WINDOW = timedelta(hours=24)
-_RECENT_LIMIT = 10
-_DRY_RUN_MODE = "dry-run"
 
 _STYLES = {
     "bold": "1",
@@ -756,124 +751,6 @@ def _raid_next_to_merge_lines(ctx, painter, party_names):
     return lines + [""]
 
 
-def _dispatch_rows(ctx, party_names):
-    cutoff = timeutil.to_iso(ctx.now - _FAILURE_WINDOW)
-    rows = ctx.conn.execute(
-        "SELECT * FROM dispatch_decisions WHERE outcome = 'deferred' OR decided_at >= ?"
-        " ORDER BY decided_at DESC, rowid DESC",
-        (cutoff,),
-    ).fetchall()
-    if party_names is None:
-        return rows
-    return [row for row in rows if row["party"] in party_names]
-
-
-def _dispatch_launch_model(ctx, row):
-    return {
-        "party": row["party"],
-        "generation": row["generation"],
-        "rule": row["rule"],
-        "subject": sanitize.strip_control_sequences(row["subject"]),
-        "reason": _optional_text(row["reason"]),
-        "decided_at": row["decided_at"],
-        "age": timeutil.age_label(ctx.now, row["decided_at"]),
-    }
-
-
-def _dispatch_recent_model(ctx, row):
-    model = _dispatch_launch_model(ctx, row)
-    model["outcome"] = "planned" if row["mode"] == _DRY_RUN_MODE else row["outcome"]
-    model["action"] = "run guild revive --party {}".format(row["party"]) if model["outcome"] == "suggested" else None
-    return model
-
-
-def _dispatch_project_model(ctx, project_config):
-    block = project_config["dispatcher"]
-    name = project_config["name"]
-    return {
-        "name": name,
-        "rules": dict(sorted(block["rules"].items())),
-    }
-
-
-def _is_failed(row):
-    return row["state"] == "failed" or row["outcome"] == "failed"
-
-
-def _dispatch_pause_model(ctx, pause_row):
-    if pause_row is None:
-        return None
-    return {
-        "reason": sanitize.strip_control_sequences(pause_row["reason"]),
-        "paused_by": pause_row["paused_by"],
-        "age": timeutil.age_label(ctx.now, pause_row["paused_at"]),
-    }
-
-
-def dispatcher_model(ctx, party_names):
-    rows = _dispatch_rows(ctx, party_names)
-    decided = [row for row in rows if row["outcome"] not in ("deferred", "failed")]
-    return {
-        "projects": [
-            _dispatch_project_model(ctx, project_config)
-            for project_config in config.load_all_projects(ctx.projects_dir)
-            if "dispatcher" in project_config
-        ],
-        "paused": _dispatch_pause_model(ctx, dispatch_pause_commands.current(ctx.conn)),
-        "failed": [_dispatch_launch_model(ctx, row) for row in rows if _is_failed(row)],
-        "deferred": [_dispatch_launch_model(ctx, row) for row in rows if row["outcome"] == "deferred"],
-        "recent": [_dispatch_recent_model(ctx, row) for row in decided[:_RECENT_LIMIT]],
-    }
-
-
-def _dispatcher_lines(ctx, painter, party_names):
-    model = dispatcher_model(ctx, party_names)
-    lines = [
-        "  {}: {}".format(
-            project["name"], ", ".join("{} {}".format(rule, mode) for rule, mode in project["rules"].items())
-        )
-        for project in model["projects"]
-    ]
-    lines.extend(
-        painter.paint(
-            "  failed: {} g{} {} ago ({}): {}".format(
-                row["party"], row["generation"], row["age"], row["rule"], row["reason"]
-            ),
-            "red",
-        )
-        for row in model["failed"]
-    )
-    lines.extend(
-        "  deferred: {} {} {} {} ago: {}".format(
-            row["party"], row["rule"], row["subject"], row["age"], row["reason"]
-        )
-        for row in model["deferred"]
-    )
-    lines.extend(
-        "  recent: {} {} {} {} {} ago{}".format(
-            row["outcome"],
-            row["rule"],
-            row["subject"],
-            row["party"],
-            row["age"],
-            "" if row["action"] is None else ": {}".format(row["action"]),
-        )
-        for row in model["recent"]
-    )
-    if model["paused"] is not None:
-        lines = [
-            painter.paint(
-                "  PAUSED since {} ago by {}: {}".format(
-                    model["paused"]["age"], model["paused"]["paused_by"], model["paused"]["reason"]
-                ),
-                "red",
-            )
-        ] + lines
-    if not lines:
-        return []
-    return [painter.paint("DISPATCHER", "bold")] + lines + [""]
-
-
 def render_board(ctx, party_filter, raid_filter, color, width):
     painter = _Painter(color, width)
     if raid_filter is not None:
@@ -898,7 +775,6 @@ def render_board(ctx, party_filter, raid_filter, color, width):
         lines.extend(_raid_next_to_merge_lines(ctx, painter, party_names))
     lines.extend(render_asks(ctx, party_names, color, width, False))
     lines.extend(_notices_section(ctx, painter, notice_rows))
-    lines.extend(_dispatcher_lines(ctx, painter, party_names))
     projects_by_name = {project["name"]: project for project in config.load_all_projects(ctx.projects_dir)}
     lines.extend(_project_lines(ctx, painter, party_rows, projects_by_name))
     for party_row in party_rows:
@@ -1146,7 +1022,6 @@ def board_model(ctx):
         "merge_queues": merge_queue_commands.board_models(
             ctx.conn, ctx.projects_dir, ctx.now, [row["name"] for row in party_rows]
         ),
-        "dispatcher": dispatcher_model(ctx, None),
         "projects": _project_models(ctx, party_rows, projects_by_name),
     }
 

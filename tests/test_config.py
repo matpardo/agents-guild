@@ -412,70 +412,13 @@ class MaxOpenPrsPerPartyConfigTests(MaxOpenPrsConfigTests):
     key = "max_open_prs_per_party"
 
 
-class DispatcherConfigTests(unittest.TestCase):
-    def _block(self):
-        return {
-            "rules": {"ask_answered": "on", "checks_failing": "dry-run"},
-        }
-
-    def _data(self, block):
-        return {"name": "acme", "paths": ["/tmp/*"], "github": {"repos": []}, "dispatcher": block}
-
-    def _message(self, block):
-        with self.assertRaises(GuildError) as raised:
-            config.validate_project_config(self._data(block))
-        return raised.exception.message
-
-    def test_absent_block_is_valid(self):
-        config.validate_project_config({"name": "acme", "paths": ["/tmp/*"], "github": {"repos": []}})
-
-    def test_valid_block_is_accepted(self):
-        config.validate_project_config(self._data(self._block()))
-
-    def test_empty_rules_object_is_accepted(self):
-        block = self._block()
-        block["rules"] = {}
-        config.validate_project_config(self._data(block))
-
-    def test_block_that_is_not_an_object_is_rejected(self):
-        self.assertIn("'dispatcher' must be an object", self._message(["x"]))
-
-    def test_missing_rules_is_rejected(self):
-        self.assertIn("exactly the key 'rules'", self._message({}))
-
-    def test_removed_keys_are_rejected_naming_the_key(self):
-        for key, value in (("permission_mode", "acceptEdits"), ("max_launches_per_hour", 3)):
-            with self.subTest(key=key):
-                block = self._block()
-                block[key] = value
-                message = self._message(block)
-                self.assertIn("'dispatcher.{}' was removed".format(key), message)
-
-    def test_extra_key_is_rejected(self):
-        block = self._block()
-        block["shell"] = True
-        self.assertIn("exactly the key", self._message(block))
-
-    def test_rules_that_is_not_an_object_is_rejected(self):
-        block = self._block()
-        block["rules"] = ["ask_answered"]
-        self.assertIn("'dispatcher.rules' must be an object", self._message(block))
-
-    def test_unknown_rule_is_rejected(self):
-        block = self._block()
-        block["rules"] = {"merge_everything": "on"}
-        self.assertIn("unknown rule 'merge_everything'", self._message(block))
-
-    def test_off_is_rejected_with_hint(self):
-        block = self._block()
-        block["rules"] = {"ask_answered": "off"}
-        message = self._message(block)
-        self.assertIn("remove the rule to disable it", message)
-
-    def test_other_rule_values_are_rejected(self):
-        block = self._block()
-        block["rules"] = {"ask_answered": True}
-        self.assertIn("must be 'dry-run' or 'on'", self._message(block))
+class RetiredDispatcherConfigTests(unittest.TestCase):
+    def test_dispatcher_key_is_ignored(self):
+        for block in ({"rules": {"ask_answered": "on"}}, ["x"], {"permission_mode": "acceptEdits"}):
+            with self.subTest(block=block):
+                config.validate_project_config(
+                    {"name": "acme", "paths": ["/tmp/*"], "github": {"repos": []}, "dispatcher": block}
+                )
 
 
 if __name__ == "__main__":

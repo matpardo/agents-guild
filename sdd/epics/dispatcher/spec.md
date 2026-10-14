@@ -2,10 +2,10 @@
 epic: dispatcher
 type: spec
 title: React to events without a watching session
-status: active
+status: archived
 owner: matpardo
 created: 2026-10-04
-updated: 2026-10-12
+updated: 2026-10-14
 ---
 
 # Spec: React to events without a watching session

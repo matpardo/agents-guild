@@ -1,3 +1,4 @@
+import json
 import os
 import sqlite3
 import time
@@ -6,8 +7,20 @@ from datetime import timedelta
 from guild import party_waits, timeutil
 from guild.cli import _build_context
 from tests.mq_fixtures import MergeQueueTestCase, TASKS_MD
-from tests.test_dispatch_limit_resume import _limit_line
 from tests.transcript_fixtures import write_transcript
+
+
+def _limit_line(resets_at):
+    return json.dumps(
+        {
+            "type": "assistant",
+            "isApiErrorMessage": True,
+            "error": "rate_limit",
+            "apiErrorStatus": 429,
+            "quotaLimits": {"status": "rejected", "resetsAt": resets_at, "rateLimitType": "five_hour"},
+            "message": {"model": "<synthetic>", "content": [{"type": "text", "text": "limit"}]},
+        }
+    )
 
 
 class PartyWaitsTests(MergeQueueTestCase):

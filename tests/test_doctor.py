@@ -192,3 +192,30 @@ class DoctorTests(GuildTestCase):
 
     def test_no_clipboard_warning_without_tmux(self):
         self.assertNotIn("OSC 52", self._clipboard_doctor_out(set()))
+
+    def _doctor_out_for_clean_setup(self):
+        self._write_settings(_ALL_HOOKS)
+        self._link_rules()
+        _, out, _ = self.run_cli(["doctor"], None, None)
+        return out
+
+    def test_warns_on_leftover_dispatcher_unit_file(self):
+        unit_dir = self.config_home / "systemd" / "user"
+        unit_dir.mkdir(parents=True)
+        (unit_dir / "guild-dispatch.timer").write_text("")
+        out = self._doctor_out_for_clean_setup()
+        self.assertIn("warn    {}".format(unit_dir / "guild-dispatch.timer"), out)
+        self.assertNotIn("guild-dispatch.service", out)
+
+    def test_no_unit_warning_without_leftover(self):
+        self.assertNotIn("retired dispatcher", self._doctor_out_for_clean_setup())
+
+    def test_warns_on_project_config_with_dispatcher_key(self):
+        self.register_project("acme", ["acme/app"])
+        path = self.config_home / "guild" / "projects" / "acme.json"
+        data = json.loads(path.read_text())
+        data["dispatcher"] = {"rules": {"next_task": "on"}}
+        path.write_text(json.dumps(data))
+        out = self._doctor_out_for_clean_setup()
+        self.assertIn("ok      project acme", out)
+        self.assertIn("warn    project acme still has a 'dispatcher' key", out)

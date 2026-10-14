@@ -2,11 +2,12 @@ import re
 import shutil
 from pathlib import Path
 
-from guild import claude_settings, config, localbase, tmux_windows
+from guild import claude_settings, config, localbase, paths, tmux_windows
 from guild.adapters import github
 from guild.errors import GuildError
 
 _TRACE_RE = re.compile(r"guild|ask #[0-9]|notice #[0-9]", re.IGNORECASE)
+_RETIRED_UNIT_NAMES = ("guild-dispatch.timer", "guild-dispatch.service")
 _PR_SCAN_FIELDS = ("number", "title", "body", "comments", "commits")
 
 
@@ -67,6 +68,15 @@ def _clipboard_lines():
     ]
 
 
+def _dispatch_unit_lines():
+    unit_dir = paths.systemd_user_dir()
+    return [
+        (True, "warn    {} is left from the retired dispatcher: run install.sh to remove it".format(unit_dir / name))
+        for name in _RETIRED_UNIT_NAMES
+        if (unit_dir / name).exists()
+    ]
+
+
 def _project_lines(projects_dir):
     if not projects_dir.is_dir():
         return []
@@ -78,6 +88,8 @@ def _project_lines(projects_dir):
             lines.append((False, "invalid project {}: {}".format(config_file.name, error.message)))
             continue
         lines.append((True, "ok      project {}".format(data["name"])))
+        if "dispatcher" in data:
+            lines.append((True, "warn    project {} still has a 'dispatcher' key: the dispatcher was retired, remove it".format(data["name"])))
         for warning in localbase.behind_warning_lines(data):
             lines.append((True, "warn    {}".format(warning)))
     return lines
@@ -126,6 +138,7 @@ def run(ctx, scan_prs):
     checks.extend(_allow_rule_lines(settings))
     checks.append(_rules_line())
     checks.extend(_clipboard_lines())
+    checks.extend(_dispatch_unit_lines())
     checks.extend(_project_lines(ctx.projects_dir))
     if scan_prs:
         checks.extend(_scan_lines(ctx))

@@ -1,6 +1,6 @@
 import json
 
-from guild import db, paths, schema
+from guild import db, events, paths, schema, timeutil
 from tests.testutil import GuildTestCase
 
 _SEED = {
@@ -110,6 +110,44 @@ class SeenNoticeRebuildTests(GuildTestCase):
         code, out, err = self.run_cli(["notices"], None, None)
         self.assertIn("#1 [human] kept", out)
         self.assertIn("new #2 [human] restored", out)
+
+
+_RETIRED_TABLES = ("dispatch_pause", "dispatch_decisions", "dispatch_cursors")
+_RETIRED_EVENTS = (
+    ("dispatch.paused", {"party": "alpha", "reason": "freeze"}),
+    ("dispatch.resumed", {"party": "alpha"}),
+    ("dispatch.decided", {"project": "acme", "key": "k", "mode": "on", "rule": "next_task", "outcome": "suggested"}),
+    ("dispatch.launched", {"project": "acme", "key": "k", "window_id": "@1"}),
+    ("dispatch.launch_failed", {"project": "acme", "key": "k", "reason": "x", "window_id": None}),
+    ("dispatch.bound", {"project": "acme", "key": "k"}),
+)
+
+
+def _table_names(conn):
+    return {row["name"] for row in conn.execute("SELECT name FROM sqlite_master WHERE type = 'table'")}
+
+
+class RetiredDispatchRebuildTests(GuildTestCase):
+    def test_old_dispatch_events_replay_and_tables_are_gone(self):
+        conn = db.connect(paths.db_path())
+        for table in _RETIRED_TABLES:
+            conn.execute("CREATE TABLE {} (x INTEGER)".format(table))
+        conn.commit()
+        conn.close()
+
+        conn = db.connect(paths.db_path())
+        self.assertFalse(set(_RETIRED_TABLES) & _table_names(conn))
+        with db.writing(conn):
+            for kind, payload in _RETIRED_EVENTS:
+                events.record(conn, timeutil.utcnow(), "test@host", "alpha", None, "acme", kind, "local", payload)
+        conn.close()
+
+        code, out, err = self.run_cli(["rebuild"], None, None)
+        self.assertEqual(code, 0, err)
+        conn = db.connect(paths.db_path())
+        self.assertFalse(set(_RETIRED_TABLES) & _table_names(conn))
+        replayed = [row["kind"] for row in conn.execute("SELECT kind FROM events WHERE kind LIKE 'dispatch.%'")]
+        self.assertEqual(replayed, [kind for kind, _ in _RETIRED_EVENTS])
 
 
 class ExportTests(GuildTestCase):

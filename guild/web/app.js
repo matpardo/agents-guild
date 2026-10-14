@@ -11,11 +11,10 @@
   var EMPTY_REASON_MESSAGE = "write a reason first";
   var NOTICE_FORM_FOCUS_KEY = "notice-form";
   var NOTICE_TTLS = ["1h", "8h", "1d", "3d"];
-  var RAID_PAUSE_CONFIRM_TEXT = "Pausing stops dispatches and tells members to hand off.";
+  var RAID_PAUSE_CONFIRM_TEXT = "Pausing tells members to hand off.";
   var EMPTY_ANSWER_MESSAGE = "write an answer first";
   var DEFAULT_BRANCHES = ["main", "master"];
   var BLOCKED_EXTERNAL_TEXT = "blocked: manual";
-  var DISPATCH_REASON_FOCUS_KEY = "dispatch-pause";
 var NO_SESSION_MESSAGE = "session token not loaded, reload the page";
   var sessionToken = null;
 
@@ -57,9 +56,6 @@ var NO_SESSION_MESSAGE = "session token not loaded, reload the page";
     raidBusy: {},
     partyHandoffStatuses: {},
     partyHandoffBusy: {},
-    dispatchReason: "",
-    dispatchStatus: "",
-    dispatchBusy: false,
     focusedAskId: null,
     focusStart: 0,
     focusEnd: 0,
@@ -246,9 +242,6 @@ var NO_SESSION_MESSAGE = "session token not loaded, reload the page";
       remaining: "Tasks not done in the party's active quests plus open PRs outside them; the tooltip lists done/total per quest.",
       allDone: "Every task of the party's active quests is done and no open PR is left outside them.",
       resumeCommand: "Run this to start the next generation of this party; it waits for a new leader.",
-      dispatcherRules: "Dispatcher rules this project enabled with their mode.",
-      dispatcherDeferred: "A dispatch waiting on a live session, an open window, a paused raid or a paused dispatcher; retried until it expires after 24 hours.",
-      dispatcherPlanned: "The rule is in dry-run: it recorded what it would do and did nothing.",
       leader: "The leader session of the party.",
       noLeader: "The party has no leader session right now.",
       claims: "Areas this party has reserved so other parties do not edit them.",
@@ -477,28 +470,6 @@ var NO_SESSION_MESSAGE = "session token not loaded, reload the page";
         delete state.raidStatuses[raidName];
       } else {
         state.raidStatuses[raidName] = errorMessage(result.body);
-      }
-      fetchBoard();
-    });
-  }
-
-  function postDispatchAction(action) {
-    if (sessionToken === null) {
-      state.dispatchStatus = NO_SESSION_MESSAGE;
-      fetchBoard();
-      return;
-    }
-    state.dispatchBusy = true;
-    state.dispatchStatus = "sending...";
-    fetchBoard();
-    var payload = action === "pause" ? { reason: state.dispatchReason } : {};
-    sendPost("/api/dispatch/" + action, payload).then(function (result) {
-      state.dispatchBusy = false;
-      if (result.ok) {
-        state.dispatchReason = "";
-        state.dispatchStatus = "";
-      } else {
-        state.dispatchStatus = errorMessage(result.body);
       }
       fetchBoard();
     });
@@ -1311,97 +1282,6 @@ var NO_SESSION_MESSAGE = "session token not loaded, reload the page";
     appendAll(section, items.map(renderMemoryItem));
   }
 
-  function renderFailed(launch) {
-    var text = "failed " + launch.party + " g" + launch.generation + " " + launch.age + " ago (" + launch.rule + ", " + launch.subject + ")";
-    if (launch.reason) {
-      text += ": " + launch.reason;
-    }
-    return classedText("p", text, "queue-main-red");
-  }
-
-  function renderDispatchProject(project) {
-    var rules = Object.keys(project.rules).map(function (rule) {
-      return rule + " " + project.rules[rule];
-    }).join(", ");
-    return explain(
-      classedText("p", project.name + ": " + rules, "muted"),
-      "ui",
-      "dispatcherRules"
-    );
-  }
-
-  function renderDeferred(launch) {
-    var text = "deferred " + launch.party + " " + launch.rule + " " + launch.subject + " " + launch.age + " ago: " + launch.reason;
-    return explain(classedText("p", text, "muted"), "ui", "dispatcherDeferred");
-  }
-
-  function renderRecent(decision) {
-    var text = "recent " + decision.outcome + " " + decision.rule + " " + decision.subject + " " + decision.party + " " + decision.age + " ago";
-    if (decision.action !== null) {
-      text += ": " + decision.action;
-    }
-    var node = classedText("p", text, "muted");
-    return decision.outcome === "planned" ? explain(node, "ui", "dispatcherPlanned") : node;
-  }
-
-  function renderDispatchPauseControls(dispatcher) {
-    var controls = el("span");
-    controls.className = "pr-block-controls";
-    if (dispatcher.paused !== null) {
-      controls.appendChild(classedText("span", "paused", "pill lifecycle-blocked-external"));
-      controls.appendChild(textEl(
-        "span",
-        dispatcher.paused.reason + " (" + dispatcher.paused.paused_by + ", " + dispatcher.paused.age + " ago)"
-      ));
-      var resumeButton = textEl("button", "Resume dispatch");
-      resumeButton.type = "button";
-      resumeButton.disabled = state.dispatchBusy;
-      resumeButton.addEventListener("click", function () {
-        postDispatchAction("resume");
-      });
-      controls.appendChild(resumeButton);
-    } else if (dispatcher.projects.length > 0) {
-      var input = el("input");
-      input.type = "text";
-      input.className = "block-reason dispatch-reason";
-      input.placeholder = "reason";
-      input.value = state.dispatchReason;
-      input.disabled = state.dispatchBusy;
-      input.dataset.focusKey = DISPATCH_REASON_FOCUS_KEY;
-      input.addEventListener("input", function () {
-        state.dispatchReason = input.value;
-      });
-      controls.appendChild(input);
-      var pauseButton = textEl("button", "Pause dispatch");
-      pauseButton.type = "button";
-      pauseButton.disabled = state.dispatchBusy || state.dispatchReason.trim() === "";
-      pauseButton.addEventListener("click", function () {
-        postDispatchAction("pause");
-      });
-      controls.appendChild(pauseButton);
-    }
-    var status = textEl("span", state.dispatchStatus || "");
-    status.className = "ask-status";
-    controls.appendChild(status);
-    return controls;
-  }
-
-  function renderDispatcher(dispatcher) {
-    var section = document.getElementById("dispatcher");
-    clear(section);
-    var count = dispatcher.projects.length + dispatcher.failed.length
-      + dispatcher.deferred.length + dispatcher.recent.length;
-    if (count === 0 && dispatcher.paused === null) {
-      return;
-    }
-    section.appendChild(textEl("h2", "dispatcher"));
-    section.appendChild(renderDispatchPauseControls(dispatcher));
-    appendAll(section, dispatcher.projects.map(renderDispatchProject));
-    appendAll(section, dispatcher.failed.map(renderFailed));
-    appendAll(section, dispatcher.deferred.map(renderDeferred));
-    appendAll(section, dispatcher.recent.map(renderRecent));
-  }
-
   function renderDriftEntry(entry) {
     var article = el("article");
     article.className = "card drift";
@@ -2067,18 +1947,7 @@ var NO_SESSION_MESSAGE = "session token not loaded, reload the page";
       projects: data.projects,
       raids: data.raids,
       merge_queues: filterMergeQueuesByParty(data.merge_queues, state.partyFilter),
-      dispatcher: filterDispatcher(data.dispatcher, function (launch) {
-        return launch.party === state.partyFilter;
-      }),
     };
-  }
-
-  function filterDispatcher(dispatcher, keep) {
-    return Object.assign({}, dispatcher, {
-      failed: dispatcher.failed.filter(keep),
-      deferred: dispatcher.deferred.filter(keep),
-      recent: dispatcher.recent.filter(keep),
-    });
   }
 
   function filterMergeQueuesByParty(queues, partyName) {
@@ -2144,9 +2013,6 @@ var NO_SESSION_MESSAGE = "session token not loaded, reload the page";
       raids: data.raids,
       merge_queues: data.merge_queues.filter(function (queue) {
         return queue.scope === "raid:" + state.raidFilter;
-      }),
-      dispatcher: filterDispatcher(data.dispatcher, function (launch) {
-        return members.indexOf(launch.party) !== -1;
       }),
     };
   }
@@ -2392,7 +2258,6 @@ var NO_SESSION_MESSAGE = "session token not loaded, reload the page";
     renderNotices(filtered.notices, filtered.projects, filtered.raids);
     renderMemory(filtered.memory);
     renderRaids(filtered.raids);
-    renderDispatcher(filtered.dispatcher);
     renderMergeQueues(filtered.merge_queues);
     renderDrift(filtered.drift);
     renderProjects(filtered.projects);
