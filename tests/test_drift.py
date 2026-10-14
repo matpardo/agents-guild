@@ -587,7 +587,22 @@ class CardLagTests(DriftTestCase):
         code, out, err = self._drift()
         self.assertIn("PR merged, card not done (1)", out)
         self.assertIn(
-            "pr:acme/app#9: merged, task:wave9/T01 card DEMO-90 not done (In Progress): move DEMO-90 to Done",
+            "card DEMO-90 not done (In Progress): move DEMO-90 to Done; merged pr:acme/app#9 task:wave9/T01",
+            out,
+        )
+
+    def test_merged_prs_on_one_card_are_one_finding(self):
+        self._record_cards([self._card("DEMO-90", "indeterminate", status="In Progress")])
+        self._track_pr(9, "wave9", "T01")
+        self._track_pr(11, "wave9", "T01")
+        self._track_with_card(12, "DEMO-90")
+        for number in (9, 11, 12):
+            self._set_pr_lifecycle(number, "merged")
+        code, out, err = self._drift()
+        self.assertIn("PR merged, card not done (1)", out)
+        self.assertIn(
+            "card DEMO-90 not done (In Progress): move DEMO-90 to Done;"
+            " merged pr:acme/app#9 task:wave9/T01, pr:acme/app#11 task:wave9/T01, pr:acme/app#12",
             out,
         )
 
@@ -605,7 +620,7 @@ class CardLagTests(DriftTestCase):
         self.assertIn("pr:acme/app#10 (draft): card DEMO-91 not started (To Do): move DEMO-91 to In Progress", out)
         self._set_pr_lifecycle(10, "merged")
         code, out, err = self._drift()
-        self.assertIn("pr:acme/app#10: merged, card DEMO-91 not done (To Do): move DEMO-91 to Done", out)
+        self.assertIn("card DEMO-91 not done (To Do): move DEMO-91 to Done; merged pr:acme/app#10", out)
 
     def test_card_flag_pr_with_card_started_is_not_a_finding(self):
         self._record_cards([self._card("DEMO-91", "indeterminate")])

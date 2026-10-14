@@ -91,3 +91,10 @@ of <total> refs still open (may be stale)` when nothing is blocked anymore.
 **Status:** [x] done — #101
 
 **What:** a party sees its own tracker and SDD drift without running `guild drift`: a capped `drift:` section in the session brief, an `update tracker/SDD: <finding>` item in `guild next` (after own PR attention, before the next task), a `move <KEY> to In Progress` line on `task start`, and an owner follow-up line (`move <KEY> to Done; mark <tid> done in <epic> tasks.md`) in merge notices.
+
+## T12 — One merged-PR card finding per card
+
+**Depends on:** T09
+**Status:** [x] done — #164
+
+**What:** `PR merged, card not done` groups merged PRs by card: one finding per card, listing its merged PRs, instead of one finding per PR asking for the same move.
