@@ -254,7 +254,7 @@ updated: 2026-10-14
 ## T24 — Retire the dispatcher
 
 **Depends on:** T23
-**Status:** [x] done
+**Status:** [x] done — #159
 
 **What:** the dispatcher, `guild dispatch`, the dispatch timer, the dispatch pause, the board and web dispatcher sections, the `dispatcher` project config block and the dispatch tables and reducers are deleted; old `dispatch.*` events replay as no-ops; `install.sh` removes a leftover dispatch timer and `guild doctor` warns about a leftover unit file or config key. Decision `20261014_board-shows-waits-no-dispatcher`.
 
