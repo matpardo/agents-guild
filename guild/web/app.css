@@ -679,6 +679,10 @@ main.history-main {
   color: var(--danger);
 }
 
+.party-waits .pill {
+  margin-right: 0.3rem;
+}
+
 .resume-command code {
   word-break: break-all;
 }

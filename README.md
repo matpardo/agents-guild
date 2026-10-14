@@ -1020,6 +1020,16 @@ one `finding class:` line per class (marked `(at threshold)` at or above
 `guild finding list` prints the finding classes of the project with their PR
 counts.
 
+Each party block of `guild board` prints a `waits on:` line after `status:`
+when the party's open work waits on something: `checks pending (N)`,
+`checks failing (N)`, `merge conflict`, `behind base`, `changes requested`,
+`N unresolved threads`, `human review`, `merge` (a ready PR to merge by hand),
+`green draft: mark ready`, the fix request tag, `ask #N open`, `ask #N answered`
+and `notice #N unread` (not yet read by the leader session), and `resets HH:MM`
+or `reset: resume by hand` when the live leader hit a usage limit. Only open
+PRs count and closed parties show nothing. The model key is `waits`
+(`kind`, `subject`, `label` per wait).
+
 ### `guild drift`
 
 `guild drift [--epic <slug> | --all]` reports, for the project resolved from
@@ -1108,6 +1118,9 @@ after updating guild.
 right one is sticky and always visible, holding the open asks and the merge
 queue; the left one holds notices, drift and the parties. On narrower
 screens it is a single column with asks and the merge queue first.
+
+**Party waits**: each party card shows a `waits on:` row with one pill per
+wait (model key `waits`), with a tooltip that explains the kind.
 
 **What it shows**: open asks (question, party, options,
 refs, how many refs still block it, a collapsible context, a `detail` control

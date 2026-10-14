@@ -86,6 +86,16 @@ class TooltipCoverageTests(unittest.TestCase):
     def test_blocked_waits(self):
         self.assertCovers("blockedWait", ["permission"])
 
+    def test_party_waits(self):
+        self.assertCovers(
+            "partyWait",
+            [
+                "checks-pending", "checks-failing", "conflict", "behind", "changes-requested", "threads",
+                "human-review", "human-merge", "draft-green", "fix-requested", "ask-open",
+                "ask-answered-unseen", "notices-unread", "limit-reset",
+            ],
+        )
+
     def test_drift_rules(self):
         rules = _DRIFT_RULE_RE.findall(_DRIFT_PY) + [_DRIFT_EXTRA_RULE]
         self.assertGreater(len(rules), 1)

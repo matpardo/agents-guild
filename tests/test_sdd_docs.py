@@ -144,9 +144,9 @@ class DispatcherDocsTests(unittest.TestCase):
         for tid in ("T10", "T11", "T12", "T13"):
             self.assertEqual(by_tid[tid], "done")
 
-    def test_decision_is_accepted_and_names_the_guards(self):
+    def test_decision_is_superseded_and_names_the_guards(self):
         text = self._decision.read_text()
-        self.assertIn("- **Status:** accepted", text)
+        self.assertIn("- **Status:** superseded by 20261014_board-shows-waits-no-dispatcher", text)
         self.assertIn("- **Supersedes:** 20261004_dispatcher-launches-fresh-sessions", text)
         self.assertIn("No session starts or wakes on its own.", text)
         self.assertIn("deferred and retried for 24 hours", text)

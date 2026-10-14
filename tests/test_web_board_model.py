@@ -232,7 +232,7 @@ class BoardModelShapeTests(BoardModelTestCase):
             set(party),
             {
                 "name", "state", "generation", "status", "ctx", "caps", "resume_command",
-                "leader_session_name", "has_live_leader", "quests", "prs", "raids", "claims", "remaining", "drift",
+                "leader_session_name", "has_live_leader", "quests", "prs", "raids", "claims", "remaining", "drift", "waits",
             },
         )
         self.assertEqual(party["name"], "alpha")

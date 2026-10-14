@@ -3,7 +3,7 @@ import shlex
 import textwrap
 from datetime import timedelta
 
-from guild import config, ctx_pressure, fix_request, identity, links, merge_queue, party_progress, party_status, pii, pr_asks, resume
+from guild import config, ctx_pressure, fix_request, identity, links, merge_queue, party_progress, party_status, party_waits, pii, pr_asks, resume
 from guild import sanitize, session_status, timeutil
 from guild.commands import brief as brief_commands
 from guild.commands import claim as claim_commands
@@ -681,6 +681,9 @@ def _party_section(ctx, painter, party_row, project_config):
     lines.append(
         painter.paint("  status: {}".format(party_status.label(ctx, status)), _STATUS_STYLES[status["status"]])
     )
+    waits = party_waits.for_party(ctx, party_row)
+    if waits:
+        lines.append(painter.paint("  waits on: {}".format("; ".join(wait["label"] for wait in waits)), "yellow"))
     lines.append(_remaining_line(painter, party_progress.remaining(ctx.conn, party_row["name"])))
     lines.extend(_party_cap_lines(painter, _party_caps(ctx, party_row, project_config)))
     pressure = _ctx_model(ctx, party_row, project_config)
@@ -1077,6 +1080,7 @@ def _party_model(ctx, party_row, project_config):
         "generation": party_row["generation"],
         "status": _status_model(ctx, party_row),
         "remaining": party_progress.remaining(ctx.conn, party_row["name"]),
+        "waits": party_waits.for_party(ctx, party_row),
         "drift": _party_drift_model(ctx, party_row),
         "ctx": _ctx_model(ctx, party_row, project_config),
         "caps": _party_caps(ctx, party_row, project_config),
