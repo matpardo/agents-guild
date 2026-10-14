@@ -950,6 +950,21 @@ says so; `green` clears only the manual mark, the `gh` mark clears on the next
 sync that sees the base branch green. Projection `main_status`, rebuilt like
 everything else.
 
+**Main blocked by billing.** When GitHub Actions cannot run because the
+account's billing failed, every job of main fails without starting. The sync
+fetches the annotations of each failing run (`gh api
+repos/<repo>/check-runs/<id>/annotations`, only for runs that have any) and,
+when every failing run carries the message `recent account payments have
+failed`, stores the mark with `external` = `billing` (`main_status.external`,
+carried by the `main.status_synced` payload; events without it replay as an
+ordinary red). The queue then shows `0. MAIN BLOCKED (billing) <repo> →
+re-run main once billing is fixed` instead of `MAIN RED`, `guild board` and the
+web card show the same, `guild pr ready-check` lists the gate `main blocked:
+billing` (still exit 1), and the push hook does not refuse: it warns `main of
+<repo> is blocked by billing: CI will not run`. A single failing run with
+another cause keeps main red. Re-run main's last run once billing is fixed;
+the next sync clears the mark.
+
 **Data and freshness.** The order is computed from stored data, so it is only
 as fresh as the last `guild sync --source gh` (the header says `synced N min
 ago`, the latest sync among the PRs shown). For every open PR whose party is

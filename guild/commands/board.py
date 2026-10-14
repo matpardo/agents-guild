@@ -693,8 +693,8 @@ def _party_section(ctx, painter, party_row, project_config):
     if resume_command is not None:
         lines.append(painter.paint("  resume: {}".format(resume_command), "cyan"))
     next_ref = merge_queue_commands.next_to_merge(ctx.conn, {party_row["name"]})
-    for label in merge_queue_commands.main_red_labels(ctx.conn, {party_row["name"]}):
-        lines.append(painter.paint("  MAIN RED: {}".format(label), "red"))
+    for text in merge_queue_commands.main_board_texts(ctx.conn, {party_row["name"]}):
+        lines.append(painter.paint("  {}".format(text), "red"))
     if next_ref is not None:
         lines.append(painter.paint("  next to merge: {}".format(next_ref), "green"))
     pr_rows = _party_pr_rows(ctx.conn, party_row["name"])
@@ -739,8 +739,8 @@ def _party_rows_for_names(conn, party_names):
 def _raid_next_to_merge_lines(ctx, painter, party_names):
     next_ref = merge_queue_commands.next_to_merge(ctx.conn, party_names)
     lines = [
-        painter.paint("MAIN RED: {}".format(label), "red")
-        for label in merge_queue_commands.main_red_labels(ctx.conn, party_names)
+        painter.paint(text, "red")
+        for text in merge_queue_commands.main_board_texts(ctx.conn, party_names)
     ]
     if next_ref is not None:
         lines.append(painter.paint("next to merge: {}".format(next_ref), "green"))

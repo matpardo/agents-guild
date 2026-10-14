@@ -111,7 +111,7 @@ class TooltipCoverageTests(unittest.TestCase):
         self.assertCovers(
             "ui",
             [
-                "noticeNew", "issued", "timeLeft", "askBlocks", "mainRed",
+                "noticeNew", "issued", "timeLeft", "askBlocks", "mainRed", "mainBlocked",
                 "generation", "leader", "noLeader", "claims", "synced",
                 "ctxHigh", "resumeCommand", "remaining", "allDone",
                 "baseBranch", "nextToMerge", "noMergeReady", "queueDetail",

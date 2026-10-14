@@ -303,6 +303,32 @@ class BoardLineTests(QueueCliTestCase):
         self.assertIn("  MAIN RED: acme/app \u2014 ci down (manual)", out)
 
 
+class BillingBlockedMainTests(QueueCliTestCase):
+    def setUp(self):
+        super().setUp()
+        self.mark_billing_blocked()
+
+    def test_queue_shows_blocked_row_zero(self):
+        code, out, err = self.queue(["--raid", "ci"], None)
+        self.assertEqual(
+            out.splitlines()[1], "0. MAIN BLOCKED (billing) acme/app \u2192 re-run main once billing is fixed"
+        )
+        self.assertNotIn("MAIN RED", out)
+
+    def test_raid_board_shows_blocked_main(self):
+        code, out, err = self.run_cli(["board", "--raid", "ci"], None, self.repo_dir)
+        self.assertEqual(out.splitlines()[0], "MAIN BLOCKED (billing): acme/app")
+
+    def test_party_block_shows_blocked_main(self):
+        code, out, err = self.run_cli(["board", "--party", "gamma"], None, self.repo_dir)
+        self.assertIn("  MAIN BLOCKED (billing): acme/app", out)
+
+    def test_ready_check_lists_the_gate_and_exits_one(self):
+        code, out, err = self.run_cli(["pr", "ready-check", "acme/app#2"], None, self.repo_dir)
+        self.assertEqual(code, 1)
+        self.assertIn("main blocked: billing", out + err)
+
+
 class SyncedLabelTests(QueueCliTestCase):
     def test_reports_minutes_since_the_latest_sync(self):
         from datetime import timedelta

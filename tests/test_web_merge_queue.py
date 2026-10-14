@@ -131,9 +131,16 @@ class MergeQueueModelTests(MergeQueueModelTestCase):
         self.run_cli(["main", "red", "acme/app", "--reason", "ci down"], None, self.repo_dir)
         queues = self.queues_by_scope()
         self.assertEqual(
-            queues["raid:ci"]["main"], [{"repo": "acme/app", "source": "manual", "reason": "ci down"}]
+            queues["raid:ci"]["main"], [{"repo": "acme/app", "source": "manual", "reason": "ci down", "external": None}]
         )
         self.assertEqual(queues["raid:empty"]["main"], [])
+
+    def test_billing_blocked_main_carries_its_external_cause(self):
+        self.mark_billing_blocked()
+        self.assertEqual(
+            self.queues_by_scope()["raid:ci"]["main"],
+            [{"repo": "acme/app", "source": "gh", "reason": "checks failing: lint", "external": "billing"}],
+        )
 
     def test_party_outside_raids_gets_its_own_queue(self):
         queue = self.queues_by_scope()["party:gamma"]

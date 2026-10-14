@@ -305,7 +305,7 @@ def _raid_queue_entry_line(raid_name, position, entry):
 def _raid_queue_lines(conn, raid_name, members):
     scoped = merge_queue_commands.load_scoped_queue(conn, members)
     lines = [
-        "raid {}: MAIN RED {} \u2192 fix before anything".format(raid_name, merge_queue_commands.main_label(row))
+        "raid {}: {}".format(raid_name, merge_queue_commands.main_headline(row))
         for row in scoped["main"]
     ]
     lines.extend(

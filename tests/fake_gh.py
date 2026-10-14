@@ -69,6 +69,9 @@ def main():
     if args[:1] == ["api"]:
         parts = args[1].split("/")
         repo = "-".join(parts[1:3])
+        if parts[3] == "check-runs":
+            _respond("annotations_{}_{}".format(repo, parts[4]))
+            return
         branch = "-".join(parts[4:-1])
         _respond("branch_checks_{}_{}".format(repo, branch))
         return

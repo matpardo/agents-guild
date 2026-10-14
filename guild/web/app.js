@@ -237,6 +237,7 @@ var NO_SESSION_MESSAGE = "session token not loaded, reload the page";
       timeLeft: "How long until the notice expires.",
       askBlocks: "How many references (tasks, PRs) still wait on this ask; 0 may mean the list is stale.",
       mainRed: "The main branch of this repo is failing; fix it before merging anything else.",
+      mainBlocked: "CI cannot run on main because of an external cause; re-run main once it is fixed.",
       generation: "How many times the party's leader session was replaced.",
       ctxHigh: "The leader session is near its context limit and should run guild handoff soon.",
       remaining: "Tasks not done in the party's active quests plus open PRs outside them; the tooltip lists done/total per quest.",
@@ -1523,6 +1524,10 @@ var NO_SESSION_MESSAGE = "session token not loaded, reload the page";
   }
 
   function renderMainRow(row) {
+    if (row.external !== null) {
+      var blocked = "MAIN BLOCKED (" + row.external + ") " + row.repo + " \u2192 re-run main once " + row.external + " is fixed";
+      return explain(classedText("p", blocked, "queue-main-red"), "ui", "mainBlocked");
+    }
     var text = "MAIN RED " + row.repo + " \u2014 " + row.reason + " (" + row.source + ") \u2192 fix before anything";
     return explain(classedText("p", text, "queue-main-red"), "ui", "mainRed");
   }

@@ -11,6 +11,20 @@ _FAILED_RUNS = {
         {"name": "deploy", "conclusion": None},
     ]
 }
+_BILLING_TEXT = "The job was not started because recent account payments have failed or your spending limit needs to be increased."
+_BILLING_RUNS = {
+    "check_runs": [
+        {"id": 11, "name": "lint", "conclusion": "failure", "output": {"annotations_count": 1}},
+        {"id": 12, "name": "unit", "conclusion": "failure", "output": {"annotations_count": 1}},
+        {"id": 13, "name": "docs", "conclusion": "success", "output": {"annotations_count": 0}},
+    ]
+}
+_MIXED_RUNS = {
+    "check_runs": [
+        {"id": 11, "name": "lint", "conclusion": "failure", "output": {"annotations_count": 1}},
+        {"id": 12, "name": "unit", "conclusion": "failure", "output": {"annotations_count": 1}},
+    ]
+}
 _GREEN_RUNS = {"check_runs": [{"name": "unit", "conclusion": "success"}]}
 
 
@@ -117,6 +131,84 @@ class GhSyncTests(_CloneFixture, _MainStatusCase):
         code, out, err = self.run_cli(["sync", "--source", "gh"], "sess-1", self.repo_dir)
         self.assertIn("acme/app: main status check failed: boom", out + err)
         self.assertEqual(self.rows(), [])
+
+    def _write_annotations(self, run_id, message):
+        self.write_gh_fixture("annotations_acme-app_{}".format(run_id), [{"message": message}])
+
+    def _external(self):
+        conn = sqlite3.connect(str(self.data_home / "guild" / "guild.db"))
+        rows = conn.execute("SELECT external FROM main_status ORDER BY repo, source").fetchall()
+        conn.close()
+        return [row[0] for row in rows]
+
+    def test_every_failing_run_blocked_by_billing_marks_main_external(self):
+        self.write_gh_fixture("branch_checks_acme-app_main", _BILLING_RUNS)
+        self._write_annotations(11, _BILLING_TEXT)
+        self._write_annotations(12, _BILLING_TEXT.upper())
+        self._sync()
+        self.assertEqual(self.rows(), [("acme/app", "gh", 1, "checks failing: lint, unit")])
+        self.assertEqual(self._external(), ["billing"])
+
+    def test_one_failing_run_without_billing_text_keeps_main_red(self):
+        self.write_gh_fixture("branch_checks_acme-app_main", _MIXED_RUNS)
+        self._write_annotations(11, _BILLING_TEXT)
+        self._write_annotations(12, "Process completed with exit code 1.")
+        self._sync()
+        self.assertEqual(self._external(), [None])
+
+    def test_failing_run_without_annotations_keeps_main_red(self):
+        self.write_gh_fixture("branch_checks_acme-app_main", _FAILED_RUNS)
+        self._sync()
+        self.assertEqual(self._external(), [None])
+
+    def test_billing_fixed_clears_the_external_mark(self):
+        self.write_gh_fixture("branch_checks_acme-app_main", _BILLING_RUNS)
+        self._write_annotations(11, _BILLING_TEXT)
+        self._write_annotations(12, _BILLING_TEXT)
+        self._sync()
+        self.write_gh_fixture("branch_checks_acme-app_main", _GREEN_RUNS)
+        self._sync()
+        self.assertEqual(self.rows(), [("acme/app", "gh", 0, None)])
+        self.assertEqual(self._external(), [None])
+
+    def test_external_change_with_same_reason_records_a_new_event(self):
+        self.write_gh_fixture("branch_checks_acme-app_main", _MIXED_RUNS)
+        self._write_annotations(11, _BILLING_TEXT)
+        self._write_annotations(12, "boom")
+        self._sync()
+        self._write_annotations(12, _BILLING_TEXT)
+        self._sync()
+        self._sync()
+        self.assertEqual(self.event_kinds(), ["main.status_synced", "main.status_synced"])
+
+    def test_rebuild_replays_the_external_mark(self):
+        self.write_gh_fixture("branch_checks_acme-app_main", _BILLING_RUNS)
+        self._write_annotations(11, _BILLING_TEXT)
+        self._write_annotations(12, _BILLING_TEXT)
+        self._sync()
+        self.run_cli(["rebuild"], None, self.repo_dir)
+        self.assertEqual(self._external(), ["billing"])
+
+    def test_old_payload_without_external_replays_as_red(self):
+        conn = sqlite3.connect(str(self.data_home / "guild" / "guild.db"))
+        conn.execute(
+            "INSERT INTO events (id, ts, origin, kind, visibility, payload) VALUES (?, ?, ?, ?, ?, ?)",
+            ("old-1", "2026-01-01T00:00:00Z", "t", "main.status_synced", "guild",
+             '{"repo": "acme/app", "red": true, "reason": "checks failing: lint"}'),
+        )
+        conn.commit()
+        conn.close()
+        self.run_cli(["rebuild"], None, self.repo_dir)
+        self.assertEqual(self._external(), [None])
+
+    def test_billing_main_shows_as_blocked_in_the_merge_queue(self):
+        self.write_gh_fixture("branch_checks_acme-app_main", _BILLING_RUNS)
+        self._write_annotations(11, _BILLING_TEXT)
+        self._write_annotations(12, _BILLING_TEXT)
+        self._sync()
+        code, out, err = self.run_cli(["merge-queue", "--party", "alpha"], None, self.repo_dir)
+        self.assertIn("0. MAIN BLOCKED (billing) acme/app \u2192 re-run main once billing is fixed", out)
+        self.assertNotIn("MAIN RED", out)
 
     def test_manual_and_gh_marks_coexist(self):
         self.write_gh_fixture("branch_checks_acme-app_main", _FAILED_RUNS)

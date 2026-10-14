@@ -540,8 +540,9 @@ def _merge_queue_unpinned(conn, event):
 def _record_main_status(conn, event, source):
     payload = event["payload"]
     conn.execute(
-        "INSERT OR REPLACE INTO main_status (repo, source, red, reason, updated_at) VALUES (?, ?, ?, ?, ?)",
-        (payload["repo"], source, 1 if payload["red"] else 0, payload["reason"], event["ts"]),
+        "INSERT OR REPLACE INTO main_status (repo, source, red, reason, external, updated_at)"
+        " VALUES (?, ?, ?, ?, ?, ?)",
+        (payload["repo"], source, 1 if payload["red"] else 0, payload["reason"], payload.get("external"), event["ts"]),
     )
 
 

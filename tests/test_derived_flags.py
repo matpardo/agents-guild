@@ -116,6 +116,12 @@ class RedMainPushTests(MergeQueueTestCase):
         code, out, err = self.push()
         self.assertEqual((code, out), (0, ""))
 
+    def test_billing_blocked_main_does_not_refuse_and_warns(self):
+        self.mark_billing_blocked()
+        code, out, err = self.push()
+        self.assertEqual(code, 0, err)
+        self.assertIn("main of acme/app is blocked by billing: CI will not run", out + err)
+
     def test_refused_while_main_is_red_with_reason_and_way_out(self):
         self.mark_red()
         code, out, err = self.push()

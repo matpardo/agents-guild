@@ -348,6 +348,7 @@ _COLUMN_MIGRATIONS = (
     ("prs", "head_sha", "TEXT"),
     ("prs", "fix_requested_at", "TEXT"),
     ("notices", "unbound", "INTEGER"),
+    ("main_status", "external", "TEXT"),
 )
 
 

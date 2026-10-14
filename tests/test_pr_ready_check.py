@@ -83,10 +83,14 @@ class GatesTests(unittest.TestCase):
             merge_queue.gates(self.entry("ready", ["needs-human-pr-review"]), []), ["needs human review"]
         )
 
+    def test_billing_blocked_main_gates_as_blocked(self):
+        rows = [{"repo": "acme/app", "reason": "boom", "source": "gh", "external": "billing"}]
+        self.assertEqual(merge_queue.gates(self.entry("ready", []), rows), ["main blocked: billing"])
+
     def test_only_red_main_of_the_same_repo_gates(self):
         rows = [
-            {"repo": "acme/app", "reason": "boom", "source": "ci"},
-            {"repo": "acme/other", "reason": "x", "source": "ci"},
+            {"repo": "acme/app", "reason": "boom", "source": "ci", "external": None},
+            {"repo": "acme/other", "reason": "x", "source": "ci", "external": None},
         ]
         self.assertEqual(
             merge_queue.gates(self.entry("ready", []), rows), ["main red acme/app \u2014 boom (ci)"]

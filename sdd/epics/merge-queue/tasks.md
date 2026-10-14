@@ -91,3 +91,13 @@ updated: 2026-09-29
 **Status:** [x] done — #157
 
 **What:** a ready PR whose action is `review: human, then merge` is the queue head, so `merge-queue --head`, the board and the next-to-merge lines no longer say `no PR ready to merge` while it waits for the human.
+
+## T13 — A main blocked by billing is external, not red
+
+**Depends on:** T12
+**Status:** [x] done — #162
+
+**What:** when every failing check run on main carries the "recent account payments have failed" annotation, sync records main as blocked by billing: the queue, `next`, the board and the web show `MAIN BLOCKED (billing)`, `ready-check` gates on it, and the push hook warns instead of refusing.
+
+**Acceptance:**
+- [x] A mixed failure set stays red; old `main.status_synced` events replay as red.
