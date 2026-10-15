@@ -152,6 +152,18 @@ def _task_done(conn, event):
     )
 
 
+def _task_moved(conn, event):
+    payload = event["payload"]
+    conn.execute(
+        "UPDATE quest_tasks SET quest = ? WHERE quest = ? AND tid = ?",
+        (payload["to_quest"], payload["from_quest"], payload["tid"]),
+    )
+    conn.execute(
+        "UPDATE prs SET task_quest = ? WHERE task_quest = ? AND task_tid = ?",
+        (payload["to_quest"], payload["from_quest"], payload["tid"]),
+    )
+
+
 def _epic_synced(conn, event):
     payload = event["payload"]
     project, epic = payload["project"], payload["epic"]
@@ -670,6 +682,7 @@ _REDUCERS = {
     "task.started": _task_started,
     "task.blocked": _task_blocked,
     "task.done": _task_done,
+    "task.moved": _task_moved,
     "epic.synced": _epic_synced,
     "tracker.synced": _tracker_synced,
     "finding.recorded": _finding_recorded,

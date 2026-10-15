@@ -121,7 +121,7 @@ guild party start <name>
 guild party resume <party> [--session <name>]   # --session: from a human terminal only
 guild party close [<party>] [--force]  # <party>: from a terminal, or your own party; --force overrides the quest done gate
 
-guild quest add <slug> --title "..." --epic <slug> --tasks T09,T07b
+guild quest add <slug> --title "..." --epic <slug> [--tasks T09,T07b]   # without --tasks: an empty epic quest
 guild quest add <slug> --title "..." --no-epic [--tasks A,B [--titles "First,Second"]]
 guild quest add <slug> --title "..." --followups-of <quest> [--tasks A,B [--titles ...]]
 guild quest done <slug> [--accept-drift] [--force]   # refuses while tasks are not done; --force overrides
@@ -131,6 +131,7 @@ guild task add <quest>/<tid> --title "..."          # open quests of your party,
 guild task start <quest>/<tid> [--summary "..."]
 guild task block <quest>/<tid> --reason "..."
 guild task done  <quest>/<tid> [--summary "..."]   # epic quests: also mark it done in the epic's tasks.md
+guild task move  <quest>/<tid>[,<tid>...] --to <quest>   # queued or blocked tasks, same epic, to another party's quest
 
 guild pr track <owner/repo>#<n> (--task <quest>/<tid> | --card <KEY>) --what "..." --waits "..." [--needs-human-pr-review]
                                [--fixes-main] [--fixes-flaky]
@@ -1529,6 +1530,19 @@ epic quest `task add` prints `add <tid> to <epic> tasks.md in the SDD` and
 updates `tasks.md` through the normal skills. Two `guild drift` rules detect
 a missed update (`quest task not in SDD`, `task done, SDD not done`), and the
 epic `quest done` drift gate refuses on them.
+
+### Moving tasks between quests
+
+`guild task move <quest>/<tid>[,<tid>...] --to <target-quest>` hands queued or
+blocked tasks of your quest to another active quest, so a second party can work
+part of a backlog. The target party opens an empty quest first (`guild quest add
+<slug> --epic <epic> --title "..."`, no `--tasks`). Both quests must be active, in
+the same project and the same epic (or both without an epic). The move is
+refused, with nothing written, when a task is `active` or `done`, already exists
+in the target, has an open tracked PR, or holds an unexpired claim of your party
+(`guild release <area>` first). Title, state, summary and blocked reason travel
+with the task, and its tracked PRs are re-pointed to the target quest. The board
+shows a `move to` select on queued and blocked tasks.
 
 ### No overlapping task lists
 

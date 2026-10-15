@@ -887,6 +887,15 @@ def _task_model(ctx, project, epic, task_row, task_prs, project_config):
     }
 
 
+def _move_targets(conn, quest_row):
+    rows = conn.execute(
+        "SELECT slug FROM quests WHERE state = 'active' AND project = ? AND slug != ?"
+        " AND epic IS ? ORDER BY slug ASC",
+        (quest_row["project"], quest_row["slug"], quest_row["epic"]),
+    ).fetchall()
+    return [row["slug"] for row in rows]
+
+
 def _quest_model(ctx, project, quest_row, prs_by_task, project_config):
     task_rows = _open_task_rows(ctx.conn, quest_row["slug"])
     tasks = [
@@ -903,6 +912,7 @@ def _quest_model(ctx, project, quest_row, prs_by_task, project_config):
     return {
         "slug": quest_row["slug"],
         "title": sanitize.strip_control_sequences(quest_row["title"]),
+        "move_targets": _move_targets(ctx.conn, quest_row),
         "tasks": tasks,
     }
 

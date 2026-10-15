@@ -239,7 +239,7 @@ class BoardModelShapeTests(BoardModelTestCase):
         self.assertEqual(party["state"], "active")
         self.assertEqual(len(party["quests"]), 1)
         quest = party["quests"][0]
-        self.assertEqual(set(quest), {"slug", "title", "tasks"})
+        self.assertEqual(set(quest), {"slug", "title", "move_targets", "tasks"})
         self.assertEqual(quest["slug"], "demo")
         tasks_by_tid = {task["tid"]: task for task in quest["tasks"]}
         self.assertEqual(set(tasks_by_tid), {"T01", "T02"})

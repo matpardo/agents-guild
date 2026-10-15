@@ -153,6 +153,14 @@ def _handle_task_done(ctx, args):
     return 0
 
 
+def _handle_task_move(ctx, args):
+    from guild.commands import task as task_commands
+
+    quest, tids_csv = args.ref.split("/", 1)
+    _print(task_commands.move(ctx, quest, tids_csv, args.to))
+    return 0
+
+
 def _handle_pr_track(ctx, args):
     from guild.commands import pr as pr_commands
 
@@ -733,6 +741,11 @@ def _add_task_parser(subparsers):
     done.add_argument("ref")
     done.add_argument("--summary")
     done.set_defaults(handler=_handle_task_done)
+
+    move = actions.add_parser("move", help="move queued or blocked tasks to another quest of the same epic")
+    move.add_argument("ref", help="<quest>/<tid>[,<tid>...]")
+    move.add_argument("--to", required=True, help="target quest slug")
+    move.set_defaults(handler=_handle_task_move)
 
 
 def _add_flag_pair(parser, name, dest):

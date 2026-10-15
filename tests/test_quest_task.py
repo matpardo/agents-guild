@@ -31,12 +31,21 @@ class QuestAddValidationTests(GuildTestCase):
         self.assertIn("never synced", err)
         self.assertIn("guild sync --source sdd", err)
 
-    def test_epic_quest_requires_tasks(self):
+    def test_epic_quest_without_tasks_is_empty(self):
+        self.sync_sdd(
+            self.repo_dir, "sess-1", "acme", "compliance", "## T01 — First task\n\n**Deps:** —\n"
+        )
         code, out, err = self.run_cli(
             ["quest", "add", "demo", "--title", "Demo", "--epic", "compliance"], "sess-1", self.repo_dir
         )
+        self.assertEqual(code, 0, err)
+        code, out, err = self.run_cli(["board"], "sess-1", self.repo_dir)
+        self.assertNotIn("queued:", out)
+
+    def test_quest_without_epic_or_no_epic_fails(self):
+        code, out, err = self.run_cli(["quest", "add", "demo", "--title", "Demo"], "sess-1", self.repo_dir)
         self.assertEqual(code, 1)
-        self.assertIn("--epic and --tasks", err)
+        self.assertIn("--epic", err)
 
     def test_no_epic_cannot_combine_with_epic(self):
         code, out, err = self.run_cli(
