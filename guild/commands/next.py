@@ -187,7 +187,7 @@ def _cap_wait_line(ctx, party, project):
     return status["party_wait"] or status["project_wait"]
 
 
-def _claim_area(item):
+def claim_area(item):
     if item["epic"] is not None:
         return "task:{}/{}".format(item["epic"], item["tid"])
     return "task:{}/{}".format(item["quest"], item["tid"])
@@ -264,7 +264,7 @@ def _evaluate_next_task(conn, now, project, party):
         if ask_id is not None:
             blocked.append("{}/{}: open ask #{}".format(item["quest"], item["tid"], ask_id))
             continue
-        holder = _claim_holder(conn, now, project, _claim_area(item), party)
+        holder = _claim_holder(conn, now, project, claim_area(item), party)
         if holder is not None:
             blocked.append("{}/{}: claimed by {}".format(item["quest"], item["tid"], holder))
             continue

@@ -396,3 +396,35 @@ class WebPartyWaitsBehaviorTests(unittest.TestCase):
 
     def test_party_without_waits_has_no_waits_line(self):
         self.assertNotIn("waits on:", self._rendered([]))
+
+
+@unittest.skipIf(shutil.which("node") is None, "node not installed")
+class WebTaskMoveBehaviorTests(unittest.TestCase):
+    def _rendered(self, task_state, move_targets):
+        task = {
+            "tid": "T01", "title": "First", "state": task_state, "summary": None,
+            "blocked_reason": None, "card_url": None, "prs": [],
+        }
+        quest = {"slug": "src", "title": "Src", "move_targets": move_targets, "tasks": [task]}
+        parties = [dict(_BOARD["parties"][0], name="a", quests=[quest])]
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "board.json"
+            path.write_text(json.dumps(dict(_BOARD, parties=parties)))
+            return subprocess.run(
+                ["node", str(_HARNESS), str(_APP_JS_PATH), str(path), "all", "all", "parties"],
+                capture_output=True, text=True, timeout=30, check=True,
+            ).stdout.strip()
+
+    def test_queued_task_lists_the_move_targets(self):
+        out = self._rendered("queued", ["dst", "dst2"])
+        self.assertIn("move to...", out)
+        self.assertIn("dst2", out)
+
+    def test_blocked_task_can_move(self):
+        self.assertIn("move to...", self._rendered("blocked", ["dst"]))
+
+    def test_active_task_has_no_move_control(self):
+        self.assertNotIn("move to...", self._rendered("active", ["dst"]))
+
+    def test_no_targets_means_no_move_control(self):
+        self.assertNotIn("move to...", self._rendered("queued", []))

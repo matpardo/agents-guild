@@ -16,6 +16,7 @@ from guild.commands import memory as memory_commands
 from guild.commands import notice as notice_commands
 from guild.commands import pr as pr_commands
 from guild.commands import raid_pause as raid_pause_commands
+from guild.commands import task as task_commands
 from guild.errors import GuildError
 from guild.resources import report as resources_report
 
@@ -36,6 +37,7 @@ _NOTICE_ACTION_RE = re.compile(r"^/api/notices/([^/]+)/(seen|unseen)$")
 _PR_ACTION_RE = re.compile(r"^/api/prs/([^/]+/[^/]+)/(\d+)/(block|unblock|ask-fix)$")
 _RAID_ACTION_RE = re.compile(r"^/api/raids/([^/]+)/(pause|resume)$")
 _MEMORY_ACTION_RE = re.compile(r"^/api/memory/([^/]+)/([1-9][0-9]*)/rm$")
+_TASK_MOVE_RE = re.compile(r"^/api/quests/([^/]+)/tasks/([^/]+)/move$")
 _PARTY_HANDOFF_RE = re.compile(r"^/api/parties/([^/]+)/hand-off$")
 _SEEN_ALL_PATH = "/api/notices/seen-all"
 _NOTICE_CREATE_PATH = "/api/notices/create"
@@ -182,6 +184,14 @@ def _run_party_handoff_action(party):
         ctx.conn.close()
 
 
+def _run_task_move_action(quest, tid, payload):
+    ctx = _action_context()
+    try:
+        return task_commands.move_for_owner(ctx, quest, tid, payload["to"])
+    finally:
+        ctx.conn.close()
+
+
 def _run_pr_action(action, ref, payload):
     ctx = _action_context()
     try:
@@ -286,6 +296,8 @@ class BoardRequestHandler(http_server.BaseHTTPRequestHandler):
             raise _RequestRejected(400, "answer must be a string")
         if action == "create" and not all(isinstance(payload.get(key), str) for key in ("text", "to", "ttl")):
             raise _RequestRejected(400, "text, to and ttl must be strings")
+        if action == "move" and not isinstance(payload.get("to"), str):
+            raise _RequestRejected(400, "to must be a string")
         if action == "block" and not isinstance(payload.get("reason"), str):
             raise _RequestRejected(400, "reason must be a string")
         return payload
@@ -331,6 +343,10 @@ class BoardRequestHandler(http_server.BaseHTTPRequestHandler):
         if party_handoff_match is not None:
             party = party_handoff_match.group(1)
             return self._post_action("hand-off", lambda payload: _run_party_handoff_action(party))
+        task_move_match = _TASK_MOVE_RE.match(path)
+        if task_move_match is not None:
+            quest, tid = task_move_match.groups()
+            return self._post_action("move", lambda payload: _run_task_move_action(quest, tid, payload))
         notice_match = _NOTICE_ACTION_RE.match(path)
         if notice_match is None:
             return self._method_not_allowed()

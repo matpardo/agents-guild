@@ -56,6 +56,7 @@ var NO_SESSION_MESSAGE = "session token not loaded, reload the page";
     raidBusy: {},
     partyHandoffStatuses: {},
     partyHandoffBusy: {},
+    taskMoveStatuses: {},
     focusedAskId: null,
     focusStart: 0,
     focusEnd: 0,
@@ -414,6 +415,29 @@ var NO_SESSION_MESSAGE = "session token not loaded, reload the page";
         delete state.partyHandoffStatuses[partyName];
       } else {
         state.partyHandoffStatuses[partyName] = errorMessage(result.body);
+      }
+      fetchBoard();
+    });
+  }
+
+  function taskMoveUrl(quest, tid) {
+    return "/api/quests/" + quest + "/tasks/" + tid + "/move";
+  }
+
+  function postTaskMove(quest, tid, target) {
+    var key = quest + "/" + tid;
+    if (sessionToken === null) {
+      state.taskMoveStatuses[key] = NO_SESSION_MESSAGE;
+      fetchBoard();
+      return;
+    }
+    state.taskMoveStatuses[key] = "sending...";
+    fetchBoard();
+    sendPost(taskMoveUrl(quest, tid), { to: target }).then(function (result) {
+      if (result.ok) {
+        delete state.taskMoveStatuses[key];
+      } else {
+        state.taskMoveStatuses[key] = errorMessage(result.body);
       }
       fetchBoard();
     });
@@ -1687,7 +1711,32 @@ var NO_SESSION_MESSAGE = "session token not loaded, reload the page";
     return list;
   }
 
-  function renderTask(task) {
+  function renderTaskMoveControls(quest, task) {
+    var controls = el("span");
+    controls.className = "task-move-controls";
+    var select = el("select");
+    var placeholder = textEl("option", "move to...");
+    placeholder.value = "";
+    select.appendChild(placeholder);
+    quest.move_targets.forEach(function (target) {
+      var option = textEl("option", target);
+      option.value = target;
+      select.appendChild(option);
+    });
+    select.addEventListener("change", function () {
+      if (select.value === "") {
+        return;
+      }
+      postTaskMove(quest.slug, task.tid, select.value);
+    });
+    controls.appendChild(select);
+    var status = textEl("span", state.taskMoveStatuses[quest.slug + "/" + task.tid] || "");
+    status.className = "ask-status";
+    controls.appendChild(status);
+    return controls;
+  }
+
+  function renderTask(quest, task) {
     var item = el("li");
     item.className = "task task-" + task.state;
     var head = el("div");
@@ -1701,6 +1750,10 @@ var NO_SESSION_MESSAGE = "session token not loaded, reload the page";
       head.appendChild(link(task.card_url, task.tid + " card"));
     }
     item.appendChild(head);
+    var movable = task.state === "queued" || task.state === "blocked";
+    if (movable && quest.move_targets.length > 0) {
+      item.appendChild(renderTaskMoveControls(quest, task));
+    }
     if (task.summary) {
       item.appendChild(textEl("p", task.summary));
     }
@@ -1720,7 +1773,12 @@ var NO_SESSION_MESSAGE = "session token not loaded, reload the page";
     article.appendChild(textEl("h4", quest.slug + " — " + quest.title));
     var list = el("ul");
     list.className = "task-list";
-    appendAll(list, quest.tasks.map(renderTask));
+    appendAll(
+      list,
+      quest.tasks.map(function (task) {
+        return renderTask(quest, task);
+      })
+    );
     article.appendChild(list);
     return article;
   }

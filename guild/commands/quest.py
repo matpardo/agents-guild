@@ -240,8 +240,8 @@ def add(ctx, slug, title, epic, tasks_csv, titles_csv, no_epic, followups_of):
         raise GuildError("--no-epic cannot be combined with --epic", 1)
     if titles_csv is not None and (not free or tasks_csv is None):
         raise GuildError("--titles requires --no-epic (or --followups-of) and --tasks", 1)
-    if not free and (epic is None or tasks_csv is None):
-        raise GuildError("epic quests require --epic and --tasks, or pass --no-epic", 1)
+    if not free and epic is None:
+        raise GuildError("epic quests require --epic, or pass --no-epic", 1)
     existing = ctx.conn.execute("SELECT slug FROM quests WHERE slug = ?", (slug,)).fetchone()
     if existing is not None:
         raise GuildError("quest '{}' already exists".format(slug), 1)
@@ -253,7 +253,7 @@ def add(ctx, slug, title, epic, tasks_csv, titles_csv, no_epic, followups_of):
     if free and tasks_csv is not None:
         tasks = _free_tasks(tasks_csv, titles_csv)
     if not free:
-        tasks = _resolve_epic_tasks(ctx.conn, project, epic, tasks_csv)
+        tasks = _resolve_epic_tasks(ctx.conn, project, epic, tasks_csv or "")
         reject_taken_tasks(ctx.conn, ctx.now, project, epic, tasks, binding["party"])
     with db.writing(ctx.conn):
         events.record(
