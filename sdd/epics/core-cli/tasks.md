@@ -70,3 +70,10 @@ updated: 2026-09-28
 **Status:** [x] done — #131
 
 **What:** every subcommand and non-obvious flag has a one-line `help=`, so `guild --help` and `guild <command> --help` replace memorizing commands; internal commands are marked as such.
+
+## T10 — Move tasks between quests
+
+**Depends on:** T09
+**Status:** [x] done — #165
+
+**What:** `guild task move <quest>/<tid>[,<tid>...] --to <quest>` moves queued or blocked tasks to another active quest of the same project and epic, even one owned by another party, so a backlog can be split across parallel sessions; tasks with an open PR or a live claim stay. `guild quest add --epic` accepts no `--tasks` to open an empty quest that receives them. The board offers the same move on each queued or blocked task.
