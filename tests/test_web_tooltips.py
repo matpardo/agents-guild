@@ -91,7 +91,7 @@ class TooltipCoverageTests(unittest.TestCase):
             "partyWait",
             [
                 "checks-pending", "checks-failing", "conflict", "behind", "changes-requested", "threads",
-                "human-review", "human-merge", "draft-green", "fix-requested", "ask-open",
+                "human-review", "human-merge", "draft-green", "ask-open",
                 "ask-answered-unseen", "notices-unread", "limit-reset",
             ],
         )

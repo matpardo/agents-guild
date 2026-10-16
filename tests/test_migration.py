@@ -228,6 +228,35 @@ class MigrationTests(GuildTestCase):
         self.assertNotIn("keeper", columns)
         self.assertEqual(party["leader_session_id"], "sess-1")
 
+    def test_rebuild_replays_an_old_fix_requested_event_as_a_no_op(self):
+        conn = db.connect(paths.db_path())
+        events.record(
+            conn, timeutil.utcnow(), "tester@host", None, "sess-1", "acme", "pr.fix_requested", "guild",
+            {"repo": "acme/app", "number": 1, "party": "alpha", "reasons": ["checks failing (1)"]},
+        )
+        conn.commit()
+        conn.close()
+        code, out, err = self.run_cli(["rebuild"], None, None)
+        self.assertEqual(code, 0, err)
+
+    def test_db_with_the_fix_requested_at_column_loses_it_and_keeps_its_rows(self):
+        db_path = self.data_home / "guild.db"
+        conn = db.connect(db_path)
+        conn.execute("ALTER TABLE prs ADD COLUMN fix_requested_at TEXT")
+        conn.execute(
+            "INSERT INTO prs (repo, number, party, what, lifecycle, seeded, fix_requested_at)"
+            " VALUES ('acme/app', 1, 'alpha', 'w', 'draft', 0, '2026-10-11T10:00:00+00:00')"
+        )
+        conn.commit()
+        conn.close()
+
+        again = db.connect(db_path)
+        columns = {row["name"] for row in again.execute("PRAGMA table_info(prs)").fetchall()}
+        pr_row = again.execute("SELECT * FROM prs WHERE number = 1").fetchone()
+        again.close()
+        self.assertNotIn("fix_requested_at", columns)
+        self.assertEqual(pr_row["repo"], "acme/app")
+
     def test_old_schema_db_gains_cards_table(self):
         db_path = self.data_home / "guild.db"
         _make_old_schema_db(db_path)

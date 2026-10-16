@@ -1,7 +1,5 @@
 import json
 
-from guild import merge_queue
-
 
 def _party_started(conn, event):
     payload = event["payload"]
@@ -356,20 +354,8 @@ def _pr_synced(conn, event):
             payload["number"],
         ),
     )
-    _close_settled_fix_request(conn, payload["repo"], payload["number"])
     if "change_set" in payload:
         _store_change_set(conn, payload["repo"], payload["number"], payload["change_set"])
-
-
-def _close_settled_fix_request(conn, repo, number):
-    row = conn.execute(
-        "SELECT lifecycle, checks_failing, mergeable, review_decision, unresolved_threads, merge_state"
-        " FROM prs WHERE repo = ? AND number = ?",
-        (repo, number),
-    ).fetchone()
-    if row["lifecycle"] not in ("merged", "closed") and merge_queue.fix_reasons(row):
-        return
-    conn.execute("UPDATE prs SET fix_requested_at = NULL WHERE repo = ? AND number = ?", (repo, number))
 
 
 def _store_change_set(conn, repo, number, change_set):
@@ -387,14 +373,6 @@ def _store_change_set(conn, repo, number, change_set):
     conn.execute("DELETE FROM pr_files WHERE repo = ? AND number = ?", (repo, number))
     for path in change_set["paths"]:
         conn.execute("INSERT INTO pr_files (repo, number, path) VALUES (?, ?, ?)", (repo, number, path))
-
-
-def _pr_fix_requested(conn, event):
-    payload = event["payload"]
-    conn.execute(
-        "UPDATE prs SET fix_requested_at = ? WHERE repo = ? AND number = ?",
-        (event["ts"], payload["repo"], payload["number"]),
-    )
 
 
 def _pr_comments_acknowledged(conn, event):
@@ -690,7 +668,6 @@ _REDUCERS = {
     "pr.set": _pr_set,
     "pr.synced": _pr_synced,
     "pr.comments_acknowledged": _pr_comments_acknowledged,
-    "pr.fix_requested": _pr_fix_requested,
     "ask.created": _ask_created,
     "ask.answered": _ask_answered,
     "ask.dismissed": _ask_dismissed,
@@ -722,7 +699,7 @@ def _retired(conn, event):
 
 
 _REDUCERS.update(
-    {kind: _retired for kind in ("dispatch.paused", "dispatch.resumed", "dispatch.decided", "dispatch.launched", "dispatch.launch_failed", "dispatch.bound")}
+    {kind: _retired for kind in ("dispatch.paused", "dispatch.resumed", "dispatch.decided", "dispatch.launched", "dispatch.launch_failed", "dispatch.bound", "pr.fix_requested")}
 )
 
 

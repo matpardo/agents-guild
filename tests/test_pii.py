@@ -87,7 +87,7 @@ class ValidateFieldTests(unittest.TestCase):
             self.fail("expected GuildError")
 
     def test_accepts_hyphenated_word_containing_secret_substring(self):
-        pii.validate_field("run guild pr ask-fix now", "notice text", 500, [])
+        pii.validate_field("run guild pr task-list now", "notice text", 500, [])
 
     def test_accepts_decision_phrase(self):
         pii.validate_field("decisión del dev", "notice text", 500, [])

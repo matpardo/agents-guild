@@ -344,7 +344,6 @@ _COLUMN_MIGRATIONS = (
     ("prs", "fixes_flaky", "INTEGER"),
     ("prs", "blocked_external", "TEXT"),
     ("prs", "head_sha", "TEXT"),
-    ("prs", "fix_requested_at", "TEXT"),
     ("notices", "unbound", "INTEGER"),
     ("main_status", "external", "TEXT"),
 )
@@ -406,6 +405,23 @@ def _drop_keeper(conn):
     conn.execute("COMMIT")
 
 
+def _prs_has_fix_requested_at(conn):
+    return any(row["name"] == "fix_requested_at" for row in conn.execute("PRAGMA table_info(prs)"))
+
+
+def _drop_fix_requested_at(conn):
+    if not _prs_has_fix_requested_at(conn):
+        return
+    conn.execute("BEGIN IMMEDIATE")
+    try:
+        if _prs_has_fix_requested_at(conn):
+            conn.execute("ALTER TABLE prs DROP COLUMN fix_requested_at")
+    except Exception:
+        conn.execute("ROLLBACK")
+        raise
+    conn.execute("COMMIT")
+
+
 def _raid_members_has_lead(conn):
     return any(row["name"] == "lead" for row in conn.execute("PRAGMA table_info(raid_members)"))
 
@@ -446,6 +462,7 @@ def create_all(conn):
         _add_column_if_missing(conn, table, column, ddl_type)
     _drop_keeper(conn)
     _drop_raid_lead(conn)
+    _drop_fix_requested_at(conn)
     _split_needs_human(conn)
     _default_fix_marks(conn)
 

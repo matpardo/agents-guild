@@ -1,6 +1,6 @@
 import json
 
-from guild import config, db, events, fix_request, identity, merge_queue, pr_asks, refs, resolve, sanitize, timeutil
+from guild import config, db, events, identity, merge_queue, pr_asks, refs, resolve, sanitize, timeutil
 from guild.commands import main_status as main_status_commands
 from guild.commands import raid as raid_commands
 from guild.errors import GuildError
@@ -83,7 +83,6 @@ def _pr_record(conn, row):
         "fixes_main": bool(row["fixes_main"]),
         "fixes_flaky": bool(row["fixes_flaky"]),
         "blocked_external": row["blocked_external"],
-        "fix_requested_at": row["fix_requested_at"],
         "mergeable": row["mergeable"],
         "review_decision": row["review_decision"],
         "unresolved_threads": row["unresolved_threads"],
@@ -346,9 +345,6 @@ def _action_text(entry):
 def _task_text(ctx, entry):
     task = entry["task"] or "-"
     brackets = list(entry["labels"])
-    request = fix_request.status(ctx.projects_dir, ctx.now, entry["repo"], entry["party"], entry["fix_requested_at"])
-    if request is not None:
-        brackets.append(fix_request.label(request))
     if not brackets:
         return task
     return "{} {}".format(task, " ".join("[{}]".format(text) for text in brackets))
@@ -492,8 +488,6 @@ def _entry_model(projects_dir, now, entry):
         "checks_passing": entry["checks_passing"],
         "checks_pending": entry["checks_pending"],
         "labels": entry["labels"],
-        "fix_reasons": entry["fix_reasons"],
-        "fix_request": fix_request.status(projects_dir, now, entry["repo"], entry["party"], entry["fix_requested_at"]),
         "url": "https://github.com/{}/pull/{}".format(entry["repo"], entry["number"]),
     }
 

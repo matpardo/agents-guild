@@ -122,8 +122,6 @@ def _entry(pr):
         "checks_passing": pr["checks_passing"],
         "checks_pending": pr["checks_pending"],
         "labels": _labels(pr),
-        "fix_reasons": fix_reasons(pr),
-        "fix_requested_at": pr["fix_requested_at"],
     }
 
 

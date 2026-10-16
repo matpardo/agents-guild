@@ -260,7 +260,7 @@ class BoardModelShapeTests(BoardModelTestCase):
             {
                 "repo", "number", "lifecycle", "needs_ask_answer", "needs_human_pr_review", "checks_failing",
                 "checks_passing", "checks_pending", "what", "waits", "url", "card", "card_url",
-                "branch", "fixes_main", "fixes_flaky", "blocked_external", "base_branch", "review_reasons", "ask_id", "party", "fix_reasons", "fix_request",
+                "branch", "fixes_main", "fixes_flaky", "blocked_external", "base_branch", "review_reasons", "ask_id", "party",
             },
         )
         self.assertEqual(pr["repo"], "acme/app")

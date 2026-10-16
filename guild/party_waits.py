@@ -1,7 +1,7 @@
 import json
 from datetime import datetime
 
-from guild import fix_request, identity, merge_queue, paths, session_info, transcript_usage
+from guild import identity, merge_queue, paths, session_info, transcript_usage
 from guild.commands import merge_queue as merge_queue_commands
 from guild.commands import notice as notice_commands
 from guild.commands import raid as raid_commands
@@ -55,9 +55,6 @@ def _pr_waits(ctx, pr, entry):
         waits.append(_wait("draft-green", pr["ref"], "green draft: mark ready"))
     if pr["lifecycle"] == "ready" and entry["state"] == "ready" and entry["external"] is None:
         waits.append(_wait("human-merge", pr["ref"], "merge"))
-    request = fix_request.status(ctx.projects_dir, ctx.now, pr["repo"], pr["party"], pr["fix_requested_at"])
-    if request is not None:
-        waits.append(_wait("fix-requested", pr["ref"], fix_request.label(request)))
     return waits
 
 
