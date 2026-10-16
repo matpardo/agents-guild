@@ -494,31 +494,88 @@ def _file_cap_warning(ctx, target_dir, branch, paths):
     )
 
 
-def _red_main_push_result(ctx, target_dir, branch):
-    repo = localbase.origin_repo_slug(target_dir)
-    if repo is None:
-        return None
+def _red_main_checks(ctx, repo):
     red = ctx.conn.execute(
         "SELECT source, reason, updated_at FROM main_status WHERE repo = ? AND red = 1 AND external IS NULL ORDER BY source",
         (repo,),
     ).fetchall()
     if not red:
         return None
-    fixer = ctx.conn.execute(
-        "SELECT 1 FROM prs WHERE repo = ? AND branch = ? AND fixes_main = 1"
-        " AND lifecycle NOT IN ('merged', 'closed')",
-        (repo, branch),
-    ).fetchone()
-    if fixer is not None:
-        return None
-    checks = "; ".join(
+    return "; ".join(
         "{} ({}, red since {})".format(row["reason"] or "no reason given", row["source"], row["updated_at"])
         for row in red
     )
+
+
+def _fixes_main_pr_exists(ctx, repo, number, branch):
+    if number is None and not branch:
+        return False
+    row = ctx.conn.execute(
+        "SELECT 1 FROM prs WHERE repo = ? AND fixes_main = 1 AND lifecycle NOT IN ('merged', 'closed')"
+        " AND (? IS NULL OR number = ?) AND (? IS NULL OR branch = ?)",
+        (repo, number, number, branch, branch),
+    ).fetchone()
+    return row is not None
+
+
+def _red_main_push_result(ctx, target_dir, branch, open_pr):
+    repo = localbase.origin_repo_slug(target_dir)
+    if repo is None:
+        return None
+    checks = _red_main_checks(ctx, repo)
+    if checks is None:
+        return None
+    if _fixes_main_pr_exists(ctx, repo, None, branch):
+        return None
+    if open_pr is None or open_pr["isDraft"]:
+        warning = "guild: main of {} is red: {}; keep iterating in draft, do not mark the PR Ready".format(
+            repo, checks
+        )
+        return {"blocked": False, "message": None, "system_message": warning}
     message = (
         "guild: main of {} is red: {}\n"
-        "fix main first, or flag your PR with `guild pr set <ref> --fixes-main` if it repairs main"
-    ).format(repo, checks)
+        "pushing to Ready PR #{} would fire CI on red main: go back to draft with `gh pr ready --undo {}`,"
+        " wait for main green, or flag it with `guild pr set <ref> --fixes-main` if it repairs main"
+    ).format(repo, checks, open_pr["number"], open_pr["number"])
+    return {"blocked": True, "message": message, "system_message": None}
+
+
+def _flag_value(args, flags):
+    for index, token in enumerate(args[:-1]):
+        if token in flags:
+            return args[index + 1]
+    return None
+
+
+def _gh_red_main_result(ctx, tokens):
+    command = _gh_pr_command(tokens)
+    if command is None:
+        return None
+    global_repo, verb, args = command
+    if verb == "ready" and "--undo" not in args:
+        target = _gh_pr_target(tokens, ctx.cwd)
+        way_out = "keep the PR in draft (`gh pr ready --undo <n>`) and wait for main green"
+    elif verb == "create" and "--draft" not in args and "-d" not in args:
+        repo, _ = _gh_pr_arguments(args)
+        target = {
+            "repo": repo or global_repo or localbase.origin_repo_slug(ctx.cwd),
+            "number": None,
+            "branch": _flag_value(args, ("-H", "--head")) or _current_branch(ctx.cwd),
+        }
+        way_out = "create it with `--draft` and wait for main green"
+    else:
+        return None
+    if target["repo"] is None:
+        return None
+    checks = _red_main_checks(ctx, target["repo"])
+    if checks is None:
+        return None
+    if _fixes_main_pr_exists(ctx, target["repo"], target["number"], target["branch"]):
+        return None
+    message = (
+        "guild: main of {} is red: {}\n"
+        "this PR would fire CI on red main: {}, or flag it with `guild pr set <ref> --fixes-main` if it repairs main"
+    ).format(target["repo"], checks, way_out)
     return {"blocked": True, "message": message, "system_message": None}
 
 
@@ -550,7 +607,11 @@ def pre_push(ctx, command):
         segments = _push_segments(command)
     except ValueError:
         return _unresolved_branch_result()
+    warnings = []
     for tokens in segments:
+        gh_result = _gh_red_main_result(ctx, tokens)
+        if gh_result is not None:
+            return gh_result
         invocation = _push_invocation(tokens, ctx.cwd)
         if invocation is None:
             continue
@@ -563,7 +624,7 @@ def pre_push(ctx, command):
         if not branch:
             return _unresolved_branch_result()
         try:
-            prs = github.pr_list_for_branch(target_dir, branch, ["number", "state", "url"])
+            prs = github.pr_list_for_branch(target_dir, branch, ["number", "state", "url", "isDraft"])
         except github.GhCommandError as error:
             return {
                 "blocked": False,
@@ -581,8 +642,9 @@ def pre_push(ctx, command):
                 ),
                 "system_message": None,
             }
-        red_main_result = _red_main_push_result(ctx, target_dir, branch)
-        if red_main_result is not None:
+        open_pr = next((pr for pr in prs if pr["state"] == "OPEN"), None)
+        red_main_result = _red_main_push_result(ctx, target_dir, branch, open_pr)
+        if red_main_result is not None and red_main_result["blocked"]:
             return red_main_result
         paths, failure = _push_paths_or_result(target_dir)
         if failure is not None:
@@ -590,17 +652,18 @@ def pre_push(ctx, command):
         shared_areas_result = _shared_areas_push_result(ctx, target_dir, paths)
         if shared_areas_result is not None:
             return shared_areas_result
-        warnings = [
+        red_main_warning = None if red_main_result is None else red_main_result["system_message"]
+        warnings.extend(
             warning
             for warning in (
+                red_main_warning,
                 _billing_blocked_main_warning(ctx, target_dir),
                 _file_cap_warning(ctx.with_cwd(Path(target_dir)), target_dir, branch, paths),
             )
             if warning is not None
-        ]
-        if warnings:
-            return {"blocked": False, "message": None, "system_message": "\n".join(warnings)}
-    return {"blocked": False, "message": None, "system_message": None}
+        )
+    system_message = "\n".join(warnings) if warnings else None
+    return {"blocked": False, "message": None, "system_message": system_message}
 
 
 _GIT_WRITE_VERBS = ("push", "rebase", "commit")
@@ -645,14 +708,28 @@ def _gh_pr_arguments(args):
     return repo, positional
 
 
-def _gh_pr_target(tokens, default_cwd):
+def _gh_pr_command(tokens):
     if len(tokens) < 3 or Path(tokens[0]).name != "gh":
         return None
-    if tokens[1] != "pr" or tokens[2] not in _GH_PR_WRITE_VERBS:
+    global_repo = None
+    index = 1
+    while index + 1 < len(tokens) and tokens[index] in _GH_REPO_FLAGS:
+        global_repo = tokens[index + 1]
+        index += 2
+    if index + 1 >= len(tokens) or tokens[index] != "pr":
         return None
-    repo, positional = _gh_pr_arguments(tokens[3:])
-    if repo is None:
-        repo = localbase.origin_repo_slug(default_cwd)
+    return global_repo, tokens[index + 1], tokens[index + 2:]
+
+
+def _gh_pr_target(tokens, default_cwd):
+    command = _gh_pr_command(tokens)
+    if command is None:
+        return None
+    global_repo, verb, args = command
+    if verb not in _GH_PR_WRITE_VERBS:
+        return None
+    repo, positional = _gh_pr_arguments(args)
+    repo = repo or global_repo or localbase.origin_repo_slug(default_cwd)
     if positional is None:
         return {"repo": repo, "number": None, "branch": _current_branch(default_cwd)}
     if _PR_NUMBER_RE.match(positional):
