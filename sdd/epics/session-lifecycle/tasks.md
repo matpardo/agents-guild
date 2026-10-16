@@ -3,7 +3,7 @@ epic: session-lifecycle
 type: tasks
 title: Handoffs that clean up and sessions that respawn
 status: done
-updated: 2026-10-04
+updated: 2026-10-16
 ---
 
 # Tasks: Handoffs that clean up and sessions that respawn
@@ -116,3 +116,15 @@ updated: 2026-10-04
 **Acceptance:**
 - [x] No command or flag mentions keeper or respawn.
 - [x] Rebuilding a log with `keeper: true` events succeeds and the column is gone.
+
+## T10 — Respawn the next generation at the context limit
+
+**Depends on:** T09
+**Status:** [x] done — #169
+
+**What:** a compaction nudges the session toward a handoff whatever the percentage, and `handoff --respawn` is back for sessions in a recorded window: it launches and binds the next generation itself and closes the old pane. Decision `20261016_respawn-on-context-limit`.
+
+**Acceptance:**
+- [x] SessionStart with `source: compact` resets the nudge marker and nudges a bound session.
+- [x] The nudge asks for `--respawn` only when the current generation has a recorded window.
+- [x] `--respawn` without a recorded window, or with `--close`, is refused before anything is written.
