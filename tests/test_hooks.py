@@ -1326,6 +1326,24 @@ class PrePrOwnerHookTests(GuildTestCase):
     def test_foreign_push_after_env_assignment_asks(self):
         self._assert_asks("sess-2", "FOO=1 git push")
 
+    def test_foreign_push_after_cd_asks(self):
+        elsewhere = self.root / "elsewhere"
+        elsewhere.mkdir()
+        code, out, err = self.run_hook(
+            "pre-pr-owner",
+            {
+                "session_id": "sess-2",
+                "cwd": str(elsewhere),
+                "tool_name": "Bash",
+                "tool_input": {"command": "cd {} && git push".format(self.repo_dir)},
+            },
+        )
+        self.assertEqual(code, 0)
+        self.assertEqual(json.loads(out)["hookSpecificOutput"]["permissionDecision"], "ask")
+
+    def test_foreign_push_after_unresolvable_cd_is_silent(self):
+        self._assert_silent("sess-2", "cd {} && git push".format(self.root / "missing"))
+
     def test_foreign_push_after_and_operator_asks(self):
         self._assert_asks("sess-2", "git fetch && git push")
 

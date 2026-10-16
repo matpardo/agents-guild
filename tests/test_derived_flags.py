@@ -67,8 +67,8 @@ class AskFlagTests(MergeQueueTestCase):
 
 
 class RedMainPushTests(MergeQueueTestCase):
-    def setUp(self):
-        super().setUp()
+    def init_repo(self, directory, branch):
+        directory.mkdir(parents=True, exist_ok=True)
         for command in (
             ["git", "init", "-q", "-b", "main"],
             ["git", "config", "user.email", "t@t.com"],
@@ -77,9 +77,15 @@ class RedMainPushTests(MergeQueueTestCase):
             ["git", "update-ref", "refs/remotes/origin/main", "HEAD"],
             ["git", "symbolic-ref", "refs/remotes/origin/HEAD", "refs/remotes/origin/main"],
             ["git", "remote", "add", "origin", "https://github.com/acme/app.git"],
-            ["git", "checkout", "-q", "-b", "feature/fix"],
+            ["git", "checkout", "-q", "-b", branch],
         ):
-            subprocess.run(command, cwd=str(self.repo_dir), check=True)
+            subprocess.run(command, cwd=str(directory), check=True)
+
+    def setUp(self):
+        super().setUp()
+        self.init_repo(self.repo_dir, "feature/fix")
+        self.worktree = self.root / "wt"
+        self.init_repo(self.worktree, "feature/wt")
         self.start_party("alpha", "sess-1")
         self.run_cli(["quest", "add", "qa", "--title", "qa", "--no-epic"], "sess-1", self.repo_dir)
         self.run_cli(["task", "add", "qa/T01", "--title", "t"], "sess-1", self.repo_dir)
@@ -226,3 +232,80 @@ class RedMainPushTests(MergeQueueTestCase):
     def test_billing_blocked_main_does_not_refuse_gh_pr_ready(self):
         self.mark_billing_blocked()
         self.assertEqual(self.hook_command("gh pr ready 12")[0], 0)
+
+    def hook_command_from(self, cwd, command):
+        return self.run_hook(
+            "pre-push",
+            {"session_id": "sess-1", "tool_input": {"command": command}, "cwd": str(cwd)},
+        )
+
+    def list_worktree_pr(self, is_draft):
+        self.write_gh_fixture(
+            "list_feature-wt", [{"number": 9, "state": "OPEN", "url": "u", "isDraft": is_draft}]
+        )
+
+    def test_cd_into_worktree_push_to_ready_pr_is_refused(self):
+        self.mark_red()
+        self.list_worktree_pr(False)
+        code, out, err = self.hook_command_from(self.root, "cd {} && git push".format(self.worktree))
+        self.assertEqual(code, 2)
+        self.assertIn("pushing to Ready PR #9", err)
+
+    def test_cd_into_worktree_push_to_draft_pr_warns(self):
+        self.mark_red()
+        self.list_worktree_pr(True)
+        code, out, err = self.hook_command_from(self.root, "cd {} && git push".format(self.worktree))
+        self.assertEqual(code, 0, err)
+        self.assertIn("keep iterating in draft", out)
+
+    def test_relative_cd_resolves_against_the_start_dir(self):
+        self.mark_red()
+        self.list_worktree_pr(False)
+        self.assertEqual(self.hook_command_from(self.root, "cd wt && git push")[0], 2)
+
+    def test_cd_inside_shell_c_is_followed(self):
+        self.mark_red()
+        self.list_worktree_pr(False)
+        command = "bash -c 'cd {} && git push'".format(self.worktree)
+        self.assertEqual(self.hook_command_from(self.root, command)[0], 2)
+
+    def test_unresolvable_cd_makes_the_push_unresolved(self):
+        self.mark_red()
+        missing = self.root / "missing"
+        for command in ("cd {} && git push".format(missing), "cd && git push", "cd - && git push"):
+            with self.subTest(command=command):
+                code, out, err = self.hook_command_from(self.repo_dir, command)
+                self.assertEqual(code, 0, err)
+                self.assertIn("could not determine", out)
+
+    def test_cd_into_worktree_gh_pr_ready_uses_the_worktree_repo(self):
+        self.mark_red()
+        self.assertEqual(self.hook_command_from(self.root, "cd {} && gh pr ready".format(self.worktree))[0], 2)
+
+    def test_unresolvable_cd_makes_gh_pr_ready_unresolved(self):
+        self.mark_red()
+        code, out, err = self.hook_command_from(self.repo_dir, "cd {} && gh pr ready".format(self.root / "missing"))
+        self.assertEqual(code, 0, err)
+        self.assertIn("could not determine", out)
+
+    def test_gh_repo_equals_forms_refused_while_main_is_red(self):
+        self.mark_red()
+        for command in (
+            "gh pr ready 12 --repo=acme/app",
+            "gh --repo=acme/app pr ready 12",
+            "gh pr create --repo=acme/app --title=x",
+        ):
+            with self.subTest(command=command):
+                self.assertEqual(self.hook_command_from(self.root, command)[0], 2)
+
+    def test_gh_pr_create_head_equals_form_exempts_a_fixes_main_branch(self):
+        self.mark_red()
+        self.track_fixer(["--fixes-main"])
+        self.assertEqual(self.hook_command("gh pr create --head=feature/fix")[0], 0)
+        self.assertEqual(self.hook_command("gh pr create --head=feature/other")[0], 2)
+
+    def test_gh_pr_create_bundled_draft_flags(self):
+        self.mark_red()
+        self.assertEqual(self.hook_command("gh pr create -fd")[0], 0)
+        self.assertEqual(self.hook_command("gh pr create -df")[0], 0)
+        self.assertEqual(self.hook_command("gh pr create -f")[0], 2)
