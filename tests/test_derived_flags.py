@@ -122,20 +122,107 @@ class RedMainPushTests(MergeQueueTestCase):
         self.assertEqual(code, 0, err)
         self.assertIn("main of acme/app is blocked by billing: CI will not run", out + err)
 
-    def test_refused_while_main_is_red_with_reason_and_way_out(self):
+    def hook_command(self, command):
+        return self.run_hook(
+            "pre-push",
+            {"session_id": "sess-1", "tool_input": {"command": command}, "cwd": str(self.repo_dir)},
+        )
+
+    def list_pr(self, is_draft):
+        self.write_gh_fixture(
+            "list_feature-fix", [{"number": 9, "state": "OPEN", "url": "u", "isDraft": is_draft}]
+        )
+
+    def test_no_pr_push_warns_while_main_is_red(self):
         self.mark_red()
+        code, out, err = self.push()
+        self.assertEqual(code, 0, err)
+        self.assertIn("main of acme/app is red: lint broke (manual, red since", out)
+        self.assertIn("keep iterating in draft, do not mark the PR Ready", out)
+
+    def test_draft_pr_push_warns_while_main_is_red(self):
+        self.mark_red()
+        self.list_pr(True)
+        code, out, err = self.push()
+        self.assertEqual(code, 0, err)
+        self.assertIn("keep iterating in draft", out)
+
+    def test_ready_pr_push_is_refused_while_main_is_red(self):
+        self.mark_red()
+        self.list_pr(False)
         code, out, err = self.push()
         self.assertEqual(code, 2)
         self.assertIn("main of acme/app is red: lint broke (manual, red since", err)
-        self.assertIn("fix main first, or flag your PR with `guild pr set <ref> --fixes-main`", err)
+        self.assertIn("gh pr ready --undo 9", err)
+        self.assertIn("guild pr set <ref> --fixes-main", err)
 
-    def test_refused_for_a_pr_not_flagged_fixes_main(self):
+    def test_ready_pr_push_allowed_for_a_fixes_main_pr(self):
         self.mark_red()
-        self.track_fixer([])
-        self.assertEqual(self.push()[0], 2)
-
-    def test_allowed_for_the_branch_of_a_fixes_main_pr(self):
-        self.mark_red()
+        self.list_pr(False)
         self.track_fixer(["--fixes-main"])
         code, out, err = self.push()
         self.assertEqual((code, out), (0, ""))
+
+    def test_fixes_flaky_does_not_exempt_a_ready_pr_push(self):
+        self.mark_red()
+        self.list_pr(False)
+        self.track_fixer(["--fixes-flaky"])
+        self.assertEqual(self.push()[0], 2)
+
+    def test_ready_pr_push_allowed_when_main_is_green(self):
+        self.list_pr(False)
+        code, out, err = self.push()
+        self.assertEqual((code, out), (0, ""))
+
+    def test_gh_pr_ready_refused_while_main_is_red(self):
+        self.mark_red()
+        code, out, err = self.hook_command("gh pr ready 12")
+        self.assertEqual(code, 2)
+        self.assertIn("main of acme/app is red: lint broke", err)
+        self.assertIn("gh pr ready --undo", err)
+
+    def test_gh_pr_ready_forms_refused_while_main_is_red(self):
+        self.mark_red()
+        for command in (
+            "gh pr ready",
+            "gh pr ready feature/fix",
+            "gh pr ready https://github.com/acme/app/pull/12",
+            "gh -R acme/app pr ready 12",
+            "gh --repo acme/app pr ready 12",
+            "gh pr ready 12 -R acme/app",
+            "git status && gh pr ready 12",
+            "true; gh pr ready 12",
+        ):
+            with self.subTest(command=command):
+                self.assertEqual(self.hook_command(command)[0], 2)
+
+    def test_gh_pr_ready_undo_passes_while_main_is_red(self):
+        self.mark_red()
+        code, out, err = self.hook_command("gh pr ready --undo 12")
+        self.assertEqual((code, out), (0, ""))
+
+    def test_gh_pr_create_needs_draft_while_main_is_red(self):
+        self.mark_red()
+        self.assertEqual(self.hook_command("gh pr create --title x")[0], 2)
+        self.assertEqual(self.hook_command("gh pr create --draft")[0], 0)
+        self.assertEqual(self.hook_command("gh pr create -d")[0], 0)
+
+    def test_gh_pr_commands_pass_when_main_is_green(self):
+        for command in ("gh pr ready 12", "gh pr create --title x", "gh -R acme/app pr ready 12"):
+            with self.subTest(command=command):
+                self.assertEqual(self.hook_command(command), (0, "", ""))
+
+    def test_gh_pr_ready_passes_for_a_fixes_main_pr_number(self):
+        self.mark_red()
+        self.track_fixer(["--fixes-main"])
+        self.assertEqual(self.hook_command("gh pr ready 9"), (0, "", ""))
+        self.assertEqual(self.hook_command("gh pr ready 12")[0], 2)
+
+    def test_gh_pr_ready_refused_for_a_fixes_flaky_pr_number(self):
+        self.mark_red()
+        self.track_fixer(["--fixes-flaky"])
+        self.assertEqual(self.hook_command("gh pr ready 9")[0], 2)
+
+    def test_billing_blocked_main_does_not_refuse_gh_pr_ready(self):
+        self.mark_billing_blocked()
+        self.assertEqual(self.hook_command("gh pr ready 12")[0], 0)

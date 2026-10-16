@@ -2044,11 +2044,15 @@ Without a hooks manager, add the same call to the repository's
 - `pre-push`: inspects `git push` commands before they run (including
   `env`/`command`/`sudo`-wrapped, `VAR=val`-prefixed, `bash -c`/`sh -c`
   nested, and `&&`/`;`/`||`-chained forms); blocks pushes to a branch whose
-  only PRs are merged/closed, and pushes while the repo's main is red (the
-  message names the failing checks and since when, and the way out: fix main
-  first or flag the PR with `guild pr set <ref> --fixes-main`; a branch whose
-  open tracked PR is flagged `fixes-main` passes, and nothing is checked when
-  there is no main status). Branch deletions (`--delete`, `-d`, or a
+  only PRs are merged/closed. While the repo's main is red, a push to a branch
+  with no open PR or a draft PR passes with a warning (keep iterating in draft,
+  do not mark it Ready) naming the failing checks and since when; a push to a
+  Ready PR is blocked, as are `gh pr ready` and `gh pr create` without
+  `--draft`/`-d` (also as `gh -R <repo> pr ...` or chained). The message gives
+  the way out: `gh pr ready --undo <n>`, wait for main green, or flag the PR
+  with `guild pr set <ref> --fixes-main` if it repairs main (only `fixes-main`
+  exempts, not `fixes-flaky`); `gh pr ready --undo` always passes, and nothing
+  is checked when there is no main status. Branch deletions (`--delete`, `-d`, or a
   `:<branch>` refspec) push no commits and pass unchecked. When a push is detected but its branch or
   directory cannot be determined (bad `-C` dir, detached HEAD, unparseable
   command), it warns via `systemMessage` instead of allowing the push
