@@ -55,3 +55,15 @@ updated: 2026-10-11
 - [x] A push from a draft PR or a branch without PR passes with a warning; a push to a Ready PR is refused with the way out.
 - [x] `gh pr ready` and a non-draft `gh pr create` are refused while main is red; `gh pr ready --undo` and `gh pr create --draft` pass.
 - [x] A `fixes_main` PR passes every check; billing only warns.
+
+## T05 — Push and PR hooks follow cd and flag=value forms
+
+**Depends on:** T04
+**Status:** [x] done — #167
+
+**What:** `guild hook pre-push` and `pre-pr-owner` follow `cd <dir>` segments of a chained command, so `cd <worktree> && git push` resolves the branch of that worktree; a `cd` that cannot be resolved makes a later push or `gh pr ready|create` warn as unresolved. `--repo=<r>` and `--head=<b>` are parsed, and `gh pr create -fd` counts as draft.
+
+**Acceptance:**
+- [x] A push to a Ready PR after `cd <worktree>` is refused while main is red; a draft PR only warns.
+- [x] An unresolvable `cd` before a push gives the unresolved warning.
+- [x] `--repo=` and `--head=` forms and bundled `-fd` are recognized.

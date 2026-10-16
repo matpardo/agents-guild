@@ -541,26 +541,59 @@ def _red_main_push_result(ctx, target_dir, branch, open_pr):
 
 
 def _flag_value(args, flags):
-    for index, token in enumerate(args[:-1]):
-        if token in flags:
+    for index, token in enumerate(args):
+        if token in flags and index + 1 < len(args):
             return args[index + 1]
+        for flag in flags:
+            if flag.startswith("--") and token.startswith(flag + "="):
+                return token[len(flag) + 1:]
     return None
 
 
-def _gh_red_main_result(ctx, tokens):
+_CREATE_BOOLEAN_SHORT_FLAGS = frozenset("dfw")
+
+
+def _creates_draft(args):
+    for token in args:
+        if token == "--draft":
+            return True
+        bundle = token[1:]
+        if token.startswith("-") and not token.startswith("--") and "d" in bundle:
+            if set(bundle) <= _CREATE_BOOLEAN_SHORT_FLAGS:
+                return True
+    return False
+
+
+def _cd_destination(tokens, cwd):
+    if not tokens or tokens[0] != "cd":
+        return False, cwd
+    if len(tokens) != 2 or tokens[1] == "-" or cwd is None:
+        return True, None
+    destination = Path(cwd) / Path(tokens[1]).expanduser()
+    return True, destination if destination.is_dir() else None
+
+
+def _needs_cwd(tokens):
+    if _push_invocation(tokens, None) is not None:
+        return True
+    command = _gh_pr_command(tokens)
+    return command is not None and command[1] in ("ready", "create")
+
+
+def _gh_red_main_result(ctx, tokens, cwd):
     command = _gh_pr_command(tokens)
     if command is None:
         return None
     global_repo, verb, args = command
     if verb == "ready" and "--undo" not in args:
-        target = _gh_pr_target(tokens, ctx.cwd)
+        target = _gh_pr_target(tokens, cwd)
         way_out = "keep the PR in draft (`gh pr ready --undo <n>`) and wait for main green"
-    elif verb == "create" and "--draft" not in args and "-d" not in args:
+    elif verb == "create" and not _creates_draft(args):
         repo, _ = _gh_pr_arguments(args)
         target = {
-            "repo": repo or global_repo or localbase.origin_repo_slug(ctx.cwd),
+            "repo": repo or global_repo or localbase.origin_repo_slug(cwd),
             "number": None,
-            "branch": _flag_value(args, ("-H", "--head")) or _current_branch(ctx.cwd),
+            "branch": _flag_value(args, ("-H", "--head")) or _current_branch(cwd),
         }
         way_out = "create it with `--draft` and wait for main green"
     else:
@@ -608,11 +641,17 @@ def pre_push(ctx, command):
     except ValueError:
         return _unresolved_branch_result()
     warnings = []
+    cwd = ctx.cwd
     for tokens in segments:
-        gh_result = _gh_red_main_result(ctx, tokens)
+        is_cd, cwd = _cd_destination(tokens, cwd)
+        if is_cd:
+            continue
+        if cwd is None and _needs_cwd(tokens):
+            return _unresolved_branch_result()
+        gh_result = _gh_red_main_result(ctx, tokens, cwd)
         if gh_result is not None:
             return gh_result
-        invocation = _push_invocation(tokens, ctx.cwd)
+        invocation = _push_invocation(tokens, cwd)
         if invocation is None:
             continue
         target_dir, push_args = invocation
@@ -702,6 +741,8 @@ def _gh_pr_arguments(args):
                 repo = args[index + 1]
             index += 2
             continue
+        if token.startswith("--repo="):
+            repo = token[len("--repo="):]
         if not token.startswith("-") and positional is None:
             positional = token
         index += 1
@@ -713,9 +754,15 @@ def _gh_pr_command(tokens):
         return None
     global_repo = None
     index = 1
-    while index + 1 < len(tokens) and tokens[index] in _GH_REPO_FLAGS:
-        global_repo = tokens[index + 1]
-        index += 2
+    while index + 1 < len(tokens):
+        if tokens[index] in _GH_REPO_FLAGS:
+            global_repo = tokens[index + 1]
+            index += 2
+        elif tokens[index].startswith("--repo="):
+            global_repo = tokens[index][len("--repo="):]
+            index += 1
+        else:
+            break
     if index + 1 >= len(tokens) or tokens[index] != "pr":
         return None
     return global_repo, tokens[index + 1], tokens[index + 2:]
@@ -787,8 +834,12 @@ def pre_pr_owner(ctx, command):
         segments = _push_segments(command)
     except ValueError:
         return None
+    cwd = ctx.cwd
     for tokens in segments:
-        target = _pr_target(tokens, ctx.cwd)
+        is_cd, cwd = _cd_destination(tokens, cwd)
+        if is_cd or cwd is None:
+            continue
+        target = _pr_target(tokens, cwd)
         if target is None:
             continue
         row = _foreign_pr(ctx, binding, target)

@@ -2043,7 +2043,10 @@ Without a hooks manager, add the same call to the repository's
   run in well under 100ms against a local SQLite DB.
 - `pre-push`: inspects `git push` commands before they run (including
   `env`/`command`/`sudo`-wrapped, `VAR=val`-prefixed, `bash -c`/`sh -c`
-  nested, and `&&`/`;`/`||`-chained forms); blocks pushes to a branch whose
+  nested, and `&&`/`;`/`||`-chained forms, following `cd <dir>` segments so
+  later segments use that directory; a `cd` that cannot be resolved gives the
+  unresolved warning below for a later push, `gh pr ready` or `gh pr create`;
+  `--repo=<r>`, `--head=<b>` and bundled `-fd` forms are understood); blocks pushes to a branch whose
   only PRs are merged/closed. While the repo's main is red, a push to a branch
   with no open PR or a draft PR passes with a warning (keep iterating in draft,
   do not mark it Ready) naming the failing checks and since when; a push to a
@@ -2069,7 +2072,8 @@ Without a hooks manager, add the same call to the repository's
 - `pre-pr-owner`: guards against crossing contexts between parties. On a
   `Bash` call it detects writes to a tracked PR — `git push`/`rebase`/`commit`
   on the branch of an open PR (same wrapper, `-C` and chaining handling as
-  `pre-push`; branch deletions pass) and `gh pr checkout|comment|review|edit|
+  `pre-push`, including `cd <dir>` segments; segments after a `cd` that
+  cannot be resolved are skipped; branch deletions pass) and `gh pr checkout|comment|review|edit|
   ready|close|merge` addressed by number, URL, branch or the current branch.
   The PR is looked up in the local `prs` table (branch matched together with
   the `origin` repo). When the PR is tracked by a different party than the
