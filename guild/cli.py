@@ -3,6 +3,7 @@ import json
 import os
 import shutil
 import sys
+import time
 from pathlib import Path
 
 from guild import db, notify, origin, paths, session_info, timeutil
@@ -487,6 +488,7 @@ def _handle_handoff(ctx, args):
             ("--learned", args.learned is not None),
             ("--model", args.model is not None),
             ("--dry-run", args.dry_run),
+            ("--respawn", args.respawn),
             ("--close", args.close),
         )
         for flag, given in provided:
@@ -501,6 +503,7 @@ def _handle_handoff(ctx, args):
             ("--in-flight", args.in_flight is not None),
             ("--learned", args.learned is not None),
             ("--model", args.model is not None),
+            ("--respawn", args.respawn),
             ("--close", args.close),
         )
         for flag, given in provided:
@@ -520,9 +523,11 @@ def _handle_handoff(ctx, args):
         args.in_flight,
         args.learned,
         args.model,
+        args.respawn,
         args.close,
         tmux,
         os.environ.get("TMUX_PANE"),
+        time.sleep,
     )
     _print(text)
     sys.stdout.flush()
@@ -1030,6 +1035,7 @@ def build_parser():
     handoff.add_argument("--learned", help="what the next session should know")
     handoff.add_argument("--model", help="model for the next session")
     handoff.add_argument("--dry-run", action="store_true", help="with prune: list what would be deleted")
+    handoff.add_argument("--respawn", action="store_true", help="launch the next session in a new tmux window")
     handoff.add_argument("--close", action="store_true", help="close this pane if it is the window guild launched")
     handoff.add_argument("--party", help="hand off a party whose leader session is gone (terminal only)")
     handoff.set_defaults(handler=_handle_handoff)
@@ -1206,7 +1212,10 @@ def _run_stateful_hook(hook_name, stdin_data):
         ctx = _build_context(session_id, cwd)
         if hook_name == "session-start":
             text = hook_commands.session_start(
-                ctx, os.environ.get("GUILD_RESUME") or None, stdin_data.get("permission_mode")
+                ctx,
+                os.environ.get("GUILD_RESUME") or None,
+                stdin_data.get("permission_mode"),
+                stdin_data.get("source"),
             )
         elif hook_name == "post-tool-use":
             text = hook_commands.post_tool_use(ctx)

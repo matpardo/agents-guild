@@ -8,7 +8,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-from guild import config, ctx_pressure, db, identity, localbase, names, session_status, timeutil
+from guild import config, ctx_pressure, db, identity, localbase, names, session_status, timeutil, tmux_windows
 from guild.adapters import github
 from guild.commands import brief as brief_commands
 from guild.commands import claim as claim_commands
@@ -223,7 +223,7 @@ def notification(ctx, notification_type, message, push_runner):
     _run_push(ctx, binding, wait, push_runner)
 
 
-def session_start(ctx, resume_party, permission_mode):
+def session_start(ctx, resume_party, permission_mode, source):
     lines = _auto_resume_lines(ctx, resume_party, permission_mode)
     binding = identity.resolve_binding(ctx.conn, ctx.session_id)
     if binding is not None:
@@ -231,6 +231,7 @@ def session_start(ctx, resume_party, permission_mode):
         lines.extend(_resume_lines(ctx, binding))
         with db.writing(ctx.conn):
             _mark_working(ctx, binding)
+        lines.extend(_compact_nudge_lines(ctx, binding, source))
     lines.extend(brief_commands.render_brief(ctx))
     lines.extend(_membership_warning_lines(ctx, binding))
     _spawn_background_sync(ctx.cwd)
@@ -260,11 +261,30 @@ def _ctx_nudge_lines(ctx, binding):
         return []
     marker.parent.mkdir(parents=True, exist_ok=True)
     marker.touch()
-    return [
-        "Context at {}%. Start nothing new; let in-flight runs finish, then run "
+    return [_nudge_text(ctx, binding, "Context at {}%".format(pct))]
+
+
+def _compact_nudge_lines(ctx, binding, source):
+    if source != "compact" or binding["project"] is None:
+        return []
+    marker = _nudge_marker_path(ctx)
+    marker.parent.mkdir(parents=True, exist_ok=True)
+    marker.touch()
+    return [_nudge_text(ctx, binding, "Context was compacted")]
+
+
+def _nudge_text(ctx, binding, lead):
+    recorded_window = tmux_windows.recorded_window(ctx.conn, binding["party"], binding["generation"])
+    if recorded_window is not None:
+        return (
+            "{}. Start nothing new; let in-flight runs finish, then run "
+            '`guild handoff --respawn --in-flight "..." --learned "..."`. Nothing after it.'.format(lead)
+        )
+    return (
+        "{}. Start nothing new; let in-flight runs finish, then run "
         '`guild handoff --in-flight "..." --learned "..."`. '
-        "Give the human the printed command, then nothing.".format(pct)
-    ]
+        "Give the human the printed command, then nothing.".format(lead)
+    )
 
 
 def prompt_submit(ctx):

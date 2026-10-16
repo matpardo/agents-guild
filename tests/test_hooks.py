@@ -4,7 +4,7 @@ import string
 import subprocess
 from unittest import mock
 
-from guild import ctx_pressure
+from guild import ctx_pressure, db, events, timeutil
 from guild import paths
 from guild import pii
 from guild import notify
@@ -282,6 +282,81 @@ class CtxNudgeTests(GuildTestCase):
             "prompt-submit", {"session_id": "sess-1", "cwd": str(repo_dir)}
         )
         self.assertNotIn("Context at", out)
+
+
+class CompactNudgeTests(GuildTestCase):
+    PLAIN = (
+        'Start nothing new; let in-flight runs finish, then run '
+        '`guild handoff --in-flight "..." --learned "..."`. '
+        'Give the human the printed command, then nothing.'
+    )
+    RESPAWN = (
+        'Start nothing new; let in-flight runs finish, then run '
+        '`guild handoff --respawn --in-flight "..." --learned "..."`. Nothing after it.'
+    )
+
+    def _bound(self):
+        repo_dir = self.register_project("acme", ["acme/app"])
+        self.run_cli(["party", "start", "alpha"], "sess-1", repo_dir)
+        return repo_dir
+
+    def _record_window(self, generation):
+        conn = db.connect(paths.db_path())
+        with db.writing(conn):
+            events.record(
+                conn, timeutil.utcnow(), "tester@host", "alpha", None, "acme", "leader.window_launched", "local",
+                {"party": "alpha", "generation": generation, "window_id": "@{}".format(generation)},
+            )
+        conn.close()
+
+    def _start(self, repo_dir, source):
+        payload = {"session_id": "sess-1", "cwd": str(repo_dir), "source": source}
+        code, out, err = self.run_hook("session-start", payload)
+        return out
+
+    def test_compact_nudges_below_threshold(self):
+        repo_dir = self._bound()
+        statusline_commands.record_ctx(paths.state_dir(), "sess-1", 25)
+        out = self._start(repo_dir, "compact")
+        self.assertIn("Context was compacted. " + self.PLAIN, out)
+
+    def test_compact_resets_the_one_shot_marker(self):
+        repo_dir = self._bound()
+        self._start(repo_dir, "compact")
+        self.assertIn("Context was compacted", self._start(repo_dir, "compact"))
+
+    def test_compact_unbound_stays_silent(self):
+        code, out, err = self.run_hook(
+            "session-start", {"session_id": "sess-9", "cwd": str(self.root), "source": "compact"}
+        )
+        self.assertNotIn("Context was compacted", out)
+
+    def test_startup_does_not_nudge(self):
+        repo_dir = self._bound()
+        self.assertNotIn("Context was compacted", self._start(repo_dir, "startup"))
+
+    def test_recorded_window_names_respawn(self):
+        repo_dir = self._bound()
+        self._record_window(1)
+        self.assertIn("Context was compacted. " + self.RESPAWN, self._start(repo_dir, "compact"))
+
+    def test_window_of_other_generation_stays_plain(self):
+        repo_dir = self._bound()
+        self._record_window(2)
+        self.assertIn("Context was compacted. " + self.PLAIN, self._start(repo_dir, "compact"))
+
+    def test_threshold_nudge_names_respawn_with_window(self):
+        repo_dir = self._bound()
+        self._record_window(1)
+        statusline_commands.record_ctx(paths.state_dir(), "sess-1", 85)
+        code, out, err = self.run_hook("prompt-submit", {"session_id": "sess-1", "cwd": str(repo_dir)})
+        self.assertIn("Context at 85%. " + self.RESPAWN, out)
+
+    def test_threshold_nudge_plain_without_window(self):
+        repo_dir = self._bound()
+        statusline_commands.record_ctx(paths.state_dir(), "sess-1", 85)
+        code, out, err = self.run_hook("prompt-submit", {"session_id": "sess-1", "cwd": str(repo_dir)})
+        self.assertIn("Context at 85%. " + self.PLAIN, out)
 
 
 class PostToolUseHookTests(GuildTestCase):
