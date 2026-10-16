@@ -3,7 +3,7 @@ epic: party-waits
 type: tasks
 title: Show what each party waits on
 status: active
-updated: 2026-10-14
+updated: 2026-10-16
 ---
 
 # Tasks: Show what each party waits on
@@ -28,3 +28,14 @@ updated: 2026-10-14
 **Acceptance:**
 - [x] An event of another kind is never decoded by the waits.
 - [x] A client that hung up prints no traceback.
+
+## T03 — Remove pr ask-fix
+
+**Depends on:** T01
+**Status:** [x] done — #168
+
+**What:** `guild pr ask-fix` and its `fixing` tag, `fix-requested` wait, web button and `fix_request_stale_hours` key are removed; `guild next` already sends the owner to a PR with failing checks, conflicts or review blockers. Old `pr.fix_requested` events replay as a no-op and the `fix_requested_at` column is dropped.
+
+**Acceptance:**
+- [x] No command, board field, web control or config key mentions a fix request.
+- [x] An old `pr.fix_requested` event replays in `guild rebuild`.

@@ -2,9 +2,8 @@ import json
 import os
 import sqlite3
 import time
-from datetime import timedelta
 
-from guild import party_waits, timeutil
+from guild import party_waits
 from guild.cli import _build_context
 from tests.mq_fixtures import MergeQueueTestCase, TASKS_MD
 from tests.transcript_fixtures import write_transcript
@@ -80,10 +79,6 @@ class PartyWaitsTests(MergeQueueTestCase):
         self.run_cli(["pr", "set", "acme/app#1", "--lifecycle", "draft"], "sess-1", self.repo_dir)
         self.update_pr("checks_passing = 1, checks_failing = 0, checks_pending = 0")
         self.assertEqual(self.waits(), [("draft-green", "acme/app#1", "green draft: mark ready")])
-
-    def test_fix_request_shows_its_label(self):
-        self.update_pr("fix_requested_at = '{}'".format(timeutil.to_iso(timeutil.utcnow() - timedelta(hours=3))))
-        self.assertIn(("fix-requested", "acme/app#1", "fixing · alpha · 3h"), self.waits())
 
     def test_blocked_external_pr_is_not_a_merge_wait(self):
         self.update_pr("blocked_external = 'legal'")

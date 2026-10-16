@@ -197,7 +197,6 @@ def validate_project_config(data):
     _validate_max_open_prs_config(data, "max_open_prs_per_party")
     _validate_max_open_prs_config(data, "max_open_prs_per_file")
     _validate_max_open_prs_config(data, "finding_guard_threshold")
-    _validate_max_open_prs_config(data, "fix_request_stale_hours")
 
 
 def load_project_file(config_file):

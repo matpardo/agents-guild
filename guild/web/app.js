@@ -185,7 +185,6 @@ var NO_SESSION_MESSAGE = "session token not loaded, reload the page";
       "human-review": "A PR of this party needs a human review before merging.",
       "human-merge": "A PR of this party is ready to merge; merge it by hand.",
       "draft-green": "A draft PR of this party has green checks; mark it ready for review.",
-      "fix-requested": "You asked for a fix on a PR of this party and it is not resolved yet.",
       "ask-open": "The party has an open ask waiting for your answer.",
       "ask-answered-unseen": "An ask of this party was answered and its leader has not read the answer yet.",
       "notices-unread": "A notice for this party was issued and its leader has not read it yet.",
@@ -556,14 +555,7 @@ var NO_SESSION_MESSAGE = "session token not loaded, reload the page";
     return input;
   }
 
-  function renderAskFixButton(ref, fix, location) {
-    var label = fix.request && fix.request.stale ? "Ask " + fix.party + " again" : "Ask " + fix.party + " to fix";
-    return prButton(location, ref, label, function () {
-      postPrAction(location, ref, "ask-fix", {});
-    });
-  }
-
-  function renderPrBlockControls(ref, blockedExternal, location, fix) {
+  function renderPrBlockControls(ref, blockedExternal, location) {
     var key = location + "|" + ref;
     var controls = el("span");
     controls.className = "pr-block-controls";
@@ -588,26 +580,10 @@ var NO_SESSION_MESSAGE = "session token not loaded, reload the page";
         })
       );
     }
-    var open = fix.request && !fix.request.stale;
-    if (!isManuallyBlocked(blockedExternal) && fix.reasons.length > 0 && !open) {
-      controls.appendChild(renderAskFixButton(ref, fix, location));
-    }
     var status = textEl("span", state.prStatuses[key] || "");
     status.className = "ask-status";
     controls.appendChild(status);
     return controls;
-  }
-
-  function fixOf(model) {
-    return { party: model.party, reasons: model.fix_reasons, request: model.fix_request };
-  }
-
-  function renderFixingPill(model) {
-    var request = model.fix_request;
-    var pill = textEl("span", request.stale ? "fixing \u00b7 stale" : "fixing \u00b7 " + request.party + " \u00b7 " + request.age_hours + "h");
-    pill.className = "pill lifecycle-fixing";
-    pill.title = "the human asked " + request.party + " to fix this on " + request.at + "; clears when the blockers are gone";
-    return pill;
   }
 
   function isManuallyBlocked(reason) {
@@ -1464,9 +1440,6 @@ var NO_SESSION_MESSAGE = "session token not loaded, reload the page";
     if (isReadyToMerge(entry)) {
       head.appendChild(renderReadyPill());
     }
-    if (entry.fix_request) {
-      head.appendChild(renderFixingPill(entry));
-    }
     head.appendChild(renderChecks(entry));
     head.appendChild(textEl("span", entry.party));
     head.appendChild(textEl("span", entry.task || "-"));
@@ -1534,7 +1507,7 @@ var NO_SESSION_MESSAGE = "session token not loaded, reload the page";
     item.value = entry.position;
     item.appendChild(renderQueueEntryHead(entry));
     item.appendChild(renderQueueSummary(entry));
-    item.appendChild(renderPrBlockControls(entry.ref, entry.blocked_external, "queue", fixOf(entry)));
+    item.appendChild(renderPrBlockControls(entry.ref, entry.blocked_external, "queue"));
     if (entry.why) {
       item.appendChild(classedText("p", entry.why, "queue-reason"));
     }
@@ -1683,11 +1656,8 @@ var NO_SESSION_MESSAGE = "session token not loaded, reload the page";
       row.appendChild(explain(base, "ui", "baseBranch"));
     }
     appendAll(row, renderReasonPills(pr.review_reasons));
-    if (pr.fix_request) {
-      row.appendChild(renderFixingPill(pr));
-    }
     row.appendChild(renderChecks(pr));
-    row.appendChild(renderPrBlockControls(pr.repo + "#" + pr.number, pr.blocked_external, "card", fixOf(pr)));
+    row.appendChild(renderPrBlockControls(pr.repo + "#" + pr.number, pr.blocked_external, "card"));
     if (pr.card_url) {
       row.appendChild(link(pr.card_url, pr.card));
     } else if (pr.card) {

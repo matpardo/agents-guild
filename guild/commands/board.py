@@ -2,7 +2,7 @@ import json
 import shlex
 import textwrap
 
-from guild import config, ctx_pressure, fix_request, identity, links, merge_queue, party_progress, party_status, party_waits, pii, pr_asks, resume
+from guild import config, ctx_pressure, identity, links, merge_queue, party_progress, party_status, party_waits, pii, pr_asks, resume
 from guild import sanitize, session_status, timeutil
 from guild.commands import brief as brief_commands
 from guild.commands import claim as claim_commands
@@ -113,10 +113,6 @@ def _checks_painted(painter, pr_row):
     return text
 
 
-def _fix_request(ctx, pr_row):
-    return fix_request.status(ctx.projects_dir, ctx.now, pr_row["repo"], pr_row["party"], pr_row["fix_requested_at"])
-
-
 def _badges(ctx, pr_row):
     badges = [(pr_row["lifecycle"], _LIFECYCLE_STYLES[pr_row["lifecycle"]])]
     for column, label, style in _FLAG_STYLES:
@@ -124,9 +120,6 @@ def _badges(ctx, pr_row):
             badges.append(("{} (ask #{})".format(label, pr_row["open_ask_id"]), style))
         elif pr_row[column]:
             badges.append((label, style))
-    request = _fix_request(ctx, pr_row)
-    if request is not None:
-        badges.append((fix_request.label(request), "yellow"))
     return badges
 
 
@@ -801,8 +794,6 @@ def _pr_model(ctx, pr_row, project_config):
         "fixes_flaky": bool(pr_row["fixes_flaky"]),
         "blocked_external": _optional_text(pr_row["blocked_external"]),
         "party": pr_row["party"],
-        "fix_reasons": merge_queue.fix_reasons(pr_row),
-        "fix_request": _fix_request(ctx, pr_row),
         "checks_failing": pr_row["checks_failing"] or 0,
         "checks_passing": pr_row["checks_passing"] or 0,
         "checks_pending": pr_row["checks_pending"] or 0,

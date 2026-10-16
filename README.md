@@ -141,7 +141,6 @@ guild pr set   <owner/repo>#<n> [--lifecycle draft|converging|ready] [--waits ".
                                [--fixes-main | --no-fixes-main]
                                [--fixes-flaky | --no-fixes-flaky]
                                [--blocked-external "<reason>" | --no-blocked-external]
-guild pr ask-fix <owner/repo>#<n>       # human: ask the owning party to fix an automatically blocked PR
 guild pr ready-check <owner/repo>#<n>   # read-only: everything standing between the PR and a merge
 
 guild finding list                              # finding classes of the project with PR counts
@@ -802,19 +801,6 @@ A PR that had the old `needs-human` lifecycle becomes `draft` with
 `needs-ask-answer` set, both in the live database and when events replay in
 `guild rebuild`.
 
-**Ask to fix.** `guild pr ask-fix <owner/repo>#<n>` is for the human, with no bound party: when an open
-PR is blocked automatically (failing checks, merge conflict, changes requested, unresolved review threads
-or a branch behind base) it records a `pr.fix_requested` event and posts a notice to the project,
-`<party>: fix <ref>: <reasons>`, naming the owning party. It refuses a PR with no automatic blocker, a
-manually blocked PR (unblock it first) and a PR that is not open. The request stays open, shown as a
-`fixing · <party> · <N>h` tag in `guild board`, `guild merge-queue`, `guild pr ready-check` and `guild web` (PR
-card and merge-queue entry, tooltip: the human asked <party> to fix this on <date>; clears when the blockers are
-gone), until the PR has no automatic blockers left or is merged or closed. While it is open `ask-fix` refuses
-with `fix already requested <N>h ago; waiting on <party>` and the web hides the button, even after the party
-pushes a new head commit. With the project key `fix_request_stale_hours` set, a request older than that with
-blockers still present reads `fixing · stale`, the web offers Ask <party> again and `ask-fix` records a new
-request; without the key a request never goes stale.
-
 **Manual block.** `guild pr set --blocked-external "<reason>"` (the flag keeps its name) marks a PR
 that waits on something outside development (a decision, a meeting); sync
 never clears it, `--no-blocked-external` does. `guild web` shows the PR with a `blocked: manual` pill carrying the reason (also on its merge-queue entry), and its Block manually (asks for a reason) and Unblock buttons, on the PR card and on its merge-queue entry, do the same from the browser, recording the same `pr.set` event with no party. In the merge queue the PR is
@@ -1228,8 +1214,8 @@ uses `innerHTML` or any HTML-injecting API, so text coming from agents, SDD,
 GitHub or the tracker is never executed. Every write runs a command function of `guild/commands` as the human actor,
 the one behind the CLI command (`ask.answer`, `ask.dismiss`,
 `notice.mark_seen|mark_unseen|mark_all_seen`; for a PR, `pr.block_external` and
-`pr.unblock_external`, which record `pr set --blocked-external` with no party, and `pr.ask_fix`; an empty
-reason, a refused fix request or an untracked PR answers `422`). `guild web` writes nothing else
+`pr.unblock_external`, which record `pr set --blocked-external` with no party; an empty
+reason or an untracked PR answers `422`). `guild web` writes nothing else
 to the database, and it logs no per-request
 access noise to stderr (server errors still do). Ctrl-C exits cleanly.
 
@@ -1679,7 +1665,6 @@ All keys. The loader rejects a wrong type with a clear error for every key excep
 - `max_open_prs_per_party` (positive integer, absent: no cap): open tracked PRs of one party at which `guild next` offers no new task and says to merge the first PR in queue order. Recommended: 3.
 - `max_open_prs` (positive integer, absent: no cap): the same, counting the open tracked PRs of all parties of the project. Size it to review throughput, e.g. 10.
 - `max_open_prs_per_file` (positive integer, absent: no warning, no extra calls): when a `git push` diff touches a file that this many other open tracked PRs of the project already change, `pre-push` warns (never denies) naming the file and those PRs. Needs `guild sync --source gh`, which then stores the changed files of every open tracked PR (`pr_files`, one `gh pr view` call per PR). Exclusive `area:` claims stay for files that need exclusivity.
-- `fix_request_stale_hours` (positive integer, absent: an open fix request never goes stale and clears only when the PR has no automatic blockers left or is merged or closed): hours after which a request with blockers still present reads `fixing · stale` and `guild pr ask-fix` (and the web button) may ask again.
 - `finding_guard_threshold` (positive integer, absent: findings are recorded silently): when `guild finding record` has counted that many distinct PRs for one finding class, one notice to `project:<name>` asks to make the class an architecture guard.
 - `handoff_retention_days` (positive integer, at most 3650, absent: kept forever): days after a party closes at which `guild handoff prune` deletes its last handoff file.
 - `pii_patterns` (list of regexes, absent: only the built-in email pattern): checked against notice text, ask question/context, answer text and handoff `--in-flight`/`--learned` for the caller's project. A match rejects the command with an error that names the field, never the matched text.
