@@ -43,3 +43,15 @@ updated: 2026-10-11
 - [x] The dispatcher table, the project config list and the command list match `guild/dispatch_rules.py`, `guild/config.py` and `guild/cli.py`.
 - [x] `GUILD.md` names each agent-visible behavior added since it was last revised.
 - [x] `CLAUDE.md` exists and every claim in it is checked against the repo.
+
+## T04 — Red main gates Ready instead of every push
+
+**Depends on:** T02
+**Status:** [x] done — #166
+
+**What:** with main red (not blocked by billing) a push from a branch with no PR or a draft PR passes with a warning to keep iterating in draft; a push to a Ready PR, `gh pr ready` without `--undo` and `gh pr create` without `--draft` are refused, since they would fire CI on red main. Only a PR flagged `fixes_main` is exempt; `fixes_flaky` is not. The checks live in `guild hook pre-push` and accept `gh -R <repo> pr ...` forms (decisión del dev, 2026-10-15).
+
+**Acceptance:**
+- [x] A push from a draft PR or a branch without PR passes with a warning; a push to a Ready PR is refused with the way out.
+- [x] `gh pr ready` and a non-draft `gh pr create` are refused while main is red; `gh pr ready --undo` and `gh pr create --draft` pass.
+- [x] A `fixes_main` PR passes every check; billing only warns.
