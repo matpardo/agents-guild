@@ -3,7 +3,7 @@ epic: install-and-update
 type: tasks
 title: Versioned install and self-update
 status: active
-updated: 2026-09-29
+updated: 2026-10-17
 ---
 
 # Tasks: Versioned install and self-update
@@ -42,3 +42,10 @@ updated: 2026-09-29
 **Status:** [x] done — #26
 
 **What:** `python3 -m guild` put the current directory ahead of `PYTHONPATH`, so running `guild` from inside any guild checkout (the development one included) ran that checkout's code instead of the installed one — the hole behind the earlier "edits go live" incident. `bin/guild` and the background sync spawned by `session-start` now start Python in isolated mode (`-I`) and put their own repo first explicitly.
+
+## T06 — The CLAUDE.md hint prints only when the line is missing
+
+**Depends on:** T01
+**Status:** [x] done — #172
+
+**What:** `install.sh`, and so every `./update.sh`, printed the hint to add `@~/.claude/GUILD.md` to `~/.claude/CLAUDE.md` even when the line was already there. It now prints only when `grep` does not find the line, following a symlinked `CLAUDE.md`.
