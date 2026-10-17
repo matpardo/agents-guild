@@ -320,6 +320,18 @@ class CompactNudgeTests(GuildTestCase):
         out = self._start(repo_dir, "compact")
         self.assertIn("Context was compacted. " + self.PLAIN, out)
 
+    def test_compact_records_the_pre_compact_pct(self):
+        repo_dir = self._bound()
+        statusline_commands.record_ctx(paths.state_dir(), "sess-1", 27)
+        self._start(repo_dir, "compact")
+        self.assertEqual([27], statusline_commands.read_compact_pcts(paths.state_dir(), "acme"))
+
+    def test_startup_records_no_compact_pct(self):
+        repo_dir = self._bound()
+        statusline_commands.record_ctx(paths.state_dir(), "sess-1", 27)
+        self._start(repo_dir, "startup")
+        self.assertEqual([], statusline_commands.read_compact_pcts(paths.state_dir(), "acme"))
+
     def test_compact_resets_the_one_shot_marker(self):
         repo_dir = self._bound()
         self._start(repo_dir, "compact")

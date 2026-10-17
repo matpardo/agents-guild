@@ -19,6 +19,20 @@ def read_ctx(state_dir, session_id):
         return None
 
 
+def record_compact_pct(state_dir, project, pct):
+    directory = state_dir / "compact-pct"
+    directory.mkdir(parents=True, exist_ok=True)
+    with (directory / project).open("a") as handle:
+        handle.write("{}\n".format(pct))
+
+
+def read_compact_pcts(state_dir, project):
+    path = state_dir / "compact-pct" / project
+    if not path.is_file():
+        return []
+    return [int(line) for line in path.read_text().split() if line.isdigit()]
+
+
 def _raid_label(ctx, row):
     if raid_commands.is_paused(ctx.conn, row["raid"]):
         return "{} ⏸".format(row["raid"])

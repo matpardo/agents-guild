@@ -2,6 +2,8 @@ import json
 import os
 from unittest import mock
 
+from guild import paths
+from guild.commands import statusline as statusline_commands
 from tests.testutil import GuildTestCase
 
 _ALL_HOOKS = {
@@ -219,3 +221,26 @@ class DoctorTests(GuildTestCase):
         out = self._doctor_out_for_clean_setup()
         self.assertIn("ok      project acme", out)
         self.assertIn("warn    project acme still has a 'dispatcher' key", out)
+
+    def test_warns_when_threshold_is_above_observed_compaction(self):
+        self.register_project("acme", ["acme/app"])
+        statusline_commands.record_compact_pct(paths.state_dir(), "acme", 31)
+        statusline_commands.record_compact_pct(paths.state_dir(), "acme", 24)
+        out = self._doctor_out_for_clean_setup()
+        self.assertIn(
+            "warn    project acme handoff_threshold 80% is above observed compaction at 24% (2 samples): lower it below 24",
+            out,
+        )
+
+    def test_no_compaction_warning_when_threshold_is_below_it(self):
+        self.register_project("acme", ["acme/app"])
+        path = self.config_home / "guild" / "projects" / "acme.json"
+        data = json.loads(path.read_text())
+        data["handoff_threshold"] = 20
+        path.write_text(json.dumps(data))
+        statusline_commands.record_compact_pct(paths.state_dir(), "acme", 24)
+        self.assertNotIn("observed compaction", self._doctor_out_for_clean_setup())
+
+    def test_no_compaction_warning_without_samples(self):
+        self.register_project("acme", ["acme/app"])
+        self.assertNotIn("observed compaction", self._doctor_out_for_clean_setup())
