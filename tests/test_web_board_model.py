@@ -417,17 +417,20 @@ class BoardModelCtxPressureTests(BoardModelTestCase):
     def test_ctx_is_null_without_a_recorded_pct(self):
         self.assertIsNone(self._party()["ctx"])
 
-    def test_ctx_is_null_below_the_threshold(self):
+    def test_ctx_below_the_threshold_is_not_high(self):
         statusline_commands.record_ctx(
             paths.state_dir(), "sess-1", ctx_pressure.DEFAULT_HANDOFF_THRESHOLD - 1
         )
-        self.assertIsNone(self._party()["ctx"])
+        self.assertEqual(
+            self._party()["ctx"],
+            {"pct": 79, "threshold": ctx_pressure.DEFAULT_HANDOFF_THRESHOLD, "source": "configured", "high": False},
+        )
 
-    def test_ctx_carries_pct_and_threshold_when_high(self):
+    def test_ctx_carries_pct_threshold_and_source_when_high(self):
         statusline_commands.record_ctx(paths.state_dir(), "sess-1", 93)
         self.assertEqual(
             self._party()["ctx"],
-            {"pct": 93, "threshold": ctx_pressure.DEFAULT_HANDOFF_THRESHOLD, "high": True},
+            {"pct": 93, "threshold": ctx_pressure.DEFAULT_HANDOFF_THRESHOLD, "source": "configured", "high": True},
         )
 
     def test_ctx_is_null_when_the_leader_session_is_gone(self):

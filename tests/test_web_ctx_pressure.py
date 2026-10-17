@@ -22,7 +22,11 @@ class CtxPressureSourceTests(unittest.TestCase):
         self.assertIn("ctxHigh === 0", self.block)
 
     def test_party_card_renders_the_badge_and_the_resume_command(self):
-        self.assertIn('explain(ctxBadge, "ui", "ctxHigh")', self.source)
+        self.assertIn('explain(ctxBadge, "ui", party.ctx.high ? "ctxHigh" : "ctx")', self.source)
+        self.assertIn('party.ctx.source === "configured"', self.source)
+
+    def test_counter_counts_only_high_contexts(self):
+        self.assertIn("party.ctx !== null && party.ctx.high", self.block)
         self.assertIn('textEl("code", party.resume_command)', self.source)
 
 

@@ -320,17 +320,34 @@ class CompactNudgeTests(GuildTestCase):
         out = self._start(repo_dir, "compact")
         self.assertIn("Context was compacted. " + self.PLAIN, out)
 
-    def test_compact_records_the_pre_compact_pct(self):
+    def _pre_compact(self, session_id):
+        return self.run_hook("pre-compact", {"session_id": session_id, "cwd": str(self.root), "trigger": "auto"})
+
+    def test_pre_compact_records_the_session_pct(self):
+        statusline_commands.record_ctx(paths.state_dir(), "sess-1", 27)
+        statusline_commands.record_ctx(paths.state_dir(), "sess-9", 84)
+        self._pre_compact("sess-1")
+        self._pre_compact("sess-9")
+        self.assertEqual(84, statusline_commands.latest_compact_pct(paths.state_dir()))
+
+    def test_pre_compact_without_a_pct_records_nothing(self):
+        code, out, err = self._pre_compact("sess-1")
+        self.assertEqual("", out)
+        self.assertIsNone(statusline_commands.latest_compact_pct(paths.state_dir()))
+
+    def test_compact_session_start_records_nothing(self):
         repo_dir = self._bound()
         statusline_commands.record_ctx(paths.state_dir(), "sess-1", 27)
         self._start(repo_dir, "compact")
-        self.assertEqual([27], statusline_commands.read_compact_pcts(paths.state_dir(), "acme"))
+        self.assertIsNone(statusline_commands.latest_compact_pct(paths.state_dir()))
 
-    def test_startup_records_no_compact_pct(self):
+    def test_ctx_nudge_follows_the_margin(self):
         repo_dir = self._bound()
-        statusline_commands.record_ctx(paths.state_dir(), "sess-1", 27)
-        self._start(repo_dir, "startup")
-        self.assertEqual([], statusline_commands.read_compact_pcts(paths.state_dir(), "acme"))
+        (self.config_home / "guild" / "guild.json").write_text('{"handoff_margin": 10}')
+        statusline_commands.record_compact_pct(paths.state_dir(), 40)
+        statusline_commands.record_ctx(paths.state_dir(), "sess-1", 31)
+        code, out, err = self.run_hook("prompt-submit", {"session_id": "sess-1", "cwd": str(repo_dir)})
+        self.assertIn("Context at 31%", out)
 
     def test_compact_resets_the_one_shot_marker(self):
         repo_dir = self._bound()

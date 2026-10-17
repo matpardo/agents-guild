@@ -78,19 +78,34 @@ def _dispatch_unit_lines():
     ]
 
 
-def _compaction_lines(state_dir, data):
-    samples = statusline_commands.read_compact_pcts(state_dir, data["name"])
-    if not samples:
-        return []
-    threshold = ctx_pressure.threshold(data)
-    lowest = min(samples)
-    if threshold < lowest:
-        return []
-    message = "warn    project {} handoff_threshold {}% is above observed compaction at {}% ({} samples): lower it below {}"
-    return [(True, message.format(data["name"], threshold, lowest, len(samples), lowest))]
+def _global_config_lines(global_config_path):
+    try:
+        return config.load_global(global_config_path), []
+    except GuildError as error:
+        return None, [(False, "invalid {}".format(error.message))]
 
 
-def _project_lines(projects_dir, state_dir):
+def _handoff_line(state_dir, global_config):
+    resolved = ctx_pressure.threshold(state_dir, global_config, None)
+    if resolved["source"] == "configured":
+        return []
+    return [(True, "ok      handoff at {}% ({})".format(resolved["value"], resolved["source"]))]
+
+
+def _compaction_lines(state_dir, global_config, data):
+    if global_config is None or global_config.get("handoff_margin") is not None:
+        return []
+    compaction = statusline_commands.latest_compact_pct(state_dir)
+    if compaction is None:
+        return []
+    threshold = ctx_pressure.threshold(state_dir, global_config, data)["value"]
+    if threshold < compaction:
+        return []
+    message = "warn    project {} handoff_threshold {}% is above the last compaction at {}%: lower it or set handoff_margin"
+    return [(True, message.format(data["name"], threshold, compaction))]
+
+
+def _project_lines(projects_dir, state_dir, global_config):
     if not projects_dir.is_dir():
         return []
     lines = []
@@ -103,7 +118,7 @@ def _project_lines(projects_dir, state_dir):
         lines.append((True, "ok      project {}".format(data["name"])))
         if "dispatcher" in data:
             lines.append((True, "warn    project {} still has a 'dispatcher' key: the dispatcher was retired, remove it".format(data["name"])))
-        lines.extend(_compaction_lines(state_dir, data))
+        lines.extend(_compaction_lines(state_dir, global_config, data))
         for warning in localbase.behind_warning_lines(data):
             lines.append((True, "warn    {}".format(warning)))
     return lines
@@ -153,7 +168,11 @@ def run(ctx, scan_prs):
     checks.append(_rules_line())
     checks.extend(_clipboard_lines())
     checks.extend(_dispatch_unit_lines())
-    checks.extend(_project_lines(ctx.projects_dir, ctx.state_dir))
+    global_config, global_lines = _global_config_lines(paths.global_config_path())
+    checks.extend(global_lines)
+    if global_config is not None:
+        checks.extend(_handoff_line(ctx.state_dir, global_config))
+    checks.extend(_project_lines(ctx.projects_dir, ctx.state_dir, global_config))
     if scan_prs:
         checks.extend(_scan_lines(ctx))
     healthy = all(passed for passed, _ in checks)

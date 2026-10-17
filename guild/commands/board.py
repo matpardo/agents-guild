@@ -3,7 +3,7 @@ import shlex
 import textwrap
 
 from guild import config, ctx_pressure, identity, links, merge_queue, party_progress, party_status, party_waits, pii, pr_asks, resume
-from guild import sanitize, session_status, timeutil
+from guild import paths, sanitize, session_status, timeutil
 from guild.commands import brief as brief_commands
 from guild.commands import claim as claim_commands
 from guild.commands import drift as drift_commands
@@ -268,7 +268,8 @@ def _ctx_high_parties(ctx, party_names):
     for party_row in party_rows:
         if party_names is not None and party_row["name"] not in party_names:
             continue
-        if _ctx_model(ctx, party_row, projects_by_name.get(party_row["project"])) is not None:
+        pressure = _ctx_model(ctx, party_row, projects_by_name.get(party_row["project"]))
+        if pressure is not None and pressure["high"]:
             names_over_threshold.append(party_row["name"])
     return names_over_threshold
 
@@ -571,10 +572,17 @@ def _party_claims(ctx, party_name):
 
 
 def _ctx_model(ctx, party_row, project_config):
-    pressure = ctx_pressure.for_party(ctx, party_row, project_config)
-    if pressure is None or not pressure["high"]:
-        return None
-    return pressure
+    return ctx_pressure.for_party(ctx, party_row, config.load_global(paths.global_config_path()), project_config)
+
+
+def _ctx_text(pressure):
+    text = "  context: {}% (handoff at {}%".format(pressure["pct"], pressure["threshold"])
+    if pressure["source"] != "configured":
+        text += ", {}".format(pressure["source"])
+    text += ")"
+    if pressure["high"]:
+        return text + " → run guild handoff"
+    return text
 
 
 def _resume_command(ctx, party_row):
@@ -674,14 +682,7 @@ def _party_section(ctx, painter, party_row, project_config):
     lines.extend(_party_cap_lines(painter, _party_caps(ctx, party_row, project_config)))
     pressure = _ctx_model(ctx, party_row, project_config)
     if pressure is not None:
-        lines.append(
-            painter.paint(
-                "  context: {}% (handoff at {}%) → run guild handoff".format(
-                    pressure["pct"], pressure["threshold"]
-                ),
-                "red",
-            )
-        )
+        lines.append(painter.paint(_ctx_text(pressure), "red" if pressure["high"] else "dim"))
     resume_command = _resume_command(ctx, party_row)
     if resume_command is not None:
         lines.append(painter.paint("  resume: {}".format(resume_command), "cyan"))

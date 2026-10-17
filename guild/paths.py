@@ -26,6 +26,10 @@ def db_path():
     return data_dir() / "guild.db"
 
 
+def global_config_path():
+    return config_dir() / "guild.json"
+
+
 def projects_config_dir():
     return config_dir() / "projects"
 

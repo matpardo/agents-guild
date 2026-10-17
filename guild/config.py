@@ -199,6 +199,21 @@ def validate_project_config(data):
     _validate_max_open_prs_config(data, "finding_guard_threshold")
 
 
+def load_global(config_file):
+    if not config_file.is_file():
+        return {}
+    try:
+        data = json.loads(config_file.read_text())
+    except (OSError, json.JSONDecodeError) as error:
+        raise GuildError("invalid global config '{}': {}".format(config_file, error), 1)
+    if not isinstance(data, dict):
+        raise GuildError("invalid global config '{}': must be a JSON object".format(config_file), 1)
+    margin = data.get("handoff_margin")
+    if margin is not None and (isinstance(margin, bool) or not isinstance(margin, int) or not 0 <= margin <= 100):
+        raise GuildError("global config 'handoff_margin' must be an integer from 0 to 100", 1)
+    return data
+
+
 def load_project_file(config_file):
     try:
         raw = config_file.read_text()

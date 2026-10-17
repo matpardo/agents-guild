@@ -239,6 +239,7 @@ var NO_SESSION_MESSAGE = "session token not loaded, reload the page";
       mainBlocked: "CI cannot run on main because of an external cause; re-run main once it is fixed.",
       generation: "How many times the party's leader session was replaced.",
       ctxHigh: "The leader session is near its context limit and should run guild handoff soon.",
+      ctx: "Context used by the leader session / the percentage at which it is nudged to run guild handoff.",
       remaining: "Tasks not done in the party's active quests plus open PRs outside them; the tooltip lists done/total per quest.",
       allDone: "Every task of the party's active quests is done and no open PR is left outside them.",
       resumeCommand: "Run this to start the next generation of this party; it waits for a new leader.",
@@ -923,7 +924,7 @@ var NO_SESSION_MESSAGE = "session token not loaded, reload the page";
 
   function ctxHighCount(parties) {
     return parties.filter(function (party) {
-      return party.ctx !== null;
+      return party.ctx !== null && party.ctx.high;
     }).length;
   }
 
@@ -1836,9 +1837,10 @@ var NO_SESSION_MESSAGE = "session token not loaded, reload the page";
     summary.appendChild(renderStatusBadge(party.status));
     summary.appendChild(renderRemainingBadge(party.remaining));
     if (party.ctx !== null) {
-      var ctxBadge = textEl("span", "context " + party.ctx.pct + "% / " + party.ctx.threshold + "%");
-      ctxBadge.className = "status-badge badge-warn";
-      summary.appendChild(explain(ctxBadge, "ui", "ctxHigh"));
+      var ctxSource = party.ctx.source === "configured" ? "" : " (" + party.ctx.source + ")";
+      var ctxBadge = textEl("span", "context " + party.ctx.pct + "% / " + party.ctx.threshold + "%" + ctxSource);
+      ctxBadge.className = party.ctx.high ? "status-badge badge-warn" : "status-badge";
+      summary.appendChild(explain(ctxBadge, "ui", party.ctx.high ? "ctxHigh" : "ctx"));
     }
     summary.appendChild(explain(textEl("span", party.state), "partyState", party.state));
     summary.appendChild(explain(textEl("span", "gen " + party.generation), "ui", "generation"));

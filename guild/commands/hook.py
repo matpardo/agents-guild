@@ -8,7 +8,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-from guild import config, ctx_pressure, db, identity, localbase, names, session_status, timeutil, tmux_windows
+from guild import config, ctx_pressure, db, identity, localbase, names, paths, session_status, timeutil, tmux_windows
 from guild.adapters import github
 from guild.commands import brief as brief_commands
 from guild.commands import claim as claim_commands
@@ -250,30 +250,33 @@ def _ctx_nudge_lines(ctx, binding):
     if binding is None or binding["project"] is None:
         return []
     project = binding["project"]
-    pct = statusline_commands.read_ctx(ctx.state_dir, ctx.session_id)
-    if pct is None:
-        return []
     project_data = config.load_project(ctx.projects_dir, project)
-    if not ctx_pressure.is_high(pct, project_data):
+    global_config = config.load_global(paths.global_config_path())
+    pressure = ctx_pressure.reading(ctx.state_dir, ctx.session_id, global_config, project_data)
+    if pressure is None or not pressure["high"]:
         return []
     marker = _nudge_marker_path(ctx)
     if marker.exists():
         return []
     marker.parent.mkdir(parents=True, exist_ok=True)
     marker.touch()
-    return [_nudge_text(ctx, binding, "Context at {}%".format(pct))]
+    return [_nudge_text(ctx, binding, "Context at {}%".format(pressure["pct"]))]
 
 
 def _compact_nudge_lines(ctx, binding, source):
     if source != "compact" or binding["project"] is None:
         return []
-    pct = statusline_commands.read_ctx(ctx.state_dir, ctx.session_id)
-    if pct is not None:
-        statusline_commands.record_compact_pct(ctx.state_dir, binding["project"], pct)
     marker = _nudge_marker_path(ctx)
     marker.parent.mkdir(parents=True, exist_ok=True)
     marker.touch()
     return [_nudge_text(ctx, binding, "Context was compacted")]
+
+
+def pre_compact(ctx):
+    pct = statusline_commands.read_ctx(ctx.state_dir, ctx.session_id)
+    if pct is None:
+        return
+    statusline_commands.record_compact_pct(ctx.state_dir, pct)
 
 
 def _nudge_text(ctx, binding, lead):

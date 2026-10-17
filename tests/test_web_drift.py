@@ -382,3 +382,30 @@ class WebTaskMoveBehaviorTests(unittest.TestCase):
 
     def test_no_targets_means_no_move_control(self):
         self.assertNotIn("move to...", self._rendered("queued", []))
+
+
+@unittest.skipIf(shutil.which("node") is None, "node not installed")
+class WebCtxBehaviorTests(unittest.TestCase):
+    def _rendered(self, out_id):
+        parties = [dict(party) for party in _BOARD["parties"]]
+        parties[0]["ctx"] = {"pct": 42, "threshold": 75, "source": "compaction 85% − 10", "high": False}
+        parties[1]["ctx"] = {"pct": 72, "threshold": 70, "source": "configured", "high": True}
+        with tempfile.TemporaryDirectory() as tmp:
+            board = Path(tmp) / "board.json"
+            board.write_text(json.dumps(dict(_BOARD, parties=parties)))
+            result = subprocess.run(
+                ["node", str(_HARNESS), str(_APP_JS_PATH), str(board), "all", "all", out_id],
+                capture_output=True, text=True, timeout=30, check=True,
+            )
+        return result.stdout.strip()
+
+    def test_badge_shows_below_threshold_with_its_source(self):
+        self.assertIn("context 42% / 75% (compaction 85% − 10)", self._rendered("parties"))
+
+    def test_badge_without_a_derived_source_shows_only_the_values(self):
+        out = self._rendered("parties")
+        self.assertIn("context 72% / 70%", out)
+        self.assertNotIn("(configured)", out)
+
+    def test_only_high_contexts_count_as_context_high(self):
+        self.assertIn("context high (1)", self._rendered("asks"))

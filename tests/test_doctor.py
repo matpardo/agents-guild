@@ -12,6 +12,7 @@ _ALL_HOOKS = {
     "PostToolUse": [{"hooks": [{"type": "command", "command": "guild hook post-tool-use"}]}],
     "Notification": [{"hooks": [{"type": "command", "command": "guild hook notification"}]}],
     "Stop": [{"hooks": [{"type": "command", "command": "guild hook stop"}]}],
+    "PreCompact": [{"matcher": "auto", "hooks": [{"type": "command", "command": "guild hook pre-compact"}]}],
     "PreToolUse": [
         {"matcher": "Bash", "hooks": [{"type": "command", "command": "guild hook pre-push"}]},
         {"matcher": "Edit|Write", "hooks": [{"type": "command", "command": "guild hook pre-edit"}]},
@@ -96,7 +97,7 @@ class DoctorTests(GuildTestCase):
         self._link_rules()
         code, out, err = self.run_cli(["doctor"], None, None)
         self.assertEqual(code, 1)
-        self.assertEqual(out.count("missing hook"), 9)
+        self.assertEqual(out.count("missing hook"), 10)
         self.assertEqual(out.count("missing ask rule"), 2)
 
     def test_missing_notification_and_stop_hooks_fail_and_name_them(self):
@@ -222,13 +223,26 @@ class DoctorTests(GuildTestCase):
         self.assertIn("ok      project acme", out)
         self.assertIn("warn    project acme still has a 'dispatcher' key", out)
 
-    def test_warns_when_threshold_is_above_observed_compaction(self):
+    def _write_global(self, data):
+        (self.config_home / "guild").mkdir(parents=True, exist_ok=True)
+        (self.config_home / "guild" / "guild.json").write_text(json.dumps(data))
+
+    def test_missing_pre_compact_hook_fails_and_names_it(self):
+        hooks = dict(_ALL_HOOKS)
+        del hooks["PreCompact"]
+        self._write_settings(hooks)
+        self._link_rules()
+        code, out, err = self.run_cli(["doctor"], None, None)
+        self.assertEqual(code, 1)
+        self.assertIn("missing hook PreCompact: guild hook pre-compact", out)
+
+    def test_warns_when_threshold_is_above_the_last_compaction(self):
         self.register_project("acme", ["acme/app"])
-        statusline_commands.record_compact_pct(paths.state_dir(), "acme", 31)
-        statusline_commands.record_compact_pct(paths.state_dir(), "acme", 24)
+        statusline_commands.record_compact_pct(paths.state_dir(), 31)
+        statusline_commands.record_compact_pct(paths.state_dir(), 24)
         out = self._doctor_out_for_clean_setup()
         self.assertIn(
-            "warn    project acme handoff_threshold 80% is above observed compaction at 24% (2 samples): lower it below 24",
+            "warn    project acme handoff_threshold 80% is above the last compaction at 24%: lower it or set handoff_margin",
             out,
         )
 
@@ -238,9 +252,29 @@ class DoctorTests(GuildTestCase):
         data = json.loads(path.read_text())
         data["handoff_threshold"] = 20
         path.write_text(json.dumps(data))
-        statusline_commands.record_compact_pct(paths.state_dir(), "acme", 24)
-        self.assertNotIn("observed compaction", self._doctor_out_for_clean_setup())
+        statusline_commands.record_compact_pct(paths.state_dir(), 24)
+        self.assertNotIn("last compaction", self._doctor_out_for_clean_setup())
 
     def test_no_compaction_warning_without_samples(self):
         self.register_project("acme", ["acme/app"])
-        self.assertNotIn("observed compaction", self._doctor_out_for_clean_setup())
+        self.assertNotIn("last compaction", self._doctor_out_for_clean_setup())
+
+    def test_margin_prints_the_derived_handoff_and_silences_the_warning(self):
+        self.register_project("acme", ["acme/app"])
+        self._write_global({"handoff_margin": 10})
+        statusline_commands.record_compact_pct(paths.state_dir(), 85)
+        out = self._doctor_out_for_clean_setup()
+        self.assertIn("ok      handoff at 75% (compaction 85% − 10)", out)
+        self.assertNotIn("last compaction", out)
+
+    def test_margin_without_compaction_prints_no_handoff_line(self):
+        self._write_global({"handoff_margin": 10})
+        self.assertNotIn("handoff at", self._doctor_out_for_clean_setup())
+
+    def test_invalid_global_config_fails(self):
+        self._write_global({"handoff_margin": "ten"})
+        self._write_settings(_ALL_HOOKS)
+        self._link_rules()
+        code, out, err = self.run_cli(["doctor"], None, None)
+        self.assertEqual(code, 1)
+        self.assertIn("invalid global config 'handoff_margin' must be an integer from 0 to 100", out)
