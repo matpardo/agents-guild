@@ -37,7 +37,9 @@ CLAUDE_DIR="$HOME/.claude"
 mkdir -p "$CLAUDE_DIR"
 link_or_warn "$REPO_ROOT/GUILD.md" "$CLAUDE_DIR/GUILD.md"
 "$REPO_ROOT/bin/guild" wire-settings
-echo "add the line @~/.claude/GUILD.md to $CLAUDE_DIR/CLAUDE.md so every session loads the agent rules"
+if ! grep -qsF '@~/.claude/GUILD.md' "$CLAUDE_DIR/CLAUDE.md"; then
+  echo "add the line @~/.claude/GUILD.md to $CLAUDE_DIR/CLAUDE.md so every session loads the agent rules"
+fi
 
 SYSTEMD_USER_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/systemd/user"
 if [ -e "$SYSTEMD_USER_DIR/guild-dispatch.timer" ] || [ -e "$SYSTEMD_USER_DIR/guild-dispatch.service" ]; then

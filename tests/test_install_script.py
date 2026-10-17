@@ -64,3 +64,17 @@ class InstallScriptTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertFalse(self.systemctl_log.exists())
         self.assertNotIn("retired dispatcher", result.stdout)
+
+    def test_hints_the_claude_md_line_when_missing(self):
+        result = self._run()
+        self.assertIn("add the line @~/.claude/GUILD.md", result.stdout)
+
+    def test_no_claude_md_hint_when_the_line_is_there(self):
+        target = self.home / "configs" / "CLAUDE.md"
+        target.parent.mkdir()
+        target.write_text("# rules\n@~/.claude/GUILD.md\n")
+        (self.home / ".claude").mkdir()
+        (self.home / ".claude" / "CLAUDE.md").symlink_to(target)
+        result = self._run()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertNotIn("add the line @~/.claude/GUILD.md", result.stdout)
