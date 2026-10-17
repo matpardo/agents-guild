@@ -3,7 +3,7 @@ epic: session-lifecycle
 type: tasks
 title: Handoffs that clean up and sessions that respawn
 status: done
-updated: 2026-10-16
+updated: 2026-10-17
 ---
 
 # Tasks: Handoffs that clean up and sessions that respawn
@@ -128,3 +128,15 @@ updated: 2026-10-16
 - [x] SessionStart with `source: compact` resets the nudge marker and nudges a bound session.
 - [x] The nudge asks for `--respawn` only when the current generation has a recorded window.
 - [x] `--respawn` without a recorded window, or with `--close`, is refused before anything is written.
+
+## T11 — Doctor warns when the handoff threshold sits above compaction
+
+**Depends on:** T10
+**Status:** [x] done — #170
+
+**What:** the compact `SessionStart` records the last context percentage per project, and `guild doctor` warns when a project's `handoff_threshold` is at or above the lowest one, because that percentage nudge never fires.
+
+**Acceptance:**
+- [x] SessionStart with `source: compact` appends the pre-compact percentage for the bound project.
+- [x] `guild doctor` warns, without changing the exit code, when `handoff_threshold` is at or above the lowest recorded value.
+- [x] No samples, or a threshold below them, prints nothing.

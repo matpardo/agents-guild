@@ -267,6 +267,9 @@ def _ctx_nudge_lines(ctx, binding):
 def _compact_nudge_lines(ctx, binding, source):
     if source != "compact" or binding["project"] is None:
         return []
+    pct = statusline_commands.read_ctx(ctx.state_dir, ctx.session_id)
+    if pct is not None:
+        statusline_commands.record_compact_pct(ctx.state_dir, binding["project"], pct)
     marker = _nudge_marker_path(ctx)
     marker.parent.mkdir(parents=True, exist_ok=True)
     marker.touch()

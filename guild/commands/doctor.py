@@ -2,8 +2,9 @@ import re
 import shutil
 from pathlib import Path
 
-from guild import claude_settings, config, localbase, paths, tmux_windows
+from guild import claude_settings, config, ctx_pressure, localbase, paths, tmux_windows
 from guild.adapters import github
+from guild.commands import statusline as statusline_commands
 from guild.errors import GuildError
 
 _TRACE_RE = re.compile(r"guild|ask #[0-9]|notice #[0-9]", re.IGNORECASE)
@@ -77,7 +78,19 @@ def _dispatch_unit_lines():
     ]
 
 
-def _project_lines(projects_dir):
+def _compaction_lines(state_dir, data):
+    samples = statusline_commands.read_compact_pcts(state_dir, data["name"])
+    if not samples:
+        return []
+    threshold = ctx_pressure.threshold(data)
+    lowest = min(samples)
+    if threshold < lowest:
+        return []
+    message = "warn    project {} handoff_threshold {}% is above observed compaction at {}% ({} samples): lower it below {}"
+    return [(True, message.format(data["name"], threshold, lowest, len(samples), lowest))]
+
+
+def _project_lines(projects_dir, state_dir):
     if not projects_dir.is_dir():
         return []
     lines = []
@@ -90,6 +103,7 @@ def _project_lines(projects_dir):
         lines.append((True, "ok      project {}".format(data["name"])))
         if "dispatcher" in data:
             lines.append((True, "warn    project {} still has a 'dispatcher' key: the dispatcher was retired, remove it".format(data["name"])))
+        lines.extend(_compaction_lines(state_dir, data))
         for warning in localbase.behind_warning_lines(data):
             lines.append((True, "warn    {}".format(warning)))
     return lines
@@ -139,7 +153,7 @@ def run(ctx, scan_prs):
     checks.append(_rules_line())
     checks.extend(_clipboard_lines())
     checks.extend(_dispatch_unit_lines())
-    checks.extend(_project_lines(ctx.projects_dir))
+    checks.extend(_project_lines(ctx.projects_dir, ctx.state_dir))
     if scan_prs:
         checks.extend(_scan_lines(ctx))
     healthy = all(passed for passed, _ in checks)
