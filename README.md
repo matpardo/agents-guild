@@ -97,7 +97,7 @@ re-runs `guild wire-settings`, which only adds what is missing.
 `~/.claude/GUILD.md` exists and that every project config loads; it exits 1
 and names what is missing. It also checks that the guild state commands are in
 `permissions.allow` (see "Hooks"); a missing allow rule is a `warn` line and
-never changes the exit code. It also warns about a leftover `guild-dispatch.timer` or `guild-dispatch.service` unit file (`install.sh` removes both) and about a project config that still has a `dispatcher` key (ignored, safe to delete). It warns too when a project's `handoff_threshold` is at or above the lowest context percentage seen right before a compaction (recorded by the `SessionStart` hook with source `compact`), since that threshold never fires.
+never changes the exit code. It also warns about a leftover `guild-dispatch.timer` or `guild-dispatch.service` unit file (`install.sh` removes both) and about a project config that still has a `dispatcher` key (ignored, safe to delete). With a global `handoff_margin` (see "Global config") and a recorded compaction it prints `ok      handoff at 75% (compaction 85% − 10)`; without a margin it warns when a project's `handoff_threshold` is at or above the last compaction (recorded by the `PreCompact` hook), since that threshold never fires. An invalid `guild.json` fails the check.
 
 `guild doctor --scan-prs` additionally lists the open PRs of every project's
 `github.repos` through `gh` and scans title, body, comments and commit
@@ -213,6 +213,7 @@ guild hook pre-edit
 guild hook pre-commit      # git hook: no stdin, session from CLAUDE_CODE_SESSION_ID
 guild hook notification    # records the session status
 guild hook stop
+guild hook pre-compact     # records the context percentage before an automatic compaction
 
 guild seed <file.json>
 guild rebuild
@@ -1636,6 +1637,24 @@ Party, quest and project names are validated against a slug rule
 filesystem path (handoff files, project config files) — this is defense
 against path traversal, not an identity boundary.
 
+## Global config
+
+`$XDG_CONFIG_HOME/guild/guild.json` (default `~/.config/guild/guild.json`),
+optional, written by hand:
+
+```json
+{"handoff_margin": 10}
+```
+
+- `handoff_margin` (integer 0-100): when set and an automatic compaction has
+  been recorded, the handoff threshold of every project is the last compaction
+  percentage minus this margin (floored at 0), instead of `handoff_threshold`.
+  It is global because the compaction point comes from the user's Claude Code
+  settings. The last compaction wins over older ones, so after a change to
+  those settings one compaction corrects it: until then a lower old point
+  hands off early, and a higher old one is caught by the nudge that follows
+  every compaction.
+
 ## Project config
 
 `$XDG_CONFIG_HOME/guild/projects/<name>.json` (default
@@ -1684,7 +1703,7 @@ All keys. The loader rejects a wrong type with a clear error for every key excep
 - `tracker` (object, absent: no tracker sync): drives `guild sync --source tracker` (see "Tracker sync"). `kind` is required when the block exists; only `"jira-acli"` is supported, anything else is rejected when the config loads.
   - `browse_url` (string starting with `https://`, absent: tasks carry no `card_url`): the base `guild web` prepends to a task's tracker key to build its card link (`https://acme.atlassian.net/browse/DEMO-1`).
 - `next.stale_hours` (positive integer, absent: `guild next` skips its stale-`converging` step and the web in-progress page shows no stale marker): hours without activity after which a `converging` PR is reported and a quest is marked stale.
-- `handoff_threshold` (integer percent 0-100, default 80): context usage at or above which the `UserPromptSubmit`/`PostToolUse` hooks nudge once per session toward `guild handoff` (`guild handoff --respawn` for sessions in a window guild launched; the same nudge comes right after a compaction, whatever the percentage) and the board reports the party as context high. The nudge asks the session to start nothing new, let running executions finish, hand off and stop. Recommended: 40, so sessions stay short and each fresh generation starts from the brief. `guild doctor` warns when the threshold is at or above the observed compaction point. Claude Code's `autoCompactWindow` setting (tokens) and `CLAUDE_AUTOCOMPACT_PCT_OVERRIDE` env var move that point; for example `autoCompactWindow: 1000000` with an override of `85` and a threshold of `70`.
+- `handoff_threshold` (integer percent 0-100, default 80): context usage at or above which the `UserPromptSubmit`/`PostToolUse` hooks nudge once per session toward `guild handoff` (`guild handoff --respawn` for sessions in a window guild launched; the same nudge comes right after a compaction, whatever the percentage) and the board reports the party as context high. The nudge asks the session to start nothing new, let running executions finish, hand off and stop. Recommended: 40, so sessions stay short and each fresh generation starts from the brief. A global `handoff_margin` replaces it with the last compaction minus the margin (see "Global config"). Claude Code's `autoCompactWindow` setting (tokens) and `CLAUDE_AUTOCOMPACT_PCT_OVERRIDE` env var move that point; for example `autoCompactWindow: 1000000` with an override of `85` and a threshold of `70`.
 - `max_open_prs_per_party` (positive integer, absent: no cap): open tracked PRs of one party at which `guild next` offers no new task and says to merge the first PR in queue order. Recommended: 3.
 - `max_open_prs` (positive integer, absent: no cap): the same, counting the open tracked PRs of all parties of the project. Size it to review throughput, e.g. 10.
 - `max_open_prs_per_file` (positive integer, absent: no warning, no extra calls): when a `git push` diff touches a file that this many other open tracked PRs of the project already change, `pre-push` warns (never denies) naming the file and those PRs. Needs `guild sync --source gh`, which then stores the changed files of every open tracked PR (`pr_files`, one `gh pr view` call per PR). Exclusive `area:` claims stay for files that need exclusivity.
@@ -1944,6 +1963,9 @@ which merges this block and keeps what is already there:
     "Stop": [
       {"hooks": [{"type": "command", "command": "guild hook stop"}]}
     ],
+    "PreCompact": [
+      {"matcher": "auto", "hooks": [{"type": "command", "command": "guild hook pre-compact"}]}
+    ],
     "PreToolUse": [
       {
         "matcher": "Bash",
@@ -2128,6 +2150,11 @@ Without a hooks manager, add the same call to the repository's
   `agent_type` (null on the main thread), and a `permissionDecisionReason`
   reaches the denied subagent verbatim.
 
+- `pre-compact` (matcher `auto`, so a manual `/compact` never fires it): appends the
+  session's last statusline percentage, still the pre-compact value, to the global
+  `$XDG_STATE_HOME/guild/compaction-pct`. Bound or not, since the compaction point
+  comes from the user's Claude Code settings. It prints nothing.
+
 - `notification` and `stop`: record the session status (see "Session
   status"). They print nothing, ignore unbound sessions and exit 0 whatever
   the stdin carries.
@@ -2183,15 +2210,19 @@ session ends or its context drops; nothing is stored.
 
 - `guild board`: counted in the heading
   (`NEEDS YOU · 1 open ask · 1 blocked · 1 context high`) and, under the party
-  itself, `context: 86% (handoff at 80%) → run guild handoff`. The heading is a
-  counter only; no per-party line is added above the parties.
+  itself, `context: 86% (handoff at 80%) → run guild handoff`. Below the
+  threshold the line still shows, dimmed and without the call to action; with a
+  `handoff_margin` it names the source: `context: 42% (handoff at 75%, compaction 85% − 10)`.
+  The heading is a counter only; no per-party line is added above the parties.
 - A party left in `awaiting-leader` by `guild handoff` also gets a
   `resume: cd <cwd> && GUILD_RESUME=<party> claude -n <party>-g<next> …` line,
   so the command to start the next generation survives the session that printed
   it. `guild revive` starts the same fresh next generation for such a party.
 - `guild web` / `/api/board`: a `context <pct>% / <threshold>%` badge on the
-  party and the same counter in the asks heading (`context high (1)`); per party
-  the model carries `ctx` (`pct`, `threshold`, `high`, or `null` when not high)
+  party, with `(compaction 85% − 10)` when derived and warn-styled only when
+  high, and the counter in the asks heading (`context high (1)`); per party
+  the model carries `ctx` (`pct`, `threshold`, `source`, `high`, or `null`
+  without a live leader or a recorded percentage)
   and `resume_command` (or `null`).
 
 **Push command.** An optional project config key runs a command when a session

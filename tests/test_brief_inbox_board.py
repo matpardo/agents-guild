@@ -516,13 +516,20 @@ class BoardSessionStatusTests(GuildTestCase):
             "\n  context: 86% (handoff at 80%) → run guild handoff\n", out
         )
 
-    def test_no_context_line_below_the_threshold(self):
+    def test_context_line_below_the_threshold_asks_for_nothing(self):
         statusline_commands.record_ctx(
             paths.state_dir(), "sess-1", ctx_pressure.DEFAULT_HANDOFF_THRESHOLD - 1
         )
         code, out, err = self.run_cli(["board"], None, None)
-        self.assertNotIn("context:", out)
+        self.assertIn("\n  context: 79% (handoff at 80%)\n", out)
         self.assertIn("NEEDS YOU · nothing", out)
+
+    def test_context_line_names_the_compaction_source(self):
+        (self.config_home / "guild" / "guild.json").write_text('{"handoff_margin": 10}')
+        statusline_commands.record_compact_pct(paths.state_dir(), 85)
+        statusline_commands.record_ctx(paths.state_dir(), "sess-1", 42)
+        code, out, err = self.run_cli(["board"], None, None)
+        self.assertIn("\n  context: 42% (handoff at 75%, compaction 85% − 10)\n", out)
 
     def test_context_high_scoped_to_party_filter(self):
         self.run_cli(["party", "start", "beta"], "sess-2", self.repo_dir)

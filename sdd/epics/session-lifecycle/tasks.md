@@ -140,3 +140,16 @@ updated: 2026-10-17
 - [x] SessionStart with `source: compact` appends the pre-compact percentage for the bound project.
 - [x] `guild doctor` warns, without changing the exit code, when `handoff_threshold` is at or above the lowest recorded value.
 - [x] No samples, or a threshold below them, prints nothing.
+
+## T12 — Handoff threshold follows the last automatic compaction
+
+**Depends on:** T11
+**Status:** [x] done — #171
+
+**What:** a `PreCompact` hook (matcher `auto`) records the pre-compact context percentage globally, and a global `handoff_margin` in `guild.json` makes every project's threshold the last compaction minus the margin. Board, web and doctor show the value and its source. Decisión del dev, 2026-10-17: the margin is global because the compaction point comes from the user's Claude Code settings.
+
+**Acceptance:**
+- [x] `PreCompact` with trigger `auto` appends the session's last percentage; manual `/compact` and the compact `SessionStart` record nothing.
+- [x] With `handoff_margin` and a sample, the threshold is the last sample minus the margin for every project; otherwise `handoff_threshold`.
+- [x] Board and web show the context below the threshold too, with the derived source; only high contexts count as context high.
+- [x] Doctor prints the derived handoff, keeps the no-margin warning, and fails on an invalid `guild.json`.

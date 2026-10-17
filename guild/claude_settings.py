@@ -14,6 +14,7 @@ EXPECTED_HOOKS = (
     ("PreToolUse", "Bash", "guild hook pre-answer"),
     ("Notification", None, "guild hook notification"),
     ("Stop", None, "guild hook stop"),
+    ("PreCompact", "auto", "guild hook pre-compact"),
 )
 
 EXPECTED_ASK_RULES = ("Bash(guild party start:*)", "Bash(guild quest add:*)")
