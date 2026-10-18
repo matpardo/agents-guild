@@ -3,7 +3,7 @@ epic: session-lifecycle
 type: tasks
 title: Handoffs that clean up and sessions that respawn
 status: done
-updated: 2026-10-17
+updated: 2026-10-18
 ---
 
 # Tasks: Handoffs that clean up and sessions that respawn
@@ -153,3 +153,16 @@ updated: 2026-10-17
 - [x] With `handoff_margin` and a sample, the threshold is the last sample minus the margin for every project; otherwise `handoff_threshold`.
 - [x] Board and web show the context below the threshold too, with the derived source; only high contexts count as context high.
 - [x] Doctor prints the derived handoff, keeps the no-margin warning, and fails on an invalid `guild.json`.
+
+## T13 — Handoff margin as a share and a floor above the session start
+
+**Depends on:** T12
+**Status:** [x] done — #173
+
+**What:** with a 1M context window the automatic compaction lands around 21%, so the margin in points put the threshold below a fresh session's start and every respawned generation handed off at once. Decisión del dev, 2026-10-18: `handoff_margin` becomes a share of the last compaction, and each session's threshold is floored at its first nonzero reading plus 5.
+
+**Acceptance:**
+- [x] With `handoff_margin` and a sample, the threshold is the sample minus that share of it, rounded down.
+- [x] The statusline keeps the first nonzero reading per session; the threshold never sits below it plus 5, and the board and web name that source.
+- [x] Doctor warns when the derived handoff sits within 5 points of the latest session start.
+- [x] `ctx-baseline` markers are pruned with the other state markers.
