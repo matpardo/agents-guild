@@ -166,3 +166,15 @@ updated: 2026-10-18
 - [x] The statusline keeps the first nonzero reading per session; the threshold never sits below it plus 5, and the board and web name that source.
 - [x] Doctor warns when the derived handoff sits within 5 points of the latest session start.
 - [x] `ctx-baseline` markers are pruned with the other state markers.
+
+## T14 — Revive from the main checkout when the worktree is gone
+
+**Depends on:** —
+**Status:** [x] done — #174
+
+**What:** `revive` gives a party whose recorded cwd no longer exists (a removed worktree) the nearest main checkout above that cwd, and launches it `fresh`, since its transcript cannot be resumed from another directory. Without such a checkout the party is still skipped with the reason.
+
+**Acceptance:**
+- [x] A removed worktree under a main checkout launches the next generation fresh from that checkout.
+- [x] `--list` shows the checkout as cwd and `fresh`.
+- [x] A missing cwd with no main checkout above it is still skipped.
