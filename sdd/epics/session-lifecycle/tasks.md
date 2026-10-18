@@ -178,3 +178,14 @@ updated: 2026-10-18
 - [x] A removed worktree under a main checkout launches the next generation fresh from that checkout.
 - [x] `--list` shows the checkout as cwd and `fresh`.
 - [x] A missing cwd with no main checkout above it is still skipped.
+
+## T15 — Idle compactions leave no compaction sample
+
+**Depends on:** T12
+**Status:** [x] done — #175
+
+**What:** `PreCompact` with trigger `auto` also fires on Claude Code's idle compaction, which runs on a quiet session long before the context limit. The hook skips the sample when the statusline percentage is 30 minutes old or more, so the handoff threshold follows only context-limit compactions.
+
+**Acceptance:**
+- [x] A pre-compact whose statusline percentage is 30 minutes old or more records nothing.
+- [x] A pre-compact right after activity still records the percentage.

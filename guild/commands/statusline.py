@@ -21,6 +21,10 @@ def read_ctx(state_dir, session_id):
     return _read_pct(state_dir / "ctx" / session_id)
 
 
+def ctx_recorded_at(state_dir, session_id):
+    return (state_dir / "ctx" / session_id).stat().st_mtime
+
+
 def read_baseline(state_dir, session_id):
     return _read_pct(state_dir / "ctx-baseline" / session_id)
 

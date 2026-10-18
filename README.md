@@ -2163,7 +2163,11 @@ Without a hooks manager, add the same call to the repository's
 - `pre-compact` (matcher `auto`, so a manual `/compact` never fires it): appends the
   session's last statusline percentage, still the pre-compact value, to the global
   `$XDG_STATE_HOME/guild/compaction-pct`. Bound or not, since the compaction point
-  comes from the user's Claude Code settings. It prints nothing.
+  comes from the user's Claude Code settings. It prints nothing. When the
+  statusline last wrote that percentage 30 minutes ago or more, the compaction is
+  Claude Code's idle compaction (same `auto` trigger, fired on a quiet session
+  over `CLAUDE_CODE_IDLE_COMPACT_MIN_TOKENS`), not the context limit, and nothing
+  is recorded.
 
 - `notification` and `stop`: record the session status (see "Session
   status"). They print nothing, ignore unbound sessions and exit 0 whatever

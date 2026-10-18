@@ -24,6 +24,7 @@ from guild.errors import GuildError
 from guild.identity import UNBOUND_HINT
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
+_IDLE_COMPACTION_SECONDS = 30 * 60
 _EDIT_TOOL_PATH_FIELDS = {
     "Edit": "file_path",
     "Write": "file_path",
@@ -272,9 +273,14 @@ def _compact_nudge_lines(ctx, binding, source):
     return [_nudge_text(ctx, binding, "Context was compacted")]
 
 
+def _idle_compaction(ctx):
+    silence = ctx.now.timestamp() - statusline_commands.ctx_recorded_at(ctx.state_dir, ctx.session_id)
+    return silence >= _IDLE_COMPACTION_SECONDS
+
+
 def pre_compact(ctx):
     pct = statusline_commands.read_ctx(ctx.state_dir, ctx.session_id)
-    if pct is None:
+    if pct is None or _idle_compaction(ctx):
         return
     statusline_commands.record_compact_pct(ctx.state_dir, pct)
 
