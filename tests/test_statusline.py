@@ -22,6 +22,11 @@ class StatuslineTests(GuildTestCase):
         ctx_file = paths.state_dir() / "ctx" / "sess-1"
         self.assertEqual(ctx_file.read_text(), "81")
 
+    def test_ctx_flag_keeps_the_first_nonzero_pct_as_baseline(self):
+        for pct in ("0", "12", "30"):
+            self.run_cli(["statusline", "--session", "sess-1", "--ctx", pct], None, None)
+        self.assertEqual((paths.state_dir() / "ctx-baseline" / "sess-1").read_text(), "12")
+
     def test_empty_when_nothing_pending(self):
         code, out, err = self.run_cli(["statusline", "--session", "sess-1"], None, None)
         self.assertEqual(code, 0)

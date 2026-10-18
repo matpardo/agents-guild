@@ -9,8 +9,33 @@ def record_ctx(state_dir, session_id, pct):
     (directory / session_id).write_text(str(pct))
 
 
+def record_baseline_once(state_dir, session_id, pct):
+    path = state_dir / "ctx-baseline" / session_id
+    if pct == 0 or path.exists():
+        return
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(str(pct))
+
+
 def read_ctx(state_dir, session_id):
-    path = state_dir / "ctx" / session_id
+    return _read_pct(state_dir / "ctx" / session_id)
+
+
+def read_baseline(state_dir, session_id):
+    return _read_pct(state_dir / "ctx-baseline" / session_id)
+
+
+def latest_baseline(state_dir):
+    directory = state_dir / "ctx-baseline"
+    if not directory.is_dir():
+        return None
+    files = sorted(directory.iterdir(), key=lambda path: path.stat().st_mtime)
+    if not files:
+        return None
+    return _read_pct(files[-1])
+
+
+def _read_pct(path):
     if not path.is_file():
         return None
     try:

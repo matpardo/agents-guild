@@ -345,9 +345,17 @@ class CompactNudgeTests(GuildTestCase):
         repo_dir = self._bound()
         (self.config_home / "guild" / "guild.json").write_text('{"handoff_margin": 10}')
         statusline_commands.record_compact_pct(paths.state_dir(), 40)
-        statusline_commands.record_ctx(paths.state_dir(), "sess-1", 31)
+        statusline_commands.record_ctx(paths.state_dir(), "sess-1", 36)
         code, out, err = self.run_hook("prompt-submit", {"session_id": "sess-1", "cwd": str(repo_dir)})
-        self.assertIn("Context at 31%", out)
+        self.assertIn("Context at 36%", out)
+
+    def test_fresh_session_above_a_low_compaction_threshold_is_not_nudged(self):
+        repo_dir = self._bound()
+        (self.config_home / "guild" / "guild.json").write_text('{"handoff_margin": 10}')
+        statusline_commands.record_compact_pct(paths.state_dir(), 12)
+        self.run_cli(["statusline", "--session", "sess-1", "--ctx", "12"], "sess-1", repo_dir)
+        code, out, err = self.run_hook("prompt-submit", {"session_id": "sess-1", "cwd": str(repo_dir)})
+        self.assertNotIn("Context at", out)
 
     def test_compact_resets_the_one_shot_marker(self):
         repo_dir = self._bound()

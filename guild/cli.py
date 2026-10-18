@@ -640,6 +640,7 @@ def _handle_statusline(ctx, args):
 
     if args.ctx is not None:
         statusline_commands.record_ctx(ctx.state_dir, args.session, args.ctx)
+        statusline_commands.record_baseline_once(ctx.state_dir, args.session, args.ctx)
     _print(statusline_commands.render(ctx, args.session))
     return 0
 

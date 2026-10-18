@@ -23,7 +23,9 @@ class StatePruneTests(GuildTestCase):
         self.ctx = _build_context(_LEADER, self.repo_dir)
         self.ctx_dir = self.ctx.state_dir / "ctx"
         self.hints_dir = self.ctx.state_dir / "hints"
+        self.baseline_dir = self.ctx.state_dir / "ctx-baseline"
         self.ctx_dir.mkdir(parents=True, exist_ok=True)
+        self.baseline_dir.mkdir(parents=True, exist_ok=True)
         self.hints_dir.mkdir(parents=True, exist_ok=True)
 
     def _marker(self, directory, name, age_seconds):
@@ -42,6 +44,7 @@ class StatePruneTests(GuildTestCase):
     def test_dead_markers_of_every_name_shape_are_deleted(self):
         names = [
             (self.ctx_dir, _DEAD),
+            (self.baseline_dir, _DEAD),
             (self.hints_dir, _DEAD),
             (self.hints_dir, "nudge-" + _DEAD),
             (self.hints_dir, "resumed-{}-g3".format(_DEAD)),

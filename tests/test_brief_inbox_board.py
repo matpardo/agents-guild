@@ -529,7 +529,7 @@ class BoardSessionStatusTests(GuildTestCase):
         statusline_commands.record_compact_pct(paths.state_dir(), 85)
         statusline_commands.record_ctx(paths.state_dir(), "sess-1", 42)
         code, out, err = self.run_cli(["board"], None, None)
-        self.assertIn("\n  context: 42% (handoff at 75%, compaction 85% − 10)\n", out)
+        self.assertIn("\n  context: 42% (handoff at 76%, compaction 85% − 10%)\n", out)
 
     def test_context_high_scoped_to_party_filter(self):
         self.run_cli(["party", "start", "beta"], "sess-2", self.repo_dir)
