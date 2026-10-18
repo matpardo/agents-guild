@@ -33,17 +33,21 @@ class ThresholdTests(GuildTestCase):
         statusline_commands.record_compact_pct(paths.state_dir(), 85)
         self.assertEqual(
             self._value({"handoff_margin": 10}, {"handoff_threshold": 70}),
-            {"value": 75, "source": "compaction 85% − 10"},
+            {"value": 76, "source": "compaction 85% − 10%"},
         )
+
+    def test_margin_is_a_share_of_a_low_compaction(self):
+        statusline_commands.record_compact_pct(paths.state_dir(), 21)
+        self.assertEqual(self._value({"handoff_margin": 10}, None)["value"], 18)
 
     def test_margin_is_the_same_for_every_project(self):
         statusline_commands.record_compact_pct(paths.state_dir(), 60)
-        self.assertEqual(self._value({"handoff_margin": 10}, {"handoff_threshold": 20})["value"], 50)
-        self.assertEqual(self._value({"handoff_margin": 10}, {"handoff_threshold": 90})["value"], 50)
+        self.assertEqual(self._value({"handoff_margin": 10}, {"handoff_threshold": 20})["value"], 54)
+        self.assertEqual(self._value({"handoff_margin": 10}, {"handoff_threshold": 90})["value"], 54)
 
-    def test_margin_above_the_compaction_floors_at_zero(self):
+    def test_full_margin_is_zero(self):
         statusline_commands.record_compact_pct(paths.state_dir(), 5)
-        self.assertEqual(self._value({"handoff_margin": 10}, None)["value"], 0)
+        self.assertEqual(self._value({"handoff_margin": 100}, None)["value"], 0)
 
 
 class ReadingTests(GuildTestCase):
@@ -71,6 +75,33 @@ class ReadingTests(GuildTestCase):
         self.assertEqual(
             ctx_pressure.reading(paths.state_dir(), "sess-1", {}, None),
             {"pct": 10, "threshold": ctx_pressure.DEFAULT_HANDOFF_THRESHOLD, "source": "configured", "high": False},
+        )
+
+
+class BaselineTests(GuildTestCase):
+    def test_first_nonzero_reading_is_the_baseline(self):
+        for pct in (0, 12, 30):
+            statusline_commands.record_baseline_once(paths.state_dir(), "sess-1", pct)
+        self.assertEqual(statusline_commands.read_baseline(paths.state_dir(), "sess-1"), 12)
+
+    def test_no_reading_has_no_baseline(self):
+        self.assertIsNone(statusline_commands.read_baseline(paths.state_dir(), "sess-1"))
+
+    def test_threshold_below_the_baseline_headroom_rises_to_it(self):
+        statusline_commands.record_compact_pct(paths.state_dir(), 12)
+        statusline_commands.record_baseline_once(paths.state_dir(), "sess-1", 12)
+        statusline_commands.record_ctx(paths.state_dir(), "sess-1", 12)
+        self.assertEqual(
+            ctx_pressure.reading(paths.state_dir(), "sess-1", {"handoff_margin": 10}, None),
+            {"pct": 12, "threshold": 17, "source": "session start 12% + 5", "high": False},
+        )
+
+    def test_threshold_above_the_baseline_headroom_stays(self):
+        statusline_commands.record_baseline_once(paths.state_dir(), "sess-1", 12)
+        statusline_commands.record_ctx(paths.state_dir(), "sess-1", 40)
+        self.assertEqual(
+            ctx_pressure.reading(paths.state_dir(), "sess-1", {}, {"handoff_threshold": 40}),
+            {"pct": 40, "threshold": 40, "source": "configured", "high": True},
         )
 
 

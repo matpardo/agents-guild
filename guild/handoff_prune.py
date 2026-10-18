@@ -9,7 +9,7 @@ from guild.errors import GuildError
 _NO_RETENTION_REASON = "no handoff_retention_days configured"
 _NO_REGISTRY_LINE = "markers kept: no session registry"
 _MARKER_MIN_AGE_SECONDS = 86400
-_MARKER_DIRS = ("ctx", "hints")
+_MARKER_DIRS = ("ctx", "ctx-baseline", "hints")
 _MARKER_NAME_RE = re.compile(
     r"^(?:nudge-|resumed-|raid-warn-|raid-pause-)?"
     r"([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})"

@@ -89,7 +89,14 @@ def _handoff_line(state_dir, global_config):
     resolved = ctx_pressure.threshold(state_dir, global_config, None)
     if resolved["source"] == "configured":
         return []
-    return [(True, "ok      handoff at {}% ({})".format(resolved["value"], resolved["source"]))]
+    lines = [(True, "ok      handoff at {}% ({})".format(resolved["value"], resolved["source"]))]
+    baseline = statusline_commands.latest_baseline(state_dir)
+    floored = ctx_pressure.floor_above_baseline(resolved, baseline)
+    if floored is resolved:
+        return lines
+    message = "warn    handoff at {}% is under {} points above a fresh session at {}%: sessions hand off at {}% instead"
+    lines.append((True, message.format(resolved["value"], ctx_pressure.BASELINE_HEADROOM, baseline, floored["value"])))
+    return lines
 
 
 def _compaction_lines(state_dir, global_config, data):

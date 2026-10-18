@@ -264,8 +264,18 @@ class DoctorTests(GuildTestCase):
         self._write_global({"handoff_margin": 10})
         statusline_commands.record_compact_pct(paths.state_dir(), 85)
         out = self._doctor_out_for_clean_setup()
-        self.assertIn("ok      handoff at 75% (compaction 85% − 10)", out)
+        self.assertIn("ok      handoff at 76% (compaction 85% − 10%)", out)
         self.assertNotIn("last compaction", out)
+        self.assertNotIn("fresh session", out)
+
+    def test_warns_when_the_derived_handoff_sits_near_a_fresh_session(self):
+        self._write_global({"handoff_margin": 10})
+        statusline_commands.record_compact_pct(paths.state_dir(), 21)
+        statusline_commands.record_baseline_once(paths.state_dir(), "sess-1", 15)
+        self.assertIn(
+            "warn    handoff at 18% is under 5 points above a fresh session at 15%: sessions hand off at 20% instead",
+            self._doctor_out_for_clean_setup(),
+        )
 
     def test_margin_without_compaction_prints_no_handoff_line(self):
         self._write_global({"handoff_margin": 10})

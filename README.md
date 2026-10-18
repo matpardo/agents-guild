@@ -97,7 +97,7 @@ re-runs `guild wire-settings`, which only adds what is missing.
 `~/.claude/GUILD.md` exists and that every project config loads; it exits 1
 and names what is missing. It also checks that the guild state commands are in
 `permissions.allow` (see "Hooks"); a missing allow rule is a `warn` line and
-never changes the exit code. It also warns about a leftover `guild-dispatch.timer` or `guild-dispatch.service` unit file (`install.sh` removes both) and about a project config that still has a `dispatcher` key (ignored, safe to delete). With a global `handoff_margin` (see "Global config") and a recorded compaction it prints `ok      handoff at 75% (compaction 85% − 10)`; without a margin it warns when a project's `handoff_threshold` is at or above the last compaction (recorded by the `PreCompact` hook), since that threshold never fires. An invalid `guild.json` fails the check.
+never changes the exit code. It also warns about a leftover `guild-dispatch.timer` or `guild-dispatch.service` unit file (`install.sh` removes both) and about a project config that still has a `dispatcher` key (ignored, safe to delete). With a global `handoff_margin` (see "Global config") and a recorded compaction it prints `ok      handoff at 76% (compaction 85% − 10%)`, plus a `warn` when that handoff sits less than 5 points above the starting percentage of the latest session (the handoff would fire on a fresh session, so sessions hand off at that start + 5 instead); without a margin it warns when a project's `handoff_threshold` is at or above the last compaction (recorded by the `PreCompact` hook), since that threshold never fires. An invalid `guild.json` fails the check.
 
 `guild doctor --scan-prs` additionally lists the open PRs of every project's
 `github.repos` through `gh` and scans title, body, comments and commit
@@ -1376,8 +1376,8 @@ nothing):
   the close (project config, optional); without that key it is kept forever and
   the summary says `kept N closed-party handoff(s): no handoff_retention_days
   configured`;
-- state markers under `$XDG_STATE_HOME/guild/ctx` and `hints` (context
-  readings, nudge, resume and raid markers) of sessions that neither run
+- state markers under `$XDG_STATE_HOME/guild/ctx`, `ctx-baseline` and `hints` (context
+  readings, session start readings, nudge, resume and raid markers) of sessions that neither run
   (`~/.claude/sessions`) nor lead an open party are deleted once a day old; with
   no session registry nothing is deleted (`markers kept: no session registry`).
   Other files in those directories, such as `human`, are kept.
@@ -1648,12 +1648,20 @@ optional, written by hand:
 
 - `handoff_margin` (integer 0-100): when set and an automatic compaction has
   been recorded, the handoff threshold of every project is the last compaction
-  percentage minus this margin (floored at 0), instead of `handoff_threshold`.
+  percentage minus this share of it (85% with a margin of 10 gives 76%, rounded
+  down), instead of `handoff_threshold`. The margin is a share, not points, because
+  with a 1M context window Claude Code may compact at around 21% of it.
   It is global because the compaction point comes from the user's Claude Code
   settings. The last compaction wins over older ones, so after a change to
   those settings one compaction corrects it: until then a lower old point
   hands off early, and a higher old one is caught by the nudge that follows
   every compaction.
+
+Whatever the source, a session's threshold is never below its starting
+percentage plus 5 (the first nonzero `guild statusline --ctx` reading, kept in
+`$XDG_STATE_HOME/guild/ctx-baseline`): a fresh session that already starts
+above the threshold would otherwise hand off at once, and every respawned
+generation after it too.
 
 ## Project config
 
@@ -2212,14 +2220,14 @@ session ends or its context drops; nothing is stored.
   (`NEEDS YOU · 1 open ask · 1 blocked · 1 context high`) and, under the party
   itself, `context: 86% (handoff at 80%) → run guild handoff`. Below the
   threshold the line still shows, dimmed and without the call to action; with a
-  `handoff_margin` it names the source: `context: 42% (handoff at 75%, compaction 85% − 10)`.
+  `handoff_margin` it names the source: `context: 42% (handoff at 76%, compaction 85% − 10%)`, or `session start 12% + 5` when the starting floor wins.
   The heading is a counter only; no per-party line is added above the parties.
 - A party left in `awaiting-leader` by `guild handoff` also gets a
   `resume: cd <cwd> && GUILD_RESUME=<party> claude -n <party>-g<next> …` line,
   so the command to start the next generation survives the session that printed
   it. `guild revive` starts the same fresh next generation for such a party.
 - `guild web` / `/api/board`: a `context <pct>% / <threshold>%` badge on the
-  party, with `(compaction 85% − 10)` when derived and warn-styled only when
+  party, with `(compaction 85% − 10%)` or `(session start 12% + 5)` when derived and warn-styled only when
   high, and the counter in the asks heading (`context high (1)`); per party
   the model carries `ctx` (`pct`, `threshold`, `source`, `high`, or `null`
   without a live leader or a recorded percentage)
