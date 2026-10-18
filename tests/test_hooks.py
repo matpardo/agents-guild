@@ -1,7 +1,9 @@
 import json
+import os
 import sqlite3
 import string
 import subprocess
+import time
 from unittest import mock
 
 from guild import ctx_pressure, db, events, timeutil
@@ -329,6 +331,13 @@ class CompactNudgeTests(GuildTestCase):
         self._pre_compact("sess-1")
         self._pre_compact("sess-9")
         self.assertEqual(84, statusline_commands.latest_compact_pct(paths.state_dir()))
+
+    def test_pre_compact_after_a_long_silence_records_nothing(self):
+        statusline_commands.record_ctx(paths.state_dir(), "sess-1", 21)
+        stale = time.time() - 55 * 60
+        os.utime(paths.state_dir() / "ctx" / "sess-1", (stale, stale))
+        self._pre_compact("sess-1")
+        self.assertIsNone(statusline_commands.latest_compact_pct(paths.state_dir()))
 
     def test_pre_compact_without_a_pct_records_nothing(self):
         code, out, err = self._pre_compact("sess-1")
