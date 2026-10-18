@@ -41,7 +41,7 @@ def _repo_slug(remote_url):
     return "{}/{}".format(parts[-2], parts[-1])
 
 
-def _is_main_checkout(directory):
+def is_main_checkout(directory):
     return (Path(directory) / ".git").is_dir()
 
 
@@ -65,7 +65,7 @@ def locate_clones(project):
     seen = set()
     for pattern in project["paths"]:
         for match in sorted(glob.glob(str(Path(pattern).expanduser()))):
-            if match in seen or not _is_main_checkout(match):
+            if match in seen or not is_main_checkout(match):
                 continue
             seen.add(match)
             repo = _clone_repo(match, repos)
