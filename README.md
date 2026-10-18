@@ -1409,8 +1409,10 @@ guild revive --list            # no tmux needed: one copy-paste command per part
 - cwd and permission mode come from the leader row (recorded by the
   `SessionStart` hook); when missing, the first lines of the transcript are
   read. A mode that is not known is never invented.
-- A party whose cwd no longer exists, or that already has a window in the
-  `guild` session, is skipped with the reason printed.
+- A party whose cwd no longer exists (a removed worktree) starts `fresh` from
+  the nearest main checkout above that cwd, since its transcript cannot be
+  resumed elsewhere. With no such checkout, or with a window already in the
+  `guild` session, the party is skipped with the reason printed.
 - Names: the tmux window is named after the party, with `automatic-rename`
   and `allow-rename` off, and the `guild` session sets `set-titles on` /
   `set-titles-string "#W"` so the outer terminal title shows the party, plus

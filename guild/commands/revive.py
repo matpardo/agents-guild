@@ -1,7 +1,8 @@
 import json
 import os
+from pathlib import Path
 
-from guild import db, events, party_status, resume, tmux_windows
+from guild import db, events, localbase, party_status, resume, tmux_windows
 from guild.errors import GuildError
 
 TRANSCRIPT_LINE_LIMIT = 200
@@ -89,6 +90,13 @@ def _parse_record(line):
     return record
 
 
+def _surviving_checkout(cwd):
+    for directory in Path(cwd).parents:
+        if localbase.is_main_checkout(directory):
+            return str(directory)
+    return None
+
+
 def _quest_label(conn, party):
     quests = conn.execute(
         "SELECT slug FROM quests WHERE party = ? AND state = 'active' ORDER BY slug ASC", (party,)
@@ -119,6 +127,10 @@ def _entry(ctx, transcripts_dir, party):
         transcript_cwd, transcript_mode = read_location(transcript)
         cwd = cwd or transcript_cwd
         mode = mode or transcript_mode
+    checkout = None if cwd is None or os.path.isdir(cwd) else _surviving_checkout(cwd)
+    if checkout is not None:
+        cwd = checkout
+        transcript = None
     last_activity = ctx.conn.execute(
         "SELECT MAX(ts) AS ts FROM events WHERE party = ?", (party["name"],)
     ).fetchone()["ts"]

@@ -430,6 +430,25 @@ class LaunchTests(ReviveBase):
         self.assertIn(str(self.root / "gone"), out)
         self.assertIn("fresh session", out)
 
+    def _set_removed_worktree_leader(self):
+        (self.repo_dir / ".git").mkdir()
+        self._set_leader("alpha", str(self.repo_dir / ".claude" / "worktrees" / "gone"), "acceptEdits")
+
+    def test_removed_worktree_launches_fresh_from_its_main_checkout(self):
+        self._set_removed_worktree_leader()
+        tmux = self._tmux()
+        out = self._revive(["alpha"], False, False, tmux, None)
+        new_session = [call for call in tmux.calls if call[0] == "new-session"][0]
+        self.assertEqual(new_session[new_session.index("-c") + 1], str(self.repo_dir))
+        self.assertTrue(new_session[-1].startswith("GUILD_RESUME=alpha claude -n alpha-g2 "))
+        self.assertIn("launched alpha (fresh)", out)
+
+    def test_removed_worktree_lists_its_main_checkout_as_fresh(self):
+        self._set_removed_worktree_leader()
+        out = self._revive([], False, True, self._tmux(installed=False), None)
+        self.assertIn("1. alpha (acme) [fresh]", out)
+        self.assertIn("cwd: {}\n".format(self.repo_dir), out)
+
     def test_unknown_cwd_is_skipped_with_reason(self):
         self._set_leader("beta", None, None)
         tmux = self._tmux()
