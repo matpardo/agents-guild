@@ -147,3 +147,10 @@ updated: 2026-10-04
 **Status:** [x] done — #156
 
 **What:** a merge queue entry whose state is `ready` and that is not a draft shows a green `ready` pill in its head, next to the other tags, so the PRs with green checks and nothing pending stand out.
+
+## T21 — Show why an all-done quest cannot close
+
+**Depends on:** T14
+**Status:** [x] done — #176
+
+**What:** a quest with every task done whose epic has drift shows `can't close: drift` on the CLI and web board, with findings split into its own and other owners' (`drift.epic_findings_by_owner`); the `quest done` refusal uses the same split.
