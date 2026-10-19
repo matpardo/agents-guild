@@ -99,14 +99,26 @@ def refresh_sdd_snapshot(ctx, project):
     ]
 
 
-def _gate_drift(ctx, project, epic, accept_drift, stale_notes):
+def _owner_sections(split):
+    lines = []
+    if split["own"]:
+        lines.append("yours:")
+        lines.extend(split["own"])
+    if split["foreign"]:
+        lines.append("other parties:")
+        lines.extend("{} (party {})".format(item["text"], item["party"]) for item in split["foreign"])
+    return lines
+
+
+def _gate_drift(ctx, project, epic, party, accept_drift, stale_notes):
     if epic is None:
         return []
-    findings = drift.epic_findings(ctx.conn, project, epic)
+    split = drift.epic_findings_by_owner(ctx.conn, project, epic, party)
+    findings = split["own"] + [item["text"] for item in split["foreign"]]
     if findings and not accept_drift:
         raise GuildError(
             "drift in epic '{}', fix it or pass --accept-drift:\n{}".format(
-                epic, "\n".join(findings + stale_notes)
+                epic, "\n".join(_owner_sections(split) + stale_notes)
             ),
             1,
         )
@@ -155,7 +167,9 @@ def done(ctx, slug, accept_drift, force):
         raise GuildError("quest '{}' is already {}".format(slug, row["state"]), 1)
     _gate_unfinished_tasks(ctx.conn, slug, force)
     stale_notes = [] if row["epic"] is None else refresh_sdd_snapshot(ctx, row["project"])
-    findings = _gate_drift(ctx, row["project"], row["epic"], accept_drift, stale_notes)
+    findings = _gate_drift(
+        ctx, row["project"], row["epic"], binding["party"], accept_drift, stale_notes
+    )
     snapshot = achievement.build(ctx.conn, slug, ctx.now, findings)
     with db.writing(ctx.conn):
         events.record(

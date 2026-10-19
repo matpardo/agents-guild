@@ -409,3 +409,32 @@ class WebCtxBehaviorTests(unittest.TestCase):
 
     def test_only_high_contexts_count_as_context_high(self):
         self.assertIn("context high (1)", self._rendered("asks"))
+
+
+@unittest.skipIf(shutil.which("node") is None, "node not installed")
+class WebCloseBlockersBehaviorTests(unittest.TestCase):
+    def _parties_text(self, close_blockers):
+        quest = {"slug": "q1", "title": "Quest", "move_targets": [], "tasks": [], "close_blockers": close_blockers}
+        parties = [dict(_BOARD["parties"][0], quests=[quest])]
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "board.json"
+            path.write_text(json.dumps(dict(_BOARD, parties=parties)))
+            return subprocess.run(
+                ["node", str(_HARNESS), str(_APP_JS_PATH), str(path), "all", "all", "parties"],
+                capture_output=True, text=True, timeout=30, check=True,
+            ).stdout
+
+    def test_quest_with_blockers_shows_badge_and_both_lists(self):
+        blockers = {"own": ["OWN1"], "foreign": [{"text": "FOR1", "party": "zed"}]}
+        text = self._parties_text(blockers)
+        self.assertIn("can't close: drift", text)
+        self.assertIn("yours OWN1", text)
+        self.assertIn("other parties FOR1 (party zed)", text)
+
+    def test_quest_without_blockers_shows_no_badge(self):
+        self.assertNotIn("can't close", self._parties_text(None))
+
+    def test_empty_own_list_is_omitted(self):
+        text = self._parties_text({"own": [], "foreign": [{"text": "FOR1", "party": "zed"}]})
+        self.assertNotIn("yours", text)
+        self.assertIn("other parties", text)
