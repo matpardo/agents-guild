@@ -370,6 +370,19 @@ def epic_findings(conn, project, epic):
     return [finding for _, rule_findings in groups for finding in rule_findings]
 
 
+def epic_findings_by_owner(conn, project, epic, party):
+    own = []
+    foreign = []
+    for rule, rule_findings in _collect_epic_scoped(conn, project, (epic,), None):
+        for text in rule_findings:
+            owner = _finding_party(conn, rule, text)
+            if owner is None or owner == party:
+                own.append(text)
+                continue
+            foreign.append({"text": text, "party": owner})
+    return {"own": own, "foreign": foreign}
+
+
 def _render(groups):
     lines = []
     total = 0

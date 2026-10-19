@@ -481,6 +481,37 @@ def _open_task_rows(conn, quest_slug):
     ).fetchall()
 
 
+def _close_blockers(ctx, quest_row):
+    if quest_row["epic"] is None:
+        return None
+    if _open_task_rows(ctx.conn, quest_row["slug"]):
+        return None
+    has_tasks = ctx.conn.execute(
+        "SELECT 1 FROM quest_tasks WHERE quest = ? LIMIT 1", (quest_row["slug"],)
+    ).fetchone()
+    if has_tasks is None:
+        return None
+    split = drift_commands.epic_findings_by_owner(
+        ctx.conn, quest_row["project"], quest_row["epic"], quest_row["party"]
+    )
+    if not split["own"] and not split["foreign"]:
+        return None
+    return split
+
+
+def _close_blocker_lines(painter, blockers):
+    summary = "    can't close: drift ({} yours, {} other parties)".format(
+        len(blockers["own"]), len(blockers["foreign"])
+    )
+    lines = [painter.paint(summary, "red")]
+    lines.extend("      yours: {}".format(text) for text in blockers["own"])
+    lines.extend(
+        "      other parties: {} (party {})".format(item["text"], item["party"])
+        for item in blockers["foreign"]
+    )
+    return lines
+
+
 def _quest_lines(ctx, painter, quest_row, prs_by_task):
     title = sanitize.strip_control_sequences(quest_row["title"])
     lines = ["  {} — {}".format(painter.paint(quest_row["slug"], "bold"), title)]
@@ -494,6 +525,9 @@ def _quest_lines(ctx, painter, quest_row, prs_by_task):
         lines.extend(_task_lines(ctx, painter, task_row, task_prs))
     if queued:
         lines.append(painter.paint("    ○ queued: {}".format(", ".join(queued)), "dim"))
+    blockers = _close_blockers(ctx, quest_row)
+    if blockers is not None:
+        lines.extend(_close_blocker_lines(painter, blockers))
     return lines
 
 
@@ -905,6 +939,7 @@ def _quest_model(ctx, project, quest_row, prs_by_task, project_config):
         "slug": quest_row["slug"],
         "title": sanitize.strip_control_sequences(quest_row["title"]),
         "move_targets": _move_targets(ctx.conn, quest_row),
+        "close_blockers": _close_blockers(ctx, quest_row),
         "tasks": tasks,
     }
 

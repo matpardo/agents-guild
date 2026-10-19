@@ -224,6 +224,7 @@ var NO_SESSION_MESSAGE = "session token not loaded, reload the page";
       unused: "A Docker image that no container uses.",
     },
     ui: {
+      closeBlocked: "Every task is done but the epic drift gate blocks quest done; drift of other parties must be fixed by them, or pass --accept-drift.",
       openPrs: "Open PRs of this party against its cap (max_open_prs_per_party); PRs blocked externally are not counted.",
       projectOpenPrs: "Open PRs of the whole project against its cap (max_open_prs); PRs blocked externally are not counted.",
       capWait: "The cap is reached: merge the PR named before opening another.",
@@ -1738,10 +1739,50 @@ var NO_SESSION_MESSAGE = "session token not loaded, reload the page";
     return item;
   }
 
+  function renderCloseBlockerList(label, items) {
+    if (items.length === 0) {
+      return null;
+    }
+    var block = el("div");
+    block.className = "party-drift";
+    block.appendChild(textEl("h4", label));
+    var list = el("ul");
+    items.forEach(function (item) {
+      list.appendChild(textEl("li", item));
+    });
+    block.appendChild(list);
+    return block;
+  }
+
+  function renderCloseBlockers(blockers) {
+    var wrapper = el("div");
+    var badge = textEl("span", "can't close: drift");
+    badge.className = "status-badge badge-warn";
+    wrapper.appendChild(explain(badge, "ui", "closeBlocked"));
+    var sections = [
+      renderCloseBlockerList("yours", blockers.own),
+      renderCloseBlockerList(
+        "other parties",
+        blockers.foreign.map(function (item) {
+          return item.text + " (party " + item.party + ")";
+        })
+      ),
+    ];
+    sections.forEach(function (section) {
+      if (section) {
+        wrapper.appendChild(section);
+      }
+    });
+    return wrapper;
+  }
+
   function renderQuest(quest) {
     var article = el("div");
     article.className = "quest";
     article.appendChild(textEl("h4", quest.slug + " — " + quest.title));
+    if (quest.close_blockers) {
+      article.appendChild(renderCloseBlockers(quest.close_blockers));
+    }
     var list = el("ul");
     list.className = "task-list";
     appendAll(

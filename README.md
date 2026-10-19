@@ -337,8 +337,10 @@ Quests without tasks are allowed. For an epic quest it first refreshes the SDD
 snapshot of the project (as `guild sync --source sdd`, when the project has an `sdd`
 block); if the refresh fails it keeps the stored snapshot and the refusal says it may be
 stale. It then runs the drift check (the `guild drift` rules, scoped to that epic) and refuses with the
-findings listed; `--accept-drift` finishes anyway and records the findings. No-epic
-quests skip the gate. The `quest.done` event freezes an `achievement` snapshot
+findings listed, split into `yours:` and `other parties:` (each with its party);
+`--accept-drift` finishes anyway and records the findings. A quest whose tasks are all
+done but whose epic has drift shows `can't close: drift (N yours, M other parties)` with
+the same split on the text board and the web board. No-epic quests skip the gate. The `quest.done` event freezes an `achievement` snapshot
 (started_at, done_at, party, project, epic, title, tasks_done, tasks_blocked_events,
 sdd_tids, epic_progress, jira_cards_done, prs_merged, handoffs, sessions, asks_raised,
 asks_answered, median_answer_seconds, drift) because the epic, card and task
