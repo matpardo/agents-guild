@@ -276,6 +276,10 @@ _CREATE_STATEMENTS = (
     )
     """,
     """
+    CREATE INDEX IF NOT EXISTS idx_events_kind_project
+        ON events (kind, project, ts)
+    """,
+    """
     CREATE INDEX IF NOT EXISTS idx_resource_samples_item
         ON resource_samples (project, category, item, ts)
     """,

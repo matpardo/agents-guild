@@ -5,6 +5,7 @@
   var BOARD_URL = "/api/board";
   var SESSION_URL = "/api/session";
   var RESOURCES_URL = "/api/resources";
+  var COMPACT_URL = "/api/compact";
   var ANSWERED_ASKS_URL = "/api/asks/answered";
   var RESOURCE_ITEMS_PER_CATEGORY = 10;
   var NO_RESOURCES_MESSAGE = "no samples yet; run guild resources collect";
@@ -56,6 +57,8 @@ var NO_SESSION_MESSAGE = "session token not loaded, reload the page";
     raidBusy: {},
     partyHandoffStatuses: {},
     partyHandoffBusy: {},
+    compactStatus: "",
+    compactBusy: false,
     taskMoveStatuses: {},
     focusedAskId: null,
     focusStart: 0,
@@ -418,6 +421,22 @@ var NO_SESSION_MESSAGE = "session token not loaded, reload the page";
         state.partyHandoffStatuses[partyName] = errorMessage(result.body);
       }
       fetchBoard();
+    });
+  }
+
+  function postCompact() {
+    if (sessionToken === null) {
+      state.compactStatus = NO_SESSION_MESSAGE;
+      fetchResources();
+      return;
+    }
+    state.compactBusy = true;
+    state.compactStatus = "compacting...";
+    fetchResources();
+    sendPost(COMPACT_URL, {}).then(function (result) {
+      state.compactBusy = false;
+      state.compactStatus = result.ok ? "" : errorMessage(result.body);
+      fetchResources();
     });
   }
 
@@ -2285,6 +2304,17 @@ var NO_SESSION_MESSAGE = "session token not loaded, reload the page";
     return details;
   }
 
+  function renderCompactControls() {
+    var controls = el("p");
+    var button = textEl("button", "Compact db");
+    button.type = "button";
+    button.disabled = state.compactBusy;
+    button.addEventListener("click", postCompact);
+    controls.appendChild(button);
+    controls.appendChild(classedText("span", state.compactStatus, "ask-status"));
+    return controls;
+  }
+
   function renderResources(model) {
     var section = document.getElementById("resources");
     clear(section);
@@ -2297,6 +2327,7 @@ var NO_SESSION_MESSAGE = "session token not loaded, reload the page";
       section.appendChild(textEl("p", line));
     });
     section.appendChild(classedText("p", "sampled at " + model.machine.sampled_at, "muted"));
+    section.appendChild(renderCompactControls());
     section.appendChild(renderResourceProjects(model));
   }
 

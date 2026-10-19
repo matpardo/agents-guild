@@ -652,6 +652,13 @@ def _handle_seed(ctx, args):
     return 0
 
 
+def _handle_compact(ctx, args):
+    from guild.commands import compact as compact_commands
+
+    _print(compact_commands.run(ctx, args.dry_run))
+    return 0
+
+
 def _handle_rebuild(ctx, args):
     from guild.commands import rebuild as rebuild_commands
 
@@ -1065,6 +1072,11 @@ def build_parser():
     _add_timer_parser(subparsers, "sync-sdd-timer", "sync-sdd")
     _add_timer_parser(subparsers, "sync-tracker-timer", "sync-tracker")
     _add_timer_parser(subparsers, "resources-timer", "resources-collect")
+    _add_timer_parser(subparsers, "compact-timer", "compact")
+
+    compact = subparsers.add_parser("compact", help="back up the database, then drop duplicate sync events and old resource samples")
+    compact.add_argument("--dry-run", action="store_true", help="list what would be deleted; no backup, no changes")
+    compact.set_defaults(handler=_handle_compact)
 
     drift = subparsers.add_parser("drift", help="check SDD drift of epics")
     drift_scope = drift.add_mutually_exclusive_group()

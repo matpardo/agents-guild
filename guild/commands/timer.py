@@ -66,7 +66,21 @@ RESOURCES_COLLECT = _UnitSpec(
     "resources-timer",
     "Nice=19\nIOSchedulingClass=idle\n",
 )
-UNITS = {"sync-gh": SYNC_GH, "sync-sdd": SYNC_SDD, "sync-tracker": SYNC_TRACKER, "resources-collect": RESOURCES_COLLECT}
+COMPACT = _UnitSpec(
+    "guild-compact.service",
+    "guild-compact.timer",
+    "guild compact",
+    "compact",
+    "compact-timer",
+    "Nice=19\nIOSchedulingClass=idle\n",
+)
+UNITS = {
+    "sync-gh": SYNC_GH,
+    "sync-sdd": SYNC_SDD,
+    "sync-tracker": SYNC_TRACKER,
+    "resources-collect": RESOURCES_COLLECT,
+    "compact": COMPACT,
+}
 
 
 def run_systemctl(argv):
