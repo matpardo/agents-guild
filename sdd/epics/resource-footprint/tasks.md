@@ -123,3 +123,15 @@ updated: 2026-10-04
 **Acceptance:**
 - [x] The README documents the commands, categories, attribution rules, flags, report reading, limits, cost and storage.
 - [x] The SDD documents parse and agree with the spec.
+
+## T11 — Compact the database
+
+**Depends on:** T10
+**Status:** [x] done — #177
+
+**What:** `guild compact` backs up the database, drops repeated sync events while keeping the first and last of each run, prunes resource samples past `resource_retention_days`, and vacuums. It also has a timer and a web action.
+
+**Acceptance:**
+- [x] A rebuild after compacting yields the same projections and the same sync freshness.
+- [x] The backup is written before any delete, and a failed backup deletes nothing.
+- [x] Samples are kept when `resource_retention_days` is unset.
