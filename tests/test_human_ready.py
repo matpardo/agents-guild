@@ -59,6 +59,14 @@ class HeadCommitDateTests(unittest.TestCase):
     def test_none_without_commits(self):
         self.assertIsNone(human_ready.head_commit_date([], "a"))
 
+    def test_falls_back_to_the_latest_date_without_head_sha(self):
+        commits = [{"oid": "a", "committedDate": "2026-10-20T12:00:00Z"}]
+        self.assertEqual(human_ready.head_commit_date(commits, None), "2026-10-20T12:00:00Z")
+
+    def test_falls_back_when_the_head_commit_has_no_date(self):
+        commits = [{"oid": "a", "committedDate": "2026-10-20T12:00:00Z"}, {"oid": "b", "committedDate": None}]
+        self.assertEqual(human_ready.head_commit_date(commits, "b"), "2026-10-20T12:00:00Z")
+
 
 class CiLabelFlagTests(unittest.TestCase):
     def test_none_without_config(self):
@@ -118,6 +126,12 @@ class SyncFreshnessFactsTests(MergeQueueTestCase):
         self._view(labels=[])
         self.sync_gh("sess-1")
         self.assertEqual(self._row()["ci_label"], 0)
+
+    def test_counts_after_the_head_commit_picked_by_sha(self):
+        commits = [{"oid": "head", "committedDate": "2026-10-20T10:30:00Z"}, {"oid": "old", "committedDate": "2026-10-20T12:00:00Z"}]
+        self._view(headRefOid="head", commits=commits, reviews=[_review("bot", "2026-10-20T10:45:00Z")])
+        self.sync_gh("sess-1")
+        self.assertEqual(self._row()["comments_after_head"], 2)
 
     def test_no_commits_stores_null(self):
         self._view(commits=[])
