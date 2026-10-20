@@ -277,7 +277,8 @@ Deterministic, per-party ranking, evaluated in order:
    comes before the caller's own problems, healthy or not
    (`fixes a broken main — land it first`). A PR listed here is not listed
    again by the rules below.
-2. Own PR with failing checks, a merge conflict (`mergeable == CONFLICTING`),
+2. Own PR with failing checks (not when they are all billing failures,
+   `prs.checks_billing`), a merge conflict (`mergeable == CONFLICTING`),
    or unseen review comments (`review_comment_count >
    last_notified_comment_count`).
 3. Own PR carrying the manual `needs-ask-answer` flag that has an ask,
@@ -997,7 +998,9 @@ The same test runs per open PR with failing checks, over the check runs of its
 head commit (`prs.checks_billing`: 1 billing, 0 a real failure, empty when
 nothing is failing; it never moves the PR's last activity). Such a PR gets the
 label `checks blocked by billing (n)` and is no longer a `checks failing` fix
-reason in the queue nor a `guild pr ready-check` blocker: it shows as `ready
+reason in the queue, a `guild pr ready-check` blocker, a `checks-failing` party
+wait nor a `failing checks` line of `guild next`, and a draft with only such
+failures counts as a green draft: it shows as `ready
 (CI pending)` with the note. If the extra call
 fails, the PR counts as a real failure and the sync reports it.
 

@@ -28,10 +28,16 @@ def _review_kinds(pr):
     return [(kind, reason) for reason in reasons for prefix, kind in _REASON_KINDS if prefix in reason]
 
 
+def _real_failures(pr):
+    if pr["checks_billing"]:
+        return 0
+    return pr["checks_failing"]
+
+
 def _check_waits(pr):
     if pr["checks_pending"] > 0:
         return [_wait("checks-pending", pr["ref"], "checks pending ({})".format(pr["checks_pending"]))]
-    if pr["checks_failing"] > 0 and pr["lifecycle"] in _CHECKED_LIFECYCLES:
+    if _real_failures(pr) > 0 and pr["lifecycle"] in _CHECKED_LIFECYCLES:
         return [_wait("checks-failing", pr["ref"], "checks failing ({})".format(pr["checks_failing"]))]
     return []
 
@@ -39,7 +45,7 @@ def _check_waits(pr):
 def _draft_green(pr):
     return (
         pr["lifecycle"] in _DRAFT_LIFECYCLES
-        and pr["checks_failing"] == 0
+        and _real_failures(pr) == 0
         and pr["checks_pending"] == 0
         and pr["checks_passing"] > 0
     )
