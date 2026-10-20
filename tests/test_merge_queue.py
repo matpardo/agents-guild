@@ -18,6 +18,7 @@ def _pr(number, **overrides):
         "card": None,
         "lifecycle": "ready",
         "checks_failing": 0,
+        "checks_billing": 0,
         "checks_passing": 3,
         "checks_pending": 0,
         "mergeable": "MERGEABLE",
@@ -202,6 +203,16 @@ class StateTests(unittest.TestCase):
 
     def test_failing_checks(self):
         self.assertEqual(self._blocked_reasons(checks_failing=2), ["checks failing (2)"])
+
+    def test_billing_checks_show_a_label_and_do_not_block(self):
+        entry = self._entry(checks_failing=2, checks_billing=1)
+        self.assertEqual(entry["state"], "ready")
+        self.assertIn("checks blocked by billing (2)", entry["labels"])
+
+    def test_real_failures_keep_blocking_without_the_billing_flag(self):
+        entry = self._entry(checks_failing=2, checks_billing=0)
+        self.assertEqual(entry["blockers"], ["checks failing (2)"])
+        self.assertNotIn("checks blocked by billing (2)", entry["labels"])
 
     def test_merge_conflict(self):
         self.assertEqual(self._blocked_reasons(mergeable="CONFLICTING"), ["merge conflict"])

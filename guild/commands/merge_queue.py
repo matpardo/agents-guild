@@ -73,6 +73,7 @@ def _pr_record(conn, row):
         "card": row["card"],
         "lifecycle": row["lifecycle"],
         "checks_failing": row["checks_failing"] or 0,
+        "checks_billing": row["checks_billing"],
         "checks_passing": row["checks_passing"] or 0,
         "checks_pending": row["checks_pending"] or 0,
         "needs_ask_answer": pr_asks.needs_answer(row),

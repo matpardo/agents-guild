@@ -41,7 +41,7 @@ def review_reasons(mergeable, review_decision, unresolved_threads, merge_state):
 
 def fix_reasons(pr):
     reasons = []
-    if pr["checks_failing"]:
+    if pr["checks_failing"] and not pr["checks_billing"]:
         reasons.append("checks failing ({})".format(pr["checks_failing"]))
     reasons.extend(
         review_reasons(pr["mergeable"], pr["review_decision"], pr["unresolved_threads"], pr["merge_state"])
@@ -91,6 +91,8 @@ def _labels(pr):
         labels.append(_REVIEW_LABEL)
     if pr["blocked_external"] is not None:
         labels.append(_BLOCKED_EXTERNAL_LABEL)
+    if pr["checks_billing"] == 1:
+        labels.append("checks blocked by billing ({})".format(pr["checks_failing"]))
     return labels
 
 

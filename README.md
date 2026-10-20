@@ -979,6 +979,13 @@ billing` (still exit 1), and the push hook does not refuse: it warns `main of
 another cause keeps main red. Re-run main's last run once billing is fixed;
 the next sync clears the mark.
 
+The same test runs per open PR with failing checks, over the check runs of its
+head commit (`prs.checks_billing`: 1 billing, 0 a real failure, empty when
+nothing is failing; it never moves the PR's last activity). Such a PR gets the
+label `checks blocked by billing (n)` and is no longer a `checks failing` fix
+reason in the queue nor a `guild pr ready-check` blocker. If the extra call
+fails, the PR counts as a real failure and the sync reports it.
+
 **Data and freshness.** The order is computed from stored data, so it is only
 as fresh as the last `guild sync --source gh` (the header says `synced N min
 ago`, the latest sync among the PRs shown). For every open PR whose party is
@@ -1763,7 +1770,7 @@ All keys. The loader rejects a wrong type with a clear error for every key excep
 - `max_open_prs` (positive integer, absent: no cap): the same, counting the open tracked PRs of all parties of the project. Size it to review throughput, e.g. 10.
 - `max_open_prs_per_file` (positive integer, absent: no warning, no extra calls): when a `git push` diff touches a file that this many other open tracked PRs of the project already change, `pre-push` warns (never denies) naming the file and those PRs. Needs `guild sync --source gh`, which then stores the changed files of every open tracked PR (`pr_files`, one `gh pr view` call per PR). Exclusive `area:` claims stay for files that need exclusivity.
 - `finding_guard_threshold` (positive integer, absent: findings are recorded silently): when `guild finding record` has counted that many distinct PRs for one finding class, one notice to `project:<name>` asks to make the class an architecture guard.
-- `human_ready.ci_label` (non-empty string, absent: no label tracking): the label that makes the project run CI. `guild sync --source gh` stores per PR whether it carries the label (`prs.ci_label`) and how many comments or reviews by other authors came after the head commit (`prs.comments_after_head`). Stored facts only for now; later tasks of the `human-ready-prs` epic read them.
+- `human_ready.ci_label` (non-empty string, absent: no label tracking): the label that makes the project run CI. `guild sync --source gh` stores per PR whether it carries the label (`prs.ci_label`) and how many comments or reviews by other authors came after the head commit (`prs.comments_after_head`). It also stores `prs.checks_billing` for PRs with failing checks (see Main blocked by billing). Stored facts only for now; later tasks of the `human-ready-prs` epic read them.
 - `handoff_retention_days` (positive integer, at most 3650, absent: kept forever): days after a party closes at which `guild handoff prune` deletes its last handoff file.
 - `pii_patterns` (list of regexes, absent: only the built-in email pattern): checked against notice text, ask question/context, answer text and handoff `--in-flight`/`--learned` for the caller's project. A match rejects the command with an error that names the field, never the matched text.
 - `notify` (object, absent: nothing is run): `{"command": [<argv>...]}`, a non-empty list of non-empty strings run once per blocking wait (see "Session status"). `command` is the only allowed key.

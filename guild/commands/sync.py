@@ -111,6 +111,19 @@ def _open_pr_unresolved_threads(ctx, row, lifecycle, failures):
         return None
 
 
+def _pr_checks_billing(ctx, row, head_sha, failing, failures):
+    if failing == 0:
+        return None
+    if not head_sha:
+        return 0
+    try:
+        checks = github.branch_checks(ctx.cwd, row["repo"], head_sha)
+        return int(_billing_blocked(ctx, row["repo"], checks))
+    except github.GhCommandError as error:
+        failures.append("{}#{}: billing check failed: {}".format(row["repo"], row["number"], error))
+        return 0
+
+
 def _sync_pr(ctx, projects, row, failures):
     gh_data = github.pr_view(
         ctx.cwd,
@@ -145,6 +158,7 @@ def _sync_pr(ctx, projects, row, failures):
         "cross_repository": gh_data.get("isCrossRepository"),
         "title": gh_data.get("title"),
         "checks_failing": failing,
+        "checks_billing": _pr_checks_billing(ctx, row, gh_data.get("headRefOid"), failing, failures),
         "checks_passing": passing,
         "checks_pending": pending,
         "lifecycle": lifecycle,

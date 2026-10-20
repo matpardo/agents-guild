@@ -138,6 +138,19 @@ class OutputTests(QueueCliTestCase):
         self.assertIn("2. acme/app#6  gamma  qc/T01 [draft]", out)
         self.assertNotIn("next action", out)
 
+    def test_billing_blocked_checks_show_a_label_and_no_fix(self):
+        self.write_gh_fixture("view_acme-app_5", dict(_view(0, 2), headRefOid="head"))
+        self.write_gh_fixture(
+            "branch_checks_acme-app_head",
+            {"check_runs": [{"id": 11, "name": "a", "conclusion": "failure", "output": {"annotations_count": 1}}]},
+        )
+        self.write_gh_fixture("annotations_acme-app_11", [{"message": "recent account payments have failed"}])
+        code, out, err = self.sync_gh("sess-1")
+        self.assertEqual(code, 0, err)
+        code, out, err = self.queue(["--party", "gamma"], None)
+        self.assertIn("[checks blocked by billing (2)]", out)
+        self.assertNotIn("checks failing", out)
+
     def test_review_flag_shows_a_human_review_action_and_its_label(self):
         self.run_cli(["pr", "set", "acme/app#5", "--needs-human-pr-review"], "sess-3", self.repo_dir)
         code, out, err = self.queue(["--party", "gamma"], None)

@@ -157,3 +157,93 @@ class SyncFreshnessFactsTests(MergeQueueTestCase):
         code, out, err = self.run_cli(["rebuild"], None, None)
         self.assertEqual(code, 0, err)
         self.assertEqual(dict(self._row()), before)
+
+
+_BILLING_TEXT = "The job was not started because recent account payments have failed."
+_FAILING_ROLLUP = [{"conclusion": "FAILURE"}, {"conclusion": "FAILURE"}]
+
+
+def _run(run_id, conclusion, annotations):
+    return {"id": run_id, "name": "job{}".format(run_id), "conclusion": conclusion, "output": {"annotations_count": annotations}}
+
+
+class ChecksBillingTests(MergeQueueTestCase):
+    def setUp(self):
+        super().setUp()
+        self.start_party("alpha", "sess-1")
+        self.run_cli(["quest", "add", "demo", "--title", "Demo", "--no-epic"], "sess-1", self.repo_dir)
+        self.run_cli(["task", "add", "demo/T01", "--title", "First"], "sess-1", self.repo_dir)
+        self.track("sess-1", 1, "demo/T01", "ready")
+
+    def _view(self, **extra):
+        view = dict(OPEN_VIEW, statusCheckRollup=_FAILING_ROLLUP, headRefOid="head")
+        view.update(extra)
+        self.write_gh_fixture("view_acme-app_1", view)
+
+    def _runs(self, runs):
+        self.write_gh_fixture("branch_checks_acme-app_head", {"check_runs": runs})
+
+    def _annotate(self, run_id, message):
+        self.write_gh_fixture("annotations_acme-app_{}".format(run_id), [{"message": message}])
+
+    def _value(self):
+        return self.query("SELECT checks_billing FROM prs WHERE number = 1")[0]["checks_billing"]
+
+    def test_all_failing_runs_billing_stores_one(self):
+        self._view()
+        self._runs([_run(11, "failure", 1), _run(12, "failure", 1), _run(13, "success", 0)])
+        self._annotate(11, _BILLING_TEXT)
+        self._annotate(12, _BILLING_TEXT)
+        self.assertEqual(self.sync_gh("sess-1")[0], 0)
+        self.assertEqual(self._value(), 1)
+
+    def test_mixed_failures_store_zero(self):
+        self._view()
+        self._runs([_run(11, "failure", 1), _run(12, "failure", 1)])
+        self._annotate(11, _BILLING_TEXT)
+        self._annotate(12, "tests failed")
+        self.sync_gh("sess-1")
+        self.assertEqual(self._value(), 0)
+
+    def test_failing_run_without_annotations_stores_zero(self):
+        self._view()
+        self._runs([_run(11, "failure", 0)])
+        self.sync_gh("sess-1")
+        self.assertEqual(self._value(), 0)
+
+    def test_no_failing_checks_stores_null(self):
+        self._view(statusCheckRollup=[{"conclusion": "SUCCESS"}])
+        self.assertEqual(self.sync_gh("sess-1")[0], 0)
+        self.assertIsNone(self._value())
+
+    def test_missing_head_sha_stores_zero(self):
+        self._view(headRefOid=None)
+        self.assertEqual(self.sync_gh("sess-1")[0], 0)
+        self.assertEqual(self._value(), 0)
+
+    def test_gh_error_stores_zero_and_reports(self):
+        self._view()
+        code, out, err = self.sync_gh("sess-1")
+        self.assertNotEqual(code, 0)
+        self.assertIn("billing check failed", out + err)
+        self.assertEqual(self._value(), 0)
+
+    def test_flag_change_keeps_last_activity(self):
+        self._view()
+        self._runs([_run(11, "failure", 1)])
+        self._annotate(11, _BILLING_TEXT)
+        self.sync_gh("sess-1")
+        before = self.query("SELECT last_activity_at FROM prs WHERE number = 1")[0]["last_activity_at"]
+        self._annotate(11, "tests failed")
+        self.sync_gh("sess-1")
+        self.assertEqual(self._value(), 0)
+        self.assertEqual(self.query("SELECT last_activity_at FROM prs WHERE number = 1")[0]["last_activity_at"], before)
+
+    def test_rebuild_reproduces_the_column(self):
+        self._view()
+        self._runs([_run(11, "failure", 1)])
+        self._annotate(11, _BILLING_TEXT)
+        self.sync_gh("sess-1")
+        code, out, err = self.run_cli(["rebuild"], None, None)
+        self.assertEqual(code, 0, err)
+        self.assertEqual(self._value(), 1)
