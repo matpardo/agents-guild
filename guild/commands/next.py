@@ -73,7 +73,7 @@ def _tier0_candidates(conn, party):
 def _tier1_candidates(conn, party):
     results = []
     for row in _own_open_prs(conn, party):
-        if (row["checks_failing"] or 0) > 0:
+        if (row["checks_failing"] or 0) > 0 and not row["checks_billing"]:
             results.append((row, "failing checks ({} failing)".format(row["checks_failing"]), False))
             continue
         reasons = merge_queue.review_reasons(

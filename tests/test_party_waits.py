@@ -60,6 +60,26 @@ class PartyWaitsTests(MergeQueueTestCase):
         self.update_pr("checks_failing = 1, checks_pending = 0")
         self.assertEqual(self.waits(), [("checks-failing", "acme/app#1", "checks failing (1)")])
 
+    def test_failing_checks_with_real_classification_still_wait(self):
+        self.update_pr("checks_failing = 1, checks_pending = 0, checks_billing = 0")
+        self.assertEqual(self.kinds(), ["checks-failing"])
+
+    def test_billing_failing_checks_make_no_wait_in_any_checked_lifecycle(self):
+        self.update_pr("checks_failing = 1, checks_pending = 0, checks_billing = 1")
+        for lifecycle in ("draft", "converging", "ready"):
+            self.run_cli(["pr", "set", "acme/app#1", "--lifecycle", lifecycle], "sess-1", self.repo_dir)
+            self.assertNotIn("checks-failing", self.kinds(), lifecycle)
+
+    def test_draft_with_only_billing_failures_is_draft_green(self):
+        self.run_cli(["pr", "set", "acme/app#1", "--lifecycle", "draft"], "sess-1", self.repo_dir)
+        self.update_pr("checks_passing = 1, checks_failing = 1, checks_pending = 0, checks_billing = 1")
+        self.assertEqual(self.waits(), [("draft-green", "acme/app#1", "green draft: mark ready")])
+
+    def test_draft_with_real_failures_is_not_draft_green(self):
+        self.run_cli(["pr", "set", "acme/app#1", "--lifecycle", "draft"], "sess-1", self.repo_dir)
+        self.update_pr("checks_passing = 1, checks_failing = 1, checks_pending = 0, checks_billing = 0")
+        self.assertEqual(self.kinds(), ["checks-failing"])
+
     def test_failing_checks_with_pending_report_pending_only(self):
         self.update_pr("checks_failing = 1, checks_pending = 1")
         self.assertEqual(self.kinds(), ["checks-pending"])

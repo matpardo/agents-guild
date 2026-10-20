@@ -56,6 +56,39 @@ class Tier1Tests(NextTestCase):
         self.assertEqual(code, 0)
         self.assertIn("PR acme/app#1: failing checks (1 failing)", out)
 
+    def test_billing_failing_checks_not_reported(self):
+        self.write_gh_fixture(
+            "view_acme-app_1",
+            {
+                "state": "OPEN", "isDraft": True, "headRefName": "feature/x", "title": "t",
+                "statusCheckRollup": [{"conclusion": "FAILURE"}],
+            },
+        )
+        self.run_cli(["sync", "--source", "gh"], "sess-1", self.repo_dir)
+        conn = sqlite3.connect(str(self.data_home / "guild" / "guild.db"))
+        conn.execute("UPDATE prs SET checks_billing = 1 WHERE number = 1")
+        conn.commit()
+        conn.close()
+        code, out, err = self.run_cli(["next"], "sess-1", self.repo_dir)
+        self.assertEqual(code, 0)
+        self.assertNotIn("failing checks", out)
+
+    def test_real_failing_checks_classification_reported(self):
+        self.write_gh_fixture(
+            "view_acme-app_1",
+            {
+                "state": "OPEN", "isDraft": True, "headRefName": "feature/x", "title": "t",
+                "statusCheckRollup": [{"conclusion": "FAILURE"}],
+            },
+        )
+        self.run_cli(["sync", "--source", "gh"], "sess-1", self.repo_dir)
+        conn = sqlite3.connect(str(self.data_home / "guild" / "guild.db"))
+        conn.execute("UPDATE prs SET checks_billing = 0 WHERE number = 1")
+        conn.commit()
+        conn.close()
+        code, out, err = self.run_cli(["next"], "sess-1", self.repo_dir)
+        self.assertIn("PR acme/app#1: failing checks (1 failing)", out)
+
     def test_merge_conflict_reported(self):
         self.write_gh_fixture(
             "view_acme-app_1",
