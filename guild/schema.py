@@ -349,6 +349,8 @@ _COLUMN_MIGRATIONS = (
     ("prs", "comments_after_head", "INTEGER"),
     ("prs", "ci_label", "INTEGER"),
     ("prs", "checks_billing", "INTEGER"),
+    ("prs", "trace_valid", "INTEGER"),
+    ("prs", "trace_reason", "TEXT"),
     ("prs", "blocked_external", "TEXT"),
     ("prs", "head_sha", "TEXT"),
     ("notices", "unbound", "INTEGER"),

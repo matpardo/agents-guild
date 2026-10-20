@@ -13,6 +13,7 @@ _LIFECYCLE_ENTRY_KEYS = {"command", "timeout_minutes"}
 _LIFECYCLE_MAX_TIMEOUT_MINUTES = 1440
 _HANDOFF_RETENTION_MAX_DAYS = 3650
 _RESOURCE_RETENTION_MAX_DAYS = 3650
+_TRACE_VALIDATOR_MAX_TIMEOUT_SECONDS = 300
 
 
 def _validate_tracker_config(tracker_config):
@@ -100,6 +101,34 @@ def _validate_next_config(data):
         raise GuildError("project config 'next.stale_hours' must be a positive integer", 1)
 
 
+def _validate_trace_validator(validator):
+    if not isinstance(validator, dict):
+        raise GuildError("project config 'human_ready.trace_validator' must be an object", 1)
+    for key in validator:
+        if key not in ("command", "timeout_seconds"):
+            raise GuildError(
+                "project config 'human_ready.trace_validator' has unknown key '{}'".format(key), 1
+            )
+    command = validator.get("command")
+    if (
+        not isinstance(command, list)
+        or not command
+        or not all(isinstance(part, str) and part for part in command)
+    ):
+        raise GuildError(
+            "project config 'human_ready.trace_validator.command' must be a non-empty list of non-empty strings",
+            1,
+        )
+    timeout = validator.get("timeout_seconds")
+    if type(timeout) is not int or not 1 <= timeout <= _TRACE_VALIDATOR_MAX_TIMEOUT_SECONDS:
+        raise GuildError(
+            "project config 'human_ready.trace_validator.timeout_seconds' must be an integer from 1 to {}".format(
+                _TRACE_VALIDATOR_MAX_TIMEOUT_SECONDS
+            ),
+            1,
+        )
+
+
 def _validate_human_ready_config(data):
     human_ready = data.get("human_ready")
     if human_ready is None:
@@ -107,11 +136,13 @@ def _validate_human_ready_config(data):
     if not isinstance(human_ready, dict):
         raise GuildError("project config 'human_ready' must be an object", 1)
     for key in human_ready:
-        if key != "ci_label":
+        if key not in ("ci_label", "trace_validator"):
             raise GuildError("project config 'human_ready' has unknown key '{}'".format(key), 1)
     ci_label = human_ready.get("ci_label")
     if "ci_label" in human_ready and (not isinstance(ci_label, str) or not ci_label):
         raise GuildError("project config 'human_ready.ci_label' must be a non-empty string", 1)
+    if "trace_validator" in human_ready:
+        _validate_trace_validator(human_ready["trace_validator"])
 
 
 def _validate_handoff_retention_config(data):

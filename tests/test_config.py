@@ -37,6 +37,34 @@ class ValidateProjectConfigTests(unittest.TestCase):
             with self.assertRaises(GuildError, msg=bad):
                 config.validate_project_config(dict(_BASE_CONFIG, human_ready=bad))
 
+    def test_human_ready_accepts_trace_validator(self):
+        validator = {"command": ["check", "{head_sha}"], "timeout_seconds": 30}
+        config.validate_project_config(dict(_BASE_CONFIG, human_ready={"trace_validator": validator}))
+        config.validate_project_config(
+            dict(_BASE_CONFIG, human_ready={"ci_label": "run-ci", "trace_validator": validator})
+        )
+
+    def test_human_ready_rejects_bad_trace_validator(self):
+        good = {"command": ["check"], "timeout_seconds": 30}
+        bad_validators = [
+            ["x"],
+            {"timeout_seconds": 30},
+            {"command": ["check"]},
+            dict(good, extra=1),
+            dict(good, command=[]),
+            dict(good, command="x"),
+            dict(good, command=[""]),
+            dict(good, command=[1]),
+            dict(good, timeout_seconds=0),
+            dict(good, timeout_seconds=-1),
+            dict(good, timeout_seconds=True),
+            dict(good, timeout_seconds="30"),
+            dict(good, timeout_seconds=301),
+        ]
+        for bad in bad_validators:
+            with self.assertRaises(GuildError, msg=bad):
+                config.validate_project_config(dict(_BASE_CONFIG, human_ready={"trace_validator": bad}))
+
     def test_allows_unknown_keys(self):
         config.validate_project_config(
             {

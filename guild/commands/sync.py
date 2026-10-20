@@ -4,7 +4,7 @@ import re
 import sqlite3
 from pathlib import Path
 
-from guild import config, db, events, handoff_prune, human_ready, localbase, paths, timeutil
+from guild import config, db, events, handoff_prune, human_ready, localbase, paths, timeutil, trace_validator
 from guild.adapters import github, jira_acli, sdd
 from guild.commands import claim as claim_commands
 from guild.commands import drift as drift_commands
@@ -125,7 +125,17 @@ def _pr_checks_billing(ctx, row, head_sha, failing, failures):
         return 0
 
 
-def _sync_pr(ctx, projects, row, failures):
+def _trace_facts(project, row, gh_data, lifecycle, runner):
+    if project is None or "trace_validator" not in project.get("human_ready", {}) or lifecycle != "ready":
+        return None, None
+    cwd = lifecycle_commands.checkout_for(project, row["repo"])
+    if cwd is None:
+        return None, "no local clone of {}".format(row["repo"])
+    discussion = {"comments": gh_data.get("comments") or [], "reviews": gh_data.get("reviews") or []}
+    return trace_validator.check(project, cwd, row["number"], gh_data.get("headRefOid"), discussion, runner)
+
+
+def _sync_pr(ctx, projects, row, failures, lifecycle_runner):
     gh_data = github.pr_view(
         ctx.cwd,
         row["repo"],
@@ -140,18 +150,20 @@ def _sync_pr(ctx, projects, row, failures):
     lifecycle = _lifecycle_from_gh(row["lifecycle"], gh_data)
     review_comment_count = len(gh_data.get("comments") or []) + len(gh_data.get("reviews") or [])
     head_date = human_ready.head_commit_date(gh_data.get("commits") or [], gh_data.get("headRefOid"))
+    project = _project_for_repo(projects, row["repo"])
+    trace_valid, trace_reason = _trace_facts(project, row, gh_data, lifecycle, lifecycle_runner)
     payload = {
         "repo": row["repo"],
         "number": row["number"],
+        "trace_valid": trace_valid,
+        "trace_reason": trace_reason,
         "comments_after_head": human_ready.comments_after_head(
             head_date,
             (gh_data.get("author") or {}).get("login"),
             gh_data.get("comments") or [],
             gh_data.get("reviews") or [],
         ),
-        "ci_label": human_ready.ci_label_flag(
-            _project_for_repo(projects, row["repo"]), gh_data.get("labels") or []
-        ),
+        "ci_label": human_ready.ci_label_flag(project, gh_data.get("labels") or []),
         "gh_state": gh_data.get("state"),
         "gh_draft": gh_data.get("isDraft"),
         "branch": gh_data.get("headRefName"),
@@ -545,7 +557,7 @@ def _sync_gh(ctx, lifecycle_runner):
     triggers = []
     for row in rows:
         try:
-            lifecycle = _sync_pr(ctx, projects, row, failures)
+            lifecycle = _sync_pr(ctx, projects, row, failures, lifecycle_runner)
         except github.GhCommandError as error:
             failures.append("{}#{}: {}".format(row["repo"], row["number"], error))
             continue

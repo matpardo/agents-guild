@@ -1,11 +1,13 @@
 import http.client
 import json
+import sys
 import threading
 from pathlib import Path
 
 from guild import context, db, paths, timeutil, webserver
 from guild.commands import board as board_commands
-from tests.mq_fixtures import TASKS_MD, MergeQueueTestCase, diff_fixture
+from tests.lifecycle_fixtures import init_clone
+from tests.mq_fixtures import OPEN_VIEW, TASKS_MD, MergeQueueTestCase, diff_fixture
 
 _WEB_DIR = Path(__file__).resolve().parent.parent / "guild" / "web"
 _ES = "config/locales/es.yml"
@@ -96,6 +98,16 @@ class MergeQueueModelTests(MergeQueueModelTestCase):
         self.assertEqual(first["branch"], "feature/x")
         self.assertEqual((first["state"], first["action"], first["reasons"]), ("ready", "merge", []))
         self.assertEqual(first["unblocks"], 1)
+
+    def test_invalid_review_trace_reaches_human_missing(self):
+        init_clone(self.repo_dir, "acme/app")
+        command = [sys.executable, "-I", "-c", "print('no trace'); raise SystemExit(1)"]
+        self._set_project_config({"human_ready": {"trace_validator": {"command": command, "timeout_seconds": 30}}})
+        self.write_gh_fixture("view_acme-app_1", dict(OPEN_VIEW, headRefOid="e" * 40))
+        code, out, err = self.sync_gh("sess-1")
+        self.assertEqual(code, 0, err)
+        first = self.queues_by_scope()["raid:ci"]["queue"][0]
+        self.assertEqual((first["human_state"], first["human_missing"]), ("blocked", ["review trace invalid: no trace"]))
 
     def test_draft_entry_is_ready_with_a_label_and_a_promote_action(self):
         queue = self.queues_by_scope()["raid:ci"]["queue"]

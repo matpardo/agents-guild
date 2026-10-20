@@ -1,8 +1,11 @@
 import json
+import shutil
 import sqlite3
+import sys
 import unittest
 
 from guild import human_ready
+from tests.lifecycle_fixtures import init_clone
 from tests.mq_fixtures import OPEN_VIEW, MergeQueueTestCase
 
 _HEAD = "2026-10-20T10:00:00Z"
@@ -265,3 +268,121 @@ class ChecksBillingTests(MergeQueueTestCase):
         code, out, err = self.run_cli(["rebuild"], None, None)
         self.assertEqual(code, 0, err)
         self.assertEqual(self._value(), 1)
+
+
+_TRACE_SHA = "c" * 40
+_VALIDATOR_SCRIPT = """import pathlib, sys
+here = pathlib.Path(sys.argv[0]).parent
+(here / "ran").write_text(" ".join(sys.argv[1:3]))
+code = int((here / "code").read_text())
+print((here / "message").read_text())
+sys.exit(code)
+"""
+
+
+class TraceValidatorSyncTests(MergeQueueTestCase):
+    def setUp(self):
+        super().setUp()
+        init_clone(self.repo_dir, "acme/app")
+        self.scripts = self.root / "validator"
+        self.scripts.mkdir()
+        self.script = self.scripts / "validate.py"
+        self.script.write_text(_VALIDATOR_SCRIPT)
+        self._verdict(0, "")
+        self.start_party("alpha", "sess-1")
+        self.run_cli(["quest", "add", "demo", "--title", "Demo", "--no-epic"], "sess-1", self.repo_dir)
+        self.run_cli(["task", "add", "demo/T01", "--title", "First"], "sess-1", self.repo_dir)
+        self.track("sess-1", 1, "demo/T01", "ready")
+
+    def _verdict(self, code, message):
+        (self.scripts / "code").write_text(str(code))
+        (self.scripts / "message").write_text(message)
+
+    def _configure(self):
+        command = [sys.executable, "-I", str(self.script), "{head_sha}", "{pr}", "{comments_file}"]
+        self._set_project_config({"human_ready": {"trace_validator": {"command": command, "timeout_seconds": 30}}})
+
+    def _view(self, **extra):
+        self.write_gh_fixture("view_acme-app_1", dict(OPEN_VIEW, headRefOid=_TRACE_SHA, **extra))
+
+    def _trace(self):
+        row = self.query("SELECT trace_valid, trace_reason FROM prs WHERE number = 1")[0]
+        return row["trace_valid"], row["trace_reason"]
+
+    def _ran(self):
+        return (self.scripts / "ran").exists()
+
+    def test_ready_pr_stores_valid(self):
+        self._configure()
+        self._view()
+        self.assertEqual(self.sync_gh("sess-1")[0], 0)
+        self.assertEqual(self._trace(), (1, None))
+        self.assertEqual((self.scripts / "ran").read_text(), _TRACE_SHA + " 1")
+
+    def test_ready_pr_stores_invalid_with_reason(self):
+        self._configure()
+        self._verdict(1, "no trace for head")
+        self._view()
+        self.sync_gh("sess-1")
+        self.assertEqual(self._trace(), (0, "no trace for head"))
+
+    def test_draft_pr_is_not_validated(self):
+        self._configure()
+        self._view(isDraft=True)
+        self.sync_gh("sess-1")
+        self.assertEqual(self._trace(), (None, None))
+        self.assertFalse(self._ran())
+
+    def test_without_config_nothing_runs(self):
+        self._view()
+        self.sync_gh("sess-1")
+        self.assertEqual(self._trace(), (None, None))
+        self.assertFalse(self._ran())
+
+    def test_missing_clone_is_not_validated(self):
+        self._configure()
+        shutil.rmtree(str(self.repo_dir / ".git"))
+        self._view()
+        self.assertEqual(self.sync_gh("sess-1")[0], 0)
+        self.assertEqual(self._trace(), (None, "no local clone of acme/app"))
+        self.assertFalse(self._ran())
+
+    def test_validator_failure_does_not_fail_the_sync(self):
+        self._set_project_config(
+            {"human_ready": {"trace_validator": {"command": ["/nonexistent/validator"], "timeout_seconds": 30}}}
+        )
+        self._view()
+        code, out, err = self.sync_gh("sess-1")
+        self.assertEqual(code, 0, err)
+        self.assertEqual(self._trace(), (None, "validator could not start"))
+        self.assertEqual(self.query("SELECT lifecycle FROM prs WHERE number = 1")[0]["lifecycle"], "ready")
+
+    def test_trace_change_keeps_last_activity(self):
+        self._configure()
+        self._view()
+        self.sync_gh("sess-1")
+        before = self.query("SELECT last_activity_at FROM prs WHERE number = 1")[0]["last_activity_at"]
+        self._verdict(1, "stale")
+        self.sync_gh("sess-1")
+        self.assertEqual(self._trace(), (0, "stale"))
+        self.assertEqual(self.query("SELECT last_activity_at FROM prs WHERE number = 1")[0]["last_activity_at"], before)
+
+    def test_rebuild_reproduces_without_running_the_validator(self):
+        self._configure()
+        self._verdict(1, "no trace")
+        self._view()
+        self.sync_gh("sess-1")
+        self.script.unlink()
+        (self.scripts / "ran").unlink()
+        code, out, err = self.run_cli(["rebuild"], None, None)
+        self.assertEqual(code, 0, err)
+        self.assertEqual(self._trace(), (0, "no trace"))
+        self.assertFalse(self._ran())
+
+    def test_removing_the_config_clears_the_trace(self):
+        self._configure()
+        self._view()
+        self.sync_gh("sess-1")
+        self._set_project_config({"human_ready": {}})
+        self.sync_gh("sess-1")
+        self.assertEqual(self._trace(), (None, None))

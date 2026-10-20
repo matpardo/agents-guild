@@ -42,6 +42,8 @@ def _pr(number, **overrides):
         "blocked_external": None,
         "comments_after_head": None,
         "ci_label": None,
+        "trace_valid": None,
+        "trace_reason": None,
     }
     pr.update(overrides)
     return pr
@@ -521,6 +523,25 @@ class HumanReadyTests(unittest.TestCase):
     def test_ready_predecessor_does_not_hold_the_successor(self):
         entry = self._human_pair(_pr(1), _pr(2))
         self.assertEqual((entry["human_state"], entry["human_missing"]), ("ready", []))
+
+    def test_invalid_trace_blocks_while_the_queue_state_stays_ready(self):
+        entry = merge_queue.compute([_pr(1, trace_valid=0, trace_reason="no trace")], [], [])["queue"][0]
+        self.assertEqual(entry["state"], "ready")
+        self.assertEqual((entry["human_state"], entry["human_missing"]), ("blocked", ["review trace invalid: no trace"]))
+
+    def test_unvalidated_trace_waits_with_its_reason(self):
+        pr = _pr(1, trace_valid=None, trace_reason="validator timed out after 30s")
+        self.assertEqual(
+            _human([pr]), ("waiting", ["review trace not validated: validator timed out after 30s"])
+        )
+
+    def test_valid_and_unconfigured_traces_keep_ready(self):
+        self.assertEqual(_human([_pr(1, trace_valid=1, trace_reason=None)]), ("ready", []))
+        self.assertEqual(_human([_pr(1)]), ("ready", []))
+
+    def test_successor_of_an_invalid_trace_waits(self):
+        entry = self._human_pair(_pr(1, trace_valid=0, trace_reason="no trace"), _pr(2))
+        self.assertEqual((entry["human_state"], entry["human_missing"]), ("waiting", [f"waits on {_ref(1)}"]))
 
     def test_draft_predecessor_names_the_wait_once(self):
         entry = self._human_pair(_pr(1, lifecycle="draft"), _pr(2))

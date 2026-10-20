@@ -89,6 +89,8 @@ def _pr_record(conn, row):
         "unresolved_threads": row["unresolved_threads"],
         "comments_after_head": row["comments_after_head"],
         "ci_label": row["ci_label"],
+        "trace_valid": row["trace_valid"],
+        "trace_reason": row["trace_reason"],
         "merge_state": row["merge_state"],
         "additions": row["additions"] or 0,
         "deletions": row["deletions"] or 0,

@@ -1,11 +1,13 @@
 import json
 import sqlite3
+import sys
 import tempfile
 import unittest
 from pathlib import Path
 
 from guild import merge_queue as merge_queue_model
 from guild.commands import merge_queue
+from tests.lifecycle_fixtures import init_clone
 from tests.mq_fixtures import OPEN_VIEW, TASKS_MD, MergeQueueTestCase
 
 
@@ -87,6 +89,32 @@ class ReadyCheckTests(MergeQueueTestCase):
         code, out, err = self.check(3)
         self.assertEqual(code, 1)
         self.assertEqual(out.splitlines(), ["acme/app#3 blocked", "- 1 comment after head"])
+
+    def _configure_validator(self, code):
+        init_clone(self.repo_dir, "acme/app")
+        command = [sys.executable, "-I", "-c", code]
+        self._set_project_config({"human_ready": {"trace_validator": {"command": command, "timeout_seconds": 30}}})
+
+    def test_invalid_review_trace_is_listed_as_missing(self):
+        self._configure_validator("print('no trace'); raise SystemExit(1)")
+        self.track("sess-1", 3, "qa/T03", "ready")
+        self.write_gh_fixture("view_acme-app_3", dict(OPEN_VIEW, headRefOid="d" * 40))
+        self.sync_gh("sess-1")
+        code, out, err = self.check(3)
+        self.assertEqual(code, 1)
+        self.assertEqual(out.splitlines(), ["acme/app#3 blocked", "- review trace invalid: no trace"])
+
+    def test_unvalidated_review_trace_waits(self):
+        init_clone(self.repo_dir, "acme/app")
+        self._set_project_config(
+            {"human_ready": {"trace_validator": {"command": ["/nonexistent/validator"], "timeout_seconds": 30}}}
+        )
+        self.track("sess-1", 3, "qa/T03", "ready")
+        self.write_gh_fixture("view_acme-app_3", dict(OPEN_VIEW, headRefOid="d" * 40))
+        self.sync_gh("sess-1")
+        code, out, err = self.check(3)
+        self.assertEqual(code, 1)
+        self.assertEqual(out.splitlines(), ["acme/app#3 waiting", "- review trace not validated: validator could not start"])
 
     def test_no_checks_without_label_config_waits(self):
         self.track("sess-1", 3, "qa/T03", "ready")
