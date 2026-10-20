@@ -2,6 +2,7 @@ import hmac
 import json
 import re
 import secrets
+import sqlite3
 import sys
 from http import server as http_server
 from pathlib import Path
@@ -320,6 +321,8 @@ class BoardRequestHandler(http_server.BaseHTTPRequestHandler):
             message = run(payload)
         except GuildError as error:
             return self._write_json(422, {"error": error.message})
+        except sqlite3.Error as error:
+            return self._write_json(500, {"error": str(error)})
         return self._write_json(200, {"ok": True, "message": message})
 
     def _route_post(self):
