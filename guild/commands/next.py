@@ -184,6 +184,18 @@ def _cap_wait_line(ctx, party, project):
     return status["party_wait"] or status["project_wait"]
 
 
+def _wip_line(ctx, party):
+    queue = merge_queue_commands.load_scoped_queue(ctx.conn, {party})["queue"]
+    for entry in queue:
+        if entry["party"] != party or entry["external"] is not None or entry["lifecycle"] != "ready":
+            continue
+        if entry["human_state"] in merge_queue.HUMAN_READY_STATES:
+            continue
+        missing = entry["human_missing"] or entry["reasons"]
+        return "wait: {} is not human-ready ({}), get it merged first".format(entry["ref"], "; ".join(missing))
+    return None
+
+
 def claim_area(item):
     if item["epic"] is not None:
         return "task:{}/{}".format(item["epic"], item["tid"])
@@ -366,7 +378,7 @@ def _collect(ctx, party, project):
     next_task, disagreements, blocked = _evaluate_next_task(ctx.conn, ctx.now, project, party)
     if next_task is None:
         return candidates, None, None, disagreements, blocked
-    wait = _cap_wait_line(ctx, party, project)
+    wait = _cap_wait_line(ctx, party, project) or _wip_line(ctx, party)
     if wait is None:
         return candidates, next_task, None, disagreements, blocked
     return candidates, None, wait, disagreements, blocked
