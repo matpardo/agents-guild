@@ -330,7 +330,8 @@ def _pr_synced(conn, event):
         "UPDATE prs SET lifecycle = ?, gh_state = ?, gh_draft = ?, branch = ?, title = ?,"
         " checks_failing = ?, checks_passing = ?, checks_pending = ?, mergeable = ?, review_comment_count = ?,"
         " review_decision = ?, merge_state = ?, base_branch = ?, unresolved_threads = ?,"
-        " head_sha = ?, synced_at = ?, last_activity_at = ?, comments_after_head = ?, ci_label = ?"
+        " head_sha = ?, synced_at = ?, last_activity_at = ?, comments_after_head = ?, ci_label = ?,"
+        " checks_billing = ?"
         " WHERE repo = ? AND number = ?",
         (
             payload["lifecycle"],
@@ -352,6 +353,7 @@ def _pr_synced(conn, event):
             last_activity_at,
             payload.get("comments_after_head"),
             payload.get("ci_label"),
+            payload.get("checks_billing"),
             payload["repo"],
             payload["number"],
         ),

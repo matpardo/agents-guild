@@ -348,6 +348,7 @@ _COLUMN_MIGRATIONS = (
     ("prs", "fixes_flaky", "INTEGER"),
     ("prs", "comments_after_head", "INTEGER"),
     ("prs", "ci_label", "INTEGER"),
+    ("prs", "checks_billing", "INTEGER"),
     ("prs", "blocked_external", "TEXT"),
     ("prs", "head_sha", "TEXT"),
     ("notices", "unbound", "INTEGER"),

@@ -21,7 +21,7 @@ updated: 2026-10-20
 ## T02 — Billing-caused PR check failures are classified
 
 **Depends on:** T01
-**Status:** [ ] pending
+**Status:** [x] done — #180
 
 **What:** A PR whose checks fail while main is blocked by billing is classified as billing, not as a real failure.
 

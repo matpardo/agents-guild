@@ -35,6 +35,20 @@ class ReadyCheckTests(MergeQueueTestCase):
             ["acme/app#3 blocked", "- needs ask answer", "- checks failing (1)", "- merge conflict"],
         )
 
+    def test_billing_blocked_checks_are_not_a_blocker(self):
+        self.track("sess-1", 3, "qa/T03", "ready")
+        self.write_gh_fixture("view_acme-app_3", dict(
+            OPEN_VIEW, statusCheckRollup=[{"conclusion": "FAILURE"}], headRefOid="head"
+        ))
+        self.write_gh_fixture(
+            "branch_checks_acme-app_head",
+            {"check_runs": [{"id": 11, "name": "a", "conclusion": "failure", "output": {"annotations_count": 1}}]},
+        )
+        self.write_gh_fixture("annotations_acme-app_11", [{"message": "recent account payments have failed"}])
+        self.sync_gh("sess-1")
+        code, out, err = self.check(3)
+        self.assertEqual((code, out), (0, "acme/app#3 ready\n"))
+
     def test_shows_wait_on_predecessor(self):
         self.track("sess-1", 1, "qa/T01", "ready")
         self.track("sess-1", 2, "qa/T02", "draft")
