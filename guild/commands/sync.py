@@ -118,7 +118,8 @@ def _pr_checks_billing(ctx, row, head_sha, failing, failures):
         return 0
     try:
         checks = github.branch_checks(ctx.cwd, row["repo"], head_sha)
-        return int(_billing_blocked(ctx, row["repo"], checks))
+        failing_runs = [check for check in checks if check["conclusion"] in _FAILING_CONCLUSIONS]
+        return int(len(failing_runs) == failing and _billing_blocked(ctx, row["repo"], checks))
     except github.GhCommandError as error:
         failures.append("{}#{}: billing check failed: {}".format(row["repo"], row["number"], error))
         return 0

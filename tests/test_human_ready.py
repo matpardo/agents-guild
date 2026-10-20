@@ -211,6 +211,23 @@ class ChecksBillingTests(MergeQueueTestCase):
         self.sync_gh("sess-1")
         self.assertEqual(self._value(), 0)
 
+    def test_failing_status_context_beside_billing_run_stores_zero(self):
+        self._view(statusCheckRollup=[
+            {"__typename": "CheckRun", "conclusion": "FAILURE"},
+            {"__typename": "StatusContext", "state": "FAILURE"},
+        ])
+        self._runs([_run(11, "failure", 1)])
+        self._annotate(11, _BILLING_TEXT)
+        self.sync_gh("sess-1")
+        self.assertEqual(self._value(), 0)
+
+    def test_failing_runs_beyond_first_page_store_zero(self):
+        self._view()
+        self._runs([_run(11, "failure", 1)])
+        self._annotate(11, _BILLING_TEXT)
+        self.sync_gh("sess-1")
+        self.assertEqual(self._value(), 0)
+
     def test_no_failing_checks_stores_null(self):
         self._view(statusCheckRollup=[{"conclusion": "SUCCESS"}])
         self.assertEqual(self.sync_gh("sess-1")[0], 0)
@@ -241,8 +258,9 @@ class ChecksBillingTests(MergeQueueTestCase):
 
     def test_rebuild_reproduces_the_column(self):
         self._view()
-        self._runs([_run(11, "failure", 1)])
+        self._runs([_run(11, "failure", 1), _run(12, "failure", 1)])
         self._annotate(11, _BILLING_TEXT)
+        self._annotate(12, _BILLING_TEXT)
         self.sync_gh("sess-1")
         code, out, err = self.run_cli(["rebuild"], None, None)
         self.assertEqual(code, 0, err)

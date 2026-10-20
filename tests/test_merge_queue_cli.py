@@ -142,9 +142,15 @@ class OutputTests(QueueCliTestCase):
         self.write_gh_fixture("view_acme-app_5", dict(_view(0, 2), headRefOid="head"))
         self.write_gh_fixture(
             "branch_checks_acme-app_head",
-            {"check_runs": [{"id": 11, "name": "a", "conclusion": "failure", "output": {"annotations_count": 1}}]},
+            {
+                "check_runs": [
+                    {"id": 11, "name": "a", "conclusion": "failure", "output": {"annotations_count": 1}},
+                    {"id": 12, "name": "b", "conclusion": "failure", "output": {"annotations_count": 1}},
+                ]
+            },
         )
         self.write_gh_fixture("annotations_acme-app_11", [{"message": "recent account payments have failed"}])
+        self.write_gh_fixture("annotations_acme-app_12", [{"message": "recent account payments have failed"}])
         code, out, err = self.sync_gh("sess-1")
         self.assertEqual(code, 0, err)
         code, out, err = self.queue(["--party", "gamma"], None)
