@@ -357,7 +357,7 @@ def _human_missing(pr, billing):
     comments = pr["comments_after_head"]
     if comments:
         missing.append("{} comment{} after head".format(comments, "" if comments == 1 else "s"))
-    if _no_checks(pr) and not _ci_pending(pr, billing):
+    if _no_checks(pr) and not _is_draft(pr) and not _ci_pending(pr, billing):
         missing.append("no checks on head")
     return missing
 
@@ -398,6 +398,7 @@ def _ordered_entries(by_ref, order, edges, unblocks, billing_repos):
     predecessors = _predecessors(ordered_edges)
     blocked_refs = set()
     pending_refs = set()
+    unready_refs = set()
     external_reasons = {}
     entries = []
     for ref in order:
@@ -417,11 +418,25 @@ def _ordered_entries(by_ref, order, edges, unblocks, billing_repos):
             blocked_refs.add(ref)
         if state == _WAITING_STATE or (state == _READY_STATE and _is_draft(pr)):
             pending_refs.add(ref)
-        entries.append(_queue_entry(
+        entry = _queue_entry(
             pr, unblocks[ref], reasons, waits, _why(pr, state, position, ordered_edges), external,
             pr["repo"] in billing_repos,
-        ))
+        )
+        _hold_behind_unready(entry, before, unready_refs, reasons + waits)
+        if entry["human_state"] not in HUMAN_READY_STATES:
+            unready_refs.add(ref)
+        entries.append(entry)
     return entries
+
+
+def _hold_behind_unready(entry, before, unready_refs, stated):
+    held = ["waits on {}".format(first) for first in before if first in unready_refs]
+    held = [line for line in held if line not in stated]
+    if not held:
+        return
+    entry["human_missing"] = entry["human_missing"] + held
+    if entry["human_state"] in HUMAN_READY_STATES:
+        entry["human_state"] = _WAITING_STATE
 
 
 def _own_external(pr):

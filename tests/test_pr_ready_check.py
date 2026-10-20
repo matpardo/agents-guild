@@ -112,6 +112,24 @@ class ReadyCheckTests(MergeQueueTestCase):
         self.assertEqual(code, 1)
         self.assertEqual(out.splitlines(), ["acme/app#1 blocked", "- waits on task T02", "- wait: waits on acme/app#2"])
 
+    def test_successor_of_a_commented_predecessor_is_not_ready(self):
+        self.track("sess-1", 2, "qa/T02", "ready")
+        self.track("sess-1", 3, "qa/T03", "ready")
+        self.write_gh_fixture("view_acme-app_3", dict(
+            OPEN_VIEW,
+            author={"login": "me"},
+            commits=[{"committedDate": "2026-10-20T10:00:00Z"}],
+            comments=[{"author": {"login": "bot"}, "createdAt": "2026-10-20T11:00:00Z"}],
+        ))
+        self.sync_gh("sess-1")
+        code, out, err = self.run_cli(
+            ["merge-queue", "pin", "acme/app#3", "--before", "acme/app#2"], "sess-1", self.repo_dir
+        )
+        self.assertEqual(code, 0, err)
+        code, out, err = self.check(2)
+        self.assertEqual(code, 1)
+        self.assertEqual(out.splitlines(), ["acme/app#2 waiting", "- waits on acme/app#3"])
+
     def test_draft_gate_hints_promote_command(self):
         self.track("sess-1", 3, "qa/T03", "draft")
         code, out, err = self.check(3)
@@ -140,7 +158,7 @@ class ExternalReadyCheckTests(ReadyCheckTests):
 def _entry(lifecycle, labels):
     return {
         "lifecycle": lifecycle, "labels": labels, "number": 7, "repo": "acme/app",
-        "checks_billing": 0, "checks_failing": 0, "ci_label": None, "human_state": "ready",
+        "checks_billing": 0, "checks_failing": 0, "checks_passing": 0, "checks_pending": 0, "ci_label": None, "human_state": "ready",
     }
 
 
@@ -205,6 +223,10 @@ class NotesTests(unittest.TestCase):
 
     def ci_pending_entry(self):
         return dict(self.entry("ready", []), human_state=merge_queue_model.CI_PENDING_STATE, ci_label=0)
+
+    def test_missing_label_note_is_skipped_when_checks_exist(self):
+        entry = dict(self.ci_pending_entry(), checks_billing=1, checks_failing=2, checks_passing=0, checks_pending=0)
+        self.assertEqual(self.notes(entry, []), ["checks blocked by billing (2)"])
 
     def test_missing_label_note_names_the_configured_label(self):
         with tempfile.TemporaryDirectory() as tmp:

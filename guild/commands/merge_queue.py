@@ -531,7 +531,8 @@ def notes(projects_dir, entry, red_rows):
     ]
     if entry["checks_billing"] == 1:
         found.append("checks blocked by billing ({})".format(entry["checks_failing"]))
-    if entry["human_state"] == merge_queue.CI_PENDING_STATE and entry["ci_label"] == 0:
+    no_checks = entry["checks_failing"] == 0 and entry["checks_passing"] == 0 and entry["checks_pending"] == 0
+    if entry["human_state"] == merge_queue.CI_PENDING_STATE and entry["ci_label"] == 0 and no_checks:
         found.append(_ci_label_note(projects_dir, entry))
     return found
 

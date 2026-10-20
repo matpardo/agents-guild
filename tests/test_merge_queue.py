@@ -492,6 +492,40 @@ class HumanReadyTests(unittest.TestCase):
     def test_unresolved_threads_block_without_missing_items(self):
         self.assertEqual(_human([_pr(1, unresolved_threads=2)]), ("blocked", []))
 
+    def test_draft_without_checks_has_no_missing_items(self):
+        self.assertEqual(_human([_pr(1, lifecycle="draft", checks_passing=0)]), ("waiting", []))
+
+    def _human_pair(self, first, second):
+        result = merge_queue.compute([first, second], [_pin(first["number"], second["number"], "me")], [])
+        return _by_ref(result)[second["ref"]]
+
+    def test_successor_of_a_commented_predecessor_waits_while_the_queue_says_merge(self):
+        entry = self._human_pair(_pr(1, comments_after_head=2), _pr(2))
+        self.assertEqual((entry["state"], entry["action"]), ("ready", "merge"))
+        self.assertEqual((entry["human_state"], entry["human_missing"]), ("waiting", [f"waits on {_ref(1)}"]))
+
+    def test_successor_of_a_predecessor_without_checks_waits(self):
+        entry = self._human_pair(_pr(1, checks_passing=0, ci_label=1), _pr(2))
+        self.assertEqual((entry["human_state"], entry["human_missing"]), ("waiting", [f"waits on {_ref(1)}"]))
+
+    def test_grandchild_waits_behind_a_not_ready_grandparent(self):
+        prs = [_pr(1, comments_after_head=1), _pr(2), _pr(3)]
+        pins = [_pin(1, 2, "me"), _pin(2, 3, "me")]
+        entry = _by_ref(merge_queue.compute(prs, pins, []))[_ref(3)]
+        self.assertEqual((entry["human_state"], entry["human_missing"]), ("waiting", [f"waits on {_ref(2)}"]))
+
+    def test_ci_pending_predecessor_does_not_hold_the_successor(self):
+        entry = self._human_pair(_pr(1, checks_passing=0, ci_label=0), _pr(2))
+        self.assertEqual((entry["human_state"], entry["human_missing"]), ("ready", []))
+
+    def test_ready_predecessor_does_not_hold_the_successor(self):
+        entry = self._human_pair(_pr(1), _pr(2))
+        self.assertEqual((entry["human_state"], entry["human_missing"]), ("ready", []))
+
+    def test_draft_predecessor_names_the_wait_once(self):
+        entry = self._human_pair(_pr(1, lifecycle="draft"), _pr(2))
+        self.assertEqual(entry["human_missing"], [])
+
 
 class MainStatusTests(unittest.TestCase):
     def test_main_rows_are_returned_ordered_by_repo_and_source(self):

@@ -825,7 +825,10 @@ the head it is `ready (CI pending)` when the project's CI label is absent from
 the PR or main is blocked by billing, otherwise `waiting` with `- no checks on
 head`. It exits 0 only when the action is `merge`, the state is `ready` or
 `ready (CI pending)` and there is no gate, else 1. The merge queue order does
-not include human-ready: it only decides the sequence.
+not include human-ready: it only decides the sequence, and `guild
+merge-queue` with `--head` still order and name PRs by the queue state and
+action, while the human-ready state is shown by `ready-check` and the web pill.
+A PR behind a PR that is not human-ready is `waiting` (`- waits on <ref>`).
 
 **Lifecycle from GitHub.** Readiness is owned by `guild sync --source gh`, not
 by sessions. An open PR that is Ready for review on GitHub becomes `ready`
