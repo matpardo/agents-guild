@@ -11,7 +11,7 @@ updated: 2026-10-20
 ## T01 — Sync reads head freshness facts
 
 **Depends on:** —
-**Status:** [ ] pending
+**Status:** [x] done — #179
 
 **What:** `sync --source gh` stores per PR the number of comments and reviews by other authors after the head commit, and whether the project's CI label is on the PR.
 
@@ -43,7 +43,7 @@ updated: 2026-10-20
 **Depends on:** T03
 **Status:** [ ] pending
 
-**What:** `human_ready.trace_validator` runs a project command that validates the review trace for the head.
+**What:** `human_ready.trace_validator` runs a project command that validates the review trace for the head, and makes the project config accept `human_ready.trace_validator`, which is rejected today as an unknown key.
 
 **Acceptance:**
 - [ ] The validator runs as argv without a shell, with a timeout; `{head_sha}` is hex and `{pr}` an integer; the comments file is temporary 0600 and deleted.
@@ -87,3 +87,16 @@ updated: 2026-10-20
 
 **Acceptance:**
 - [ ] CLI and web list the same PRs in queue order.
+
+## T09 — guild ask wait and guild pr wait
+
+**Depends on:** T03
+**Status:** [ ] pending
+
+**What:** `guild ask wait <id>` blocks until the ask is answered or dismissed, and `guild pr wait <ref>` blocks until the PR gets a review event that matters for human-ready, its checks finish or it closes. Both read guild's own state after a sync, so a session can run them in the background to wake up on the change. Bot comments that review nothing (budget or trial notices) do not wake it up.
+
+**Acceptance:**
+- [ ] `ask wait` exits 0 on answered or dismissed and non-zero on an unknown id.
+- [ ] `pr wait` exits on a new comment or review by another author, on checks going from pending to done, and on close or merge; a notice-only bot comment does not end it.
+- [ ] GUILD.md tells sessions to start them in the background after `guild ask` and after marking a PR Ready.
+

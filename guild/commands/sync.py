@@ -125,8 +125,7 @@ def _sync_pr(ctx, projects, row, failures):
     failing, passing, pending = _count_checks(gh_data.get("statusCheckRollup"))
     lifecycle = _lifecycle_from_gh(row["lifecycle"], gh_data)
     review_comment_count = len(gh_data.get("comments") or []) + len(gh_data.get("reviews") or [])
-    commits = gh_data.get("commits") or []
-    head_date = commits[-1].get("committedDate") if commits else None
+    head_date = human_ready.head_commit_date(gh_data.get("commits") or [], gh_data.get("headRefOid"))
     payload = {
         "repo": row["repo"],
         "number": row["number"],

@@ -29,6 +29,10 @@ class CommentsAfterHeadTests(unittest.TestCase):
         reviews = [_review("bot", "2026-10-20T11:00:00Z"), _review("me", "2026-10-20T11:00:00Z")]
         self.assertEqual(human_ready.comments_after_head(_HEAD, "me", [], reviews), 1)
 
+    def test_pr_without_author_counts_everything(self):
+        comments = [_comment("me", "2026-10-20T11:00:00Z"), _comment("bot", "2026-10-20T11:00:00Z")]
+        self.assertEqual(human_ready.comments_after_head(_HEAD, None, comments, []), 2)
+
     def test_without_commits_is_unknown(self):
         self.assertIsNone(human_ready.comments_after_head(None, "me", [_comment("bot", _HEAD)], []))
 
@@ -37,12 +41,35 @@ class CommentsAfterHeadTests(unittest.TestCase):
         self.assertEqual(human_ready.comments_after_head(_HEAD, "me", comments, []), 1)
 
 
+class HeadCommitDateTests(unittest.TestCase):
+    def test_picks_the_commit_matching_the_head_even_if_unordered(self):
+        commits = [
+            {"oid": "b", "committedDate": "2026-10-20T10:00:00Z"},
+            {"oid": "a", "committedDate": "2026-10-20T12:00:00Z"},
+        ]
+        self.assertEqual(human_ready.head_commit_date(commits, "b"), "2026-10-20T10:00:00Z")
+
+    def test_falls_back_to_the_latest_date_when_head_is_missing(self):
+        commits = [
+            {"oid": "a", "committedDate": "2026-10-20T12:00:00Z"},
+            {"oid": "b", "committedDate": "2026-10-20T10:00:00Z"},
+        ]
+        self.assertEqual(human_ready.head_commit_date(commits, "zzz"), "2026-10-20T12:00:00Z")
+
+    def test_none_without_commits(self):
+        self.assertIsNone(human_ready.head_commit_date([], "a"))
+
+
 class CiLabelFlagTests(unittest.TestCase):
     def test_none_without_config(self):
         self.assertIsNone(human_ready.ci_label_flag({"name": "acme"}, [{"name": "run-ci"}]))
 
     def test_none_without_project(self):
         self.assertIsNone(human_ready.ci_label_flag(None, []))
+
+    def test_label_match_ignores_case(self):
+        project = {"human_ready": {"ci_label": "Run-CI"}}
+        self.assertEqual(human_ready.ci_label_flag(project, [{"name": "run-ci"}]), 1)
 
     def test_flag_follows_label_presence(self):
         project = {"human_ready": {"ci_label": "run-ci"}}
@@ -96,6 +123,17 @@ class SyncFreshnessFactsTests(MergeQueueTestCase):
         self._view(commits=[])
         self.sync_gh("sess-1")
         self.assertIsNone(self._row()["comments_after_head"])
+
+    def test_fact_only_changes_keep_last_activity(self):
+        self._set_ci_label()
+        self._view()
+        self.sync_gh("sess-1")
+        before = self.query("SELECT last_activity_at FROM prs WHERE number = 1")[0]["last_activity_at"]
+        self._view(labels=[], commits=[{"oid": "x", "committedDate": "2026-10-20T12:00:00Z"}])
+        self.sync_gh("sess-1")
+        after = self.query("SELECT last_activity_at, comments_after_head, ci_label FROM prs WHERE number = 1")[0]
+        self.assertEqual((after["comments_after_head"], after["ci_label"]), (0, 0))
+        self.assertEqual(after["last_activity_at"], before)
 
     def test_rebuild_reproduces_the_columns(self):
         self._set_ci_label()

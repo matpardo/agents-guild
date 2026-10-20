@@ -27,6 +27,7 @@ The dev leaves several parties working and comes back to many PRs in Ready with 
 - WIP 1 in `next`: no new tasks while an own Ready PR is not human-ready, not counting drafts nor PRs that only wait for the CI label.
 - `guild review-md`.
 - A "ready for you" section on the board (CLI and web).
+- `guild ask wait` and `guild pr wait`, so a waiting session wakes up when an ask is answered or a PR changes in a way that matters.
 - Minimal per-project config: `human_ready.ci_label`, `human_ready.trace_validator`.
 - `README.md` and `GUILD.md` change in every PR that changes behavior.
 
@@ -46,6 +47,10 @@ The dev leaves several parties working and comes back to many PRs in Ready with 
 - [ ] `next` gives no new task while an own Ready PR is not human-ready.
 - [ ] `review-md`, the board and the web list the same PRs, in queue order.
 - [ ] A project without config keeps its output, except for the new lines.
+
+## Limits
+
+- `committedDate` is the date of the commit, not of the push: a comment between a local commit and its push counts as later (an accepted false stale).
 
 ## Security and data
 
