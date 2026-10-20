@@ -71,7 +71,7 @@ updated: 2026-10-20
 ## T07 — guild review-md
 
 **Depends on:** T03
-**Status:** [ ] pending
+**Status:** [x] done — #185
 
 **What:** `guild review-md` lists the PRs ready for the person as markdown, in queue order.
 
