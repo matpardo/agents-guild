@@ -50,7 +50,7 @@ class TooltipCoverageTests(unittest.TestCase):
     def test_queue_states(self):
         self.assertCovers(
             "queueState",
-            [merge_queue._READY_STATE, merge_queue._WAITING_STATE, merge_queue._BLOCKED_STATE],
+            [merge_queue._READY_STATE, merge_queue.CI_PENDING_STATE, merge_queue._WAITING_STATE, merge_queue._BLOCKED_STATE],
         )
 
     def test_queue_actions(self):

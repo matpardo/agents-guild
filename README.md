@@ -814,10 +814,18 @@ none; a human terminal (or an unbound session) must pass a flag.
 
 **Ready check.** `guild pr ready-check <owner/repo>#<n>` computes the queue
 over every open tracked PR (cross-party stacks, pins and task dependencies
-count) and prints `<ref> <state>`, then one `- <blocker>` line per blocker,
-`- wait: <x>` per wait and `- gate: ...` per gate (draft with the
-`gh pr ready <n>` hint, needs human review, main red). It exits 0 only when
-the PR is a plain `merge` with no gate, else 1.
+count) and prints `<ref> <human state>` (`ready`, `ready (CI pending)`,
+`waiting` or `blocked`), then one `- <blocker>` line per blocker, one
+`- <missing>` line per missing item, `- wait: <x>` per wait, `- gate: ...` per
+gate (draft with the `gh pr ready <n>` hint, needs human review, main red) and
+`- note: <x>` per note. A PR is human-ready when it is not draft, has no
+unresolved thread, no comment or review by another author after the head
+commit (unknown counts as none) and green CI on the head. Without any check on
+the head it is `ready (CI pending)` when the project's CI label is absent from
+the PR or main is blocked by billing, otherwise `waiting` with `- no checks on
+head`. It exits 0 only when the action is `merge`, the state is `ready` or
+`ready (CI pending)` and there is no gate, else 1. The merge queue order does
+not include human-ready: it only decides the sequence.
 
 **Lifecycle from GitHub.** Readiness is owned by `guild sync --source gh`, not
 by sessions. An open PR that is Ready for review on GitHub becomes `ready`
@@ -973,8 +981,8 @@ failed`, stores the mark with `external` = `billing` (`main_status.external`,
 carried by the `main.status_synced` payload; events without it replay as an
 ordinary red). The queue then shows `0. MAIN BLOCKED (billing) <repo> →
 re-run main once billing is fixed` instead of `MAIN RED`, `guild board` and the
-web card show the same, `guild pr ready-check` lists the gate `main blocked:
-billing` (still exit 1), and the push hook does not refuse: it warns `main of
+web card show the same, `guild pr ready-check` lists the note `main blocked:
+billing` and does not fail on it, and the push hook does not refuse: it warns `main of
 <repo> is blocked by billing: CI will not run`. A single failing run with
 another cause keeps main red. Re-run main's last run once billing is fixed;
 the next sync clears the mark.
@@ -983,7 +991,8 @@ The same test runs per open PR with failing checks, over the check runs of its
 head commit (`prs.checks_billing`: 1 billing, 0 a real failure, empty when
 nothing is failing; it never moves the PR's last activity). Such a PR gets the
 label `checks blocked by billing (n)` and is no longer a `checks failing` fix
-reason in the queue nor a `guild pr ready-check` blocker. If the extra call
+reason in the queue nor a `guild pr ready-check` blocker: it shows as `ready
+(CI pending)` with the note. If the extra call
 fails, the PR counts as a real failure and the sync reports it.
 
 **Data and freshness.** The order is computed from stored data, so it is only
@@ -1140,8 +1149,8 @@ refs, how many refs still block it, a collapsible context, a `detail` control
 that loads `GET /api/asks/<id>`, and a collapsed "answered asks" section), active notices,
 the merge queue (one card per raid, plus one per party outside raids that has
 open PRs: a `MAIN RED` row per red main, then numbered PR links with their
-label pills (`draft`, `converging`), checks, party, task, state, `unblocks N`, the action and the
-`next action` marker, the reasons as pills, a collapsible ready-check detail per PR (blockers, waits and gates, the same content as `guild pr ready-check`) and a `next to merge: <ref> (<party>)` line, or `no PR ready to merge`, matching `guild merge-queue --head`; blocked PRs in place; read-only, the same order as
+label pills (`draft`, `converging`), the human-ready pill (`ready` or `ready (CI pending)`), checks, party, task, state, `unblocks N`, the action and the
+`next action` marker, the reasons as pills, a collapsible ready-check detail per PR (blockers, missing items, waits, gates and notes, the same content as `guild pr ready-check`) and a `next to merge: <ref> (<party>)` line, or `no PR ready to merge`, matching `guild merge-queue --head`; blocked PRs in place; read-only, the same order as
 `guild merge-queue`, with `synced N min ago`; the party filter keeps
 only that party's PRs and the raid filter only that raid's card; the model
 key is `merge_queues`), drift findings for the default scope (grouped by rule, one block per
@@ -1770,7 +1779,7 @@ All keys. The loader rejects a wrong type with a clear error for every key excep
 - `max_open_prs` (positive integer, absent: no cap): the same, counting the open tracked PRs of all parties of the project. Size it to review throughput, e.g. 10.
 - `max_open_prs_per_file` (positive integer, absent: no warning, no extra calls): when a `git push` diff touches a file that this many other open tracked PRs of the project already change, `pre-push` warns (never denies) naming the file and those PRs. Needs `guild sync --source gh`, which then stores the changed files of every open tracked PR (`pr_files`, one `gh pr view` call per PR). Exclusive `area:` claims stay for files that need exclusivity.
 - `finding_guard_threshold` (positive integer, absent: findings are recorded silently): when `guild finding record` has counted that many distinct PRs for one finding class, one notice to `project:<name>` asks to make the class an architecture guard.
-- `human_ready.ci_label` (non-empty string, absent: no label tracking): the label that makes the project run CI. `guild sync --source gh` stores per PR whether it carries the label (`prs.ci_label`) and how many comments or reviews by other authors came after the head commit (`prs.comments_after_head`). It also stores `prs.checks_billing` for PRs with failing checks (see Main blocked by billing). Stored facts only for now; later tasks of the `human-ready-prs` epic read them.
+- `human_ready.ci_label` (non-empty string, absent: no label tracking): the label that makes the project run CI. `guild sync --source gh` stores per PR whether it carries the label (`prs.ci_label`) and how many comments or reviews by other authors came after the head commit (`prs.comments_after_head`). It also stores `prs.checks_billing` for PRs with failing checks (see Main blocked by billing). `guild pr ready-check` and the web queue read these stored facts: a comment or review after the head makes the PR not ready, and a PR without checks whose label is absent is `ready (CI pending)` and names the label.
 - `handoff_retention_days` (positive integer, at most 3650, absent: kept forever): days after a party closes at which `guild handoff prune` deletes its last handoff file.
 - `pii_patterns` (list of regexes, absent: only the built-in email pattern): checked against notice text, ask question/context, answer text and handoff `--in-flight`/`--learned` for the caller's project. A match rejects the command with an error that names the field, never the matched text.
 - `notify` (object, absent: nothing is run): `{"command": [<argv>...]}`, a non-empty list of non-empty strings run once per blocking wait (see "Session status"). `command` is the only allowed key.

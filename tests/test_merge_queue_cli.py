@@ -342,10 +342,10 @@ class BillingBlockedMainTests(QueueCliTestCase):
         code, out, err = self.run_cli(["board", "--party", "gamma"], None, self.repo_dir)
         self.assertIn("  MAIN BLOCKED (billing): acme/app", out)
 
-    def test_ready_check_lists_the_gate_and_exits_one(self):
+    def test_ready_check_notes_billing_without_a_gate(self):
         code, out, err = self.run_cli(["pr", "ready-check", "acme/app#2"], None, self.repo_dir)
-        self.assertEqual(code, 1)
-        self.assertIn("main blocked: billing", out + err)
+        self.assertIn("- note: main blocked: billing", out.splitlines())
+        self.assertNotIn("- gate: main blocked: billing", out.splitlines())
 
 
 class SyncedLabelTests(QueueCliTestCase):

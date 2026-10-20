@@ -40,6 +40,8 @@ def _pr(number, **overrides):
         "fixes_main": False,
         "fixes_flaky": False,
         "blocked_external": None,
+        "comments_after_head": None,
+        "ci_label": None,
     }
     pr.update(overrides)
     return pr
@@ -423,12 +425,80 @@ class WaitingPropagationTests(unittest.TestCase):
         self.assertEqual([entry["next_action"] for entry in result["queue"]], [False, False])
 
 
+def _human(prs, main=()):
+    entry = merge_queue.compute(prs, [], list(main))["queue"][0]
+    return entry["human_state"], entry["human_missing"]
+
+
+def _billing_row(repo):
+    return {"repo": repo, "source": "gh", "reason": "x", "external": "billing"}
+
+
+class HumanReadyTests(unittest.TestCase):
+    def test_green_head_is_ready(self):
+        self.assertEqual(_human([_pr(1)]), ("ready", []))
+
+    def test_comment_after_head_blocks_while_the_queue_state_stays_ready(self):
+        entry = merge_queue.compute([_pr(1, comments_after_head=1)], [], [])["queue"][0]
+        self.assertEqual((entry["state"], entry["action"]), ("ready", "merge"))
+        self.assertEqual((entry["human_state"], entry["human_missing"]), ("blocked", ["1 comment after head"]))
+
+    def test_several_comments_are_pluralized(self):
+        self.assertEqual(_human([_pr(1, comments_after_head=2)]), ("blocked", ["2 comments after head"]))
+
+    def test_unknown_comments_have_no_effect(self):
+        self.assertEqual(_human([_pr(1, comments_after_head=None)]), ("ready", []))
+
+    def test_draft_waits(self):
+        self.assertEqual(_human([_pr(1, lifecycle="draft")]), ("waiting", []))
+
+    def test_no_checks_without_label_waits(self):
+        no_checks = {"checks_passing": 0}
+        entry = merge_queue.compute([_pr(1, **no_checks)], [], [])["queue"][0]
+        self.assertEqual(entry["why"], "ready, no checks")
+        self.assertEqual((entry["human_state"], entry["human_missing"]), ("waiting", ["no checks on head"]))
+
+    def test_no_checks_with_label_present_waits(self):
+        self.assertEqual(
+            _human([_pr(1, checks_passing=0, ci_label=1)]), ("waiting", ["no checks on head"])
+        )
+
+    def test_no_checks_with_label_absent_is_ci_pending(self):
+        self.assertEqual(_human([_pr(1, checks_passing=0, ci_label=0)]), (merge_queue.CI_PENDING_STATE, []))
+
+    def test_billing_classified_checks_are_ci_pending(self):
+        pr = _pr(1, checks_failing=2, checks_passing=0, checks_billing=1)
+        self.assertEqual(_human([pr]), (merge_queue.CI_PENDING_STATE, []))
+
+    def test_main_billing_of_the_same_repo_makes_no_checks_ci_pending(self):
+        pr = _pr(1, checks_passing=0)
+        self.assertEqual(_human([pr], [_billing_row("acme/app")]), (merge_queue.CI_PENDING_STATE, []))
+
+    def test_main_billing_of_another_repo_does_not(self):
+        pr = _pr(1, checks_passing=0)
+        self.assertEqual(_human([pr], [_billing_row("acme/web")]), ("waiting", ["no checks on head"]))
+
+    def test_green_head_stays_ready_under_billing_main(self):
+        self.assertEqual(_human([_pr(1)], [_billing_row("acme/app")]), ("ready", []))
+
+    def test_real_failure_stays_blocked_under_billing_main(self):
+        pr = _pr(1, checks_failing=1, checks_passing=0, checks_billing=0)
+        self.assertEqual(_human([pr], [_billing_row("acme/app")]), ("blocked", []))
+
+    def test_pending_checks_wait_even_when_the_label_is_absent(self):
+        pr = _pr(1, checks_passing=0, checks_pending=1, ci_label=0)
+        self.assertEqual(_human([pr]), ("waiting", []))
+
+    def test_unresolved_threads_block_without_missing_items(self):
+        self.assertEqual(_human([_pr(1, unresolved_threads=2)]), ("blocked", []))
+
+
 class MainStatusTests(unittest.TestCase):
     def test_main_rows_are_returned_ordered_by_repo_and_source(self):
         rows = [
-            {"repo": "acme/web", "source": "gh", "reason": "x"},
-            {"repo": "acme/app", "source": "manual", "reason": "y"},
-            {"repo": "acme/app", "source": "gh", "reason": "z"},
+            {"repo": "acme/web", "source": "gh", "reason": "x", "external": None},
+            {"repo": "acme/app", "source": "manual", "reason": "y", "external": None},
+            {"repo": "acme/app", "source": "gh", "reason": "z", "external": None},
         ]
         result = merge_queue.compute([_pr(1)], [], rows)
         self.assertEqual(

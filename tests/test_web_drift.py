@@ -131,6 +131,7 @@ class WebDriftBehaviorTests(unittest.TestCase):
             "branch": "b", "checks_failing": 0, "checks_passing": 1, "checks_pending": 0, "labels": [],
             "url": "https://example.test/1", "position": 1, "unblocks": 0, "state": "ready", "next_action": False,
             "action": "merge", "why": "ready", "reasons": [], "blockers": [], "waits": [], "gates": [],
+            "human_state": "ready", "human_missing": [], "notes": [],
         }
         queue = {"head": None, "scope": "party:a", "synced_at": "now", "synced_label": "synced now", "main": [], "queue": [entry]}
         board = dict(_BOARD, merge_queues=[queue])
@@ -153,7 +154,7 @@ class WebQueueBlockBehaviorTests(unittest.TestCase):
             "branch": "b", "checks_failing": 0, "checks_passing": 1, "checks_pending": 0, "labels": labels,
             "url": "https://example.test/1", "position": 1, "unblocks": 0,
             "state": "ready", "next_action": False, "action": "merge", "why": "ready", "reasons": [], "blockers": [],
-            "waits": [], "gates": [],
+            "waits": [], "gates": [], "human_state": "ready", "human_missing": [], "notes": [],
         }
         if blocked_external is not _MISSING:
             entry["blocked_external"] = blocked_external
@@ -165,6 +166,35 @@ class WebQueueBlockBehaviorTests(unittest.TestCase):
                 ["node", str(_HARNESS), str(_APP_JS_PATH), str(path), "all", "all", "merge-queues"],
                 capture_output=True, text=True, timeout=30, check=True,
             ).stdout
+
+    def _human_text(self, **overrides):
+        entry = {
+            "ref": "o/r#1", "repo": "o/r", "number": 1, "party": "a", "task": "q/T1", "lifecycle": "ready",
+            "branch": "b", "checks_failing": 0, "checks_passing": 0, "checks_pending": 0, "labels": [],
+            "url": "https://example.test/1", "position": 1, "unblocks": 0, "blocked_external": None,
+            "state": "ready", "next_action": False, "action": "merge", "why": "ready", "reasons": [], "blockers": [],
+            "waits": [], "gates": [], "human_state": "ready", "human_missing": [], "notes": [],
+        }
+        entry.update(overrides)
+        queue = {"head": None, "scope": "party:a", "synced_at": "now", "synced_label": "synced now", "main": [], "queue": [entry]}
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "board.json"
+            path.write_text(json.dumps(dict(_BOARD, merge_queues=[queue])))
+            return subprocess.run(
+                ["node", str(_HARNESS), str(_APP_JS_PATH), str(path), "all", "all", "merge-queues"],
+                capture_output=True, text=True, timeout=30, check=True,
+            ).stdout
+
+    def test_ci_pending_entry_shows_pill_and_note(self):
+        text = self._human_text(human_state="ready (CI pending)", notes=["CI label run-ci not on the PR"])
+        self.assertIn("b ready (CI pending) no checks", text)
+        self.assertIn("note: CI label run-ci not on the PR", text)
+
+    def test_blocked_human_state_lists_missing_without_pill(self):
+        text = self._human_text(human_state="blocked", human_missing=["1 comment after head"])
+        self.assertIn("1 comment after head", text)
+        self.assertNotIn("b ready no checks", text)
+        self.assertNotIn("(CI pending)", text)
 
     def test_entry_without_the_field_offers_block_manually(self):
         text = self._queue_text(_MISSING)
