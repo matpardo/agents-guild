@@ -51,7 +51,7 @@ updated: 2026-10-20
 ## T05 — Waits and next read the billing mode
 
 **Depends on:** T03
-**Status:** [ ] pending
+**Status:** [x] done — #183
 
 **What:** Party waits and `next` read the billing mode of main.
 
