@@ -146,7 +146,7 @@ class RetiredDispatchRebuildTests(GuildTestCase):
         self.assertEqual(code, 0, err)
         conn = db.connect(paths.db_path())
         self.assertFalse(set(_RETIRED_TABLES) & _table_names(conn))
-        replayed = [row["kind"] for row in conn.execute("SELECT kind FROM events WHERE kind LIKE 'dispatch.%'")]
+        replayed = [row["kind"] for row in conn.execute("SELECT kind FROM events WHERE kind LIKE 'dispatch.%' ORDER BY seq")]
         self.assertEqual(replayed, [kind for kind, _ in _RETIRED_EVENTS])
 
 

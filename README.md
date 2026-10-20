@@ -217,6 +217,8 @@ guild hook pre-compact     # records the context percentage before an automatic 
 
 guild seed <file.json>
 guild rebuild
+guild compact [--dry-run]   # back up the database, drop duplicate sync events and old resource samples
+guild compact-timer install --every <dur> | uninstall | print
 guild export --visibility guild
 ```
 
@@ -538,6 +540,41 @@ descending. With nothing to show it prints `no cost data`.
 Limitations: usage recorded before a session is bound is `unbound` and is not
 reattributed afterwards. There is no pricing: only token counts.
 
+### `guild compact`
+
+Every sync run appends a full snapshot to the event log even when nothing
+changed, so the database grows without bound. `guild compact` shrinks it
+without changing any projection.
+
+```
+guild compact [--dry-run]
+guild compact-timer install --every 1d | uninstall | print --every 1d
+```
+
+For each run of consecutive identical `epic.synced` events (per project and
+epic), `tracker.synced` events (per project) and `pr.synced` events (per PR,
+ignoring `synced_at`, and broken by any other `pr.*` event of that PR) it keeps
+the first and the last and deletes the ones in between, so `guild rebuild` gives
+the same projections and the board freshness (newest event per project and
+kind) does not move. With the global `resource_retention_days` set it also
+deletes `resources.sampled` events and the `resource_samples` and
+`resource_machine` rows older than that; without it the report says
+`resources kept: no resource_retention_days configured`.
+
+Before deleting anything it copies the database with SQLite's online backup to
+`$XDG_DATA_HOME/guild/guild.db.pre-compact`, overwriting the previous copy; if
+the copy fails nothing is deleted. After the deletes it records one local
+`db.compacted` event and runs `VACUUM`, which needs free disk of about the
+database size and fails with a clear error if the database is locked (the
+deletes are already committed then). `--dry-run` prints what would be deleted
+and neither backs up nor changes anything. A second `compact` while one runs
+prints `compact already running`. The timer service runs at `Nice=19` and
+`IOSchedulingClass=idle` (`guild-compact.service`, `guild-compact.timer`,
+same rules as `guild sync-timer`).
+
+Web: the "resources" section has a "Compact db" button, which posts to
+`POST /api/compact` and runs the same function.
+
 ### `guild resources`
 
 Shows per project how much disk the repo occupies and how it grew, so a repo
@@ -642,8 +679,9 @@ minutes on large trees, hence the timer's low priority. All measuring happens
 before a single write transaction records every event, so the database is
 never locked while `du` or Docker runs. Each collect adds one `resources.sampled`
 local event per project plus one for unattributed items, roughly 3 KB each; at
-the recommended cadence that is about 30-40 MB a year in total. Samples are not
-pruned: there is no retention policy yet.
+the recommended cadence that is about 30-40 MB a year in total. Samples are
+kept unless the global `resource_retention_days` is set, in which case
+`guild compact` deletes older ones (see "`guild compact`").
 
 Web: the board has a collapsible "resources" section built from
 `GET /api/resources[?project=<name>&since=<dur>]` (default `since=1d`), the
@@ -1647,7 +1685,7 @@ against path traversal, not an identity boundary.
 optional, written by hand:
 
 ```json
-{"handoff_margin": 10}
+{"handoff_margin": 10, "resource_retention_days": 90}
 ```
 
 - `handoff_margin` (integer 0-100): when set and an automatic compaction has
@@ -1660,6 +1698,9 @@ optional, written by hand:
   those settings one compaction corrects it: until then a lower old point
   hands off early, and a higher old one is caught by the nudge that follows
   every compaction.
+
+- `resource_retention_days` (positive integer, at most 3650, absent: kept
+  forever): age in days past which `guild compact` deletes resource samples.
 
 Whatever the source, a session's threshold is never below its starting
 percentage plus 5 (the first nonzero `guild statusline --ctx` reading, kept in

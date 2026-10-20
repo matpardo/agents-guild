@@ -12,6 +12,7 @@ _LIFECYCLE_EVENTS = ("on_pr_merged", "on_pr_closed")
 _LIFECYCLE_ENTRY_KEYS = {"command", "timeout_minutes"}
 _LIFECYCLE_MAX_TIMEOUT_MINUTES = 1440
 _HANDOFF_RETENTION_MAX_DAYS = 3650
+_RESOURCE_RETENTION_MAX_DAYS = 3650
 
 
 def _validate_tracker_config(tracker_config):
@@ -199,6 +200,18 @@ def validate_project_config(data):
     _validate_max_open_prs_config(data, "finding_guard_threshold")
 
 
+def _validate_resource_retention_config(data):
+    days = data.get("resource_retention_days")
+    if days is None:
+        return
+    if isinstance(days, bool) or not isinstance(days, int) or days <= 0:
+        raise GuildError("global config 'resource_retention_days' must be a positive integer", 1)
+    if days > _RESOURCE_RETENTION_MAX_DAYS:
+        raise GuildError(
+            "global config 'resource_retention_days' must be at most {}".format(_RESOURCE_RETENTION_MAX_DAYS), 1
+        )
+
+
 def load_global(config_file):
     if not config_file.is_file():
         return {}
@@ -211,6 +224,7 @@ def load_global(config_file):
     margin = data.get("handoff_margin")
     if margin is not None and (isinstance(margin, bool) or not isinstance(margin, int) or not 0 <= margin <= 100):
         raise GuildError("global config 'handoff_margin' must be an integer from 0 to 100", 1)
+    _validate_resource_retention_config(data)
     return data
 
 

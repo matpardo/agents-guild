@@ -1,7 +1,7 @@
 import json
 from datetime import timedelta
 
-from guild import config, events, merge_queue, pr_asks, resolve, timeutil
+from guild import config, merge_queue, pr_asks, resolve, timeutil
 from guild.commands import drift as drift_commands
 from guild.commands import merge_queue as merge_queue_commands
 from guild.commands import pr as pr_commands
@@ -23,23 +23,20 @@ def _own_open_prs(conn, party):
 
 
 def _last_pr_set_ts(conn, repo, number):
-    last = None
-    for event in events.all_events(conn):
-        if event["kind"] != "pr.set":
-            continue
-        payload = event["payload"]
-        if payload["repo"] == repo and payload["number"] == number:
-            last = event["ts"]
-    return last
+    row = conn.execute(
+        "SELECT MAX(ts) AS ts FROM events WHERE kind = 'pr.set'"
+        " AND json_extract(payload, '$.repo') = ? AND json_extract(payload, '$.number') = ?",
+        (repo, number),
+    ).fetchone()
+    return row["ts"]
 
 
 def _ask_answered_ts(conn, ask_id):
-    last = None
-    for event in events.all_events(conn):
-        if event["kind"] != "ask.answered" or event["payload"]["id"] != ask_id:
-            continue
-        last = event["ts"]
-    return last
+    row = conn.execute(
+        "SELECT MAX(ts) AS ts FROM events WHERE kind = 'ask.answered' AND json_extract(payload, '$.id') = ?",
+        (ask_id,),
+    ).fetchone()
+    return row["ts"]
 
 
 def _latest_answered_ask_for_ref(conn, ref):

@@ -601,6 +601,10 @@ def _lifecycle_ran(conn, event):
     return
 
 
+def _db_compacted(conn, event):
+    return
+
+
 def _resources_sampled(conn, event):
     payload = event["payload"]
     project = event["project"] or ""
@@ -691,6 +695,7 @@ _REDUCERS = {
     "cost.sampled": _cost_sampled,
     "lifecycle.ran": _lifecycle_ran,
     "resources.sampled": _resources_sampled,
+    "db.compacted": _db_compacted,
 }
 
 

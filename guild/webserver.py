@@ -10,6 +10,7 @@ from urllib.parse import parse_qs, urlsplit
 from guild import ask_detail, context, db, origin, paths, timeutil
 from guild.commands import ask as ask_commands
 from guild.commands import board as board_commands
+from guild.commands import compact as compact_commands
 from guild.commands import handoff as handoff_commands
 from guild.commands import history as history_commands
 from guild.commands import memory as memory_commands
@@ -39,6 +40,7 @@ _RAID_ACTION_RE = re.compile(r"^/api/raids/([^/]+)/(pause|resume)$")
 _MEMORY_ACTION_RE = re.compile(r"^/api/memory/([^/]+)/([1-9][0-9]*)/rm$")
 _TASK_MOVE_RE = re.compile(r"^/api/quests/([^/]+)/tasks/([^/]+)/move$")
 _PARTY_HANDOFF_RE = re.compile(r"^/api/parties/([^/]+)/hand-off$")
+_COMPACT_PATH = "/api/compact"
 _SEEN_ALL_PATH = "/api/notices/seen-all"
 _NOTICE_CREATE_PATH = "/api/notices/create"
 _ANSWERED_ASKS_PATH = "/api/asks/answered"
@@ -180,6 +182,14 @@ def _run_party_handoff_action(party):
     ctx = _action_context()
     try:
         return handoff_commands.run_for_party(ctx, party)
+    finally:
+        ctx.conn.close()
+
+
+def _run_compact():
+    ctx = _action_context()
+    try:
+        return compact_commands.run(ctx, False)
     finally:
         ctx.conn.close()
 
@@ -331,6 +341,8 @@ class BoardRequestHandler(http_server.BaseHTTPRequestHandler):
             return self._post_action(action, lambda payload: _run_raid_action(action, raid_name))
         if path == _NOTICE_CREATE_PATH:
             return self._post_action("create", _run_notice_create)
+        if path == _COMPACT_PATH:
+            return self._post_action("compact", lambda payload: _run_compact())
         if path == _SEEN_ALL_PATH:
             return self._post_action("seen-all", lambda payload: _run_seen_all())
         memory_match = _MEMORY_ACTION_RE.match(path)
