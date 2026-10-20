@@ -1,7 +1,7 @@
 import json
 from datetime import timedelta
 
-from guild import config, merge_queue, pr_asks, resolve, timeutil
+from guild import config, merge_queue, pr_asks, resolve, sanitize, timeutil
 from guild.commands import drift as drift_commands
 from guild.commands import merge_queue as merge_queue_commands
 from guild.commands import pr as pr_commands
@@ -184,15 +184,26 @@ def _cap_wait_line(ctx, party, project):
     return status["party_wait"] or status["project_wait"]
 
 
+def _unfixable_no_checks(entry):
+    return (
+        entry["ci_label"] is None
+        and entry["human_missing"] == [merge_queue.NO_CHECKS_MISSING]
+        and not entry["blockers"]
+        and not entry["waits"]
+    )
+
+
 def _wip_line(ctx, party):
+    if not any(row["lifecycle"] == "ready" for row in _own_open_prs(ctx.conn, party)):
+        return None
     queue = merge_queue_commands.load_scoped_queue(ctx.conn, {party})["queue"]
     for entry in queue:
-        if entry["party"] != party or entry["external"] is not None or entry["lifecycle"] != "ready":
+        if entry["external"] is not None or entry["lifecycle"] != "ready":
             continue
-        if entry["human_state"] in merge_queue.HUMAN_READY_STATES:
+        if entry["human_state"] in merge_queue.HUMAN_READY_STATES or _unfixable_no_checks(entry):
             continue
-        missing = entry["human_missing"] or entry["reasons"]
-        return "wait: {} is not human-ready ({}), get it merged first".format(entry["ref"], "; ".join(missing))
+        missing = sanitize.strip_control_sequences("; ".join(entry["human_missing"] or entry["reasons"]))
+        return "wait: {} is not human-ready ({}), resolve it first".format(entry["ref"], missing)
     return None
 
 
@@ -388,8 +399,8 @@ def has_work(ctx, binding):
     party = binding["party"]
     if raid_commands.paused_member_raids(ctx.conn, ctx.now, party):
         return False
-    candidates, next_task, _, _, _ = _collect(ctx, party, binding["project"])
-    return bool(candidates or next_task is not None)
+    candidates, next_task, wait, _, _ = _collect(ctx, party, binding["project"])
+    return bool(candidates or next_task is not None or wait is not None)
 
 
 def next_task_item(ctx, binding):

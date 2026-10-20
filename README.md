@@ -304,9 +304,11 @@ Deterministic, per-party ranking, evaluated in order:
    After the caps, WIP 1: while an own tracked PR that is Ready for review is
    not human-ready (its `human` state in the merge queue is `waiting` or
    `blocked`), no new task is offered; the line is `wait: <ref> is not
-   human-ready (<what is missing>), get it merged first`. Drafts, `converging`
-   PRs, PRs blocked manually and PRs that only wait for the CI label
-   (`ready (CI pending)`) do not count. No config key.
+   human-ready (<what is missing>), resolve it first`. Drafts, `converging`
+   PRs, PRs blocked manually, PRs that only wait for the CI label
+   (`ready (CI pending)`) and PRs in a project without `human_ready.ci_label`
+   whose only missing item is `no checks on head` do not count. A party held
+   this way still counts as having work (`stopped-with-work`, `queued`). No config key.
    Whether a new task would touch files an open PR already changes is not
    checked: a task's files are unknown before work starts.
 7. Next queued task of the caller's active quests, ordered by the observed
