@@ -102,6 +102,32 @@ class CommentsFileTests(unittest.TestCase):
             _check(runner)
         self.assertFalse(runner.calls[0]["path"].exists())
 
+    def test_runner_value_error_is_not_validated_and_file_deleted(self):
+        runner = FakeRunner(None, error=ValueError("embedded null byte"))
+        self.assertEqual(_check(runner), (None, "validator could not start"))
+        self.assertFalse(runner.calls[0]["path"].exists())
+
+    def test_unserializable_discussion_is_not_validated_and_file_deleted(self):
+        runner = FakeRunner(_result(0, ""))
+        created = []
+        original = trace_validator.tempfile.mkstemp
+
+        def recording(**kwargs):
+            handle, path = original(**kwargs)
+            created.append(Path(path))
+            return handle, path
+
+        trace_validator.tempfile.mkstemp = recording
+        try:
+            verdict = trace_validator.check(
+                _project(["v", "{comments_file}"], 30), "/repo", 7, _SHA, {"comments": [object()]}, runner
+            )
+        finally:
+            trace_validator.tempfile.mkstemp = original
+        self.assertEqual(verdict, (None, "validator could not start"))
+        self.assertEqual(runner.calls, [])
+        self.assertFalse(created[0].exists())
+
     def test_mkstemp_failure_is_not_validated(self):
         runner = FakeRunner(_result(0, ""))
         original = trace_validator.tempfile.mkstemp

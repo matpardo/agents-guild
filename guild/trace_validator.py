@@ -63,5 +63,7 @@ def check(project, cwd, number, head_sha, discussion, runner):
         values = {"head_sha": head_sha, "pr": str(number), "comments_file": path}
         result = runner(_argv(validator["command"], values), cwd, validator["timeout_seconds"])
         return _verdict(project, result, validator["timeout_seconds"])
+    except (ValueError, TypeError):
+        return None, "validator could not start"
     finally:
         Path(path).unlink(missing_ok=True)

@@ -55,6 +55,7 @@ class ValidateProjectConfigTests(unittest.TestCase):
             dict(good, command="x"),
             dict(good, command=[""]),
             dict(good, command=[1]),
+            dict(good, command=["check", "a\x00b"]),
             dict(good, timeout_seconds=0),
             dict(good, timeout_seconds=-1),
             dict(good, timeout_seconds=True),

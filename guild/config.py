@@ -119,6 +119,8 @@ def _validate_trace_validator(validator):
             "project config 'human_ready.trace_validator.command' must be a non-empty list of non-empty strings",
             1,
         )
+    if any("\x00" in part for part in command):
+        raise GuildError("project config 'human_ready.trace_validator.command' must not contain NUL bytes", 1)
     timeout = validator.get("timeout_seconds")
     if type(timeout) is not int or not 1 <= timeout <= _TRACE_VALIDATOR_MAX_TIMEOUT_SECONDS:
         raise GuildError(
