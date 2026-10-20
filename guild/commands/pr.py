@@ -1,4 +1,4 @@
-from guild import config, db, events, identity, merge_queue, refs
+from guild import config, db, events, identity, merge_queue, refs, sanitize
 from guild.adapters import github
 from guild.commands import main_status as main_status_commands
 from guild.commands import merge_queue as merge_queue_commands
@@ -206,9 +206,12 @@ def ready_check(ctx, ref):
     ref_text = "{}#{}".format(repo, number)
     entry = next(entry for entry in queue if entry["ref"] == ref_text)
     gates = merge_queue_commands.gates(entry, red_rows)
-    lines = ["{} {}".format(ref_text, entry["state"])]
+    lines = ["{} {}".format(ref_text, entry["human_state"])]
     lines.extend("- {}".format(blocker) for blocker in entry["blockers"])
+    lines.extend("- {}".format(text) for text in entry["human_missing"])
     lines.extend("- wait: {}".format(wait) for wait in entry["waits"])
     lines.extend("- gate: {}".format(gate) for gate in gates)
-    exit_code = 0 if entry["action"] == "merge" and not gates else 1
-    return lines, exit_code
+    lines.extend("- note: {}".format(note) for note in merge_queue_commands.notes(ctx.projects_dir, entry, red_rows))
+    ready = entry["action"] == "merge" and entry["human_state"] in merge_queue.HUMAN_READY_STATES
+    exit_code = 0 if ready and not gates else 1
+    return [sanitize.strip_control_sequences(line) for line in lines], exit_code

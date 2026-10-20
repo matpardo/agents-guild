@@ -149,6 +149,7 @@ var NO_SESSION_MESSAGE = "session token not loaded, reload the page";
     },
     queueState: {
       ready: "Nothing stands in the way of this PR.",
+      "ready (CI pending)": "Ready for you, but CI has not run on the head (billing or the CI label); check CI before merging.",
       waiting: "The PR is waiting on checks that are still running.",
       blocked: "Something must be fixed before this PR can merge.",
     },
@@ -1436,13 +1437,13 @@ var NO_SESSION_MESSAGE = "session token not loaded, reload the page";
   }
 
   function isReadyToMerge(entry) {
-    return entry.state === "ready" && entry.labels.indexOf("draft") === -1 && entry.labels.indexOf("converging") === -1;
+    return entry.human_state === "ready" || entry.human_state === "ready (CI pending)";
   }
 
-  function renderReadyPill() {
-    var pill = textEl("span", "ready");
+  function renderReadyPill(entry) {
+    var pill = textEl("span", entry.human_state);
     pill.className = "pill lifecycle-ready";
-    return explainLabel(pill, "ready");
+    return explain(pill, "queueState", entry.human_state);
   }
 
   function renderQueueEntryHead(entry) {
@@ -1465,7 +1466,7 @@ var NO_SESSION_MESSAGE = "session token not loaded, reload the page";
       head.appendChild(explainLabel(pill, label));
     });
     if (isReadyToMerge(entry)) {
-      head.appendChild(renderReadyPill());
+      head.appendChild(renderReadyPill(entry));
     }
     head.appendChild(renderChecks(entry));
     head.appendChild(textEl("span", entry.party));
@@ -1493,10 +1494,12 @@ var NO_SESSION_MESSAGE = "session token not loaded, reload the page";
   }
 
   function renderQueueDetail(entry) {
-    var lines = entry.blockers.concat(entry.waits.map(function (wait) {
+    var lines = entry.blockers.concat(entry.human_missing, entry.waits.map(function (wait) {
       return "wait: " + wait;
     }), entry.gates.map(function (gate) {
       return "gate: " + gate;
+    }), entry.notes.map(function (note) {
+      return "note: " + note;
     }));
     if (lines.length === 0) {
       return null;

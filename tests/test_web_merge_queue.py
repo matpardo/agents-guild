@@ -85,6 +85,7 @@ class MergeQueueModelTests(MergeQueueModelTestCase):
                 "position", "ref", "repo", "number", "party", "task", "lifecycle", "branch",
                 "checks_failing", "checks_passing", "checks_pending", "labels", "blocked_external", "unblocks", "state", "next_action",
                 "action", "why", "reasons", "blockers", "waits", "gates", "url",
+                "human_state", "human_missing", "notes",
             },
         )
         self.assertEqual([entry["position"] for entry in queue], [1, 2, 3])
@@ -221,9 +222,8 @@ class MergeQueuePageTests(MergeQueueTestCase):
         self.assertRegex(self.css, r"(?m)^\.checks-pending\s*\{")
 
     def test_page_tags_ready_entries_with_a_green_ready_pill(self):
-        self.assertIn('entry.state === "ready"', self.js)
-        self.assertIn('entry.labels.indexOf("draft") === -1', self.js)
-        self.assertIn("renderReadyPill()", self.js)
+        self.assertIn('entry.human_state === "ready"', self.js)
+        self.assertIn("renderReadyPill(entry)", self.js)
         self.assertRegex(self.css, r"(?m)^\.lifecycle-ready\s*\{")
 
     def test_page_says_guild_never_merges(self):

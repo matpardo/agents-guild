@@ -9,6 +9,8 @@ _BEHIND = "BEHIND"
 _HUMAN_AUTHOR = "human"
 _DRAFT_LIFECYCLES = ("draft", "converging")
 _READY_STATE = "ready"
+CI_PENDING_STATE = "ready (CI pending)"
+HUMAN_READY_STATES = (_READY_STATE, CI_PENDING_STATE)
 _WAITING_STATE = "waiting"
 _BLOCKED_STATE = "blocked"
 _MERGE_ACTION = "merge"
@@ -123,6 +125,8 @@ def _entry(pr):
         "checks_failing": pr["checks_failing"],
         "checks_passing": pr["checks_passing"],
         "checks_pending": pr["checks_pending"],
+        "checks_billing": pr["checks_billing"],
+        "ci_label": pr["ci_label"],
         "labels": _labels(pr),
     }
 
@@ -338,10 +342,43 @@ def _action(pr, state, reasons, waits, external):
     return _MERGE_ACTION
 
 
-def _queue_entry(pr, unblocks, reasons, waits, why, external):
+def _no_checks(pr):
+    return pr["checks_failing"] == 0 and pr["checks_passing"] == 0 and pr["checks_pending"] == 0
+
+
+def _ci_pending(pr, billing):
+    if pr["checks_billing"] == 1:
+        return True
+    return _no_checks(pr) and (billing or pr["ci_label"] == 0)
+
+
+def _human_missing(pr, billing):
+    missing = []
+    comments = pr["comments_after_head"]
+    if comments:
+        missing.append("{} comment{} after head".format(comments, "" if comments == 1 else "s"))
+    if _no_checks(pr) and not _is_draft(pr) and not _ci_pending(pr, billing):
+        missing.append("no checks on head")
+    return missing
+
+
+def _human_state(pr, state, missing, billing):
+    if state == _BLOCKED_STATE or pr["comments_after_head"]:
+        return _BLOCKED_STATE
+    if state == _WAITING_STATE or missing or _is_draft(pr):
+        return _WAITING_STATE
+    if _ci_pending(pr, billing):
+        return CI_PENDING_STATE
+    return _READY_STATE
+
+
+def _queue_entry(pr, unblocks, reasons, waits, why, external, billing):
     state = _state(reasons, waits)
+    missing = _human_missing(pr, billing)
     return dict(
         _entry(pr),
+        human_state=_human_state(pr, state, missing, billing),
+        human_missing=missing,
         unblocks=unblocks,
         state=state,
         reasons=reasons if state == _BLOCKED_STATE else waits,
@@ -355,12 +392,13 @@ def _queue_entry(pr, unblocks, reasons, waits, why, external):
     )
 
 
-def _ordered_entries(by_ref, order, edges, unblocks):
+def _ordered_entries(by_ref, order, edges, unblocks, billing_repos):
     position = {ref: index for index, ref in enumerate(order)}
     ordered_edges = [edge for edge in edges if edge["first"] in position and edge["second"] in position]
     predecessors = _predecessors(ordered_edges)
     blocked_refs = set()
     pending_refs = set()
+    unready_refs = set()
     external_reasons = {}
     entries = []
     for ref in order:
@@ -380,8 +418,25 @@ def _ordered_entries(by_ref, order, edges, unblocks):
             blocked_refs.add(ref)
         if state == _WAITING_STATE or (state == _READY_STATE and _is_draft(pr)):
             pending_refs.add(ref)
-        entries.append(_queue_entry(pr, unblocks[ref], reasons, waits, _why(pr, state, position, ordered_edges), external))
+        entry = _queue_entry(
+            pr, unblocks[ref], reasons, waits, _why(pr, state, position, ordered_edges), external,
+            pr["repo"] in billing_repos,
+        )
+        _hold_behind_unready(entry, before, unready_refs, reasons + waits)
+        if entry["human_state"] not in HUMAN_READY_STATES:
+            unready_refs.add(ref)
+        entries.append(entry)
     return entries
+
+
+def _hold_behind_unready(entry, before, unready_refs, stated):
+    held = ["waits on {}".format(first) for first in before if first in unready_refs]
+    held = [line for line in held if line not in stated]
+    if not held:
+        return
+    entry["human_missing"] = entry["human_missing"] + held
+    if entry["human_state"] in HUMAN_READY_STATES:
+        entry["human_state"] = _WAITING_STATE
 
 
 def _own_external(pr):
@@ -390,11 +445,12 @@ def _own_external(pr):
     return (pr["ref"], pr["blocked_external"])
 
 
-def _stuck_entries(by_ref, stuck, unblocks):
+def _stuck_entries(by_ref, stuck, unblocks, billing_repos):
     cycle = "ordering cycle between pins and task dependencies: {}".format(", ".join(stuck))
     return [
         _queue_entry(
-            by_ref[ref], unblocks[ref], _blocked_reasons(by_ref[ref]) + [cycle], [], "", _own_external(by_ref[ref])
+            by_ref[ref], unblocks[ref], _blocked_reasons(by_ref[ref]) + [cycle], [], "", _own_external(by_ref[ref]),
+            by_ref[ref]["repo"] in billing_repos,
         )
         for ref in stuck
     ]
@@ -422,6 +478,9 @@ def compute(prs, pins, main_status):
     unblocks = _unblock_counts(open_prs, edges)
     order, stuck = _topological_order(open_prs, edges, unblocks)
     by_ref = {pr["ref"]: pr for pr in open_prs}
-    entries = _ordered_entries(by_ref, order, edges, unblocks) + _stuck_entries(by_ref, stuck, unblocks)
+    billing_repos = {row["repo"] for row in main_status if row["external"] == "billing"}
+    entries = _ordered_entries(by_ref, order, edges, unblocks, billing_repos) + _stuck_entries(
+        by_ref, stuck, unblocks, billing_repos
+    )
     _flag_next_action(entries)
     return {"main": _main_entries(main_status), "queue": entries}

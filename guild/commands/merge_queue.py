@@ -87,6 +87,8 @@ def _pr_record(conn, row):
         "mergeable": row["mergeable"],
         "review_decision": row["review_decision"],
         "unresolved_threads": row["unresolved_threads"],
+        "comments_after_head": row["comments_after_head"],
+        "ci_label": row["ci_label"],
         "merge_state": row["merge_state"],
         "additions": row["additions"] or 0,
         "deletions": row["deletions"] or 0,
@@ -200,11 +202,18 @@ def _reject_cycle(conn, first_ref, second_ref):
     raise GuildError("pin would create a cycle: {} -> {}".format(first_ref, " -> ".join(path)), 1)
 
 
-def _project_for_repo(ctx, repo):
-    for project in config.load_all_projects(ctx.projects_dir):
+def _project_config(projects_dir, repo):
+    for project in config.load_all_projects(projects_dir):
         if repo in project["github"]["repos"]:
-            return project["name"]
+            return project
     return None
+
+
+def _project_for_repo(ctx, repo):
+    project = _project_config(ctx.projects_dir, repo)
+    if project is None:
+        return None
+    return project["name"]
 
 
 def _record_pin_event(ctx, kind, actor, first, second):
@@ -499,14 +508,33 @@ def gates(entry, red_rows):
         found.append("draft (gh pr ready {})".format(entry["number"]))
     if "needs-human-pr-review" in entry["labels"]:
         found.append("needs human review")
-    found.extend(_main_gate(row) for row in red_rows if row["repo"] == entry["repo"])
+    found.extend(
+        "main red {}".format(main_label(row))
+        for row in red_rows
+        if row["repo"] == entry["repo"] and row["external"] is None
+    )
     return found
 
 
-def _main_gate(row):
-    if row["external"] is not None:
-        return "main blocked: {}".format(row["external"])
-    return "main red {}".format(main_label(row))
+def _ci_label_note(projects_dir, entry):
+    project = _project_config(projects_dir, entry["repo"])
+    if project is not None and "ci_label" in project.get("human_ready", {}):
+        return "CI label {} not on the PR".format(project["human_ready"]["ci_label"])
+    return "CI label not on the PR (human_ready.ci_label no longer configured: run guild sync)"
+
+
+def notes(projects_dir, entry, red_rows):
+    found = [
+        "main blocked: {}".format(row["external"])
+        for row in red_rows
+        if row["repo"] == entry["repo"] and row["external"] is not None
+    ]
+    if entry["checks_billing"] == 1:
+        found.append("checks blocked by billing ({})".format(entry["checks_failing"]))
+    no_checks = entry["checks_failing"] == 0 and entry["checks_passing"] == 0 and entry["checks_pending"] == 0
+    if entry["human_state"] == merge_queue.CI_PENDING_STATE and entry["ci_label"] == 0 and no_checks:
+        found.append(_ci_label_note(projects_dir, entry))
+    return found
 
 
 def _queue_entry_model(projects_dir, now, position, entry, main_rows):
@@ -523,6 +551,9 @@ def _queue_entry_model(projects_dir, now, position, entry, main_rows):
         blockers=[sanitize.strip_control_sequences(blocker) for blocker in entry["blockers"]],
         waits=[sanitize.strip_control_sequences(wait) for wait in entry["waits"]],
         gates=[sanitize.strip_control_sequences(gate) for gate in gates(entry, main_rows)],
+        human_state=entry["human_state"],
+        human_missing=[sanitize.strip_control_sequences(text) for text in entry["human_missing"]],
+        notes=[sanitize.strip_control_sequences(note) for note in notes(projects_dir, entry, main_rows)],
     )
 
 
