@@ -135,3 +135,14 @@ updated: 2026-10-04
 - [x] A rebuild after compacting yields the same projections and the same sync freshness.
 - [x] The backup is written before any delete, and a failed backup deletes nothing.
 - [x] Samples are kept when `resource_retention_days` is unset.
+
+## T12 — Readers survive a long compact
+
+**Depends on:** T11
+**Status:** [x] done — #178
+
+**What:** Schema data migrations write only when rows match, so opening the database to read takes no write lock. The web compact button always leaves its busy state and shows the result or the error.
+
+**Acceptance:**
+- [x] `db.connect` and a read succeed while another connection holds the write lock.
+- [x] The compact button shows the result or the error even when the refresh fails.
