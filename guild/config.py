@@ -100,6 +100,20 @@ def _validate_next_config(data):
         raise GuildError("project config 'next.stale_hours' must be a positive integer", 1)
 
 
+def _validate_human_ready_config(data):
+    human_ready = data.get("human_ready")
+    if human_ready is None:
+        return
+    if not isinstance(human_ready, dict):
+        raise GuildError("project config 'human_ready' must be an object", 1)
+    for key in human_ready:
+        if key != "ci_label":
+            raise GuildError("project config 'human_ready' has unknown key '{}'".format(key), 1)
+    ci_label = human_ready.get("ci_label")
+    if "ci_label" in human_ready and (not isinstance(ci_label, str) or not ci_label):
+        raise GuildError("project config 'human_ready.ci_label' must be a non-empty string", 1)
+
+
 def _validate_handoff_retention_config(data):
     days = data.get("handoff_retention_days")
     if days is None:
@@ -193,6 +207,7 @@ def validate_project_config(data):
     _validate_fast_forward_base_config(data)
     _validate_lifecycle_config(data)
     _validate_next_config(data)
+    _validate_human_ready_config(data)
     _validate_handoff_retention_config(data)
     _validate_max_open_prs_config(data, "max_open_prs")
     _validate_max_open_prs_config(data, "max_open_prs_per_party")

@@ -4,7 +4,7 @@ import re
 import sqlite3
 from pathlib import Path
 
-from guild import config, db, events, handoff_prune, localbase, paths, timeutil
+from guild import config, db, events, handoff_prune, human_ready, localbase, paths, timeutil
 from guild.adapters import github, jira_acli, sdd
 from guild.commands import claim as claim_commands
 from guild.commands import drift as drift_commands
@@ -119,15 +119,25 @@ def _sync_pr(ctx, projects, row, failures):
         [
             "state", "isDraft", "mergedAt", "headRefName", "title", "statusCheckRollup",
             "reviewDecision", "mergeable", "mergeStateStatus", "baseRefName", "comments", "reviews", "headRefOid",
-            "isCrossRepository",
+            "isCrossRepository", "commits", "labels", "author",
         ],
     )
     failing, passing, pending = _count_checks(gh_data.get("statusCheckRollup"))
     lifecycle = _lifecycle_from_gh(row["lifecycle"], gh_data)
     review_comment_count = len(gh_data.get("comments") or []) + len(gh_data.get("reviews") or [])
+    head_date = human_ready.head_commit_date(gh_data.get("commits") or [], gh_data.get("headRefOid"))
     payload = {
         "repo": row["repo"],
         "number": row["number"],
+        "comments_after_head": human_ready.comments_after_head(
+            head_date,
+            (gh_data.get("author") or {}).get("login"),
+            gh_data.get("comments") or [],
+            gh_data.get("reviews") or [],
+        ),
+        "ci_label": human_ready.ci_label_flag(
+            _project_for_repo(projects, row["repo"]), gh_data.get("labels") or []
+        ),
         "gh_state": gh_data.get("state"),
         "gh_draft": gh_data.get("isDraft"),
         "branch": gh_data.get("headRefName"),

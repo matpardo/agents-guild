@@ -7,6 +7,9 @@ from guild import config
 from guild.errors import GuildError
 
 
+_BASE_CONFIG = {"name": "acme", "paths": ["/tmp/acme/*"], "github": {"repos": ["acme/app"]}}
+
+
 class ValidateProjectConfigTests(unittest.TestCase):
     def test_accepts_minimal_valid_config(self):
         config.validate_project_config(
@@ -24,6 +27,15 @@ class ValidateProjectConfigTests(unittest.TestCase):
     def test_rejects_missing_github_repos(self):
         with self.assertRaises(GuildError):
             config.validate_project_config({"name": "acme", "paths": ["/tmp/*"]})
+
+    def test_human_ready_accepts_ci_label(self):
+        config.validate_project_config(dict(_BASE_CONFIG, human_ready={"ci_label": "run-ci"}))
+        config.validate_project_config(dict(_BASE_CONFIG, human_ready={}))
+
+    def test_human_ready_rejects_bad_shapes(self):
+        for bad in ("run-ci", {"ci_label": ""}, {"ci_label": 3}, {"trace_validator": ["x"]}, {"other": 1}):
+            with self.assertRaises(GuildError, msg=bad):
+                config.validate_project_config(dict(_BASE_CONFIG, human_ready=bad))
 
     def test_allows_unknown_keys(self):
         config.validate_project_config(
