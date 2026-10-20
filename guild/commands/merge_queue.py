@@ -609,3 +609,45 @@ def board_models(conn, projects_dir, now, party_names):
         if scoped["has_prs"]:
             models.append(_scope_model(projects_dir, now, "party:{}".format(party), scoped))
     return models
+
+
+NOTHING_READY_LINE = "Nothing is ready for you."
+
+
+def _one_line(text):
+    return " ".join(sanitize.strip_control_sequences(text).split())
+
+
+def _pr_title(conn, entry):
+    row = conn.execute("SELECT title FROM prs WHERE repo = ? AND number = ?", (entry["repo"], entry["number"])).fetchone()
+    return _one_line(row["title"] or "")
+
+
+def _checks_text(entry):
+    counts = (
+        ("failing", entry["checks_failing"]),
+        ("pending", entry["checks_pending"]),
+        ("passing", entry["checks_passing"]),
+    )
+    return ", ".join("{} {}".format(count, label) for label, count in counts if count)
+
+
+def _review_md_lines(ctx, entry, main_rows):
+    url = "https://github.com/{}/pull/{}".format(entry["repo"], entry["number"])
+    lines = ["- [ ] {} {} — {}".format(entry["ref"], _pr_title(ctx.conn, entry), url)]
+    if entry["action"] == merge_queue.REVIEW_ACTION:
+        lines.append("  - review: human first")
+    checks = _checks_text(entry)
+    if checks:
+        lines.append("  - checks: {}".format(checks))
+    lines.extend("  - note: {}".format(_one_line(note)) for note in notes(ctx.projects_dir, entry, main_rows))
+    return lines
+
+
+def review_md(ctx, raid, party):
+    _, _, party_names = _resolve_scope(ctx, raid, party)
+    scoped = load_scoped_queue(ctx.conn, party_names)
+    selected = merge_queue.ready_for_person(scoped["queue"], scoped["main"])
+    if not selected:
+        return [NOTHING_READY_LINE]
+    return [line for entry in selected for line in _review_md_lines(ctx, entry, scoped["main"])]

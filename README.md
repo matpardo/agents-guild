@@ -182,6 +182,7 @@ guild merge-queue [--raid <name> | --party <name>]   # read-only: PRs in the ord
 guild merge-queue --head [--raid <name> | --party <name>]   # the first PR whose action is merge or review: <ref> <party> <task>
 guild merge-queue pin   <owner/repo>#<a> --before <owner/repo>#<b>
 guild merge-queue unpin <owner/repo>#<a> --before <owner/repo>#<b>
+guild review-md [--raid <name> | --party <name>]   # read-only: markdown list of the PRs ready for the person, in queue order
 guild main red <owner/repo> --reason "<text>"   # mark a repo's main branch red by hand
 guild main green <owner/repo>                   # clear the manual red mark
 
@@ -814,6 +815,19 @@ last line of the output says so).
 `guild merge-queue --head` prints only the first entry whose action is `merge` or `review: human, then merge`
 (PRs blocked by something outside development are skipped) as
 `<ref> <party> <task>`, or `no PR ready to merge`; it takes the same scope flags.
+
+**Review list.** `guild review-md [--raid <name> | --party <name>]` prints the
+PRs ready for the person as one markdown document, in the order of `guild
+merge-queue`, with the same scope flags and rules. A PR is listed when it is
+`ready` (not draft), its human state is `ready` or `ready (CI pending)`, it is
+not blocked by something outside development, its action is `merge` or
+`review: human, then merge`, and its repo has no red main (a main blocked by
+billing does not exclude it). Each PR is `- [ ] <owner/repo>#<n> <title> — <url>`
+followed by indented lines: `review: human first` when the action is the human
+review one, `checks: <n> passing` (also failing and pending counts), and one
+`note: <x>` per note of `guild pr ready-check`. With nothing to list it prints
+`Nothing is ready for you.`; it exits 0 either way. The output carries no
+tool-internal names, so it can be pasted outside the CLI.
 
 **Scope.** `--raid` takes the open tracked PRs of the raid's active members,
 `--party` those of one party; the two flags are mutually exclusive. Without a

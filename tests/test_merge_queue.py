@@ -661,3 +661,35 @@ class ExternalBlockTests(unittest.TestCase):
             [_pr(1, blocked_external="x"), _pr(2, checks_failing=1), _pr(3)], [], []
         )["queue"]
         self.assertEqual([entry["next_action"] for entry in result], [False, True, False])
+
+
+class ReadyForPersonTests(unittest.TestCase):
+    def _selected(self, prs, pins, main):
+        result = merge_queue.compute(prs, pins, main)
+        return _refs(merge_queue.ready_for_person(result["queue"], result["main"]))
+
+    def test_keeps_human_ready_prs_in_queue_order(self):
+        prs = [_pr(1), _pr(2), _pr(3)]
+        self.assertEqual(self._selected(prs, [_pin(3, 1, "alpha")], []), [_ref(3), _ref(1), _ref(2)])
+
+    def test_drops_draft_waiting_blocked_and_manually_blocked(self):
+        prs = [
+            _pr(1),
+            _pr(2, lifecycle="draft"),
+            _pr(3, checks_failing=1),
+            _pr(4, comments_after_head=1),
+            _pr(5, blocked_external="vendor"),
+        ]
+        self.assertEqual(self._selected(prs, [], []), [_ref(1)])
+
+    def test_keeps_ci_pending_and_the_human_review_pr(self):
+        prs = [_pr(1, checks_passing=0, ci_label=0), _pr(2, needs_human_pr_review=True)]
+        self.assertEqual(self._selected(prs, [], []), [_ref(1), _ref(2)])
+
+    def test_red_main_drops_the_prs_of_that_repo_only(self):
+        prs = [_pr(1), _pr(2, repo="acme/web", ref="acme/web#2")]
+        red = {"repo": "acme/app", "source": "gh", "reason": "x", "external": None}
+        self.assertEqual(self._selected(prs, [], [red]), ["acme/web#2"])
+
+    def test_billing_main_keeps_the_prs(self):
+        self.assertEqual(self._selected([_pr(1)], [], [_billing_row("acme/app")]), [_ref(1)])

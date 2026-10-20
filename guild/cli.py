@@ -424,6 +424,13 @@ def _handle_merge_queue(ctx, args):
     return 0
 
 
+def _handle_review_md(ctx, args):
+    from guild.commands import merge_queue as merge_queue_commands
+
+    _print_lines(merge_queue_commands.review_md(ctx, args.raid, args.party))
+    return 0
+
+
 def _handle_merge_queue_pin(ctx, args):
     from guild.commands import merge_queue as merge_queue_commands
 
@@ -908,6 +915,14 @@ def _add_merge_queue_parser(subparsers):
     unpin.set_defaults(handler=_handle_merge_queue_unpin)
 
 
+def _add_review_md_parser(subparsers):
+    parser = subparsers.add_parser("review-md", help="read-only: markdown list of the PRs ready for the person")
+    scope = parser.add_mutually_exclusive_group()
+    scope.add_argument("--raid", help="only PRs of this raid")
+    scope.add_argument("--party", help="only PRs of this party")
+    parser.set_defaults(handler=_handle_review_md)
+
+
 def _add_main_parser(subparsers):
     parser = subparsers.add_parser("main", help="mark a repo main branch red or green by hand")
     actions = parser.add_subparsers(dest="main_action", required=True, metavar="<subcommand>")
@@ -1013,6 +1028,7 @@ def build_parser():
     raids.set_defaults(handler=_handle_raids)
 
     _add_merge_queue_parser(subparsers)
+    _add_review_md_parser(subparsers)
     _add_main_parser(subparsers)
 
     board = subparsers.add_parser("board", help="show the human board")

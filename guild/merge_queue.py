@@ -16,8 +16,8 @@ _WAITING_STATE = "waiting"
 _BLOCKED_STATE = "blocked"
 _MERGE_ACTION = "merge"
 _PROMOTE_ACTION = "promote"
-_REVIEW_ACTION = "review: human, then merge"
-MERGEABLE_ACTIONS = (_MERGE_ACTION, _REVIEW_ACTION)
+REVIEW_ACTION = "review: human, then merge"
+MERGEABLE_ACTIONS = (_MERGE_ACTION, REVIEW_ACTION)
 _ASK_LABEL = "needs-ask-answer"
 _REVIEW_LABEL = "needs-human-pr-review"
 _FIXES_MAIN_LABEL = "fixes-main"
@@ -339,7 +339,7 @@ def _action(pr, state, reasons, waits, external):
     if _is_draft(pr):
         return "{}: gh pr ready \u2192 {}".format(_PROMOTE_ACTION, pr["party"])
     if pr["needs_human_pr_review"]:
-        return _REVIEW_ACTION
+        return REVIEW_ACTION
     return _MERGE_ACTION
 
 
@@ -489,3 +489,16 @@ def compute(prs, pins, main_status):
     )
     _flag_next_action(entries)
     return {"main": _main_entries(main_status), "queue": entries}
+
+
+def ready_for_person(entries, main):
+    red_repos = {row["repo"] for row in main if row["external"] is None}
+    return [
+        entry
+        for entry in entries
+        if entry["lifecycle"] == _READY_LIFECYCLE
+        and entry["human_state"] in HUMAN_READY_STATES
+        and entry["external"] is None
+        and entry["action"] in MERGEABLE_ACTIONS
+        and entry["repo"] not in red_repos
+    ]
