@@ -3,7 +3,7 @@ import sqlite3
 from datetime import timedelta
 from unittest import mock
 
-from guild import timeutil
+from guild import party_status, timeutil
 from guild.cli import _build_context
 from guild.commands import next as next_commands
 from tests.testutil import GuildTestCase
@@ -654,3 +654,166 @@ class MaxOpenPrsTests(NextTestCase):
         self.run_cli(["sync", "--source", "gh"], "sess-1", self.repo_dir)
         code, out, err = self.run_cli(["next"], "sess-1", self.repo_dir)
         self.assertIn("task demo/T03", out)
+
+
+class WipOneTests(NextTestCase):
+    def setUp(self):
+        super().setUp()
+        self.run_cli(["quest", "add", "demo", "--title", "Demo", "--no-epic"], "sess-1", self.repo_dir)
+        for tid in ("T01", "T02"):
+            self.run_cli(["task", "add", "demo/{}".format(tid), "--title", tid], "sess-1", self.repo_dir)
+        self.run_cli(["task", "start", "demo/T01"], "sess-1", self.repo_dir)
+
+    def _track(self, lifecycle, extra_args):
+        self.write_gh_fixture(
+            "view_acme-app_1",
+            {"state": "OPEN", "isDraft": lifecycle != "ready", "headRefName": "feature/1", "title": "t"},
+        )
+        code, out, err = self.run_cli(
+            ["pr", "track", "acme/app#1", "--what", "x", "--waits", "y"] + extra_args, "sess-1", self.repo_dir
+        )
+        self.assertEqual(code, 0, err)
+        self.run_cli(["pr", "set", "acme/app#1", "--lifecycle", lifecycle], "sess-1", self.repo_dir)
+
+    def _update_pr(self, assignments):
+        conn = sqlite3.connect(str(self.data_home / "guild" / "guild.db"))
+        conn.execute("UPDATE prs SET {} WHERE number = 1".format(assignments))
+        conn.commit()
+        conn.close()
+
+    def _next(self, args):
+        code, out, err = self.run_cli(args, "sess-1", self.repo_dir)
+        self.assertEqual(code, 0, err)
+        return out
+
+    def test_ready_pr_with_comment_after_head_holds_new_task(self):
+        self._track("ready", ["--task", "demo/T01"])
+        self._update_pr("comments_after_head = 1, ci_label = 1, checks_passing = 1")
+        self.assertEqual(
+            self._next(["next"]).strip(),
+            "wait: acme/app#1 is not human-ready (1 comment after head), resolve it first",
+        )
+
+    def test_ready_pr_with_label_and_no_checks_holds_new_task(self):
+        self._track("ready", ["--task", "demo/T01"])
+        self._update_pr("comments_after_head = 0, ci_label = 1")
+        self.assertEqual(
+            self._next(["next"]).strip(),
+            "wait: acme/app#1 is not human-ready (no checks on head), resolve it first",
+        )
+
+    def test_null_ci_label_and_no_checks_does_not_hold(self):
+        self._track("ready", ["--task", "demo/T01"])
+        self._update_pr("comments_after_head = 0, ci_label = NULL")
+        self.assertIn("task demo/T02", self._next(["next"]))
+
+    def test_null_ci_label_no_checks_and_comment_after_head_holds(self):
+        self._track("ready", ["--task", "demo/T01"])
+        self._update_pr("comments_after_head = 1, ci_label = NULL")
+        self.assertEqual(
+            self._next(["next"]).strip(),
+            "wait: acme/app#1 is not human-ready (1 comment after head; no checks on head), resolve it first",
+        )
+
+    def test_open_ask_hold_names_the_ask_reason(self):
+        self._track("ready", ["--task", "demo/T01"])
+        self._update_pr("ci_label = 1, checks_passing = 1")
+        self.run_cli(["ask", "ship it?", "--context", "c", "--ref", "pr:acme/app#1"], "sess-1", self.repo_dir)
+        out = self._next(["next"]).strip()
+        self.assertTrue(out.startswith("wait: acme/app#1 is not human-ready ("), out)
+        self.assertIn("ask", out)
+        self.assertTrue(out.endswith("resolve it first"), out)
+
+    def test_manually_blocked_pr_does_not_hold(self):
+        self._track("ready", ["--task", "demo/T01"])
+        self._update_pr("comments_after_head = 1, ci_label = 1, checks_passing = 1")
+        self.run_cli(["pr", "set", "acme/app#1", "--blocked-external", "waiting on vendor"], "sess-1", self.repo_dir)
+        self.assertIn("task demo/T02", self._next(["next"]))
+
+    def test_pr_behind_a_predecessor_names_the_wait(self):
+        self._track("ready", ["--task", "demo/T01"])
+        self.write_gh_fixture(
+            "view_acme-app_2",
+            {"state": "OPEN", "isDraft": True, "headRefName": "feature/2", "title": "t"},
+        )
+        self.run_cli(
+            ["pr", "track", "acme/app#2", "--card", "ACME-2", "--what", "x", "--waits", "y"],
+            "sess-1", self.repo_dir,
+        )
+        self._update_pr("ci_label = 1, checks_passing = 1")
+        self.run_cli(["merge-queue", "pin", "acme/app#2", "--before", "acme/app#1"], "sess-1", self.repo_dir)
+        self.assertEqual(
+            self._next(["next"]).strip(),
+            "wait: acme/app#1 is not human-ready (waits on acme/app#2), resolve it first",
+        )
+
+    def test_cap_line_wins_over_wip_hold(self):
+        self._track("ready", ["--task", "demo/T01"])
+        self._update_pr("comments_after_head = 1, ci_label = 1, checks_passing = 1")
+        config_file = self.config_home / "guild" / "projects" / "acme.json"
+        data = json.loads(config_file.read_text())
+        data["max_open_prs_per_party"] = 1
+        config_file.write_text(json.dumps(data))
+        self.assertEqual(self._next(["next"]).strip(), "wait: 1 open PRs, merge acme/app#1 first")
+
+    def test_party_with_held_pr_and_queued_task_reads_as_having_work(self):
+        self._track("ready", ["--task", "demo/T01"])
+        self._update_pr("comments_after_head = 1, ci_label = 1, checks_passing = 1")
+        ctx = _build_context("sess-1", self.repo_dir)
+        binding = {"party": "alpha", "project": "acme"}
+        self.assertTrue(next_commands.has_work(ctx, binding))
+        party_row = ctx.conn.execute("SELECT * FROM parties WHERE name = 'alpha'").fetchone()
+        self.assertEqual(party_status.derive(ctx, party_row)["status"], "queued")
+
+    def test_wip_queue_not_loaded_without_ready_own_pr(self):
+        self._track("draft", ["--task", "demo/T01"])
+        with mock.patch.object(next_commands.merge_queue_commands, "load_scoped_queue") as loader:
+            self._next(["next"])
+        loader.assert_not_called()
+
+    def test_ready_pr_waiting_only_for_ci_label_does_not_hold(self):
+        self._track("ready", ["--task", "demo/T01"])
+        self._update_pr("comments_after_head = 0, ci_label = 0")
+        self.assertIn("task demo/T02", self._next(["next"]))
+
+    def test_draft_pr_does_not_hold(self):
+        self._track("draft", ["--task", "demo/T01"])
+        self._update_pr("comments_after_head = 1, ci_label = 1")
+        self.assertIn("task demo/T02", self._next(["next"]))
+
+    def test_converging_pr_does_not_hold(self):
+        self._track("converging", ["--task", "demo/T01"])
+        self._update_pr("comments_after_head = 1, ci_label = 1")
+        self.assertIn("task demo/T02", self._next(["next"]))
+
+    def test_human_ready_pr_does_not_hold(self):
+        self._track("ready", ["--task", "demo/T01"])
+        self._update_pr("comments_after_head = 0, ci_label = 1, checks_passing = 1")
+        self.assertIn("task demo/T02", self._next(["next"]))
+
+    def test_other_party_pr_does_not_hold(self):
+        self._track("ready", ["--task", "demo/T01"])
+        self._update_pr("comments_after_head = 1, ci_label = 1, checks_passing = 1")
+        conn = sqlite3.connect(str(self.data_home / "guild" / "guild.db"))
+        conn.execute("INSERT INTO parties (name, project, generation, state) VALUES ('beta', 'acme', 1, 'active')")
+        conn.execute("UPDATE prs SET party = 'beta'")
+        conn.commit()
+        conn.close()
+        self.assertIn("task demo/T02", self._next(["next"]))
+
+    def test_failing_checks_tier_keeps_priority(self):
+        self._track("ready", ["--task", "demo/T01"])
+        self._update_pr("comments_after_head = 1, ci_label = 1, checks_failing = 1")
+        self.assertIn("PR acme/app#1: failing checks (1 failing)", self._next(["next"]))
+
+    def test_all_lists_the_hold_without_task(self):
+        self._track("ready", ["--task", "demo/T01"])
+        self._update_pr("comments_after_head = 1, ci_label = 1, checks_passing = 1")
+        out = self._next(["next", "--all"])
+        self.assertIn("wait: acme/app#1 is not human-ready (1 comment after head), resolve it first", out)
+        self.assertNotIn("task demo/T02", out)
+
+    def test_loose_card_pr_holds_new_task(self):
+        self._track("ready", ["--card", "ACME-1"])
+        self._update_pr("comments_after_head = 1, ci_label = 1, checks_passing = 1")
+        self.assertIn("is not human-ready", self._next(["next"]))

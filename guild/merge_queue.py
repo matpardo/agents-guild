@@ -11,6 +11,7 @@ _DRAFT_LIFECYCLES = ("draft", "converging")
 _READY_STATE = "ready"
 CI_PENDING_STATE = "ready (CI pending)"
 HUMAN_READY_STATES = (_READY_STATE, CI_PENDING_STATE)
+NO_CHECKS_MISSING = "no checks on head"
 _WAITING_STATE = "waiting"
 _BLOCKED_STATE = "blocked"
 _MERGE_ACTION = "merge"
@@ -358,7 +359,7 @@ def _human_missing(pr, billing):
     if comments:
         missing.append("{} comment{} after head".format(comments, "" if comments == 1 else "s"))
     if _no_checks(pr) and not _is_draft(pr) and not _ci_pending(pr, billing):
-        missing.append("no checks on head")
+        missing.append(NO_CHECKS_MISSING)
     if pr["trace_valid"] == 0:
         missing.append("review trace invalid: {}".format(pr["trace_reason"]))
     if pr["trace_valid"] is None and pr["trace_reason"]:

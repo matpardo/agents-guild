@@ -61,7 +61,7 @@ updated: 2026-10-20
 ## T06 — WIP 1 in next
 
 **Depends on:** T05
-**Status:** [ ] pending
+**Status:** [x] done — #184
 
 **What:** `next` gives no new task while an own Ready PR is not human-ready.
 
