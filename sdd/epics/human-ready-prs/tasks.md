@@ -31,7 +31,7 @@ updated: 2026-10-20
 ## T03 — human-ready in the queue and ready-check
 
 **Depends on:** T01, T02
-**Status:** [ ] pending
+**Status:** [x] done — #181
 
 **What:** The merge-queue model computes the human-ready state per PR and `ready-check` prints it with what is missing.
 
