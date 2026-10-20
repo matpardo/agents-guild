@@ -32,6 +32,7 @@ var NO_SESSION_MESSAGE = "session token not loaded, reload the page";
     raidFilter: "all",
     openParties: {},
     resourcesOpen: false,
+    resourcesModel: null,
     noticesOpen: true,
     queueDetailOpen: {},
     openResourceProjects: {},
@@ -424,18 +425,23 @@ var NO_SESSION_MESSAGE = "session token not loaded, reload the page";
     });
   }
 
+  function compactResultText(body) {
+    return body.message.split("\n").join("; ");
+  }
+
   function postCompact() {
     if (sessionToken === null) {
       state.compactStatus = NO_SESSION_MESSAGE;
-      fetchResources();
+      showResources();
       return;
     }
     state.compactBusy = true;
     state.compactStatus = "compacting...";
-    fetchResources();
+    showResources();
     sendPost(COMPACT_URL, {}).then(function (result) {
       state.compactBusy = false;
-      state.compactStatus = result.ok ? "" : errorMessage(result.body);
+      state.compactStatus = result.ok ? compactResultText(result.body) : errorMessage(result.body);
+      showResources();
       fetchResources();
     });
   }
@@ -2315,7 +2321,14 @@ var NO_SESSION_MESSAGE = "session token not loaded, reload the page";
     return controls;
   }
 
+  function showResources() {
+    if (state.resourcesModel !== null) {
+      renderResources(state.resourcesModel);
+    }
+  }
+
   function renderResources(model) {
+    state.resourcesModel = model;
     var section = document.getElementById("resources");
     clear(section);
     section.appendChild(textEl("h2", "resources"));

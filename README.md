@@ -570,7 +570,9 @@ deletes are already committed then). `--dry-run` prints what would be deleted
 and neither backs up nor changes anything. A second `compact` while one runs
 prints `compact already running`. The timer service runs at `Nice=19` and
 `IOSchedulingClass=idle` (`guild-compact.service`, `guild-compact.timer`,
-same rules as `guild sync-timer`).
+same rules as `guild sync-timer`). On a large database `compact` blocks
+writes to the database for about a minute, so run it when idle; readers keep
+working.
 
 Web: the "resources" section has a "Compact db" button, which posts to
 `POST /api/compact` and runs the same function.
