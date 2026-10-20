@@ -359,11 +359,15 @@ def _human_missing(pr, billing):
         missing.append("{} comment{} after head".format(comments, "" if comments == 1 else "s"))
     if _no_checks(pr) and not _is_draft(pr) and not _ci_pending(pr, billing):
         missing.append("no checks on head")
+    if pr["trace_valid"] == 0:
+        missing.append("review trace invalid: {}".format(pr["trace_reason"]))
+    if pr["trace_valid"] is None and pr["trace_reason"]:
+        missing.append("review trace not validated: {}".format(pr["trace_reason"]))
     return missing
 
 
 def _human_state(pr, state, missing, billing):
-    if state == _BLOCKED_STATE or pr["comments_after_head"]:
+    if state == _BLOCKED_STATE or pr["comments_after_head"] or pr["trace_valid"] == 0:
         return _BLOCKED_STATE
     if state == _WAITING_STATE or missing or _is_draft(pr):
         return _WAITING_STATE

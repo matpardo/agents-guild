@@ -41,7 +41,7 @@ updated: 2026-10-20
 ## T04 — Review trace validator
 
 **Depends on:** T03
-**Status:** [ ] pending
+**Status:** [x] done — #182
 
 **What:** `human_ready.trace_validator` runs a project command that validates the review trace for the head, and makes the project config accept `human_ready.trace_validator`, which is rejected today as an unknown key.
 

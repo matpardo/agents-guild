@@ -35,7 +35,7 @@ def triggers_by_project(projects, triggers):
     ]
 
 
-def _checkout_for(project, repo):
+def checkout_for(project, repo):
     for clone in localbase.locate_clones(project):
         if clone["repo"] == repo:
             return clone["path"]
@@ -117,7 +117,7 @@ def _execute(project, event_kind, payload, runner):
 
 
 def run_group(ctx, project, event_kind, repo, trigger_refs, runner):
-    cwd = _checkout_for(project, repo)
+    cwd = checkout_for(project, repo)
     payload = _base_payload(project, event_kind, repo, trigger_refs, cwd)
     if cwd is None:
         payload["status"] = "error"
@@ -134,7 +134,7 @@ def run_group(ctx, project, event_kind, repo, trigger_refs, runner):
 
 
 def _record_crash(ctx, project, event_kind, repo, trigger_refs, error):
-    payload = _base_payload(project, event_kind, repo, trigger_refs, _checkout_for(project, repo))
+    payload = _base_payload(project, event_kind, repo, trigger_refs, checkout_for(project, repo))
     payload["status"] = "error"
     payload["reason"] = "{}: {}".format(type(error).__name__, error)
     _finish(ctx, payload)
@@ -170,7 +170,7 @@ def _duration_label(duration_ms):
 
 
 def _dry_run_line(project, event_kind, repo):
-    cwd = _checkout_for(project, repo)
+    cwd = checkout_for(project, repo)
     if cwd is None:
         raise GuildError("project '{}' has no local clone of {}".format(project["name"], repo), 1)
     entry = project["lifecycle"][event_kind]
