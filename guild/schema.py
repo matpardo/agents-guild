@@ -346,6 +346,8 @@ _COLUMN_MIGRATIONS = (
     ("leaders", "handoff_consumed_at", "TEXT"),
     ("prs", "fixes_main", "INTEGER"),
     ("prs", "fixes_flaky", "INTEGER"),
+    ("prs", "comments_after_head", "INTEGER"),
+    ("prs", "ci_label", "INTEGER"),
     ("prs", "blocked_external", "TEXT"),
     ("prs", "head_sha", "TEXT"),
     ("notices", "unbound", "INTEGER"),
