@@ -2,7 +2,7 @@
 epic: human-ready-prs
 type: spec
 title: PRs that are really ready for the person
-status: active
+status: done
 owner: matpardo
 created: 2026-10-20
 updated: 2026-10-20
@@ -41,16 +41,17 @@ The dev leaves several parties working and comes back to many PRs in Ready with 
 
 ## Success criteria
 
-- [ ] `ready-check` prints the human-ready state and what is missing, and exits 0 only when the PR can be merged by hand.
-- [ ] With CI behind a label and no checks on the head, the state is "ready (CI pending)" and names the label.
-- [ ] A billing failure does not send the PR to "fix failing checks".
-- [ ] `next` gives no new task while an own Ready PR is not human-ready.
-- [ ] `review-md`, the board and the web list the same PRs, in queue order.
+- [x] `ready-check` prints the human-ready state and what is missing, and exits 0 only when the PR can be merged by hand.
+- [x] With CI behind a label and no checks on the head, the state is "ready (CI pending)" and names the label.
+- [x] A billing failure does not send the PR to "fix failing checks".
+- [x] `next` gives no new task while an own Ready PR is not human-ready.
+- [x] `review-md`, the board and the web list the same PRs, in queue order.
 - [ ] A project without config keeps its output, except for the new lines.
 
 ## Limits
 
 - `committedDate` is the date of the commit, not of the push: a comment between a local commit and its push counts as later (an accepted false stale).
+- A project without config keeps its output except for the new lines and for the `ready-check` header: a draft or a PR without checks on the head now reads `waiting`, not `ready` (decision of the dev, 2026-10-20). That success criterion stays open on purpose.
 
 ## Security and data
 

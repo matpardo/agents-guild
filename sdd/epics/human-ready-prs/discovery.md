@@ -2,7 +2,7 @@
 epic: human-ready-prs
 type: discovery
 title: PRs that are really ready for the person
-status: active
+status: done
 updated: 2026-10-20
 ---
 
