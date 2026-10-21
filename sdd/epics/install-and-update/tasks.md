@@ -60,6 +60,6 @@ updated: 2026-10-17
 ## T08 — Faster test suite
 
 **Depends on:** T07
-**Status:** [ ] todo
+**Status:** [x] done — #191
 
 **What:** The suite spent most of its time spawning the fake `gh` and `acli` scripts and rebuilding the argument parser on every in-process CLI call. The github and jira adapters now route their tool calls through one private runner that tests replace with the fixture logic of `tests/fake_gh.py` and `tests/fake_acli.py` in process; tests reuse one parser and skip gettext lookups. Production behavior is unchanged; the full run drops from about 4.5 minutes to about 1.5 on four cores with the same tests.
