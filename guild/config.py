@@ -1,6 +1,5 @@
 import fnmatch
 import json
-import re
 from pathlib import Path
 
 from guild import names, timeutil
@@ -137,14 +136,10 @@ def _validate_notice_comments(rules):
     if not isinstance(rules, list):
         raise GuildError("{} must be a list".format(key), 1)
     for rule in rules:
-        if not isinstance(rule, dict) or set(rule) != {"author", "pattern"}:
-            raise GuildError("{} entries must be objects with exactly 'author' and 'pattern'".format(key), 1)
+        if not isinstance(rule, dict) or set(rule) != {"author", "text"}:
+            raise GuildError("{} entries must be objects with exactly 'author' and 'text'".format(key), 1)
         if not all(isinstance(value, str) and value for value in rule.values()):
-            raise GuildError("{} 'author' and 'pattern' must be non-empty strings".format(key), 1)
-        try:
-            re.compile(rule["pattern"])
-        except re.error as error:
-            raise GuildError("{} has an invalid pattern: {}".format(key, error), 1)
+            raise GuildError("{} 'author' and 'text' must be non-empty strings".format(key), 1)
 
 
 def _validate_human_ready_config(data):

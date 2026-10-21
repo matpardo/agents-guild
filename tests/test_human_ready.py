@@ -49,7 +49,7 @@ def _body(entry, text):
     return dict(entry, body=text)
 
 
-_NOTICE_RULES = [{"author": "notifier", "pattern": "^Usage notice"}]
+_NOTICE_RULES = [{"author": "notifier", "text": "usage notice"}]
 
 
 class OtherAuthorCommentsTests(unittest.TestCase):
@@ -87,22 +87,19 @@ class OtherAuthorCommentsTests(unittest.TestCase):
         comments = [_comment("me", _HEAD), _comment("bot", _HEAD)]
         self.assertEqual(self._count(None, comments, [], []), 2)
 
-    def test_hostile_body_from_rule_author_returns_promptly(self):
-        rules = [{"author": "notifier", "pattern": "(a+)+$"}]
-        comments = [_body(_comment("notifier", _HEAD), "a" * 3000 + "b")]
+    def test_text_matches_body_in_a_different_case(self):
+        comments = [_body(_comment("notifier", _HEAD), "USAGE NOTICE: budget")]
+        self.assertEqual(self._count("me", comments, [], _NOTICE_RULES), 0)
+
+    def test_hostile_long_body_from_rule_author_returns_promptly(self):
+        comments = [_body(_comment("notifier", _HEAD), "a" * 100000 + "b")]
         started = time.monotonic()
-        self.assertEqual(self._count("me", comments, [], rules), 0)
+        self.assertEqual(self._count("me", comments, [], _NOTICE_RULES), 1)
         self.assertLess(time.monotonic() - started, 5)
 
-    def test_short_notice_body_still_matches_under_the_cap(self):
-        rules = [{"author": "notifier", "pattern": "budget$"}]
-        comments = [_body(_comment("notifier", _HEAD), "Usage notice: budget")]
-        self.assertEqual(self._count("me", comments, [], rules), 0)
-
-    def test_match_beyond_the_cap_is_not_a_notice(self):
-        rules = [{"author": "notifier", "pattern": "needle"}]
-        comments = [_body(_comment("notifier", _HEAD), "x" * 2000 + "needle")]
-        self.assertEqual(self._count("me", comments, [], rules), 1)
+    def test_text_beyond_two_thousand_characters_still_matches(self):
+        comments = [_body(_comment("notifier", _HEAD), "x" * 5000 + "usage notice")]
+        self.assertEqual(self._count("me", comments, [], _NOTICE_RULES), 0)
 
 
 class HeadCommitDateTests(unittest.TestCase):
@@ -215,7 +212,7 @@ class SyncFreshnessFactsTests(MergeQueueTestCase):
 
     def test_stores_other_author_comments_excluding_notice_rules(self):
         self._set_project_config(
-            {"human_ready": {"notice_comments": [{"author": "bot", "pattern": "^Usage"}]}}
+            {"human_ready": {"notice_comments": [{"author": "bot", "text": "usage"}]}}
         )
         notice = _body(_comment("bot", "2026-10-20T11:00:00Z"), "Usage notice")
         real = _body(_comment("human", "2026-10-20T09:00:00Z"), "please fix")

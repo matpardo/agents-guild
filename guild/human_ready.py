@@ -1,8 +1,4 @@
-import re
-
 from guild import timeutil
-
-_NOTICE_BODY_MAX = 2000
 
 
 def _moment(text):
@@ -34,9 +30,9 @@ def comments_after_head(head_date, author, comments, reviews):
 
 def _is_notice(entry, notice_rules):
     login = (_login(entry) or "").casefold()
-    body = (entry.get("body") or "")[:_NOTICE_BODY_MAX]
+    body = (entry.get("body") or "").casefold()
     return any(
-        login == rule["author"].casefold() and re.search(rule["pattern"], body) for rule in notice_rules
+        login == rule["author"].casefold() and rule["text"].casefold() in body for rule in notice_rules
     )
 
 

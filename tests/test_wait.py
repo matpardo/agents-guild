@@ -160,7 +160,7 @@ class PrWaitTests(WaitTestCase):
         self.run_cli(["task", "add", "demo/T01", "--title", "First"], "sess-1", self.repo_dir)
         self.track("sess-1", 7, "demo/T01", "ready")
         self._set_project_config(
-            {"human_ready": {"notice_comments": [{"author": "notifier", "pattern": "^Usage notice"}]}}
+            {"human_ready": {"notice_comments": [{"author": "notifier", "text": "usage notice"}]}}
         )
         self.view = dict(
             OPEN_VIEW,
