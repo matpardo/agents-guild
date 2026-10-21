@@ -823,3 +823,19 @@ li.finding-guard {
   color: #b45309;
   font-weight: bold;
 }
+
+.ideas-section > summary {
+  cursor: pointer;
+}
+
+.ideas-section > summary h2 {
+  display: inline;
+}
+
+.idea-fields {
+  flex-wrap: wrap;
+}
+
+.card.idea.idea-overdue {
+  border-left: 4px solid var(--danger);
+}

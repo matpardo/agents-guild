@@ -7,6 +7,7 @@ from guild import paths, sanitize, session_status, timeutil
 from guild.commands import brief as brief_commands
 from guild.commands import claim as claim_commands
 from guild.commands import drift as drift_commands
+from guild.commands import idea as idea_commands
 from guild.commands import memory as memory_commands
 from guild.commands import merge_queue as merge_queue_commands
 from guild.commands import next as next_commands
@@ -917,6 +918,19 @@ def _notice_model(ctx, row):
     }
 
 
+def _idea_model(ctx, row):
+    return {
+        "id": row["id"],
+        "title": sanitize.strip_control_sequences(row["title"]),
+        "description": sanitize.strip_control_sequences(row["description"]),
+        "requester": row["requester"],
+        "deadline": row["deadline"],
+        "project": row["project"],
+        "created_at": row["created_at"],
+        "overdue": idea_commands.is_overdue(ctx.now, row["deadline"]),
+    }
+
+
 def _memory_item_model(item):
     return {
         "id": item["id"],
@@ -1066,6 +1080,7 @@ def board_model(ctx):
         "asks": [_ask_model(ctx.conn, row) for row in ask_rows],
         "notices": [_notice_model(ctx, row) for row in notice_rows],
         "new_notice_count": notice_commands.count_new(notice_rows),
+        "ideas": [_idea_model(ctx, row) for row in idea_commands.sorted_rows(ctx, None)],
         "memory": [
             _memory_item_model(item)
             for item in memory_commands.all_items(None)

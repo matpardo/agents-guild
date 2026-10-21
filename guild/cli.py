@@ -347,6 +347,51 @@ def _handle_notices(ctx, args):
     return 0
 
 
+def _handle_idea_add(ctx, args):
+    from guild.commands import idea as idea_commands
+
+    _print(idea_commands.add(ctx, args.title, args.description, args.requester, args.deadline, args.project))
+    return 0
+
+
+def _idea_edit_fields(args):
+    fields = {
+        name: getattr(args, name)
+        for name in ("title", "description", "requester", "deadline", "project")
+        if getattr(args, name) is not None
+    }
+    for name in ("requester", "deadline", "project"):
+        if getattr(args, "no_" + name):
+            fields[name] = None
+    return fields
+
+
+def _handle_idea_edit(ctx, args):
+    from guild.commands import idea as idea_commands
+
+    _print(idea_commands.edit(ctx, args.id, _idea_edit_fields(args)))
+    return 0
+
+
+def _handle_idea_delete(ctx, args):
+    from guild.commands import idea as idea_commands
+
+    _print(idea_commands.delete(ctx, args.id))
+    return 0
+
+
+def _handle_ideas(ctx, args):
+    from guild.commands import idea as idea_commands
+
+    if args.idea_id is not None:
+        if args.project is not None:
+            raise GuildError("guild ideas <id> takes no filters", 1)
+        _print_lines(idea_commands.show(ctx, args.idea_id))
+        return 0
+    _print_lines(idea_commands.list_ideas(ctx, args.project))
+    return 0
+
+
 def _handle_claim(ctx, args):
     from guild.commands import claim as claim_commands
 
@@ -893,6 +938,33 @@ def _add_notice_parser(subparsers):
     unseen.set_defaults(handler=_handle_notice_unseen)
 
 
+def _add_idea_parser(subparsers):
+    parser = subparsers.add_parser("idea", help="add, edit or delete ideas in the backlog")
+    actions = parser.add_subparsers(dest="idea_action", required=True, metavar="<subcommand>")
+
+    add = actions.add_parser("add", help="park an idea")
+    add.add_argument("title")
+    add.add_argument("--description", required=True)
+    add.add_argument("--requester", help="who asked for it")
+    add.add_argument("--deadline", help="YYYY-MM-DD")
+    add.add_argument("--project", help="registered project the idea belongs to")
+    add.set_defaults(handler=_handle_idea_add)
+
+    edit = actions.add_parser("edit", help="change fields of an idea")
+    edit.add_argument("id", type=int)
+    edit.add_argument("--title")
+    edit.add_argument("--description")
+    for name in ("requester", "deadline", "project"):
+        group = edit.add_mutually_exclusive_group()
+        group.add_argument("--" + name)
+        group.add_argument("--no-" + name, action="store_true", help="clear the {}".format(name))
+    edit.set_defaults(handler=_handle_idea_edit)
+
+    delete = actions.add_parser("delete", help="delete an idea once it became code, spec, card or quest")
+    delete.add_argument("id", type=int)
+    delete.set_defaults(handler=_handle_idea_delete)
+
+
 def _add_memory_parser(subparsers):
     parser = subparsers.add_parser("memory", help="add, list or remove items in a party's memory")
     actions = parser.add_subparsers(dest="memory_action", required=True, metavar="<subcommand>")
@@ -1047,6 +1119,13 @@ def build_parser():
 
     notices = subparsers.add_parser("notices", help="list notices addressed to you")
     notices.set_defaults(handler=_handle_notices)
+
+    _add_idea_parser(subparsers)
+
+    ideas = subparsers.add_parser("ideas", help="list ideas, or show one in detail")
+    ideas.add_argument("idea_id", type=int, nargs="?")
+    ideas.add_argument("--project", help="only ideas of this project")
+    ideas.set_defaults(handler=_handle_ideas)
 
     claim = subparsers.add_parser("claim", help="claim a shared area or task, or check a claim")
     claim.add_argument("area")

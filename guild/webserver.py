@@ -14,6 +14,7 @@ from guild.commands import board as board_commands
 from guild.commands import compact as compact_commands
 from guild.commands import handoff as handoff_commands
 from guild.commands import history as history_commands
+from guild.commands import idea as idea_commands
 from guild.commands import memory as memory_commands
 from guild.commands import notice as notice_commands
 from guild.commands import pr as pr_commands
@@ -41,6 +42,8 @@ _RAID_ACTION_RE = re.compile(r"^/api/raids/([^/]+)/(pause|resume)$")
 _MEMORY_ACTION_RE = re.compile(r"^/api/memory/([^/]+)/([1-9][0-9]*)/rm$")
 _TASK_MOVE_RE = re.compile(r"^/api/quests/([^/]+)/tasks/([^/]+)/move$")
 _PARTY_HANDOFF_RE = re.compile(r"^/api/parties/([^/]+)/hand-off$")
+_IDEA_ACTION_RE = re.compile(r"^/api/ideas/([^/]+)/(edit|delete)$")
+_IDEA_CREATE_PATH = "/api/ideas/create"
 _COMPACT_PATH = "/api/compact"
 _SEEN_ALL_PATH = "/api/notices/seen-all"
 _NOTICE_CREATE_PATH = "/api/notices/create"
@@ -157,6 +160,31 @@ def _run_notice_create(payload):
     ctx = _action_context()
     try:
         return notice_commands.create(ctx, payload["text"], payload["to"], payload["ttl"], None)
+    finally:
+        ctx.conn.close()
+
+
+_IDEA_TEXT_KEYS = ("title", "description", "requester", "deadline", "project")
+
+
+def _run_idea_create(payload):
+    ctx = _action_context()
+    try:
+        return idea_commands.add(
+            ctx, payload["title"], payload["description"],
+            payload.get("requester"), payload.get("deadline"), payload.get("project"),
+        )
+    finally:
+        ctx.conn.close()
+
+
+def _run_idea_action(action, idea_id, payload):
+    ctx = _action_context()
+    try:
+        if action == "delete":
+            return idea_commands.delete(ctx, idea_id)
+        fields = {key: payload[key] for key in _IDEA_TEXT_KEYS if key in payload}
+        return idea_commands.edit(ctx, idea_id, fields)
     finally:
         ctx.conn.close()
 
@@ -299,12 +327,23 @@ class BoardRequestHandler(http_server.BaseHTTPRequestHandler):
         if not self._content_type_is_json():
             raise _RequestRejected(415, "content type must be application/json")
 
+    def _check_idea_payload(self, action, payload):
+        required = ("title", "description") if action == "create-idea" else ()
+        for key in required:
+            if not isinstance(payload.get(key), str):
+                raise _RequestRejected(400, "{} must be a string".format(key))
+        for key in _IDEA_TEXT_KEYS:
+            if key in payload and not isinstance(payload[key], str) and payload[key] is not None:
+                raise _RequestRejected(400, "{} must be a string or null".format(key))
+
     def _read_action_payload(self, action):
         payload = self._read_json_object()
         if action == "answer" and not isinstance(payload.get("answer"), str):
             raise _RequestRejected(400, "answer must be a string")
         if action == "create" and not all(isinstance(payload.get(key), str) for key in ("text", "to", "ttl")):
             raise _RequestRejected(400, "text, to and ttl must be strings")
+        if action in ("create-idea", "edit-idea"):
+            self._check_idea_payload(action, payload)
         if action == "move" and not isinstance(payload.get("to"), str):
             raise _RequestRejected(400, "to must be a string")
         if action == "block" and not isinstance(payload.get("reason"), str):
@@ -344,6 +383,15 @@ class BoardRequestHandler(http_server.BaseHTTPRequestHandler):
             return self._post_action(action, lambda payload: _run_raid_action(action, raid_name))
         if path == _NOTICE_CREATE_PATH:
             return self._post_action("create", _run_notice_create)
+        if path == _IDEA_CREATE_PATH:
+            return self._post_action("create-idea", _run_idea_create)
+        idea_match = _IDEA_ACTION_RE.match(path)
+        if idea_match is not None:
+            idea_id, action = idea_match.groups()
+            if not _ASK_ID_RE.match(idea_id):
+                return self._not_found()
+            post_action = "edit-idea" if action == "edit" else "delete-idea"
+            return self._post_action(post_action, lambda payload: _run_idea_action(action, int(idea_id), payload))
         if path == _COMPACT_PATH:
             return self._post_action("compact", lambda payload: _run_compact())
         if path == _SEEN_ALL_PATH:
