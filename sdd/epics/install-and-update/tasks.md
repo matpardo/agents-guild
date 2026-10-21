@@ -18,21 +18,21 @@ updated: 2026-10-17
 ## T02 — Tagged releases and guild version
 
 **Depends on:** T01
-**Status:** [ ] pending
+**Status:** [x] done — #188
 
 **What:** `v0.x.y` tags with a CHANGELOG; `guild version` shows the installed version and whether a newer release exists.
 
 ## T03 — Install script into a managed location
 
 **Depends on:** T02
-**Status:** [ ] pending
+**Status:** [x] done — #188
 
 **What:** an install script that places guild in `~/.local/share/guild/app` pinned to the latest release tag; running it again updates.
 
 ## T04 — guild self-update and new-release hint
 
 **Depends on:** T03
-**Status:** [ ] pending
+**Status:** [x] done — #188
 
 **What:** `guild self-update [--to <tag>]`, and the session-start brief mentions a newer release (checked in the background).
 
@@ -49,3 +49,10 @@ updated: 2026-10-17
 **Status:** [x] done — #172
 
 **What:** `install.sh`, and so every `./update.sh`, printed the hint to add `@~/.claude/GUILD.md` to `~/.claude/CLAUDE.md` even when the line was already there. It now prints only when `grep` does not find the line, following a symlinked `CLAUDE.md`.
+
+## T07 — Doctor reports the timers and `timers.sh` keeps them current
+
+**Depends on:** T01
+**Status:** [x] done — #188
+
+**What:** `install.sh` and `update.sh` never installed the systemd timers, so a fresh machine ran without them. `guild doctor` now warns per timer that is missing or drifted from its template (a moved `guild` path, an edited unit), keeping an installed interval as valid; `./update.sh` runs doctor, so the warning shows after each update. The new `./timers.sh` installs or refreshes the five timers (sync gh/sdd/tracker 10m, resources 2h, compact 1d), keeping the interval of any timer already installed. Nothing installs them unasked.
