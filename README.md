@@ -142,11 +142,13 @@ guild pr set   <owner/repo>#<n> [--lifecycle draft|converging|ready] [--waits ".
                                [--fixes-flaky | --no-fixes-flaky]
                                [--blocked-external "<reason>" | --no-blocked-external]
 guild pr ready-check <owner/repo>#<n>   # read-only: everything standing between the PR and a merge
+guild pr wait <owner/repo>#<n> [--timeout <dur>]   # block until a comment or review by another author, checks finished, merge or close; exit 0 on a change, 3 on timeout, 4 when no sync ran for 30m
 
 guild finding list                              # finding classes of the project with PR counts
 guild finding record <owner/repo>#<n> --class <slug>   # count a recurring audit/review finding class once per PR; with finding_guard_threshold set, one project notice asks for an architecture guard when the class repeats that many times
 
 guild ask "<question>" --context "..." [--ref <ref> ...] [--option "..."]   # refs: pr:<owner/repo>#<n>, task:<quest>/<tid>, card:<KEY>; with exactly one task in progress and no task:/card: ref it is added for you
+guild ask wait <id> [--timeout <dur>]   # block until the ask is answered or dismissed; exit 0 on either, 1 on an unknown id, 3 on timeout (default 2h)
 guild answer <id> "<text>"
 guild dismiss <id>
 guild asks [<id> | --all [--party <name>] [--since <dur>] | --answered [--page <n>] [--party <name>] [--since <dur>]]   # open asks; <id> shows task, card, PR, SDD paths, resume command and recent events; --all adds answered and dismissed with answers
@@ -250,7 +252,7 @@ name, the party's in-progress tasks, their epics, the card keys of the party's
 PRs and of those tasks, and the latest handoff file. With no `task:` or `card:`
 ref and exactly one task in progress, `task:<quest>/<tid>` is added and
 `auto-ref: task:<quest>/<tid>` is printed. With no ref and no single in-progress
-task the ask is refused. `--context` stays required.
+task the ask is refused. `--context` stays required to create an ask.
 
 `guild asks <id>` expands the ask: the task with its SDD spec and tasks paths
 (from the project `sdd` block: the filesystem path with `root`, or
@@ -773,6 +775,31 @@ Out of scope: `on_main_red` (sync cannot tell a first red observation from a
 new failure), `on_worktree_created`, a resource officer (see the `officers`
 epic), detached runs, retries, re-running lock-skipped triggers, and moving
 the runner under a scheduler.
+
+### Waiting for a change
+
+`guild ask wait <id>` and `guild pr wait <owner/repo>#<n>` block until
+something changes, so a session can start them in the background and wake up
+on the change. They poll every 15 seconds and read only guild's stored state:
+no sync, no GitHub call, no write. A PR only changes in that state when a sync
+runs, so keep `guild sync-timer` running; when the PR row has not been synced
+for 30 minutes `pr wait` gives up with exit 4. `--timeout` (default `2h`, such
+as `30m` or `4h`) ends the wait with exit 3.
+
+`ask wait` exits 0 when the ask is answered or dismissed and 1 on an unknown
+id. It never prints the answer: read it with `guild asks <id>`.
+
+`pr wait` exits 0 when the PR is merged or closed (also when it already is),
+when a comment or review by someone other than the PR author appears (the
+count is compared with the one at the start of the wait, whichever head it
+came before), or when its checks go from pending to finished. The output is one
+fixed line with the ref and counts; it never prints comment text. Comments
+from the same account as the PR author do not wake it. Notice-only comments
+configured with `human_ready.notice_comments` do not either. Exit 1 is an
+untracked or malformed ref, or a PR that has not been synced since the comment
+count existed (run `guild sync --source gh` first). The count only moves
+with a sync: a comment deleted and another added between two syncs leaves it
+unchanged and does not wake.
 
 ### `guild sync-timer`
 
@@ -1825,6 +1852,7 @@ All keys. The loader rejects a wrong type with a clear error for every key excep
 - `max_open_prs_per_file` (positive integer, absent: no warning, no extra calls): when a `git push` diff touches a file that this many other open tracked PRs of the project already change, `pre-push` warns (never denies) naming the file and those PRs. Needs `guild sync --source gh`, which then stores the changed files of every open tracked PR (`pr_files`, one `gh pr view` call per PR). Exclusive `area:` claims stay for files that need exclusivity.
 - `finding_guard_threshold` (positive integer, absent: findings are recorded silently): when `guild finding record` has counted that many distinct PRs for one finding class, one notice to `project:<name>` asks to make the class an architecture guard.
 - `human_ready.ci_label` (non-empty string, absent: no label tracking): the label that makes the project run CI. `guild sync --source gh` stores per PR whether it carries the label (`prs.ci_label`) and how many comments or reviews by other authors came after the head commit (`prs.comments_after_head`). It also stores `prs.checks_billing` for PRs with failing checks (see Main blocked by billing). `guild pr ready-check` and the web queue read these stored facts: a comment or review after the head makes the PR not ready, and a PR without checks whose label is absent is `ready (CI pending)` and names the label.
+- `human_ready.notice_comments` (list of `{"author": "<login>", "text": "<literal>"}`, absent: every entry counts): comments and reviews that review nothing, such as budget or trial notices of a bot. An entry is notice-only when its author equals `author` AND its body contains `text`, both compared case-insensitively; a review body can be empty. Both values are non-empty strings and no other key is allowed. It applies to comments and reviews. Only `guild pr wait` reads it: notice-only entries do not wake it, while human-ready (`comments_after_head`) is unchanged. Example: `{"author": "notifier", "text": "Usage notice"}`. Stored per PR as `prs.other_author_comments`.
 - `human_ready.trace_validator` (object, absent: no trace check): `{"command": [<argv>...], "timeout_seconds": N}` with `command` a non-empty list of non-empty strings and `timeout_seconds` an integer from 1 to 300. For each `ready` tracked PR, `guild sync --source gh` runs it as argv without a shell, from the main checkout of the PR's repo, in its own process group that is killed at the timeout. `{head_sha}` (hex), `{pr}` (integer) and `{comments_file}` (a 0600 temporary JSON shaped like `gh pr view --json comments,reviews`, deleted after the run) are replaced inside the elements. Exit 0 means the trace is valid; any other exit means invalid, with the last line of the output as reason (200 characters, control sequences stripped, withheld when it matches the personal-data, secret or instruction screen). A timeout, a launch error or a missing clone leaves the trace not validated, never valid. The result is stored as `prs.trace_valid` and `prs.trace_reason` in the sync record, which `guild export` includes: print only a short reason. The validator must be side-effect free and idempotent. Trust boundary: the validator inherits guild's full environment, including any tokens, so write it as a script you trust and keep it free of side effects. A repo-relative command runs from the main checkout, which may be on a branch whose files the PR changed, so prefer an absolute path to a reviewed script. The check runs for every `ready` tracked PR on every sync, one after another, each up to its timeout. The stored result is as fresh as the last sync: right after the key is added or a PR becomes Ready, the PR counts as having no trace result until the next sync. `guild pr ready-check` and the web queue read the stored result and never run the command.
 - `handoff_retention_days` (positive integer, at most 3650, absent: kept forever): days after a party closes at which `guild handoff prune` deletes its last handoff file.
 - `pii_patterns` (list of regexes, absent: only the built-in email pattern): checked against notice text, ask question/context, answer text and handoff `--in-flight`/`--learned` for the caller's project. A match rejects the command with an error that names the field, never the matched text.

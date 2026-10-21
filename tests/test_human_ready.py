@@ -2,6 +2,7 @@ import json
 import shutil
 import sqlite3
 import sys
+import time
 import unittest
 
 from guild import human_ready
@@ -42,6 +43,63 @@ class CommentsAfterHeadTests(unittest.TestCase):
     def test_deleted_author_counts_as_another_author(self):
         comments = [{"author": None, "createdAt": "2026-10-20T11:00:00Z"}]
         self.assertEqual(human_ready.comments_after_head(_HEAD, "me", comments, []), 1)
+
+
+def _body(entry, text):
+    return dict(entry, body=text)
+
+
+_NOTICE_RULES = [{"author": "notifier", "text": "usage notice"}]
+
+
+class OtherAuthorCommentsTests(unittest.TestCase):
+    def _count(self, author, comments, reviews, rules):
+        return human_ready.other_author_comments(author, comments, reviews, rules)
+
+    def test_counts_entries_by_others_before_and_after_the_head(self):
+        comments = [_comment("bot", "2026-10-20T09:00:00Z"), _comment("bot", "2026-10-20T11:00:00Z")]
+        self.assertEqual(self._count("me", comments, [_review("bot", "2026-10-20T08:00:00Z")], []), 3)
+
+    def test_excludes_the_pr_author(self):
+        comments = [_comment("me", "2026-10-20T11:00:00Z"), _comment("bot", "2026-10-20T11:00:00Z")]
+        self.assertEqual(self._count("me", comments, [], []), 1)
+
+    def test_skips_entry_matching_rule_author_and_pattern(self):
+        comments = [_body(_comment("notifier", _HEAD), "Usage notice: budget")]
+        self.assertEqual(self._count("me", comments, [], _NOTICE_RULES), 0)
+
+    def test_keeps_matching_body_by_another_author(self):
+        comments = [_body(_comment("other", _HEAD), "Usage notice: budget")]
+        self.assertEqual(self._count("me", comments, [], _NOTICE_RULES), 1)
+
+    def test_keeps_rule_author_when_body_does_not_match(self):
+        reviews = [_body(_review("notifier", _HEAD), "LGTM")]
+        self.assertEqual(self._count("me", [], reviews, _NOTICE_RULES), 1)
+
+    def test_review_without_body_is_kept(self):
+        self.assertEqual(self._count("me", [], [_review("notifier", _HEAD)], _NOTICE_RULES), 1)
+
+    def test_author_match_ignores_case(self):
+        comments = [_body(_comment("Notifier", _HEAD), "Usage notice: budget")]
+        self.assertEqual(self._count("me", comments, [], _NOTICE_RULES), 0)
+
+    def test_no_pr_author_counts_everything(self):
+        comments = [_comment("me", _HEAD), _comment("bot", _HEAD)]
+        self.assertEqual(self._count(None, comments, [], []), 2)
+
+    def test_text_matches_body_in_a_different_case(self):
+        comments = [_body(_comment("notifier", _HEAD), "USAGE NOTICE: budget")]
+        self.assertEqual(self._count("me", comments, [], _NOTICE_RULES), 0)
+
+    def test_hostile_long_body_from_rule_author_returns_promptly(self):
+        comments = [_body(_comment("notifier", _HEAD), "a" * 100000 + "b")]
+        started = time.monotonic()
+        self.assertEqual(self._count("me", comments, [], _NOTICE_RULES), 1)
+        self.assertLess(time.monotonic() - started, 5)
+
+    def test_text_beyond_two_thousand_characters_still_matches(self):
+        comments = [_body(_comment("notifier", _HEAD), "x" * 5000 + "usage notice")]
+        self.assertEqual(self._count("me", comments, [], _NOTICE_RULES), 0)
 
 
 class HeadCommitDateTests(unittest.TestCase):
@@ -151,6 +209,25 @@ class SyncFreshnessFactsTests(MergeQueueTestCase):
         after = self.query("SELECT last_activity_at, comments_after_head, ci_label FROM prs WHERE number = 1")[0]
         self.assertEqual((after["comments_after_head"], after["ci_label"]), (0, 0))
         self.assertEqual(after["last_activity_at"], before)
+
+    def test_stores_other_author_comments_excluding_notice_rules(self):
+        self._set_project_config(
+            {"human_ready": {"notice_comments": [{"author": "bot", "text": "usage"}]}}
+        )
+        notice = _body(_comment("bot", "2026-10-20T11:00:00Z"), "Usage notice")
+        real = _body(_comment("human", "2026-10-20T09:00:00Z"), "please fix")
+        self._view(comments=[notice, real, _comment("me", "2026-10-20T11:00:00Z")], reviews=[])
+        self.sync_gh("sess-1")
+        count = self.query("SELECT other_author_comments FROM prs WHERE number = 1")[0]
+        self.assertEqual(count["other_author_comments"], 1)
+
+    def test_other_author_comments_survive_rebuild(self):
+        self._view()
+        self.sync_gh("sess-1")
+        before = self.query("SELECT other_author_comments FROM prs WHERE number = 1")[0][0]
+        self.assertEqual(before, 2)
+        self.run_cli(["rebuild"], None, None)
+        self.assertEqual(self.query("SELECT other_author_comments FROM prs WHERE number = 1")[0][0], 2)
 
     def test_rebuild_reproduces_the_columns(self):
         self._set_ci_label()

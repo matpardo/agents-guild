@@ -1,4 +1,4 @@
-from guild import config, db, events, identity, merge_queue, refs, sanitize
+from guild import config, db, events, identity, merge_queue, polling, refs, sanitize
 from guild.adapters import github
 from guild.commands import main_status as main_status_commands
 from guild.commands import merge_queue as merge_queue_commands
@@ -11,8 +11,8 @@ _DRAFT_READY_HINT = (
 )
 
 
-def _load_pr(ctx, repo, number):
-    row = ctx.conn.execute(
+def _load_pr(conn, repo, number):
+    row = conn.execute(
         "SELECT * FROM prs WHERE repo = ? AND number = ?", (repo, number)
     ).fetchone()
     if row is None:
@@ -85,7 +85,7 @@ def track(ctx, ref, task_ref, card, what, waits, needs_human_pr_review, fixes_ma
 
 
 def acknowledge_comments(ctx, repo, number):
-    row = _load_pr(ctx, repo, number)
+    row = _load_pr(ctx.conn, repo, number)
     with db.writing(ctx.conn):
         events.record(
             ctx.conn,
@@ -145,7 +145,7 @@ def _record_pr_set(ctx, actor, project, repo, number, fields):
 
 def _set_blocked_external_as_human(ctx, ref, reason):
     repo, number = refs.parse_pr_ref(ref)
-    row = _load_pr(ctx, repo, number)
+    row = _load_pr(ctx.conn, repo, number)
     fields = _current_fields(row)
     fields["blocked_external"] = reason
     _record_pr_set(ctx, None, merge_queue_commands._project_for_repo(ctx, repo), repo, number, fields)
@@ -177,7 +177,7 @@ def set_(
         )
     repo, number = refs.parse_pr_ref(ref)
     binding = identity.require_binding(ctx.conn, ctx.session_id)
-    row = _load_pr(ctx, repo, number)
+    row = _load_pr(ctx.conn, repo, number)
     project = config.require_project(ctx.cwd, ctx.projects_dir)
     fields = _current_fields(row)
     fields["lifecycle"] = lifecycle if lifecycle is not None else row["lifecycle"]
@@ -197,7 +197,7 @@ def set_(
 
 def ready_check(ctx, ref):
     repo, number = refs.parse_pr_ref(ref)
-    row = _load_pr(ctx, repo, number)
+    row = _load_pr(ctx.conn, repo, number)
     if row["lifecycle"] in _CLOSED_LIFECYCLES:
         raise GuildError("PR '{}' is {}: nothing left to merge".format(ref, row["lifecycle"]), 1)
     records = merge_queue_commands.open_pr_records(ctx.conn)
@@ -215,3 +215,85 @@ def ready_check(ctx, ref):
     ready = entry["action"] == "merge" and entry["human_state"] in merge_queue.HUMAN_READY_STATES
     exit_code = 0 if ready and not gates else 1
     return [sanitize.strip_control_sequences(line) for line in lines], exit_code
+
+
+_STALE_SECONDS = 1800
+
+
+class _PrWatch:
+    def __init__(self, ref, started_at):
+        self._ref = ref
+        self._baseline = None
+        self._seen_pending = False
+        self._synced_at = None
+        self._changed_at = started_at
+
+    def check(self, row, now):
+        closed = self._closed_line(row)
+        if closed is not None:
+            return closed, 0
+        if self._new_discussion(row["other_author_comments"]):
+            return "{} new comment or review".format(self._ref), 0
+        if self._checks_finished(row):
+            return "{} checks finished: {} failing, {} passing".format(
+                self._ref, row["checks_failing"] or 0, row["checks_passing"] or 0
+            ), 0
+        if self._stale(row["synced_at"], now):
+            return (
+                "{}: no sync for 30m: run guild sync --source gh or install guild sync-timer".format(self._ref),
+                4,
+            )
+        return None
+
+    def _closed_line(self, row):
+        if row["lifecycle"] in _CLOSED_LIFECYCLES:
+            return "{} {}".format(self._ref, row["lifecycle"])
+        return None
+
+    def _new_discussion(self, current):
+        if current is None:
+            return False
+        baseline = self._baseline
+        self._baseline = current if baseline is None else min(baseline, current)
+        return baseline is not None and current > baseline
+
+    def _checks_finished(self, row):
+        pending = row["checks_pending"]
+        if pending:
+            self._seen_pending = True
+        return self._seen_pending and pending == 0
+
+    def _stale(self, synced_at, now):
+        if synced_at != self._synced_at:
+            self._synced_at = synced_at
+            self._changed_at = now
+            return False
+        return (now - self._changed_at).total_seconds() > _STALE_SECONDS
+
+
+def _read_pr(conn, repo, number):
+    row = conn.execute(
+        "SELECT lifecycle, other_author_comments, checks_pending, checks_failing, checks_passing, synced_at"
+        " FROM prs WHERE repo = ? AND number = ?",
+        (repo, number),
+    ).fetchone()
+    if row is None:
+        raise GuildError("PR '{}#{}' is no longer tracked".format(repo, number), 1)
+    return row
+
+
+def wait(conn, ref, timeout, sleep, clock):
+    repo, number = refs.parse_pr_ref(ref)
+    if _load_pr(conn, repo, number)["other_author_comments"] is None:
+        raise GuildError("no sync data yet for {}: run guild sync --source gh first".format(ref), 1)
+    watch = _PrWatch(ref, clock())
+    result = polling.until(
+        lambda: _read_pr(conn, repo, number),
+        lambda row: watch.check(row, clock()),
+        timeout,
+        sleep,
+        clock,
+    )
+    if result is None:
+        return "{} no change in {}".format(ref, polling.timeout_label(timeout)), 3
+    return result

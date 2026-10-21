@@ -66,6 +66,38 @@ class ValidateProjectConfigTests(unittest.TestCase):
             with self.assertRaises(GuildError, msg=bad):
                 config.validate_project_config(dict(_BASE_CONFIG, human_ready={"trace_validator": bad}))
 
+    def test_human_ready_accepts_notice_comments(self):
+        rules = [{"author": "notifier", "text": "Usage notice"}]
+        config.validate_project_config(dict(_BASE_CONFIG, human_ready={"notice_comments": rules}))
+        config.validate_project_config(dict(_BASE_CONFIG, human_ready={"notice_comments": []}))
+
+    def test_human_ready_rejects_bad_notice_comments(self):
+        good = {"author": "notifier", "text": "x"}
+        bad_values = [
+            "x",
+            {"author": "a", "text": "b"},
+            [["a", "b"]],
+            [dict(good, extra=1)],
+            [{"text": "x"}],
+            [{"author": "a"}],
+            [dict(good, author="")],
+            [dict(good, text="")],
+            [dict(good, text=3)],
+            [{"author": "notifier", "pattern": "^x"}],
+            [{"author": "notifier", "text": "x", "pattern": "^x"}],
+            [dict(good, author=3)],
+        ]
+        for bad in bad_values:
+            with self.assertRaises(GuildError, msg=bad):
+                config.validate_project_config(dict(_BASE_CONFIG, human_ready={"notice_comments": bad}))
+
+    def test_human_ready_rejects_bad_notice_comments_naming_the_key(self):
+        rules = [{"author": "notifier", "pattern": "^x"}]
+        with self.assertRaises(GuildError) as raised:
+            config.validate_project_config(dict(_BASE_CONFIG, human_ready={"notice_comments": rules}))
+        self.assertIn("human_ready.notice_comments", str(raised.exception))
+        self.assertEqual(raised.exception.exit_code, 1)
+
     def test_allows_unknown_keys(self):
         config.validate_project_config(
             {

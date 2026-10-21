@@ -331,7 +331,7 @@ def _pr_synced(conn, event):
         " checks_failing = ?, checks_passing = ?, checks_pending = ?, mergeable = ?, review_comment_count = ?,"
         " review_decision = ?, merge_state = ?, base_branch = ?, unresolved_threads = ?,"
         " head_sha = ?, synced_at = ?, last_activity_at = ?, comments_after_head = ?, ci_label = ?,"
-        " checks_billing = ?, trace_valid = ?, trace_reason = ?"
+        " checks_billing = ?, trace_valid = ?, trace_reason = ?, other_author_comments = ?"
         " WHERE repo = ? AND number = ?",
         (
             payload["lifecycle"],
@@ -356,6 +356,7 @@ def _pr_synced(conn, event):
             payload.get("checks_billing"),
             payload.get("trace_valid"),
             payload.get("trace_reason"),
+            payload.get("other_author_comments"),
             payload["repo"],
             payload["number"],
         ),

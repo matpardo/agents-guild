@@ -1,6 +1,6 @@
 import re
 
-from guild import config, db, events, identity, pii, refs, session_info
+from guild import config, db, events, identity, pii, polling, refs, session_info
 from guild.ids import next_id
 from guild.errors import GuildError
 
@@ -203,3 +203,31 @@ def dismiss(ctx, ask_id):
             {"id": ask_id},
         )
     return "ask #{} dismissed".format(ask_id)
+
+
+def _ask_state(conn, ask_id):
+    row = conn.execute("SELECT state FROM asks WHERE id = ?", (ask_id,)).fetchone()
+    if row is None:
+        raise GuildError("unknown ask #{}".format(ask_id), 1)
+    return row["state"]
+
+
+def _settled_line(ask_id, state):
+    if state == "answered":
+        return "ask #{} answered: read it with guild asks {}".format(ask_id, ask_id), 0
+    if state == "dismissed":
+        return "ask #{} dismissed".format(ask_id), 0
+    return None
+
+
+def wait(conn, ask_id, timeout, sleep, clock):
+    result = polling.until(
+        lambda: _ask_state(conn, ask_id),
+        lambda state: _settled_line(ask_id, state),
+        timeout,
+        sleep,
+        clock,
+    )
+    if result is None:
+        return "ask #{} still open after {}".format(ask_id, polling.timeout_label(timeout)), 3
+    return result
