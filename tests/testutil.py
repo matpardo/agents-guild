@@ -1,4 +1,5 @@
 import contextlib
+import functools
 import io
 import json
 import os
@@ -6,13 +7,16 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
+from guild import cli
 from guild.cli import main
-from tests import fake_acli
+from tests import fake_acli, fake_gh
 
 _REPO_ROOT = Path(__file__).resolve().parents[1]
 _FAKE_GH_SCRIPT = _REPO_ROOT / "tests" / "fake_gh.py"
 _FAKE_ACLI_SCRIPT = _REPO_ROOT / "tests" / "fake_acli.py"
+_cached_parser = functools.lru_cache(maxsize=None)(cli.build_parser)
 
 
 class GuildTestCase(unittest.TestCase):
@@ -57,8 +61,23 @@ class GuildTestCase(unittest.TestCase):
         os.environ["GUILD_TEST_GH_DIR"] = str(self.gh_fixtures_dir)
         os.environ["GUILD_TEST_ACLI_DIR"] = str(self.acli_fixtures_dir)
         os.environ["GUILD_ORIGIN"] = "tester@host"
+        os.environ["LANGUAGE"] = "C"
         os.environ["PATH"] = str(self.bin_dir) + os.pathsep + os.environ.get("PATH", "")
         os.environ.pop("CLAUDE_CODE_SESSION_ID", None)
+        self._patch_runner("guild.cli.build_parser", _cached_parser)
+        self._patch_runner("guild.adapters.github._run", self._fake_gh_run)
+        self._patch_runner("guild.adapters.jira_acli._run", self._fake_acli_run)
+
+    def _patch_runner(self, target, replacement):
+        patcher = mock.patch(target, replacement)
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
+    def _fake_gh_run(self, args, cwd, capture_output, text):
+        return fake_gh.respond(str(self.gh_fixtures_dir), args[1:])
+
+    def _fake_acli_run(self, args, capture_output, text):
+        return fake_acli.respond(str(self.acli_fixtures_dir), args[1:])
 
     def tearDown(self):
         os.environ.clear()

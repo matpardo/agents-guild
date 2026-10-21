@@ -1,34 +1,28 @@
 #!/usr/bin/env python3
 import json
 import os
+import subprocess
 import sys
 
 
-def _fixtures_dir():
-    return os.environ["GUILD_TEST_GH_DIR"]
-
-
-def _respond(name):
-    directory = _fixtures_dir()
+def _respond(directory, name):
     ok_path = os.path.join(directory, name + ".json")
     err_path = os.path.join(directory, name + ".err")
     if os.path.isfile(err_path):
-        sys.stderr.write(open(err_path).read())
-        sys.exit(1)
+        with open(err_path) as handle:
+            return subprocess.CompletedProcess([], 1, "", handle.read())
     if os.path.isfile(ok_path):
-        sys.stdout.write(open(ok_path).read())
-        sys.exit(0)
-    sys.stderr.write("no fixture for " + name)
-    sys.exit(1)
+        with open(ok_path) as handle:
+            return subprocess.CompletedProcess([], 0, handle.read(), "")
+    return subprocess.CompletedProcess([], 1, "", "no fixture for " + name)
 
 
-def _respond_graphql(name):
-    if not os.path.isfile(os.path.join(_fixtures_dir(), name + ".json")) and not os.path.isfile(
-        os.path.join(_fixtures_dir(), name + ".err")
+def _respond_graphql(directory, name):
+    if not os.path.isfile(os.path.join(directory, name + ".json")) and not os.path.isfile(
+        os.path.join(directory, name + ".err")
     ):
-        sys.stdout.write(json.dumps(_threads_response([])))
-        sys.exit(0)
-    _respond(name)
+        return subprocess.CompletedProcess([], 0, json.dumps(_threads_response([])), "")
+    return _respond(directory, name)
 
 
 def _threads_response(resolved_flags):
@@ -36,47 +30,42 @@ def _threads_response(resolved_flags):
     return {"data": {"repository": {"pullRequest": {"reviewThreads": {"nodes": nodes}}}}}
 
 
-def main():
-    args = sys.argv[1:]
+def respond(directory, args):
     if args[:2] == ["pr", "view"]:
         number = args[2]
-        repo_index = args.index("--repo") + 1
-        repo = args[repo_index]
-        json_index = args.index("--json") + 1
-        fields = args[json_index]
+        repo = args[args.index("--repo") + 1]
+        fields = args[args.index("--json") + 1]
         prefix = "view_files" if "files" in fields.split(",") else "view"
-        _respond("{}_{}_{}".format(prefix, repo.replace("/", "-"), number))
-        return
+        return _respond(directory, "{}_{}_{}".format(prefix, repo.replace("/", "-"), number))
     if args[:2] == ["pr", "ready"]:
         repo = args[args.index("--repo") + 1]
-        with open(os.path.join(_fixtures_dir(), "ready_calls.log"), "a") as log:
+        with open(os.path.join(directory, "ready_calls.log"), "a") as log:
             log.write("{} {}\n".format(repo, args[2]))
-        _respond("ready_{}_{}".format(repo.replace("/", "-"), args[2]))
-        return
+        return _respond(directory, "ready_{}_{}".format(repo.replace("/", "-"), args[2]))
     if args[:2] == ["pr", "list"] and "--repo" in args:
         repo = args[args.index("--repo") + 1]
-        _respond("open_{}".format(repo.replace("/", "-")))
-        return
+        return _respond(directory, "open_{}".format(repo.replace("/", "-")))
     if args[:2] == ["pr", "list"]:
-        head_index = args.index("--head") + 1
-        branch = args[head_index]
-        _respond("list_{}".format(branch.replace("/", "-")))
-        return
+        branch = args[args.index("--head") + 1]
+        return _respond(directory, "list_{}".format(branch.replace("/", "-")))
     if args[:2] == ["api", "graphql"]:
         values = dict(arg.split("=", 1) for arg in args if "=" in arg and not arg.startswith("query="))
-        _respond_graphql("threads_{}-{}_{}".format(values["owner"], values["name"], values["number"]))
-        return
+        return _respond_graphql(directory, "threads_{}-{}_{}".format(values["owner"], values["name"], values["number"]))
     if args[:1] == ["api"]:
         parts = args[1].split("/")
         repo = "-".join(parts[1:3])
         if parts[3] == "check-runs":
-            _respond("annotations_{}_{}".format(repo, parts[4]))
-            return
+            return _respond(directory, "annotations_{}_{}".format(repo, parts[4]))
         branch = "-".join(parts[4:-1])
-        _respond("branch_checks_{}_{}".format(repo, branch))
-        return
-    sys.stderr.write("fake gh: unhandled args {}".format(args))
-    sys.exit(1)
+        return _respond(directory, "branch_checks_{}_{}".format(repo, branch))
+    return subprocess.CompletedProcess([], 1, "", "fake gh: unhandled args {}".format(args))
+
+
+def main():
+    result = respond(os.environ["GUILD_TEST_GH_DIR"], sys.argv[1:])
+    sys.stdout.write(result.stdout)
+    sys.stderr.write(result.stderr)
+    sys.exit(result.returncode)
 
 
 if __name__ == "__main__":

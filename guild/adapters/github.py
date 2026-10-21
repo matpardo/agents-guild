@@ -6,8 +6,12 @@ class GhCommandError(Exception):
     pass
 
 
+def _run(args, cwd, capture_output, text):
+    return subprocess.run(args, cwd=cwd, capture_output=capture_output, text=text)
+
+
 def pr_view(cwd, repo, number, fields):
-    result = subprocess.run(
+    result = _run(
         ["gh", "pr", "view", str(number), "--repo", repo, "--json", ",".join(fields)],
         cwd=str(cwd),
         capture_output=True,
@@ -19,7 +23,7 @@ def pr_view(cwd, repo, number, fields):
 
 
 def pr_ready(cwd, repo, number):
-    result = subprocess.run(
+    result = _run(
         ["gh", "pr", "ready", str(number), "--repo", repo],
         cwd=str(cwd),
         capture_output=True,
@@ -30,7 +34,7 @@ def pr_ready(cwd, repo, number):
 
 
 def pr_diff(cwd, repo, number):
-    result = subprocess.run(
+    result = _run(
         [
             "gh", "pr", "view", str(number), "--repo", repo, "--json",
             "files,additions,deletions,createdAt",
@@ -51,7 +55,7 @@ def pr_diff(cwd, repo, number):
 
 
 def pr_list_for_branch(cwd, branch, fields):
-    result = subprocess.run(
+    result = _run(
         ["gh", "pr", "list", "--head", branch, "--state", "all", "--json", ",".join(fields)],
         cwd=str(cwd),
         capture_output=True,
@@ -63,7 +67,7 @@ def pr_list_for_branch(cwd, branch, fields):
 
 
 def pr_list_open(cwd, repo, fields):
-    result = subprocess.run(
+    result = _run(
         ["gh", "pr", "list", "--repo", repo, "--state", "open", "--json", ",".join(fields)],
         cwd=str(cwd),
         capture_output=True,
@@ -75,7 +79,7 @@ def pr_list_open(cwd, repo, fields):
 
 
 def branch_checks(cwd, repo, branch):
-    result = subprocess.run(
+    result = _run(
         ["gh", "api", "repos/{}/commits/{}/check-runs".format(repo, branch)],
         cwd=str(cwd),
         capture_output=True,
@@ -95,7 +99,7 @@ def branch_checks(cwd, repo, branch):
 
 
 def check_run_annotation_messages(cwd, repo, check_run_id):
-    result = subprocess.run(
+    result = _run(
         ["gh", "api", "repos/{}/check-runs/{}/annotations".format(repo, check_run_id)],
         cwd=str(cwd),
         capture_output=True,
@@ -116,7 +120,7 @@ _UNRESOLVED_THREADS_QUERY = (
 
 def unresolved_thread_count(cwd, repo, number):
     owner, name = repo.split("/", 1)
-    result = subprocess.run(
+    result = _run(
         [
             "gh", "api", "graphql",
             "-f", "query={}".format(_UNRESOLVED_THREADS_QUERY),

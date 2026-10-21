@@ -26,9 +26,13 @@ def _parse_item(item):
     }
 
 
+def _run(args, capture_output, text):
+    return subprocess.run(args, capture_output=capture_output, text=text)
+
+
 def _search(jql):
     try:
-        result = subprocess.run(
+        result = _run(
             ["acli", "jira", "workitem", "search", "--jql", jql, "--fields", _FIELDS, "--json", "--paginate"],
             capture_output=True,
             text=True,
