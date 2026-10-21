@@ -1,8 +1,9 @@
 import json
 import sqlite3
+import unittest
 from datetime import timedelta
 
-from guild import db, paths, timeutil
+from guild import db, paths, polling, timeutil
 from guild.cli import _build_context
 from guild.commands import ask as ask_commands
 from guild.commands import pr as pr_commands
@@ -42,6 +43,14 @@ class _LockedOnce:
         if self.reads == self._fail_on_read:
             raise sqlite3.OperationalError("database is locked")
         return self._conn.execute(sql, params)
+
+
+class UntilTests(unittest.TestCase):
+    def test_last_sleep_is_capped_at_the_remaining_time(self):
+        fake = _FakeTime()
+        result = polling.until(lambda: None, lambda snapshot: None, timedelta(seconds=20), fake.sleep, fake.clock)
+        self.assertIsNone(result)
+        self.assertEqual(fake.sleeps, [15, 5])
 
 
 class WaitTestCase(MergeQueueTestCase):
@@ -249,6 +258,27 @@ class PrWaitTests(WaitTestCase):
         for call in range(1, 13):
             self.time.on_sleep[call] = touch
         self.assertEqual(self._wait(_REF, timedelta(minutes=3)), ("acme/app#7 no change in 3m", 3))
+
+    def test_null_comment_count_refuses_without_sleeping(self):
+        self._sql("UPDATE prs SET other_author_comments = NULL WHERE number = 7")
+        with self.assertRaises(GuildError) as raised:
+            self._wait(_REF, _TWO_HOURS)
+        self.assertEqual(raised.exception.exit_code, 1)
+        self.assertEqual(str(raised.exception), "no sync data yet for acme/app#7: run guild sync --source gh first")
+        self.assertEqual(self.time.sleeps, [])
+
+    def test_row_removed_mid_wait_raises_clean_error(self):
+        self.time.on_sleep[1] = lambda: self._sql("DELETE FROM prs WHERE number = 7")
+        with self.assertRaises(GuildError) as raised:
+            self._wait(_REF, _TWO_HOURS)
+        self.assertEqual(raised.exception.exit_code, 1)
+        self.assertEqual(str(raised.exception), "PR 'acme/app#7' is no longer tracked")
+
+    def _sql(self, statement):
+        raw = sqlite3.connect(str(paths.db_path()))
+        raw.execute(statement)
+        raw.commit()
+        raw.close()
 
     def test_cli_untracked_exits_one(self):
         code, out, err = self.run_cli(["pr", "wait", "acme/app#99"], "sess-1", self.repo_dir)

@@ -14,9 +14,10 @@ def until(read, check, timeout, sleep, clock):
         result = check(snapshot)
         if result is not None:
             return result
-        if clock() >= deadline:
+        remaining = (deadline - clock()).total_seconds()
+        if remaining <= 0:
             return None
-        sleep(POLL_SECONDS)
+        sleep(min(POLL_SECONDS, remaining))
         snapshot = _reread(read, snapshot)
 
 

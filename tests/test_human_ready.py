@@ -2,6 +2,7 @@ import json
 import shutil
 import sqlite3
 import sys
+import time
 import unittest
 
 from guild import human_ready
@@ -85,6 +86,23 @@ class OtherAuthorCommentsTests(unittest.TestCase):
     def test_no_pr_author_counts_everything(self):
         comments = [_comment("me", _HEAD), _comment("bot", _HEAD)]
         self.assertEqual(self._count(None, comments, [], []), 2)
+
+    def test_hostile_body_from_rule_author_returns_promptly(self):
+        rules = [{"author": "notifier", "pattern": "(a+)+$"}]
+        comments = [_body(_comment("notifier", _HEAD), "a" * 3000 + "b")]
+        started = time.monotonic()
+        self.assertEqual(self._count("me", comments, [], rules), 0)
+        self.assertLess(time.monotonic() - started, 5)
+
+    def test_short_notice_body_still_matches_under_the_cap(self):
+        rules = [{"author": "notifier", "pattern": "budget$"}]
+        comments = [_body(_comment("notifier", _HEAD), "Usage notice: budget")]
+        self.assertEqual(self._count("me", comments, [], rules), 0)
+
+    def test_match_beyond_the_cap_is_not_a_notice(self):
+        rules = [{"author": "notifier", "pattern": "needle"}]
+        comments = [_body(_comment("notifier", _HEAD), "x" * 2000 + "needle")]
+        self.assertEqual(self._count("me", comments, [], rules), 1)
 
 
 class HeadCommitDateTests(unittest.TestCase):

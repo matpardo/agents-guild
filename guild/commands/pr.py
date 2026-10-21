@@ -272,16 +272,20 @@ class _PrWatch:
 
 
 def _read_pr(conn, repo, number):
-    return conn.execute(
+    row = conn.execute(
         "SELECT lifecycle, other_author_comments, checks_pending, checks_failing, checks_passing, synced_at"
         " FROM prs WHERE repo = ? AND number = ?",
         (repo, number),
     ).fetchone()
+    if row is None:
+        raise GuildError("PR '{}#{}' is no longer tracked".format(repo, number), 1)
+    return row
 
 
 def wait(conn, ref, timeout, sleep, clock):
     repo, number = refs.parse_pr_ref(ref)
-    _load_pr(conn, repo, number)
+    if _load_pr(conn, repo, number)["other_author_comments"] is None:
+        raise GuildError("no sync data yet for {}: run guild sync --source gh first".format(ref), 1)
     watch = _PrWatch(ref, clock())
     result = polling.until(
         lambda: _read_pr(conn, repo, number),
