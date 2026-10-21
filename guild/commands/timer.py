@@ -1,3 +1,4 @@
+import re
 import subprocess
 
 from guild import timeutil
@@ -10,6 +11,8 @@ Description={description}
 Type=oneshot
 {options}ExecStart={executable} {subcommand}
 """
+
+_INTERVAL_RE = re.compile(r"^OnUnitActiveSec=(\d+)s$", re.MULTILINE)
 
 _TIMER_TEMPLATE = """[Unit]
 Description=Run {description} periodically
@@ -111,8 +114,7 @@ def _print_hint(unit):
     return "run `guild {} print` and install the units by hand".format(unit.command_name)
 
 
-def render_units(unit, guild_executable, every):
-    seconds = int(timeutil.parse_duration(every).total_seconds())
+def _render_seconds(unit, guild_executable, seconds):
     service = _SERVICE_TEMPLATE.format(
         description=unit.description,
         options=unit.service_options,
@@ -121,6 +123,26 @@ def render_units(unit, guild_executable, every):
     )
     timer = _TIMER_TEMPLATE.format(description=unit.description, seconds=seconds, service=unit.service_name)
     return service, timer
+
+
+def render_units(unit, guild_executable, every):
+    seconds = int(timeutil.parse_duration(every).total_seconds())
+    return _render_seconds(unit, guild_executable, seconds)
+
+
+def installed_state(unit, unit_dir, guild_executable):
+    service_path = unit_dir / unit.service_name
+    timer_path = unit_dir / unit.timer_name
+    if not service_path.exists() or not timer_path.exists():
+        return "missing"
+    installed_timer = timer_path.read_text()
+    interval = _INTERVAL_RE.search(installed_timer)
+    if interval is None:
+        return "drifted"
+    service, timer = _render_seconds(unit, guild_executable, int(interval.group(1)))
+    if service_path.read_text() == service and installed_timer == timer:
+        return "current"
+    return "drifted"
 
 
 def print_units(unit, guild_executable, every):

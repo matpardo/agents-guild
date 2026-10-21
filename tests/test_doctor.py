@@ -47,6 +47,9 @@ class DoctorTests(GuildTestCase):
         self.env = mock.patch.dict(os.environ, {"HOME": str(self.home)})
         self.env.start()
         self.addCleanup(self.env.stop)
+        platform = mock.patch("guild.commands.doctor.sys.platform", "darwin")
+        platform.start()
+        self.addCleanup(platform.stop)
 
     def _write_settings(self, hooks):
         self._write_full_settings(hooks, _ASK_RULES, _ALLOW_RULES)
@@ -217,6 +220,56 @@ class DoctorTests(GuildTestCase):
 
     def test_no_unit_warning_without_leftover(self):
         self.assertNotIn("retired dispatcher", self._doctor_out_for_clean_setup())
+
+    def _write_current_timers(self):
+        from guild.commands import timer as timer_commands
+
+        unit_dir = self.config_home / "systemd" / "user"
+        unit_dir.mkdir(parents=True)
+        for unit in timer_commands.UNITS.values():
+            service, timer = timer_commands.render_units(unit, "/usr/bin/guild", "10m")
+            (unit_dir / unit.service_name).write_text(service)
+            (unit_dir / unit.timer_name).write_text(timer)
+        return unit_dir
+
+    def _doctor_with_timer_env(self, systemctl="/usr/bin/systemctl", platform="linux"):
+        def which(name):
+            return {"guild": "/usr/bin/guild", "systemctl": systemctl}.get(name)
+
+        with mock.patch("guild.commands.doctor.shutil.which", side_effect=which), mock.patch(
+            "guild.commands.doctor.sys.platform", platform
+        ):
+            return self._doctor_out_for_clean_setup()
+
+    def test_warns_on_missing_timers(self):
+        out = self._doctor_with_timer_env()
+        self.assertIn("warn    timer guild-sync-gh.timer is missing: run timers.sh", out)
+        self.assertIn("warn    timer guild-compact.timer is missing: run timers.sh", out)
+
+    def test_no_timer_warning_when_installed_units_are_current(self):
+        self._write_current_timers()
+        self.assertNotIn("timer guild-", self._doctor_with_timer_env())
+
+    def test_warns_on_drifted_timer(self):
+        unit_dir = self._write_current_timers()
+        (unit_dir / "guild-sync-gh.service").write_text("[Service]\nExecStart=/old/guild sync\n")
+        out = self._doctor_with_timer_env()
+        self.assertIn("warn    timer guild-sync-gh.timer is drifted: run timers.sh", out)
+        self.assertNotIn("guild-compact.timer", out)
+
+    def test_custom_interval_is_not_drift(self):
+        from guild.commands import timer as timer_commands
+
+        unit_dir = self._write_current_timers()
+        _, timer = timer_commands.render_units(timer_commands.COMPACT, "/usr/bin/guild", "3d")
+        (unit_dir / "guild-compact.timer").write_text(timer)
+        self.assertNotIn("timer guild-", self._doctor_with_timer_env())
+
+    def test_no_timer_check_without_systemctl(self):
+        self.assertNotIn("timer guild-", self._doctor_with_timer_env(systemctl=None))
+
+    def test_no_timer_check_off_linux(self):
+        self.assertNotIn("timer guild-", self._doctor_with_timer_env(platform="darwin"))
 
     def test_warns_on_project_config_with_dispatcher_key(self):
         self.register_project("acme", ["acme/app"])

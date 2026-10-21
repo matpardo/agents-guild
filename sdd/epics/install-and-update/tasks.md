@@ -49,3 +49,10 @@ updated: 2026-10-17
 **Status:** [x] done — #172
 
 **What:** `install.sh`, and so every `./update.sh`, printed the hint to add `@~/.claude/GUILD.md` to `~/.claude/CLAUDE.md` even when the line was already there. It now prints only when `grep` does not find the line, following a symlinked `CLAUDE.md`.
+
+## T07 — Doctor reports the timers and `timers.sh` keeps them current
+
+**Depends on:** T01
+**Status:** [ ] pending
+
+**What:** `install.sh` and `update.sh` never installed the systemd timers, so a fresh machine ran without them. `guild doctor` now warns per timer that is missing or drifted from its template (a moved `guild` path, an edited unit), keeping an installed interval as valid; `./update.sh` runs doctor, so the warning shows after each update. The new `./timers.sh` installs or refreshes the five timers (sync gh/sdd/tracker 10m, resources 2h, compact 1d), keeping the interval of any timer already installed. Nothing installs them unasked.

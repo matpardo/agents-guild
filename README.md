@@ -97,7 +97,7 @@ re-runs `guild wire-settings`, which only adds what is missing.
 `~/.claude/GUILD.md` exists and that every project config loads; it exits 1
 and names what is missing. It also checks that the guild state commands are in
 `permissions.allow` (see "Hooks"); a missing allow rule is a `warn` line and
-never changes the exit code. It also warns about a leftover `guild-dispatch.timer` or `guild-dispatch.service` unit file (`install.sh` removes both) and about a project config that still has a `dispatcher` key (ignored, safe to delete). With a global `handoff_margin` (see "Global config") and a recorded compaction it prints `ok      handoff at 76% (compaction 85% − 10%)`, plus a `warn` when that handoff sits less than 5 points above the starting percentage of the latest session (the handoff would fire on a fresh session, so sessions hand off at that start + 5 instead); without a margin it warns when a project's `handoff_threshold` is at or above the last compaction (recorded by the `PreCompact` hook), since that threshold never fires. An invalid `guild.json` fails the check.
+never changes the exit code. On Linux with `systemctl` it also warns for each of the five systemd timers (see "`guild sync-timer`") that is missing or drifted from its unit template, with `run timers.sh`; an interval you chose is not drift. It also warns about a leftover `guild-dispatch.timer` or `guild-dispatch.service` unit file (`install.sh` removes both) and about a project config that still has a `dispatcher` key (ignored, safe to delete). With a global `handoff_margin` (see "Global config") and a recorded compaction it prints `ok      handoff at 76% (compaction 85% − 10%)`, plus a `warn` when that handoff sits less than 5 points above the starting percentage of the latest session (the handoff would fire on a fresh session, so sessions hand off at that start + 5 instead); without a margin it warns when a project's `handoff_threshold` is at or above the last compaction (recorded by the `PreCompact` hook), since that threshold never fires. An invalid `guild.json` fails the check.
 
 `guild doctor --scan-prs` additionally lists the open PRs of every project's
 `github.repos` through `gh` and scans title, body, comments and commit
@@ -828,6 +828,8 @@ visits every project config that has an `sdd` (or `tracker`) block and skips the
 rest without a failure. A project whose sync fails (unreadable SDD root, `acli`
 missing or not logged in) is reported as `<project>: <reason>` and the run exits
 non-zero; the previous tracker snapshot is kept.
+
+`./timers.sh`, run from the guild clone, installs or refreshes the five timers in one go (`sync-timer`, `sync-sdd-timer`, `sync-tracker-timer` every 10m, `resources-timer` every 2h, `compact-timer` every 1d) and keeps the interval of any timer already installed. `install.sh` and `update.sh` never run it: `guild doctor`, which `update.sh` ends with, tells you when it is due.
 
 ### `guild merge-queue`
 
