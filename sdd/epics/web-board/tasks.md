@@ -154,3 +154,10 @@ updated: 2026-10-04
 **Status:** [x] done — #176
 
 **What:** a quest with every task done whose epic has drift shows `can't close: drift` on the CLI and web board, with findings split into its own and other owners' (`drift.epic_findings_by_owner`); the `quest done` refusal uses the same split.
+
+## T22 — Repaint only changed sections on poll
+
+**Depends on:** T21
+**Status:** [x] done — #193
+
+**What:** the 15-second poll repaints a board section only when its data changed, and idea fields keep their focus and caret when the ideas section does repaint.

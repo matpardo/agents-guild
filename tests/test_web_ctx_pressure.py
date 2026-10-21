@@ -15,7 +15,7 @@ class CtxPressureSourceTests(unittest.TestCase):
         self.assertNotIn("innerHTML", self.block)
 
     def test_counter_comes_from_the_filtered_parties(self):
-        self.assertIn("renderAsks(filtered.asks, filtered.blocked, filtered.parties)", self.source)
+        self.assertIn("[filtered.asks, filtered.blocked, filtered.parties], renderAsks", self.source)
         self.assertIn("context high (", self.block)
 
     def test_empty_state_accounts_for_context_high(self):

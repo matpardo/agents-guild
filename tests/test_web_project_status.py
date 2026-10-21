@@ -154,7 +154,7 @@ class FreshnessTests(ProjectStatusTestCase):
 
 class WebWiringTests(ProjectStatusTestCase):
     def test_app_renders_projects_and_caps(self):
-        for token in ("renderProjects(filtered.projects)", "party.caps", "hot_files", "finding_classes", "freshness"):
+        for token in ("[filtered.projects], renderProjects", "party.caps", "hot_files", "finding_classes", "freshness"):
             with self.subTest(token=token):
                 self.assertIn(token, _APP_JS)
 

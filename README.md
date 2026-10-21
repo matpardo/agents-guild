@@ -1277,8 +1277,9 @@ PRs, plus PRs outside active tasks, raids and claims. A party filter, a state
 filter (`all`/`fixes-main`/`fixes-flaky`/`needs-ask-answer`/`needs-human-pr-review`/`converging`/`ready`/`draft`/`merged`) and a
 raid filter (`all` plus one option per raid, narrowing parties, asks and
 notices the same way `guild board --raid` does) narrow what is shown; the
-page re-fetches `/api/board` every 15 seconds,
-keeping the current filters and which blocks are collapsed. PR links open
+page re-fetches `/api/board` every 15 seconds and repaints only the sections whose
+data changed, so a form you are typing in (an idea, a notice, an answer) keeps its
+text and focus; it also keeps the current filters and which blocks are collapsed. PR links open
 `https://github.com/<repo>/pull/<n>` in a new tab; PR cards also show review pills (`N unresolved threads`, `changes requested`, `behind base`, `merge conflict`, the same reasons as the merge queue) and `on <base>` when the PR targets a branch other than `main` or `master`. A task also links to its
 tracker card when the project configures `tracker.browse_url` (see
 "Project config"). A collapsible "resources" section at the bottom shows the
