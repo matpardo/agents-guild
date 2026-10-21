@@ -81,7 +81,7 @@ updated: 2026-10-20
 ## T08 — Ready for you on the board
 
 **Depends on:** T03
-**Status:** [ ] pending
+**Status:** [x] done — #186
 
 **What:** The board (CLI and web) gets a "ready for you" section.
 

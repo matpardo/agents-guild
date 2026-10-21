@@ -287,6 +287,21 @@ li.queue-entry {
   flex-wrap: wrap;
 }
 
+li.ready-item {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  padding: 0.2rem 0;
+}
+
+.ready-notes {
+  flex-basis: 100%;
+}
+
+.ready-notes > p {
+  margin: 0;
+}
+
 .queue-main-red {
   margin: 0.25rem 0;
   color: var(--red);

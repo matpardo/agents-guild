@@ -829,6 +829,20 @@ review one, `checks: <n> passing` (also failing and pending counts), and one
 `Nothing is ready for you.`; it exits 0 either way. The output carries no
 tool-internal names, so it can be pasted outside the CLI.
 
+**Ready for you on the board.** `guild board` prints a `READY FOR YOU` section
+right after `NEEDS YOU`, and `guild web` shows a "ready for you" section under
+the open asks (model key `ready_for_you`). Both list the PRs picked by the same
+rule as `guild review-md`, in the board's queue order (raid queues first, then
+one per party outside raids), each PR once: `<ref> <title> · <party>`, `· review
+first` when the action is the human review one, and one indented `note:` line
+per note. `guild board --party` and the web party filter keep the PRs of that
+party; `guild board --raid` and the web raid filter keep every PR whose queue
+is in that raid, so a PR shows under each raid whose queue contains it.
+`guild review-md --party X` recomputes the queue over that party alone, while
+`guild board --party X` filters the board's list, so cross-party pins can make
+them differ; the board matches the merge queue cards. With none it prints
+`READY FOR YOU · nothing` (web: `nothing is ready for you`). Read-only.
+
 **Scope.** `--raid` takes the open tracked PRs of the raid's active members,
 `--party` those of one party; the two flags are mutually exclusive. Without a
 flag, a bound session uses its raid when its party is in exactly one, errors
@@ -1178,7 +1192,7 @@ wait (model key `waits`), with a tooltip that explains the kind.
 **What it shows**: open asks (question, party, options,
 refs, how many refs still block it, a collapsible context, a `detail` control
 that loads `GET /api/asks/<id>`, and a collapsed "answered asks" section), active notices,
-the merge queue (one card per raid, plus one per party outside raids that has
+a "ready for you" list (see "Ready for you on the board"), the merge queue (one card per raid, plus one per party outside raids that has
 open PRs: a `MAIN RED` row per red main, then numbered PR links with their
 label pills (`draft`, `converging`), the human-ready pill (`ready` or `ready (CI pending)`), checks, party, task, state, `unblocks N`, the action and the
 `next action` marker, the reasons as pills, a collapsible ready-check detail per PR (blockers, missing items, waits, gates and notes, the same content as `guild pr ready-check`) and a `next to merge: <ref> (<party>)` line, or `no PR ready to merge`, matching `guild merge-queue --head`; blocked PRs in place; read-only, the same order as

@@ -777,6 +777,31 @@ def _raid_next_to_merge_lines(ctx, painter, party_names):
     return lines + [""]
 
 
+def _ready_item_lines(painter, item):
+    suffix = " · review first" if item["review_first"] else ""
+    lines = painter.wrap("{} {} · {}{}".format(item["ref"], item["title"], item["party"], suffix), "  ")
+    for note in item["notes"]:
+        lines.extend(painter.wrap("note: {}".format(note), "    "))
+    return lines
+
+
+def _ready_for_you_lines(ctx, painter, party_filter, raid_filter):
+    party_rows = ctx.conn.execute("SELECT name FROM parties WHERE state != 'closed'").fetchall()
+    scopes = merge_queue_commands.board_scopes(ctx.conn, ctx.now, {row["name"] for row in party_rows})
+    items = merge_queue_commands.ready_for_you(ctx.conn, ctx.projects_dir, scopes)
+    if party_filter is not None:
+        items = [item for item in items if item["party"] == party_filter]
+    if raid_filter is not None:
+        items = [item for item in items if "raid:{}".format(raid_filter) in item["scopes"]]
+    if not items:
+        return [painter.paint("READY FOR YOU · nothing", "green"), ""]
+    lines = [painter.paint("READY FOR YOU · {}".format(len(items)), "bold")]
+    for item in items:
+        lines.extend(_ready_item_lines(painter, item))
+    lines.append("")
+    return lines
+
+
 def render_board(ctx, party_filter, raid_filter, color, width):
     painter = _Painter(color, width)
     if raid_filter is not None:
@@ -800,6 +825,7 @@ def render_board(ctx, party_filter, raid_filter, color, width):
     if raid_filter is not None:
         lines.extend(_raid_next_to_merge_lines(ctx, painter, party_names))
     lines.extend(render_asks(ctx, party_names, color, width, False))
+    lines.extend(_ready_for_you_lines(ctx, painter, party_filter, raid_filter))
     lines.extend(_notices_section(ctx, painter, notice_rows))
     projects_by_name = {project["name"]: project for project in config.load_all_projects(ctx.projects_dir)}
     lines.extend(_project_lines(ctx, painter, party_rows, projects_by_name))
@@ -1034,6 +1060,7 @@ def board_model(ctx):
     notice_rows = notice_commands.active_notices(ctx.conn, ctx.now)
     project_names = sorted({row["project"] for row in party_rows if row["project"] is not None})
     live_party_names = {row["name"] for row in party_rows}
+    scopes = merge_queue_commands.board_scopes(ctx.conn, ctx.now, live_party_names)
     return {
         "generated_at": timeutil.to_iso(ctx.now),
         "asks": [_ask_model(ctx.conn, row) for row in ask_rows],
@@ -1051,9 +1078,8 @@ def board_model(ctx):
         "blocked": [_blocked_model(ctx, row) for row in session_status.blocked_rows(ctx.conn, None)],
         "drift": [drift_commands.board_findings(ctx, project_name) for project_name in project_names],
         "raids": _raid_models(ctx.conn, ctx.now),
-        "merge_queues": merge_queue_commands.board_models(
-            ctx.conn, ctx.projects_dir, ctx.now, [row["name"] for row in party_rows]
-        ),
+        "merge_queues": merge_queue_commands.board_models(ctx.projects_dir, ctx.now, scopes),
+        "ready_for_you": merge_queue_commands.ready_for_you(ctx.conn, ctx.projects_dir, scopes),
         "projects": _project_models(ctx, party_rows, projects_by_name),
     }
 
