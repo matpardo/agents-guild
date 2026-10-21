@@ -67,6 +67,6 @@ updated: 2026-10-17
 ## T09 — Node-driven web tests share one process
 
 **Depends on:** T08
-**Status:** [ ] todo
+**Status:** [x] done — #192
 
 **What:** Each web behavior test started its own `node` process and slept 100 ms on timers. The drift and compact harnesses now serve scenarios over stdin, one fresh vm context each, and the tests talk to one long-lived node process per harness through `tests/node_harness.py`. Same tests and assertions; `test_web_drift` drops from about 23 s to about 4 s.
