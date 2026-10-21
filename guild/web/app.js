@@ -1319,12 +1319,14 @@ var NO_SESSION_MESSAGE = "session token not loaded, reload the page";
     return input;
   }
 
-  function ideaProjectSelect(draft, projects, disabled) {
+  function ideaProjectSelect(draft, projectNames, disabled) {
     var select = el("select");
-    [""].concat(projects.map(function (project) {
-      return project.name;
-    })).forEach(function (name) {
-      select.appendChild(option(name));
+    [""].concat(projectNames).forEach(function (name) {
+      var node = option(name);
+      if (name === "") {
+        node.textContent = "no project";
+      }
+      select.appendChild(node);
     });
     select.value = draft.project;
     select.disabled = disabled;
@@ -1334,14 +1336,14 @@ var NO_SESSION_MESSAGE = "session token not loaded, reload the page";
     return select;
   }
 
-  function renderIdeaFields(draft, projects, busy) {
+  function renderIdeaFields(draft, projectNames, busy) {
     var fields = el("div");
     fields.className = "notice-actions idea-fields";
     fields.appendChild(ideaInput(draft, "title", "text", "title", busy));
     fields.appendChild(ideaInput(draft, "description", "text", "description", busy));
     fields.appendChild(ideaInput(draft, "requester", "text", "requester (optional)", busy));
-    fields.appendChild(ideaInput(draft, "deadline", "date", "deadline", busy));
-    fields.appendChild(ideaProjectSelect(draft, projects, busy));
+    fields.appendChild(ideaInput(draft, "deadline", "text", "deadline YYYY-MM-DD", busy));
+    fields.appendChild(ideaProjectSelect(draft, projectNames, busy));
     return fields;
   }
 
@@ -1353,11 +1355,11 @@ var NO_SESSION_MESSAGE = "session token not loaded, reload the page";
     return button;
   }
 
-  function renderIdeaForm(projects) {
+  function renderIdeaForm(projectNames) {
     var busy = state.ideaBusy.new === true;
     var form = el("div");
     form.className = "idea-form";
-    form.appendChild(renderIdeaFields(state.ideaForm, projects, busy));
+    form.appendChild(renderIdeaFields(state.ideaForm, projectNames, busy));
     var actions = el("div");
     actions.className = "notice-actions";
     actions.appendChild(
@@ -1414,10 +1416,10 @@ var NO_SESSION_MESSAGE = "session token not loaded, reload the page";
     article.appendChild(actions);
   }
 
-  function renderIdeaEdit(article, idea, projects) {
+  function renderIdeaEdit(article, idea, projectNames) {
     var draft = state.ideaDrafts[idea.id];
     var busy = state.ideaBusy[idea.id] === true;
-    article.appendChild(renderIdeaFields(draft, projects, busy));
+    article.appendChild(renderIdeaFields(draft, projectNames, busy));
     var actions = el("div");
     actions.className = "notice-actions";
     actions.appendChild(
@@ -1437,18 +1439,18 @@ var NO_SESSION_MESSAGE = "session token not loaded, reload the page";
     article.appendChild(actions);
   }
 
-  function renderIdea(idea, projects) {
+  function renderIdea(idea, projectNames) {
     var article = el("article");
     article.className = idea.overdue ? "card idea idea-overdue" : "card idea";
     if (state.ideaDrafts[idea.id] === undefined) {
       renderIdeaView(article, idea);
       return article;
     }
-    renderIdeaEdit(article, idea, projects);
+    renderIdeaEdit(article, idea, projectNames);
     return article;
   }
 
-  function renderIdeas(ideas, projects) {
+  function renderIdeas(ideas, projectNames) {
     var section = document.getElementById("ideas");
     clear(section);
     var details = el("details");
@@ -1460,11 +1462,11 @@ var NO_SESSION_MESSAGE = "session token not loaded, reload the page";
     var summary = el("summary");
     summary.appendChild(textEl("h2", "ideas (" + ideas.length + ")"));
     details.appendChild(summary);
-    details.appendChild(renderIdeaForm(projects));
+    details.appendChild(renderIdeaForm(projectNames));
     appendAll(
       details,
       ideas.map(function (idea) {
-        return renderIdea(idea, projects);
+        return renderIdea(idea, projectNames);
       })
     );
     section.appendChild(details);
@@ -2611,7 +2613,7 @@ var NO_SESSION_MESSAGE = "session token not loaded, reload the page";
     renderAsks(filtered.asks, filtered.blocked, filtered.parties);
     renderReadyForYou(filtered.ready_for_you);
     renderNotices(filtered.notices, filtered.projects, filtered.raids);
-    renderIdeas(filtered.ideas, data.projects);
+    renderIdeas(filtered.ideas, data.project_names);
     renderMemory(filtered.memory);
     renderRaids(filtered.raids);
     renderMergeQueues(filtered.merge_queues);

@@ -1195,8 +1195,8 @@ card. `POST /api/ideas/create` (body `{"title", "description"}` plus optional
 `POST /api/ideas/<id>/edit` (body with the fields to change; `null` clears
 requester, deadline or project) and `POST /api/ideas/<id>/delete` (body `{}`)
 run the same functions as the CLI; invalid input answers `422` with the
-message, a wrong type `400`. The project select lists the projects on the
-board; the CLI accepts any registered project.
+message, a wrong type `400`. The project select lists every registered
+project, and the deadline is typed as `YYYY-MM-DD`.
 
 ### Marking notices seen
 
