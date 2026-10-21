@@ -3,7 +3,7 @@ epic: install-and-update
 type: tasks
 title: Versioned install and self-update
 status: active
-updated: 2026-10-17
+updated: 2026-10-21
 ---
 
 # Tasks: Versioned install and self-update
@@ -70,3 +70,10 @@ updated: 2026-10-17
 **Status:** [x] done — #192
 
 **What:** Each web behavior test started its own `node` process and slept 100 ms on timers. The drift and compact harnesses now serve scenarios over stdin, one fresh vm context each, and the tests talk to one long-lived node process per harness through `tests/node_harness.py`. Same tests and assertions; `test_web_drift` drops from about 23 s to about 4 s.
+
+## T10 — Dev worktrees inside the base clone
+
+**Depends on:** —
+**Status:** [ ] todo
+
+**What:** Replace the fixed `agents-guild-dev` sibling worktree with one worktree per feature branch at `.claude/worktrees/<branch>` inside the base clone. The project config lists only the base clone in `paths`, since project resolution matches any ancestor of the working directory. ADR `20261021_worktrees-inside-base-clone` supersedes `20261008_base-clone-install`.

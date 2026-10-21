@@ -4,8 +4,8 @@ Guild is a Python 3.10 stdlib-only CLI (`guild/`) with a browser board (`guild/w
 
 ## Where to work
 
-- The base clone `agents-guild` stays on `main` and is never edited. Live sessions, the hooks and `guild web` run from it (ADR `sdd/decisions/20261008_base-clone-install.md`).
-- Develop in the `../agents-guild-dev` worktree on a feature branch: `git worktree add ../agents-guild-dev -b <branch> origin/main`. Remove it after the merge.
+- The base clone `agents-guild` stays on `main` and is never edited. Live sessions, the hooks and `guild web` run from it (ADR `sdd/decisions/20261021_worktrees-inside-base-clone.md`).
+- Develop each feature branch in its own worktree inside the base clone: `git worktree add .claude/worktrees/<branch> -b <branch> origin/main`. Remove it after the merge.
 - After a merge the base is updated with `./update.sh`, run from the base clone.
 
 ## Features

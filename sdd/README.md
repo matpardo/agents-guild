@@ -54,7 +54,7 @@ Register this repo as a guild project; point `sdd.root` at the checkout that fol
 ```json
 {
   "name": "agents-guild",
-  "paths": ["~/Documents/_projects/agents-guild", "~/Documents/_projects/agents-guild-dev"],
+  "paths": ["~/Documents/_projects/agents-guild"],
   "github": {"repos": ["matpardo/agents-guild"]},
   "sdd": {
     "root": "~/Documents/_projects/agents-guild/sdd",
