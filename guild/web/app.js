@@ -1587,6 +1587,35 @@ var NO_SESSION_MESSAGE = "session token not loaded, reload the page";
     return article;
   }
 
+  function renderReadyItem(item) {
+    var row = el("li");
+    row.appendChild(link(item.url, item.ref));
+    row.appendChild(textEl("span", item.title));
+    row.appendChild(textEl("span", item.party));
+    if (item.review_first) {
+      var pill = textEl("span", "review first");
+      pill.className = "pill lifecycle-ready";
+      row.appendChild(pill);
+    }
+    item.notes.forEach(function (note) {
+      row.appendChild(classedText("span", "note: " + note, "muted"));
+    });
+    return row;
+  }
+
+  function renderReadyForYou(items) {
+    var section = document.getElementById("ready-for-you");
+    clear(section);
+    section.appendChild(textEl("h2", "ready for you"));
+    if (items.length === 0) {
+      section.appendChild(textEl("p", "nothing is ready for you"));
+      return;
+    }
+    var list = el("ol");
+    appendAll(list, items.map(renderReadyItem));
+    section.appendChild(list);
+  }
+
   function renderMergeQueues(queues) {
     var section = document.getElementById("merge-queues");
     clear(section);
@@ -2042,6 +2071,9 @@ var NO_SESSION_MESSAGE = "session token not loaded, reload the page";
       projects: data.projects,
       raids: data.raids,
       merge_queues: filterMergeQueuesByParty(data.merge_queues, state.partyFilter),
+      ready_for_you: data.ready_for_you.filter(function (item) {
+        return item.party === state.partyFilter;
+      }),
     };
   }
 
@@ -2108,6 +2140,9 @@ var NO_SESSION_MESSAGE = "session token not loaded, reload the page";
       raids: data.raids,
       merge_queues: data.merge_queues.filter(function (queue) {
         return queue.scope === "raid:" + state.raidFilter;
+      }),
+      ready_for_you: data.ready_for_you.filter(function (item) {
+        return item.scope === scope;
       }),
     };
   }
@@ -2369,6 +2404,7 @@ var NO_SESSION_MESSAGE = "session token not loaded, reload the page";
     refreshRaidFilterOptions(data.raids);
     var filtered = applyRaidFilter(applyPartyFilter(data));
     renderAsks(filtered.asks, filtered.blocked, filtered.parties);
+    renderReadyForYou(filtered.ready_for_you);
     renderNotices(filtered.notices, filtered.projects, filtered.raids);
     renderMemory(filtered.memory);
     renderRaids(filtered.raids);

@@ -589,26 +589,28 @@ def _scope_model(projects_dir, now, scope, scoped):
     }
 
 
-def board_models(conn, projects_dir, now, party_names):
+def board_scopes(conn, now, party_names):
     records = open_pr_records(conn)
     pins = load_pins(conn)
     main_rows = main_status_commands.red_rows(conn)
     grouped = raid_commands.active_raids_grouped(conn, now)
-    models = []
+    scopes = []
     in_raid = set()
     for raid_name in sorted(grouped):
         members = {row["party"] for row in grouped[raid_name]}
         in_raid |= members
-        models.append(_scope_model(
-                projects_dir, now, "raid:{}".format(raid_name), scoped_queue(records, pins, main_rows, members)
-            ))
+        scopes.append(("raid:{}".format(raid_name), scoped_queue(records, pins, main_rows, members)))
     for party in sorted(party_names):
         if party in in_raid:
             continue
         scoped = scoped_queue(records, pins, main_rows, {party})
         if scoped["has_prs"]:
-            models.append(_scope_model(projects_dir, now, "party:{}".format(party), scoped))
-    return models
+            scopes.append(("party:{}".format(party), scoped))
+    return scopes
+
+
+def board_models(projects_dir, now, scopes):
+    return [_scope_model(projects_dir, now, scope, scoped) for scope, scoped in scopes]
 
 
 NOTHING_READY_LINE = "Nothing is ready for you."
@@ -632,22 +634,45 @@ def _checks_text(entry):
     return ", ".join("{} {}".format(count, label) for label, count in counts if count)
 
 
-def _review_md_lines(ctx, entry, main_rows):
-    url = "https://github.com/{}/pull/{}".format(entry["repo"], entry["number"])
-    lines = ["- [ ] {} {} — {}".format(entry["ref"], _pr_title(ctx.conn, entry), url)]
-    if entry["action"] == merge_queue.REVIEW_ACTION:
+def _ready_item(conn, projects_dir, scope, entry, main_rows):
+    return {
+        "ref": entry["ref"],
+        "title": _pr_title(conn, entry),
+        "url": "https://github.com/{}/pull/{}".format(entry["repo"], entry["number"]),
+        "party": entry["party"],
+        "scope": scope,
+        "review_first": entry["action"] == merge_queue.REVIEW_ACTION,
+        "checks": _checks_text(entry),
+        "notes": [_one_line(note) for note in notes(projects_dir, entry, main_rows)],
+    }
+
+
+def ready_for_you(conn, projects_dir, scopes):
+    items = []
+    seen = set()
+    for scope, scoped in scopes:
+        for entry in merge_queue.ready_for_person(scoped["queue"], scoped["main"]):
+            if entry["ref"] in seen:
+                continue
+            seen.add(entry["ref"])
+            items.append(_ready_item(conn, projects_dir, scope, entry, scoped["main"]))
+    return items
+
+
+def _review_md_lines(item):
+    lines = ["- [ ] {} {} — {}".format(item["ref"], item["title"], item["url"])]
+    if item["review_first"]:
         lines.append("  - review: human first")
-    checks = _checks_text(entry)
-    if checks:
-        lines.append("  - checks: {}".format(checks))
-    lines.extend("  - note: {}".format(_one_line(note)) for note in notes(ctx.projects_dir, entry, main_rows))
+    if item["checks"]:
+        lines.append("  - checks: {}".format(item["checks"]))
+    lines.extend("  - note: {}".format(note) for note in item["notes"])
     return lines
 
 
 def review_md(ctx, raid, party):
     _, _, party_names = _resolve_scope(ctx, raid, party)
     scoped = load_scoped_queue(ctx.conn, party_names)
-    selected = merge_queue.ready_for_person(scoped["queue"], scoped["main"])
-    if not selected:
+    items = ready_for_you(ctx.conn, ctx.projects_dir, [("review", scoped)])
+    if not items:
         return [NOTHING_READY_LINE]
-    return [line for entry in selected for line in _review_md_lines(ctx, entry, scoped["main"])]
+    return [line for item in items for line in _review_md_lines(item)]

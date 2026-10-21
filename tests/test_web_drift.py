@@ -73,7 +73,7 @@ class WebDriftScriptTests(unittest.TestCase):
 _HARNESS = Path(__file__).resolve().parent / "web_drift_harness.js"
 _MISSING = object()
 _BOARD = {
-    "generated_at": "now", "asks": [], "notices": [], "memory": [], "blocked": [], "merge_queues": [],
+    "generated_at": "now", "asks": [], "notices": [], "memory": [], "blocked": [], "merge_queues": [], "ready_for_you": [],
     "projects": [], "raids": [{"name": "r", "members": ["c"]}],
     "parties": [
         {
@@ -468,3 +468,52 @@ class WebCloseBlockersBehaviorTests(unittest.TestCase):
         text = self._parties_text({"own": [], "foreign": [{"text": "FOR1", "party": "zed"}]})
         self.assertNotIn("yours", text)
         self.assertIn("other parties", text)
+
+
+def _ready_item(ref, party, scope, review_first, notes):
+    return {
+        "ref": ref, "title": "T " + ref, "url": "https://example.test/" + ref, "party": party, "scope": scope,
+        "review_first": review_first, "checks": "1 passing", "notes": notes,
+    }
+
+
+@unittest.skipIf(shutil.which("node") is None, "node not installed")
+class WebReadyForYouBehaviorTests(unittest.TestCase):
+    _ITEMS = [
+        _ready_item("o/r#2", "a", "party:a", True, ["CI label x not on the PR"]),
+        _ready_item("o/r#1", "c", "raid:r", False, []),
+        _ready_item("o/r#3", "a", "party:a", False, []),
+    ]
+
+    def _text(self, items, party_filter, raid_filter):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "board.json"
+            path.write_text(json.dumps(dict(_BOARD, ready_for_you=items)))
+            return subprocess.run(
+                ["node", str(_HARNESS), str(_APP_JS_PATH), str(path), party_filter, raid_filter, "ready-for-you"],
+                capture_output=True, text=True, timeout=30, check=True,
+            ).stdout.strip()
+
+    def test_items_render_in_the_given_order(self):
+        text = self._text(self._ITEMS, "all", "all")
+        self.assertEqual([text.index(ref) for ref in ("o/r#2", "o/r#1", "o/r#3")], sorted(text.index(ref) for ref in ("o/r#2", "o/r#1", "o/r#3")))
+        self.assertIn("T o/r#1", text)
+
+    def test_empty_state(self):
+        self.assertEqual(self._text([], "all", "all"), "ready for you nothing is ready for you")
+
+    def test_review_first_pill_and_notes(self):
+        text = self._text(self._ITEMS, "all", "all")
+        self.assertEqual(text.count("review first"), 1)
+        self.assertIn("CI label x not on the PR", text)
+
+    def test_party_filter_hides_other_parties(self):
+        text = self._text(self._ITEMS, "a", "all")
+        self.assertIn("o/r#2", text)
+        self.assertIn("o/r#3", text)
+        self.assertNotIn("o/r#1", text)
+
+    def test_raid_filter_keeps_the_raid_scope(self):
+        text = self._text(self._ITEMS, "all", "r")
+        self.assertIn("o/r#1", text)
+        self.assertNotIn("o/r#2", text)
