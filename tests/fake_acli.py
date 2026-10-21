@@ -1,40 +1,38 @@
 #!/usr/bin/env python3
 import hashlib
 import os
+import subprocess
 import sys
-
-
-def _fixtures_dir():
-    return os.environ["GUILD_TEST_ACLI_DIR"]
 
 
 def fixture_name(jql):
     return hashlib.sha256(jql.encode()).hexdigest()
 
 
-def _respond(name):
-    directory = _fixtures_dir()
+def _respond(directory, name):
     ok_path = os.path.join(directory, name + ".json")
     err_path = os.path.join(directory, name + ".err")
     if os.path.isfile(err_path):
-        sys.stderr.write(open(err_path).read())
-        sys.exit(1)
+        with open(err_path) as handle:
+            return subprocess.CompletedProcess([], 1, "", handle.read())
     if os.path.isfile(ok_path):
-        sys.stdout.write(open(ok_path).read())
-        sys.exit(0)
-    sys.stderr.write("no fixture for jql: " + name)
-    sys.exit(1)
+        with open(ok_path) as handle:
+            return subprocess.CompletedProcess([], 0, handle.read(), "")
+    return subprocess.CompletedProcess([], 1, "", "no fixture for jql: " + name)
+
+
+def respond(directory, args):
+    if args[:3] == ["jira", "workitem", "search"]:
+        jql = args[args.index("--jql") + 1]
+        return _respond(directory, fixture_name(jql))
+    return subprocess.CompletedProcess([], 1, "", "fake acli: unhandled args {}".format(args))
 
 
 def main():
-    args = sys.argv[1:]
-    if args[:3] == ["jira", "workitem", "search"]:
-        jql_index = args.index("--jql") + 1
-        jql = args[jql_index]
-        _respond(fixture_name(jql))
-        return
-    sys.stderr.write("fake acli: unhandled args {}".format(args))
-    sys.exit(1)
+    result = respond(os.environ["GUILD_TEST_ACLI_DIR"], sys.argv[1:])
+    sys.stdout.write(result.stdout)
+    sys.stderr.write(result.stderr)
+    sys.exit(result.returncode)
 
 
 if __name__ == "__main__":

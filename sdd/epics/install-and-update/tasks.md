@@ -56,3 +56,10 @@ updated: 2026-10-17
 **Status:** [x] done — #188
 
 **What:** `install.sh` and `update.sh` never installed the systemd timers, so a fresh machine ran without them. `guild doctor` now warns per timer that is missing or drifted from its template (a moved `guild` path, an edited unit), keeping an installed interval as valid; `./update.sh` runs doctor, so the warning shows after each update. The new `./timers.sh` installs or refreshes the five timers (sync gh/sdd/tracker 10m, resources 2h, compact 1d), keeping the interval of any timer already installed. Nothing installs them unasked.
+
+## T08 — Faster test suite
+
+**Depends on:** T07
+**Status:** [ ] todo
+
+**What:** The suite spent most of its time spawning the fake `gh` and `acli` scripts and rebuilding the argument parser on every in-process CLI call. The github and jira adapters now route their tool calls through one private runner that tests replace with the fixture logic of `tests/fake_gh.py` and `tests/fake_acli.py` in process; tests reuse one parser and skip gettext lookups. Production behavior is unchanged; the full run drops from about 4.5 minutes to about 1.5 on four cores with the same tests.
