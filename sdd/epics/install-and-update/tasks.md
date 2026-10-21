@@ -77,3 +77,10 @@ updated: 2026-10-21
 **Status:** [x] done — #194
 
 **What:** Replace the fixed `agents-guild-dev` sibling worktree with one worktree per feature branch at `.claude/worktrees/<branch>` inside the base clone. The project config lists only the base clone in `paths`, since project resolution matches any ancestor of the working directory. ADR `20261021_worktrees-inside-base-clone` supersedes `20261008_base-clone-install`.
+
+## T11 — Task check ships in the change's commit
+
+**Depends on:** T10
+**Status:** [x] done — #196
+
+**What:** The SDD task of a PR lands already `[x] done — #<pr>` in the same single commit as the change: the PR is opened first, then the commit is amended with its number and force-pushed. No second commit, no follow-up PR.

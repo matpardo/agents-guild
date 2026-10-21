@@ -23,7 +23,7 @@ Guild is a Python 3.10 stdlib-only CLI (`guild/`) with a browser board (`guild/w
 ## SDD
 
 - Each PR adds a task to the matching epic's `sdd/epics/<epic>/tasks.md`.
-- An epic with `status: done` only accepts tasks already `[x] done — #<pr>` (`tests/test_sdd_docs.py`). Add that task in a second commit, once the PR number exists.
+- The task ships already `[x] done — #<pr>`, in the same single commit as the change: open the PR, then amend the commit with the PR number and force-push. An epic with `status: done` only accepts tasks in that state (`tests/test_sdd_docs.py`).
 - Take the next free `T` number after checking `main` and the open PRs: `git show origin/main:sdd/epics/<epic>/tasks.md` and `gh pr list --state open`.
 - Format and frontmatter rules: `sdd/README.md`.
 
