@@ -1,5 +1,6 @@
 import fnmatch
 import json
+import re
 from pathlib import Path
 
 from guild import names, timeutil
@@ -131,6 +132,21 @@ def _validate_trace_validator(validator):
         )
 
 
+def _validate_notice_comments(rules):
+    key = "project config 'human_ready.notice_comments'"
+    if not isinstance(rules, list):
+        raise GuildError("{} must be a list".format(key), 1)
+    for rule in rules:
+        if not isinstance(rule, dict) or set(rule) != {"author", "pattern"}:
+            raise GuildError("{} entries must be objects with exactly 'author' and 'pattern'".format(key), 1)
+        if not all(isinstance(value, str) and value for value in rule.values()):
+            raise GuildError("{} 'author' and 'pattern' must be non-empty strings".format(key), 1)
+        try:
+            re.compile(rule["pattern"])
+        except re.error as error:
+            raise GuildError("{} has an invalid pattern: {}".format(key, error), 1)
+
+
 def _validate_human_ready_config(data):
     human_ready = data.get("human_ready")
     if human_ready is None:
@@ -138,13 +154,15 @@ def _validate_human_ready_config(data):
     if not isinstance(human_ready, dict):
         raise GuildError("project config 'human_ready' must be an object", 1)
     for key in human_ready:
-        if key not in ("ci_label", "trace_validator"):
+        if key not in ("ci_label", "trace_validator", "notice_comments"):
             raise GuildError("project config 'human_ready' has unknown key '{}'".format(key), 1)
     ci_label = human_ready.get("ci_label")
     if "ci_label" in human_ready and (not isinstance(ci_label, str) or not ci_label):
         raise GuildError("project config 'human_ready.ci_label' must be a non-empty string", 1)
     if "trace_validator" in human_ready:
         _validate_trace_validator(human_ready["trace_validator"])
+    if "notice_comments" in human_ready:
+        _validate_notice_comments(human_ready["notice_comments"])
 
 
 def _validate_handoff_retention_config(data):

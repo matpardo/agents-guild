@@ -163,6 +163,12 @@ def _sync_pr(ctx, projects, row, failures, lifecycle_runner):
             gh_data.get("comments") or [],
             gh_data.get("reviews") or [],
         ),
+        "other_author_comments": human_ready.other_author_comments(
+            (gh_data.get("author") or {}).get("login"),
+            gh_data.get("comments") or [],
+            gh_data.get("reviews") or [],
+            ((project or {}).get("human_ready") or {}).get("notice_comments", []),
+        ),
         "ci_label": human_ready.ci_label_flag(project, gh_data.get("labels") or []),
         "gh_state": gh_data.get("state"),
         "gh_draft": gh_data.get("isDraft"),

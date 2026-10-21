@@ -28,7 +28,7 @@ The dev leaves several parties working and comes back to many PRs in Ready with 
 - `guild review-md`.
 - A "ready for you" section on the board (CLI and web).
 - `guild ask wait` and `guild pr wait`, so a waiting session wakes up when an ask is answered or a PR changes in a way that matters.
-- Minimal per-project config: `human_ready.ci_label`, `human_ready.trace_validator`.
+- Minimal per-project config: `human_ready.ci_label`, `human_ready.trace_validator`, `human_ready.notice_comments`.
 - `README.md` and `GUILD.md` change in every PR that changes behavior.
 
 ## Out of scope

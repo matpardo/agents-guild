@@ -209,11 +209,45 @@ def _handle_pr_ready_check(ctx, args):
     return exit_code
 
 
+_DEFAULT_WAIT_TIMEOUT = "2h"
+
+
+def _handle_ask_wait(ctx, args):
+    from guild.commands import ask as ask_commands
+
+    if args.context is not None or args.ref or args.option:
+        raise GuildError("`guild ask wait` takes only an id and --timeout", 1)
+    if not args.wait_id.isdigit():
+        raise GuildError("ask id '{}' must be an integer".format(args.wait_id), 1)
+    timeout = timeutil.parse_duration(_DEFAULT_WAIT_TIMEOUT if args.timeout is None else args.timeout)
+    line, exit_code = ask_commands.wait(ctx.conn, int(args.wait_id), timeout, time.sleep, timeutil.utcnow)
+    _print(line)
+    return exit_code
+
+
 def _handle_ask(ctx, args):
     from guild.commands import ask as ask_commands
 
+    if args.question == "wait" and args.wait_id is not None:
+        return _handle_ask_wait(ctx, args)
+    if args.wait_id is not None:
+        raise GuildError("unexpected extra argument '{}'".format(args.wait_id), 1)
+    if args.context is None:
+        raise GuildError("--context is required", 1)
+    if args.timeout is not None:
+        raise GuildError("--timeout only applies to ask wait", 1)
     _print(ask_commands.create(ctx, args.question, args.context, args.ref or [], args.option or []))
     return 0
+
+
+def _handle_pr_wait(ctx, args):
+    from guild.commands import pr as pr_commands
+
+    line, exit_code = pr_commands.wait(
+        ctx.conn, args.ref, timeutil.parse_duration(args.timeout), time.sleep, timeutil.utcnow
+    )
+    _print(line)
+    return exit_code
 
 
 def _handle_answer(ctx, args):
@@ -827,6 +861,11 @@ def _add_pr_parser(subparsers):
     ready_check.add_argument("ref")
     ready_check.set_defaults(handler=_handle_pr_ready_check)
 
+    wait = actions.add_parser("wait", help="block until the PR gets a comment, finishes checks or closes")
+    wait.add_argument("ref")
+    wait.add_argument("--timeout", default="2h", help="give up after this long, e.g. 30m, 2h (default 2h)")
+    wait.set_defaults(handler=_handle_pr_wait)
+
 
 def _add_notice_parser(subparsers):
     parser = subparsers.add_parser("notice", help="create and manage notices")
@@ -979,7 +1018,9 @@ def build_parser():
 
     ask = subparsers.add_parser("ask", help="ask the human a decision")
     ask.add_argument("question")
-    ask.add_argument("--context", required=True, help="short context for the human")
+    ask.add_argument("wait_id", nargs="?", help="ask id, with `guild ask wait <id>`")
+    ask.add_argument("--context", help="short context for the human")
+    ask.add_argument("--timeout", help="with ask wait: give up after this long (default 2h)")
     ask.add_argument("--ref", action="append", help="pr:<owner/repo>#<n>, task:<quest>/<tid> or card:<KEY>; repeatable")
     ask.add_argument("--option", action="append", help="an answer option; repeatable")
     ask.set_defaults(handler=_handle_ask)

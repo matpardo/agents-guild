@@ -1,3 +1,5 @@
+import re
+
 from guild import timeutil
 
 
@@ -25,6 +27,22 @@ def comments_after_head(head_date, author, comments, reviews):
     stamped += [(entry, entry.get("submittedAt")) for entry in reviews]
     return sum(
         1 for entry, stamp in stamped if stamp and (author is None or _login(entry) != author) and _moment(stamp) > head
+    )
+
+
+def _is_notice(entry, notice_rules):
+    login = (_login(entry) or "").casefold()
+    body = entry.get("body") or ""
+    return any(
+        login == rule["author"].casefold() and re.search(rule["pattern"], body) for rule in notice_rules
+    )
+
+
+def other_author_comments(author, comments, reviews, notice_rules):
+    return sum(
+        1
+        for entry in list(comments) + list(reviews)
+        if (author is None or _login(entry) != author) and not _is_notice(entry, notice_rules)
     )
 
 

@@ -2,7 +2,7 @@ import json
 import os
 from unittest import mock
 
-from guild import paths
+from guild import claude_settings, paths
 from guild.commands import statusline as statusline_commands
 from tests.testutil import GuildTestCase
 
@@ -125,6 +125,11 @@ class DoctorTests(GuildTestCase):
         self.assertEqual(code, 0, out)
         self.assertIn("ok      allow rule Bash(guild task:*)", out)
         self.assertEqual(out.count("ok      allow rule"), len(_ALLOW_RULES))
+
+    def test_wait_commands_match_an_expected_allow_rule(self):
+        prefixes = [rule[len("Bash("):-len(":*)")] for rule in claude_settings.EXPECTED_ALLOW_RULES]
+        for command in ("guild ask wait 1", "guild pr wait o/r#1"):
+            self.assertTrue(any(command.startswith(prefix) for prefix in prefixes), command)
 
     def test_missing_allow_rule_warns_without_changing_exit(self):
         self._write_full_settings(_ALL_HOOKS, _ASK_RULES, ["Bash(guild task:*)"])
