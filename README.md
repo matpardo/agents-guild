@@ -71,13 +71,14 @@ Hooks run `guild` in every session, so the installed copy must never be a
 checkout you are editing: a half-written change goes live at once. Run
 `./install.sh` from the base clone, keep it on `main` and never edit there.
 
-If you develop guild, do it in a temporary `-dev` worktree on a feature
-branch (`main` stays checked out in the base, so a dev worktree never uses it),
-and remove it after the merge:
+If you develop guild, do it in a temporary worktree per feature branch,
+inside the base clone under `.claude/worktrees/` (ignored by git; `main` stays
+checked out in the base, so a dev worktree never uses it), and remove it after
+the merge:
 
 ```
-git worktree add ../agents-guild-dev -b feat/x
-git worktree remove ../agents-guild-dev
+git worktree add .claude/worktrees/feat-x -b feat/x origin/main
+git worktree remove .claude/worktrees/feat-x
 ```
 
 After each merge, update the base clone with one command:

@@ -1,7 +1,7 @@
 # ADR: Install from the base clone, develop in a temporary worktree
 
 - **Date:** 2026-10-08
-- **Status:** accepted
+- **Status:** superseded by 20261021_worktrees-inside-base-clone
 - **Supersedes:** 20260928_live-worktree-install
 
 ## Context
