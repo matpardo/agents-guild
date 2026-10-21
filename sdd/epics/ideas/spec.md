@@ -2,7 +2,7 @@
 epic: ideas
 type: spec
 title: Ideas backlog
-status: active
+status: done
 owner: matpardo
 created: 2026-10-21
 updated: 2026-10-21
@@ -33,9 +33,9 @@ Ideas arrive while other work is in flight. Today they go on paper or in chat an
 
 ## Success criteria
 
-- [ ] `guild idea add|edit|delete` and `guild ideas [id]` work and survive `guild rebuild`, deletes included.
-- [ ] The web adds, edits and deletes ideas through the same functions as the CLI.
-- [ ] Output that leaves the CLI never carries an idea id.
+- [x] `guild idea add|edit|delete` and `guild ideas [id]` work and survive `guild rebuild`, deletes included.
+- [x] The web adds, edits and deletes ideas through the same functions as the CLI.
+- [x] Output that leaves the CLI never carries an idea id.
 
 ## Security and data
 
