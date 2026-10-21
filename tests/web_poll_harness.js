@@ -1,6 +1,6 @@
 const fs = require("fs");
 const vm = require("vm");
-const [src, scenario] = process.argv.slice(2);
+const readline = require("readline");
 function mk(tag) {
   const o = { tag, children: [], _text: "", value: "all", options: [], style: {}, dataset: {}, attrs: {},
     classList: { add() {}, remove() {}, toggle() {}, contains() { return false; } } };
@@ -27,30 +27,32 @@ function walk(node, selector, found) {
   node.children.forEach((child) => walk(child, selector, found));
   return found;
 }
-const byId = {};
-const doc = {
-  getElementById: (id) => (byId[id] = byId[id] || mk(id.endsWith("-filter") ? "select" : "div")),
-  createElement: mk, createTextNode: (t) => { const n = mk("#text"); n._text = t; return n; },
-  addEventListener: (n, f) => { doc.h = f; },
-  activeElement: null, querySelector: () => null,
-  querySelectorAll: (selector) => Object.values(byId).reduce((found, root) => walk(root, selector, found), []),
-};
-const idea = { id: 1, title: "Dark mode", description: "night owls", requester: null, deadline: null,
-  project: null, overdue: false };
-let board = { generated_at: "now", parties: [], raids: [], asks: [], blocked: [], notices: [], projects: [],
-  memory: [], merge_queues: [], drift: [], ready_for_you: [], ideas: [], project_names: [] };
-const intervals = [];
-const ctx = { document: doc, window: {}, console, setTimeout,
-  setInterval(fn) { intervals.push(fn); },
-  fetch: (url) => Promise.resolve({ ok: true, json: () => Promise.resolve(url === "/api/board" ? board : { token: "t" }) }) };
-ctx.window = ctx;
-vm.createContext(ctx);
-vm.runInContext(fs.readFileSync(src, "utf8"), ctx);
-doc.h();
-function titleInput() {
-  return walk(doc.getElementById("ideas"), "input.idea-title", [])[0];
-}
-setTimeout(() => {
+const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+async function run({ src, scenario }) {
+  const byId = {};
+  const doc = {
+    getElementById: (id) => (byId[id] = byId[id] || mk(id.endsWith("-filter") ? "select" : "div")),
+    createElement: mk, createTextNode: (t) => { const n = mk("#text"); n._text = t; return n; },
+    addEventListener: (n, f) => { doc.h = f; },
+    activeElement: null, querySelector: () => null,
+    querySelectorAll: (selector) => Object.values(byId).reduce((found, root) => walk(root, selector, found), []),
+  };
+  const idea = { id: 1, title: "Dark mode", description: "night owls", requester: null, deadline: null,
+    project: null, overdue: false };
+  let board = { generated_at: "now", parties: [], raids: [], asks: [], blocked: [], notices: [], projects: [],
+    memory: [], merge_queues: [], drift: [], ready_for_you: [], ideas: [], project_names: [] };
+  const intervals = [];
+  const ctx = { document: doc, window: {}, console, setTimeout,
+    setInterval(fn) { intervals.push(fn); },
+    fetch: (url) => Promise.resolve({ ok: true, json: () => Promise.resolve(url === "/api/board" ? board : { token: "t" }) }) };
+  ctx.window = ctx;
+  vm.createContext(ctx);
+  vm.runInContext(fs.readFileSync(src, "utf8"), ctx);
+  doc.h();
+  await wait(50);
+  function titleInput() {
+    return walk(doc.getElementById("ideas"), "input.idea-title", [])[0];
+  }
   const before = titleInput();
   before.value = "half typed";
   before.h.input();
@@ -59,10 +61,11 @@ setTimeout(() => {
   doc.activeElement = before;
   board = Object.assign({}, board, { generated_at: "later", ideas: scenario === "changed" ? [idea] : [] });
   intervals.forEach((fn) => fn());
-  setTimeout(() => {
-    const after = titleInput();
-    console.log(JSON.stringify({ sameNode: after === before, focused: after.focused === true,
-      selection: after.selection || null, value: after.value }));
-    process.exit(0);
-  }, 50);
-}, 50);
+  await wait(50);
+  const after = titleInput();
+  return { sameNode: after === before, focused: after.focused === true,
+    selection: after.selection || null, value: after.value };
+}
+readline.createInterface({ input: process.stdin }).on("line", async (line) => {
+  console.log(JSON.stringify(await run(JSON.parse(line))));
+});
