@@ -44,7 +44,8 @@ var NO_SESSION_MESSAGE = "session token not loaded, reload the page";
     prDrafts: {},
     prStatuses: {},
     prBusy: {},
-    focusedPrRef: null,
+    focusedKey: null,
+    sectionKeys: {},
     noticeStatuses: {},
     noticeBusy: {},
     memoryStatuses: {},
@@ -1306,8 +1307,9 @@ var NO_SESSION_MESSAGE = "session token not loaded, reload the page";
     });
   }
 
-  function ideaInput(draft, field, type, placeholder, disabled) {
+  function ideaInput(draft, key, field, type, placeholder, disabled) {
     var input = el("input");
+    input.dataset.focusKey = "idea-" + key + "-" + field;
     input.type = type;
     input.className = "block-reason idea-" + field;
     input.placeholder = placeholder;
@@ -1336,13 +1338,13 @@ var NO_SESSION_MESSAGE = "session token not loaded, reload the page";
     return select;
   }
 
-  function renderIdeaFields(draft, projectNames, busy) {
+  function renderIdeaFields(draft, key, projectNames, busy) {
     var fields = el("div");
     fields.className = "notice-actions idea-fields";
-    fields.appendChild(ideaInput(draft, "title", "text", "title", busy));
-    fields.appendChild(ideaInput(draft, "description", "text", "description", busy));
-    fields.appendChild(ideaInput(draft, "requester", "text", "requester (optional)", busy));
-    fields.appendChild(ideaInput(draft, "deadline", "text", "deadline YYYY-MM-DD", busy));
+    fields.appendChild(ideaInput(draft, key, "title", "text", "title", busy));
+    fields.appendChild(ideaInput(draft, key, "description", "text", "description", busy));
+    fields.appendChild(ideaInput(draft, key, "requester", "text", "requester (optional)", busy));
+    fields.appendChild(ideaInput(draft, key, "deadline", "text", "deadline YYYY-MM-DD", busy));
     fields.appendChild(ideaProjectSelect(draft, projectNames, busy));
     return fields;
   }
@@ -1359,7 +1361,7 @@ var NO_SESSION_MESSAGE = "session token not loaded, reload the page";
     var busy = state.ideaBusy.new === true;
     var form = el("div");
     form.className = "idea-form";
-    form.appendChild(renderIdeaFields(state.ideaForm, projectNames, busy));
+    form.appendChild(renderIdeaFields(state.ideaForm, "new", projectNames, busy));
     var actions = el("div");
     actions.className = "notice-actions";
     actions.appendChild(
@@ -1419,7 +1421,7 @@ var NO_SESSION_MESSAGE = "session token not loaded, reload the page";
   function renderIdeaEdit(article, idea, projectNames) {
     var draft = state.ideaDrafts[idea.id];
     var busy = state.ideaBusy[idea.id] === true;
-    article.appendChild(renderIdeaFields(draft, projectNames, busy));
+    article.appendChild(renderIdeaFields(draft, idea.id, projectNames, busy));
     var actions = el("div");
     actions.className = "notice-actions";
     actions.appendChild(
@@ -2357,9 +2359,9 @@ var NO_SESSION_MESSAGE = "session token not loaded, reload the page";
   function rememberFocus() {
     var active = document.activeElement;
     state.focusedAskId = null;
-    state.focusedPrRef = null;
+    state.focusedKey = null;
     if (active && active.dataset && active.dataset.focusKey) {
-      state.focusedPrRef = active.dataset.focusKey;
+      state.focusedKey = active.dataset.focusKey;
       state.focusStart = active.selectionStart;
       state.focusEnd = active.selectionEnd;
     }
@@ -2370,10 +2372,10 @@ var NO_SESSION_MESSAGE = "session token not loaded, reload the page";
     }
   }
 
-  function restorePrFocus() {
-    var inputs = document.querySelectorAll("input.block-reason");
+  function restoreKeyedFocus() {
+    var inputs = document.querySelectorAll("[data-focus-key]");
     Array.prototype.forEach.call(inputs, function (input) {
-      if (input.dataset.focusKey === state.focusedPrRef && !input.disabled) {
+      if (input.dataset.focusKey === state.focusedKey && !input.disabled) {
         input.focus();
         input.setSelectionRange(state.focusStart, state.focusEnd);
       }
@@ -2381,8 +2383,8 @@ var NO_SESSION_MESSAGE = "session token not loaded, reload the page";
   }
 
   function restoreFocus() {
-    if (state.focusedPrRef !== null) {
-      restorePrFocus();
+    if (state.focusedKey !== null) {
+      restoreKeyedFocus();
     }
     if (state.focusedAskId === null) {
       return;
@@ -2604,22 +2606,31 @@ var NO_SESSION_MESSAGE = "session token not loaded, reload the page";
       });
   }
 
-  function render(data) {
+  function renderSection(id, args, renderFn, onlyIfChanged) {
+    var key = JSON.stringify(args);
+    if (onlyIfChanged && state.sectionKeys[id] === key) {
+      return;
+    }
+    state.sectionKeys[id] = key;
+    renderFn.apply(null, args);
+  }
+
+  function render(data, onlyIfChanged) {
     rememberFocus();
     document.getElementById("generated-at").textContent = "generated at " + data.generated_at;
     refreshPartyFilterOptions(data.parties);
     refreshRaidFilterOptions(data.raids);
     var filtered = applyRaidFilter(applyPartyFilter(data));
-    renderAsks(filtered.asks, filtered.blocked, filtered.parties);
-    renderReadyForYou(filtered.ready_for_you);
-    renderNotices(filtered.notices, filtered.projects, filtered.raids);
-    renderIdeas(filtered.ideas, data.project_names);
-    renderMemory(filtered.memory);
-    renderRaids(filtered.raids);
-    renderMergeQueues(filtered.merge_queues);
-    renderDrift(filtered.drift);
-    renderProjects(filtered.projects);
-    renderParties(filtered.parties);
+    renderSection("asks", [filtered.asks, filtered.blocked, filtered.parties], renderAsks, onlyIfChanged);
+    renderSection("ready", [filtered.ready_for_you], renderReadyForYou, onlyIfChanged);
+    renderSection("notices", [filtered.notices, filtered.projects, filtered.raids], renderNotices, onlyIfChanged);
+    renderSection("ideas", [filtered.ideas, data.project_names], renderIdeas, onlyIfChanged);
+    renderSection("memory", [filtered.memory], renderMemory, onlyIfChanged);
+    renderSection("raids", [filtered.raids], renderRaids, onlyIfChanged);
+    renderSection("merge-queues", [filtered.merge_queues], renderMergeQueues, onlyIfChanged);
+    renderSection("drift", [filtered.drift], renderDrift, onlyIfChanged);
+    renderSection("projects", [filtered.projects], renderProjects, onlyIfChanged);
+    renderSection("parties", [filtered.parties], renderParties, onlyIfChanged);
     restoreFocus();
   }
 
@@ -2636,15 +2647,25 @@ var NO_SESSION_MESSAGE = "session token not loaded, reload the page";
       });
   }
 
-  function fetchBoard() {
+  function loadBoard(onlyIfChanged) {
     fetch(BOARD_URL)
       .then(function (response) {
         return response.json();
       })
-      .then(render)
+      .then(function (data) {
+        render(data, onlyIfChanged);
+      })
       .catch(function (error) {
         console.error(error);
       });
+  }
+
+  function fetchBoard() {
+    loadBoard(false);
+  }
+
+  function pollBoard() {
+    loadBoard(true);
   }
 
   document.addEventListener("DOMContentLoaded", function () {
@@ -2664,7 +2685,7 @@ var NO_SESSION_MESSAGE = "session token not loaded, reload the page";
     fetchSession();
     fetchBoard();
     fetchResources();
-    setInterval(fetchBoard, REFRESH_INTERVAL_MS);
+    setInterval(pollBoard, REFRESH_INTERVAL_MS);
     setInterval(fetchResources, REFRESH_INTERVAL_MS);
   });
 })();
