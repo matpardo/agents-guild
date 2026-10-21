@@ -1,6 +1,6 @@
 const fs = require("fs");
 const vm = require("vm");
-const [src, scenario] = process.argv.slice(2);
+const readline = require("readline");
 function mk(tag) {
   const o = { tag, children: [], _text: "", value: "all", options: [], style: {}, dataset: {}, attrs: {},
     classList: { add() {}, remove() {}, toggle() {}, contains() { return false; } } };
@@ -24,45 +24,47 @@ function findButton(node) {
   }
   return null;
 }
-const byId = {};
-const doc = {
-  getElementById: (id) => (byId[id] = byId[id] || mk(id.endsWith("-filter") ? "select" : "div")),
-  createElement: mk, createTextNode: (t) => { const n = mk("#text"); n._text = t; return n; },
-  addEventListener: (n, f) => { doc.h = f; },
-  activeElement: null, querySelector: () => null, querySelectorAll: () => [],
-};
-const board = { generated_at: "now", parties: [], raids: [], asks: [], blocked: [], notices: [], projects: [],
-  memory: [], merge_queues: [], drift: [], answered_asks: [] };
-const machine = { sampled_at: "t", disk_percent: null, mem_available: null, docker: null,
-  guild_db_bytes: 0, untracked_growth: null };
-let resourcesCalls = 0;
-function respond(body, ok) {
-  return Promise.resolve({ ok, json: () => Promise.resolve(body) });
-}
-function fetchStub(url, options) {
-  if (url === "/api/board") return respond(board, true);
-  if (url === "/api/session") return respond({ token: "t" }, true);
-  if (url === "/api/compact") {
-    return new Promise((resolve, reject) => setTimeout(() => {
-      if (scenario === "dropped") return reject(new Error("connection reset"));
-      return resolve({ ok: true, json: () => Promise.resolve({ ok: true, message: "backup done\nvacuum done" }) });
-    }, 10));
+const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+async function run({ src, scenario }) {
+  const byId = {};
+  const doc = {
+    getElementById: (id) => (byId[id] = byId[id] || mk(id.endsWith("-filter") ? "select" : "div")),
+    createElement: mk, createTextNode: (t) => { const n = mk("#text"); n._text = t; return n; },
+    addEventListener: (n, f) => { doc.h = f; },
+    activeElement: null, querySelector: () => null, querySelectorAll: () => [],
+  };
+  let resourcesCalls = 0;
+  const board = { generated_at: "now", parties: [], raids: [], asks: [], blocked: [], notices: [], projects: [],
+    memory: [], merge_queues: [], drift: [], answered_asks: [] };
+  const machine = { sampled_at: "t", disk_percent: null, mem_available: null, docker: null,
+    guild_db_bytes: 0, untracked_growth: null };
+  function respond(body, ok) {
+    return Promise.resolve({ ok, json: () => Promise.resolve(body) });
   }
-  resourcesCalls += 1;
-  if (resourcesCalls <= 2) return respond({ machine, since: "1d", projects: [], unattributed: null }, true);
-  return respond({ error: "database is locked" }, false);
+  function fetchStub(url, options) {
+    if (url === "/api/board") return respond(board, true);
+    if (url === "/api/session") return respond({ token: "t" }, true);
+    if (url === "/api/compact") {
+      return new Promise((resolve, reject) => setTimeout(() => {
+        if (scenario === "dropped") return reject(new Error("connection reset"));
+        return resolve({ ok: true, json: () => Promise.resolve({ ok: true, message: "backup done\nvacuum done" }) });
+      }, 10));
+    }
+    resourcesCalls += 1;
+    if (resourcesCalls <= 2) return respond({ machine, since: "1d", projects: [], unattributed: null }, true);
+    return respond({ error: "database is locked" }, false);
+  }
+  const ctx = { document: doc, window: {}, console, setInterval() {}, setTimeout() {}, fetch: fetchStub };
+  ctx.window = ctx;
+  vm.createContext(ctx);
+  vm.runInContext(fs.readFileSync(src, "utf8"), ctx);
+  doc.h();
+  await wait(50);
+  findButton(doc.getElementById("resources")).h.click();
+  await wait(50);
+  const after = findButton(doc.getElementById("resources"));
+  return { disabled: after.disabled, text: doc.getElementById("resources").textContent };
 }
-const ctx = { document: doc, window: {}, console, setInterval() {}, setTimeout() {}, fetch: fetchStub };
-ctx.window = ctx;
-vm.createContext(ctx);
-vm.runInContext(fs.readFileSync(src, "utf8"), ctx);
-doc.h();
-setTimeout(() => {
-  const button = findButton(doc.getElementById("resources"));
-  button.h.click();
-  setTimeout(() => {
-    const after = findButton(doc.getElementById("resources"));
-    console.log(JSON.stringify({ disabled: after.disabled, text: doc.getElementById("resources").textContent }));
-    process.exit(0);
-  }, 50);
-}, 50);
+readline.createInterface({ input: process.stdin }).on("line", async (line) => {
+  console.log(JSON.stringify(await run(JSON.parse(line))));
+});
