@@ -463,6 +463,42 @@ def _notice_unseen(conn, event):
     conn.execute("UPDATE notices SET seen_at = NULL WHERE id = ?", (event["payload"]["id"],))
 
 
+_IDEA_COLUMNS = ("title", "description", "requester", "deadline", "project")
+
+
+def _idea_created(conn, event):
+    payload = event["payload"]
+    conn.execute(
+        "INSERT INTO ideas (id, title, description, requester, deadline, project, created_at, updated_at)"
+        " VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+        (
+            payload["id"],
+            payload["title"],
+            payload["description"],
+            payload["requester"],
+            payload["deadline"],
+            payload["project"],
+            event["ts"],
+            event["ts"],
+        ),
+    )
+
+
+def _idea_edited(conn, event):
+    payload = event["payload"]
+    columns = [column for column in _IDEA_COLUMNS if column in payload["fields"]]
+    assignments = ", ".join("{} = ?".format(column) for column in columns)
+    values = [payload["fields"][column] for column in columns]
+    conn.execute(
+        "UPDATE ideas SET {}, updated_at = ? WHERE id = ?".format(assignments),
+        values + [event["ts"], payload["id"]],
+    )
+
+
+def _idea_deleted(conn, event):
+    conn.execute("DELETE FROM ideas WHERE id = ?", (event["payload"]["id"],))
+
+
 def _claim_created(conn, event):
     payload = event["payload"]
     conn.execute(
@@ -686,6 +722,9 @@ _REDUCERS = {
     "notice.closed": _notice_closed,
     "notice.seen": _notice_seen,
     "notice.unseen": _notice_unseen,
+    "idea.created": _idea_created,
+    "idea.edited": _idea_edited,
+    "idea.deleted": _idea_deleted,
     "claim.created": _claim_created,
     "claim.released": _claim_released,
     "raid.joined": _raid_joined,

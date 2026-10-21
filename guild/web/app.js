@@ -53,6 +53,11 @@ var NO_SESSION_MESSAGE = "session token not loaded, reload the page";
     noticeForm: { text: "", to: "", ttl: "1d" },
     noticeFormStatus: "",
     noticeFormBusy: false,
+    ideasOpen: true,
+    ideaForm: { title: "", description: "", requester: "", deadline: "", project: "" },
+    ideaDrafts: {},
+    ideaStatuses: {},
+    ideaBusy: {},
     raidPauseOpen: {},
     raidStatuses: {},
     raidBusy: {},
@@ -1272,6 +1277,199 @@ var NO_SESSION_MESSAGE = "session token not loaded, reload the page";
     section.appendChild(details);
   }
 
+  function ideaPayload(draft) {
+    return {
+      title: draft.title,
+      description: draft.description,
+      requester: draft.requester === "" ? null : draft.requester,
+      deadline: draft.deadline === "" ? null : draft.deadline,
+      project: draft.project === "" ? null : draft.project,
+    };
+  }
+
+  function postIdea(url, payload, key, onSuccess) {
+    if (sessionToken === null) {
+      state.ideaStatuses[key] = NO_SESSION_MESSAGE;
+      fetchBoard();
+      return;
+    }
+    state.ideaBusy[key] = true;
+    state.ideaStatuses[key] = "sending...";
+    fetchBoard();
+    sendPost(url, payload).then(function (result) {
+      delete state.ideaBusy[key];
+      state.ideaStatuses[key] = result.ok ? "" : errorMessage(result.body);
+      if (result.ok) {
+        onSuccess();
+      }
+      fetchBoard();
+    });
+  }
+
+  function ideaInput(draft, field, type, placeholder, disabled) {
+    var input = el("input");
+    input.type = type;
+    input.className = "block-reason idea-" + field;
+    input.placeholder = placeholder;
+    input.value = draft[field];
+    input.disabled = disabled;
+    input.addEventListener("input", function () {
+      draft[field] = input.value;
+    });
+    return input;
+  }
+
+  function ideaProjectSelect(draft, projects, disabled) {
+    var select = el("select");
+    [""].concat(projects.map(function (project) {
+      return project.name;
+    })).forEach(function (name) {
+      select.appendChild(option(name));
+    });
+    select.value = draft.project;
+    select.disabled = disabled;
+    select.addEventListener("change", function () {
+      draft.project = select.value;
+    });
+    return select;
+  }
+
+  function renderIdeaFields(draft, projects, busy) {
+    var fields = el("div");
+    fields.className = "notice-actions idea-fields";
+    fields.appendChild(ideaInput(draft, "title", "text", "title", busy));
+    fields.appendChild(ideaInput(draft, "description", "text", "description", busy));
+    fields.appendChild(ideaInput(draft, "requester", "text", "requester (optional)", busy));
+    fields.appendChild(ideaInput(draft, "deadline", "date", "deadline", busy));
+    fields.appendChild(ideaProjectSelect(draft, projects, busy));
+    return fields;
+  }
+
+  function ideaActionButton(label, busy, handler) {
+    var button = textEl("button", label);
+    button.type = "button";
+    button.disabled = busy;
+    button.addEventListener("click", handler);
+    return button;
+  }
+
+  function renderIdeaForm(projects) {
+    var busy = state.ideaBusy.new === true;
+    var form = el("div");
+    form.className = "idea-form";
+    form.appendChild(renderIdeaFields(state.ideaForm, projects, busy));
+    var actions = el("div");
+    actions.className = "notice-actions";
+    actions.appendChild(
+      ideaActionButton("Add idea", busy, function () {
+        postIdea("/api/ideas/create", ideaPayload(state.ideaForm), "new", function () {
+          state.ideaForm = { title: "", description: "", requester: "", deadline: "", project: "" };
+        });
+      })
+    );
+    actions.appendChild(classedText("span", state.ideaStatuses.new || "", "ask-status"));
+    form.appendChild(actions);
+    return form;
+  }
+
+  function ideaMeta(idea) {
+    var parts = [];
+    if (idea.project !== null) {
+      parts.push(idea.project);
+    }
+    if (idea.requester !== null) {
+      parts.push("from " + idea.requester);
+    }
+    if (idea.deadline !== null) {
+      parts.push("due " + idea.deadline + (idea.overdue ? " (overdue)" : ""));
+    }
+    return parts.join(" · ");
+  }
+
+  function renderIdeaView(article, idea) {
+    var busy = state.ideaBusy[idea.id] === true;
+    article.appendChild(textEl("h3", "#" + idea.id + " " + idea.title));
+    article.appendChild(classedText("p", ideaMeta(idea), "muted"));
+    article.appendChild(textEl("p", idea.description));
+    var actions = el("div");
+    actions.className = "notice-actions";
+    actions.appendChild(
+      ideaActionButton("Edit", busy, function () {
+        state.ideaDrafts[idea.id] = {
+          title: idea.title,
+          description: idea.description,
+          requester: idea.requester === null ? "" : idea.requester,
+          deadline: idea.deadline === null ? "" : idea.deadline,
+          project: idea.project === null ? "" : idea.project,
+        };
+        fetchBoard();
+      })
+    );
+    actions.appendChild(
+      ideaActionButton("Delete", busy, function () {
+        postIdea("/api/ideas/" + idea.id + "/delete", {}, idea.id, function () {});
+      })
+    );
+    actions.appendChild(classedText("span", state.ideaStatuses[idea.id] || "", "ask-status"));
+    article.appendChild(actions);
+  }
+
+  function renderIdeaEdit(article, idea, projects) {
+    var draft = state.ideaDrafts[idea.id];
+    var busy = state.ideaBusy[idea.id] === true;
+    article.appendChild(renderIdeaFields(draft, projects, busy));
+    var actions = el("div");
+    actions.className = "notice-actions";
+    actions.appendChild(
+      ideaActionButton("Save", busy, function () {
+        postIdea("/api/ideas/" + idea.id + "/edit", ideaPayload(draft), idea.id, function () {
+          delete state.ideaDrafts[idea.id];
+        });
+      })
+    );
+    actions.appendChild(
+      ideaActionButton("Cancel", busy, function () {
+        delete state.ideaDrafts[idea.id];
+        fetchBoard();
+      })
+    );
+    actions.appendChild(classedText("span", state.ideaStatuses[idea.id] || "", "ask-status"));
+    article.appendChild(actions);
+  }
+
+  function renderIdea(idea, projects) {
+    var article = el("article");
+    article.className = idea.overdue ? "card idea idea-overdue" : "card idea";
+    if (state.ideaDrafts[idea.id] === undefined) {
+      renderIdeaView(article, idea);
+      return article;
+    }
+    renderIdeaEdit(article, idea, projects);
+    return article;
+  }
+
+  function renderIdeas(ideas, projects) {
+    var section = document.getElementById("ideas");
+    clear(section);
+    var details = el("details");
+    details.className = "ideas-section";
+    details.open = state.ideasOpen;
+    details.addEventListener("toggle", function () {
+      state.ideasOpen = details.open;
+    });
+    var summary = el("summary");
+    summary.appendChild(textEl("h2", "ideas (" + ideas.length + ")"));
+    details.appendChild(summary);
+    details.appendChild(renderIdeaForm(projects));
+    appendAll(
+      details,
+      ideas.map(function (idea) {
+        return renderIdea(idea, projects);
+      })
+    );
+    section.appendChild(details);
+  }
+
   function renderMemoryItem(item) {
     var article = el("article");
     article.className = "card memory";
@@ -2057,6 +2255,7 @@ var NO_SESSION_MESSAGE = "session token not loaded, reload the page";
     }
     return {
       generated_at: data.generated_at,
+      ideas: data.ideas,
       asks: data.asks.filter(function (ask) {
         return ask.party === state.partyFilter;
       }),
@@ -2125,6 +2324,7 @@ var NO_SESSION_MESSAGE = "session token not loaded, reload the page";
     var scope = "raid:" + state.raidFilter;
     return {
       generated_at: data.generated_at,
+      ideas: data.ideas,
       asks: data.asks.filter(function (ask) {
         return members.indexOf(ask.party) !== -1;
       }),
@@ -2411,6 +2611,7 @@ var NO_SESSION_MESSAGE = "session token not loaded, reload the page";
     renderAsks(filtered.asks, filtered.blocked, filtered.parties);
     renderReadyForYou(filtered.ready_for_you);
     renderNotices(filtered.notices, filtered.projects, filtered.raids);
+    renderIdeas(filtered.ideas, data.projects);
     renderMemory(filtered.memory);
     renderRaids(filtered.raids);
     renderMergeQueues(filtered.merge_queues);

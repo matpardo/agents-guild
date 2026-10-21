@@ -9,6 +9,7 @@ PROJECTION_TABLES = (
     "cards",
     "asks",
     "notices",
+    "ideas",
     "claims",
     "raid_members",
     "raid_pauses",
@@ -171,6 +172,18 @@ _CREATE_STATEMENTS = (
         expires_at TEXT NOT NULL,
         state TEXT NOT NULL,
         created_at TEXT NOT NULL
+    )
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS ideas (
+        id INTEGER PRIMARY KEY,
+        title TEXT NOT NULL,
+        description TEXT NOT NULL,
+        requester TEXT,
+        deadline TEXT,
+        project TEXT,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
     )
     """,
     """

@@ -73,7 +73,7 @@ class WebDriftScriptTests(unittest.TestCase):
 _HARNESS = Path(__file__).resolve().parent / "web_drift_harness.js"
 _MISSING = object()
 _BOARD = {
-    "generated_at": "now", "asks": [], "notices": [], "memory": [], "blocked": [], "merge_queues": [], "ready_for_you": [],
+    "generated_at": "now", "asks": [], "notices": [], "ideas": [], "memory": [], "blocked": [], "merge_queues": [], "ready_for_you": [],
     "projects": [], "raids": [{"name": "r", "members": ["c"]}],
     "parties": [
         {
@@ -258,6 +258,35 @@ class WebNoticeAndRaidBehaviorTests(unittest.TestCase):
         self.assertIn("Create notice", out)
         self.assertIn("project:acme raid:r", out)
         self.assertIn("1h 8h 1d 3d", out)
+
+    def _idea(self, **overrides):
+        idea = {
+            "id": 1, "title": "Dark mode", "description": "night owls", "requester": "ana",
+            "deadline": "2000-01-01", "project": "acme", "created_at": "now", "overdue": True,
+        }
+        return dict(idea, **overrides)
+
+    def test_ideas_render_with_meta_and_overdue_mark(self):
+        board = dict(self._board(False), ideas=[self._idea()])
+        out = self._rendered(board, "ideas")
+        for expected in ("#1 Dark mode", "night owls", "from ana", "due 2000-01-01 (overdue)", "Edit", "Delete", "Add idea"):
+            self.assertIn(expected, out)
+
+    def test_idea_not_overdue_has_no_overdue_mark(self):
+        board = dict(self._board(False), ideas=[self._idea(overdue=False, deadline="2099-01-01")])
+        out = self._rendered(board, "ideas")
+        self.assertIn("due 2099-01-01", out)
+        self.assertNotIn("overdue", out)
+
+    def test_ideas_survive_the_party_filter(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "board.json"
+            path.write_text(json.dumps(dict(self._board(False), ideas=[self._idea()])))
+            out = subprocess.run(
+                ["node", str(_HARNESS), str(_APP_JS_PATH), str(path), "a", "all", "ideas"],
+                capture_output=True, text=True, timeout=30, check=True,
+            ).stdout
+        self.assertIn("Dark mode", out)
 
     def test_raid_button_follows_the_paused_state(self):
         running = self._rendered(self._board(False), "raids")

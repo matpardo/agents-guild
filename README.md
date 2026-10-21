@@ -159,6 +159,11 @@ guild notice seen <id>|--all
 guild notice unseen <id>
 guild notices
 
+guild idea add "<title>" --description "<text>" [--requester <text>] [--deadline YYYY-MM-DD] [--project <name>]
+guild idea edit <id> [--title ..] [--description ..] [--requester ..|--no-requester] [--deadline ..|--no-deadline] [--project ..|--no-project]
+guild idea delete <id>
+guild ideas [<id> | --project <name>]   # sorted by deadline, no deadline last; overdue marked; <id> shows one in full
+
 guild claim <area> --ttl <dur>          # area, or task:<epic>/<tid> / task:<quest>/<tid>
 guild claim check <area>                # read-only, no event; exit 0 free/yours, exit 1 someone else's
 guild release <area>
@@ -1168,6 +1173,30 @@ naming the refs and what each source says:
 
 The last line is `N findings` or `no drift`. `guild drift` never writes to
 SDD or the tracker: fixing drift stays with humans and the normal skills.
+
+### Ideas
+
+A backlog for loose ideas that would otherwise live on post-its. An idea has a
+title, a description, a creation date and, optionally, a requester (free text),
+a deadline (`YYYY-MM-DD`) and a registered project. The human and any session
+can add, edit and delete ideas; they are local and never broadcast. `guild
+ideas` lists them by deadline ascending with the ones without deadline last
+(ties by creation), and marks `overdue` the ones whose deadline is before
+today. When an idea becomes code, a spec, a card or work in progress, the
+session that did it runs `guild idea delete <id>`: a deleted idea stays in the
+event log and `guild rebuild` deletes it again. Idea ids are local; do not copy
+them into PRs, commits or cards. Title, description and requester go through
+the same email, secret and project-pattern checks as other free text.
+
+The board has an `ideas` section (the same list, in the same order, with an
+`overdue` flag per idea) with a form to add one and `Edit` / `Delete` on each
+card. `POST /api/ideas/create` (body `{"title", "description"}` plus optional
+`requester`, `deadline`, `project`, each a string or `null`),
+`POST /api/ideas/<id>/edit` (body with the fields to change; `null` clears
+requester, deadline or project) and `POST /api/ideas/<id>/delete` (body `{}`)
+run the same functions as the CLI; invalid input answers `422` with the
+message, a wrong type `400`. The project select lists the projects on the
+board; the CLI accepts any registered project.
 
 ### Marking notices seen
 

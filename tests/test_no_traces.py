@@ -4,7 +4,7 @@ from pathlib import Path
 from guild import pii
 from tests.testutil import GuildTestCase
 
-_TRACE_RE = re.compile(r"guild|ask #[0-9]|notice #[0-9]", re.IGNORECASE)
+_TRACE_RE = re.compile(r"guild|ask #[0-9]|notice #[0-9]|idea #[0-9]", re.IGNORECASE)
 _REPO_ROOT = Path(__file__).resolve().parents[1]
 
 
