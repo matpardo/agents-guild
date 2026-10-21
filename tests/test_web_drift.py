@@ -1,13 +1,12 @@
 import json
 import re
 import shutil
-import subprocess
-import tempfile
 import unittest
 from pathlib import Path
 
 from guild import context, db, paths, timeutil
 from guild.commands import board as board_commands
+from tests import node_harness
 from tests.test_party_drift import PartyDriftTestCase
 
 _APP_JS_PATH = Path(__file__).resolve().parent.parent / "guild" / "web" / "app.js"
@@ -70,7 +69,15 @@ class WebDriftScriptTests(unittest.TestCase):
         self.assertTrue(re.search(r'textEl\("li", finding\.text\)', _APP_JS))
 
 
-_HARNESS = Path(__file__).resolve().parent / "web_drift_harness.js"
+_HARNESS_NAME = "web_drift_harness.js"
+
+
+def _render(board, party_filter, raid_filter, out_id, mode):
+    return node_harness.request(_HARNESS_NAME, {
+        "src": str(_APP_JS_PATH), "data": board, "partyF": party_filter, "raidF": raid_filter, "outId": out_id, "mode": mode,
+    })
+
+
 _MISSING = object()
 _BOARD = {
     "generated_at": "now", "asks": [], "notices": [], "ideas": [], "project_names": [], "memory": [], "blocked": [], "merge_queues": [], "ready_for_you": [],
@@ -96,14 +103,8 @@ _BOARD = {
 @unittest.skipIf(shutil.which("node") is None, "node not installed")
 class WebDriftBehaviorTests(unittest.TestCase):
     def _rendered(self, party_filter, raid_filter):
-        with tempfile.TemporaryDirectory() as tmp:
-            board = Path(tmp) / "board.json"
-            board.write_text(json.dumps(_BOARD))
-            result = subprocess.run(
-                ["node", str(_HARNESS), str(_APP_JS_PATH), str(board), party_filter, raid_filter],
-                capture_output=True, text=True, timeout=30, check=True,
-            )
-        return result.stdout.strip()
+        result = _render(_BOARD, party_filter, raid_filter, "drift", "text")
+        return result.strip()
 
     def test_no_filter_shows_every_finding(self):
         self.assertEqual(self._rendered("all", "all"), "drift p scope: x rule1 (3) FA FC FN rule2 (1) FC2")
@@ -116,13 +117,7 @@ class WebDriftBehaviorTests(unittest.TestCase):
 
     def test_party_without_findings_shows_no_drift(self):
         board = dict(_BOARD, drift=[{"project": "p", "scope": "scope: x", "findings": {"rule1": [{"text": "FC", "party": "c"}]}}])
-        with tempfile.TemporaryDirectory() as tmp:
-            path = Path(tmp) / "board.json"
-            path.write_text(json.dumps(board))
-            out = subprocess.run(
-                ["node", str(_HARNESS), str(_APP_JS_PATH), str(path), "a", "all"],
-                capture_output=True, text=True, timeout=30, check=True,
-            ).stdout.strip()
+        out = _render(board, "a", "all", "drift", "text").strip()
         self.assertEqual(out, "drift p scope: x no drift")
 
     def test_party_filter_renders_a_board_with_a_merge_queue(self):
@@ -135,13 +130,7 @@ class WebDriftBehaviorTests(unittest.TestCase):
         }
         queue = {"head": None, "scope": "party:a", "synced_at": "now", "synced_label": "synced now", "main": [], "queue": [entry]}
         board = dict(_BOARD, merge_queues=[queue])
-        with tempfile.TemporaryDirectory() as tmp:
-            path = Path(tmp) / "board.json"
-            path.write_text(json.dumps(board))
-            out = subprocess.run(
-                ["node", str(_HARNESS), str(_APP_JS_PATH), str(path), "a", "all"],
-                capture_output=True, text=True, timeout=30, check=True,
-            ).stdout.strip()
+        out = _render(board, "a", "all", "drift", "text").strip()
         self.assertEqual(out, "drift p scope: x rule1 (1) FA")
 
 
@@ -159,13 +148,7 @@ class WebQueueBlockBehaviorTests(unittest.TestCase):
         if blocked_external is not _MISSING:
             entry["blocked_external"] = blocked_external
         queue = {"head": None, "scope": "party:a", "synced_at": "now", "synced_label": "synced now", "main": [], "queue": [entry]}
-        with tempfile.TemporaryDirectory() as tmp:
-            path = Path(tmp) / "board.json"
-            path.write_text(json.dumps(dict(_BOARD, merge_queues=[queue])))
-            return subprocess.run(
-                ["node", str(_HARNESS), str(_APP_JS_PATH), str(path), "all", "all", "merge-queues"],
-                capture_output=True, text=True, timeout=30, check=True,
-            ).stdout
+        return _render(dict(_BOARD, merge_queues=[queue]), "all", "all", "merge-queues", "text")
 
     def _human_text(self, **overrides):
         entry = {
@@ -177,13 +160,7 @@ class WebQueueBlockBehaviorTests(unittest.TestCase):
         }
         entry.update(overrides)
         queue = {"head": None, "scope": "party:a", "synced_at": "now", "synced_label": "synced now", "main": [], "queue": [entry]}
-        with tempfile.TemporaryDirectory() as tmp:
-            path = Path(tmp) / "board.json"
-            path.write_text(json.dumps(dict(_BOARD, merge_queues=[queue])))
-            return subprocess.run(
-                ["node", str(_HARNESS), str(_APP_JS_PATH), str(path), "all", "all", "merge-queues"],
-                capture_output=True, text=True, timeout=30, check=True,
-            ).stdout
+        return _render(dict(_BOARD, merge_queues=[queue]), "all", "all", "merge-queues", "text")
 
     def test_ci_pending_entry_shows_pill_and_note(self):
         text = self._human_text(human_state="ready (CI pending)", notes=["CI label run-ci not on the PR"])
@@ -219,13 +196,7 @@ class WebMainRowBehaviorTests(unittest.TestCase):
     def _text(self, external):
         row = {"repo": "o/r", "source": "gh", "reason": "checks failing: lint", "external": external}
         queue = {"head": None, "scope": "party:a", "synced_at": "now", "synced_label": "synced now", "main": [row], "queue": []}
-        with tempfile.TemporaryDirectory() as tmp:
-            path = Path(tmp) / "board.json"
-            path.write_text(json.dumps(dict(_BOARD, merge_queues=[queue])))
-            return subprocess.run(
-                ["node", str(_HARNESS), str(_APP_JS_PATH), str(path), "all", "all", "merge-queues"],
-                capture_output=True, text=True, timeout=30, check=True,
-            ).stdout
+        return _render(dict(_BOARD, merge_queues=[queue]), "all", "all", "merge-queues", "text")
 
     def test_red_main_row_says_fix_before_anything(self):
         text = self._text(None)
@@ -241,13 +212,7 @@ class WebMainRowBehaviorTests(unittest.TestCase):
 @unittest.skipIf(shutil.which("node") is None, "node not installed")
 class WebNoticeAndRaidBehaviorTests(unittest.TestCase):
     def _rendered(self, board, out_id):
-        with tempfile.TemporaryDirectory() as tmp:
-            path = Path(tmp) / "board.json"
-            path.write_text(json.dumps(board))
-            return subprocess.run(
-                ["node", str(_HARNESS), str(_APP_JS_PATH), str(path), "all", "all", out_id],
-                capture_output=True, text=True, timeout=30, check=True,
-            ).stdout.strip()
+        return _render(board, "all", "all", out_id, "text").strip()
 
     def _board(self, paused):
         raids = [{"name": "r", "members": ["c"], "paused": paused}]
@@ -280,13 +245,7 @@ class WebNoticeAndRaidBehaviorTests(unittest.TestCase):
 
     def _idea_form_inputs(self):
         board = dict(self._board(False), ideas=[], project_names=["acme", "zeta"])
-        with tempfile.TemporaryDirectory() as tmp:
-            path = Path(tmp) / "board.json"
-            path.write_text(json.dumps(board))
-            out = subprocess.run(
-                ["node", str(_HARNESS), str(_APP_JS_PATH), str(path), "all", "all", "ideas", "tree"],
-                capture_output=True, text=True, timeout=30, check=True,
-            ).stdout
+        out = _render(board, "all", "all", "ideas", "tree")
         found = []
 
         def walk(node):
@@ -306,13 +265,7 @@ class WebNoticeAndRaidBehaviorTests(unittest.TestCase):
         self.assertEqual(options, ["no project", "acme", "zeta"])
 
     def test_ideas_survive_the_party_filter(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            path = Path(tmp) / "board.json"
-            path.write_text(json.dumps(dict(self._board(False), ideas=[self._idea()])))
-            out = subprocess.run(
-                ["node", str(_HARNESS), str(_APP_JS_PATH), str(path), "a", "all", "ideas"],
-                capture_output=True, text=True, timeout=30, check=True,
-            ).stdout
+        out = _render(dict(self._board(False), ideas=[self._idea()]), "a", "all", "ideas", "text")
         self.assertIn("Dark mode", out)
 
     def test_raid_button_follows_the_paused_state(self):
@@ -358,14 +311,8 @@ class WebNoticeAndRaidBehaviorTests(unittest.TestCase):
 class WebMemoryBehaviorTests(unittest.TestCase):
     def _rendered(self, items, party_filter):
         board = dict(_BOARD, memory=items)
-        with tempfile.TemporaryDirectory() as tmp:
-            path = Path(tmp) / "board.json"
-            path.write_text(json.dumps(board))
-            result = subprocess.run(
-                ["node", str(_HARNESS), str(_APP_JS_PATH), str(path), party_filter, "all", "memory"],
-                capture_output=True, text=True, timeout=30, check=True,
-            )
-        return result.stdout.strip()
+        result = _render(board, party_filter, "all", "memory", "text")
+        return result.strip()
 
     def test_party_filter_keeps_only_that_party_memory(self):
         items = [
@@ -394,13 +341,7 @@ class WebPartyHandoffBehaviorTests(unittest.TestCase):
             dict(_BOARD["parties"][0], name="a", state=state, has_live_leader=has_live_leader)
         ]
         board = dict(_BOARD, parties=parties)
-        with tempfile.TemporaryDirectory() as tmp:
-            path = Path(tmp) / "board.json"
-            path.write_text(json.dumps(board))
-            return subprocess.run(
-                ["node", str(_HARNESS), str(_APP_JS_PATH), str(path), "all", "all", "parties"],
-                capture_output=True, text=True, timeout=30, check=True,
-            ).stdout.strip()
+        return _render(board, "all", "all", "parties", "text").strip()
 
     def test_active_party_with_no_live_leader_shows_the_hand_off_button(self):
         self.assertIn("Hand off", self._rendered("active", False))
@@ -416,13 +357,7 @@ class WebPartyHandoffBehaviorTests(unittest.TestCase):
 class WebPartyWaitsBehaviorTests(unittest.TestCase):
     def _rendered(self, waits):
         parties = [dict(_BOARD["parties"][0], name="a", waits=waits)]
-        with tempfile.TemporaryDirectory() as tmp:
-            path = Path(tmp) / "board.json"
-            path.write_text(json.dumps(dict(_BOARD, parties=parties)))
-            return subprocess.run(
-                ["node", str(_HARNESS), str(_APP_JS_PATH), str(path), "all", "all", "parties"],
-                capture_output=True, text=True, timeout=30, check=True,
-            ).stdout.strip()
+        return _render(dict(_BOARD, parties=parties), "all", "all", "parties", "text").strip()
 
     def test_each_wait_renders_one_pill(self):
         waits = [
@@ -447,13 +382,7 @@ class WebTaskMoveBehaviorTests(unittest.TestCase):
         }
         quest = {"slug": "src", "title": "Src", "move_targets": move_targets, "tasks": [task]}
         parties = [dict(_BOARD["parties"][0], name="a", quests=[quest])]
-        with tempfile.TemporaryDirectory() as tmp:
-            path = Path(tmp) / "board.json"
-            path.write_text(json.dumps(dict(_BOARD, parties=parties)))
-            return subprocess.run(
-                ["node", str(_HARNESS), str(_APP_JS_PATH), str(path), "all", "all", "parties"],
-                capture_output=True, text=True, timeout=30, check=True,
-            ).stdout.strip()
+        return _render(dict(_BOARD, parties=parties), "all", "all", "parties", "text").strip()
 
     def test_queued_task_lists_the_move_targets(self):
         out = self._rendered("queued", ["dst", "dst2"])
@@ -476,14 +405,8 @@ class WebCtxBehaviorTests(unittest.TestCase):
         parties = [dict(party) for party in _BOARD["parties"]]
         parties[0]["ctx"] = {"pct": 42, "threshold": 75, "source": "compaction 85% − 10", "high": False}
         parties[1]["ctx"] = {"pct": 72, "threshold": 70, "source": "configured", "high": True}
-        with tempfile.TemporaryDirectory() as tmp:
-            board = Path(tmp) / "board.json"
-            board.write_text(json.dumps(dict(_BOARD, parties=parties)))
-            result = subprocess.run(
-                ["node", str(_HARNESS), str(_APP_JS_PATH), str(board), "all", "all", out_id],
-                capture_output=True, text=True, timeout=30, check=True,
-            )
-        return result.stdout.strip()
+        result = _render(dict(_BOARD, parties=parties), "all", "all", out_id, "text")
+        return result.strip()
 
     def test_badge_shows_below_threshold_with_its_source(self):
         self.assertIn("context 42% / 75% (compaction 85% − 10)", self._rendered("parties"))
@@ -502,13 +425,7 @@ class WebCloseBlockersBehaviorTests(unittest.TestCase):
     def _parties_text(self, close_blockers):
         quest = {"slug": "q1", "title": "Quest", "move_targets": [], "tasks": [], "close_blockers": close_blockers}
         parties = [dict(_BOARD["parties"][0], quests=[quest])]
-        with tempfile.TemporaryDirectory() as tmp:
-            path = Path(tmp) / "board.json"
-            path.write_text(json.dumps(dict(_BOARD, parties=parties)))
-            return subprocess.run(
-                ["node", str(_HARNESS), str(_APP_JS_PATH), str(path), "all", "all", "parties"],
-                capture_output=True, text=True, timeout=30, check=True,
-            ).stdout
+        return _render(dict(_BOARD, parties=parties), "all", "all", "parties", "text")
 
     def test_quest_with_blockers_shows_badge_and_both_lists(self):
         blockers = {"own": ["OWN1"], "foreign": [{"text": "FOR1", "party": "zed"}]}
@@ -542,13 +459,7 @@ class WebReadyForYouBehaviorTests(unittest.TestCase):
     ]
 
     def _text(self, items, party_filter, raid_filter, mode):
-        with tempfile.TemporaryDirectory() as tmp:
-            path = Path(tmp) / "board.json"
-            path.write_text(json.dumps(dict(_BOARD, ready_for_you=items, raids=[{"name": name, "members": ["c"]} for name in ("r", "r2", "other")])))
-            return subprocess.run(
-                ["node", str(_HARNESS), str(_APP_JS_PATH), str(path), party_filter, raid_filter, "ready-for-you", mode],
-                capture_output=True, text=True, timeout=30, check=True,
-            ).stdout.strip()
+        return _render(dict(_BOARD, ready_for_you=items, raids=[{"name": name, "members": ["c"]} for name in ("r", "r2", "other")]), party_filter, raid_filter, "ready-for-you", mode).strip()
 
     def test_items_render_in_the_given_order(self):
         text = self._text(self._ITEMS, "all", "all", "text")

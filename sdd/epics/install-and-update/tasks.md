@@ -63,3 +63,10 @@ updated: 2026-10-17
 **Status:** [x] done — #191
 
 **What:** The suite spent most of its time spawning the fake `gh` and `acli` scripts and rebuilding the argument parser on every in-process CLI call. The github and jira adapters now route their tool calls through one private runner that tests replace with the fixture logic of `tests/fake_gh.py` and `tests/fake_acli.py` in process; tests reuse one parser and skip gettext lookups. Production behavior is unchanged; the full run drops from about 4.5 minutes to about 1.5 on four cores with the same tests.
+
+## T09 — Node-driven web tests share one process
+
+**Depends on:** T08
+**Status:** [x] done — #192
+
+**What:** Each web behavior test started its own `node` process and slept 100 ms on timers. The drift and compact harnesses now serve scenarios over stdin, one fresh vm context each, and the tests talk to one long-lived node process per harness through `tests/node_harness.py`. Same tests and assertions; `test_web_drift` drops from about 23 s to about 4 s.

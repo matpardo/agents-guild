@@ -1,11 +1,11 @@
 import json
 import shutil
 import sqlite3
-import subprocess
 import unittest
 from pathlib import Path
 from unittest import mock
 
+from tests import node_harness
 from tests.test_web_write import WebWriteTestCase
 
 
@@ -37,18 +37,14 @@ class WebCompactTests(WebWriteTestCase):
         self.assertIn(b'"/api/compact"', script)
 
 
-_COMPACT_HARNESS = Path(__file__).resolve().parent / "web_compact_harness.js"
+_COMPACT_HARNESS_NAME = "web_compact_harness.js"
 _APP_JS = Path(__file__).resolve().parent.parent / "guild" / "web" / "app.js"
 
 
 @unittest.skipIf(shutil.which("node") is None, "node not installed")
 class WebCompactButtonBehaviorTests(unittest.TestCase):
     def _after_click(self, scenario):
-        result = subprocess.run(
-            ["node", str(_COMPACT_HARNESS), str(_APP_JS), scenario],
-            capture_output=True, text=True, timeout=30, check=True,
-        )
-        return json.loads(result.stdout)
+        return node_harness.request(_COMPACT_HARNESS_NAME, {"src": str(_APP_JS), "scenario": scenario})
 
     def test_failed_post_with_failed_refresh_leaves_compacting_and_shows_the_error(self):
         after = self._after_click("dropped")
