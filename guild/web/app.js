@@ -133,6 +133,7 @@ var NO_SESSION_MESSAGE = "session token not loaded, reload the page";
       "fixes-flaky": "The PR fixes flaky tests; it goes first so the suite stops lying to everyone.",
       "needs-ask-answer": "The PR is stopped on an open ask; answer it so work can resume.",
       "needs-human-pr-review": "The PR touches something sensitive and needs a human review before merging.",
+      "review first": "A human must review this PR before it is merged.",
       "blocked-external": "A person marked this PR as blocked manually; it waits on something outside development, do not try to fix it.",
     },
     checks: {
@@ -1589,17 +1590,21 @@ var NO_SESSION_MESSAGE = "session token not loaded, reload the page";
 
   function renderReadyItem(item) {
     var row = el("li");
+    row.className = "ready-item";
     row.appendChild(link(item.url, item.ref));
     row.appendChild(textEl("span", item.title));
     row.appendChild(textEl("span", item.party));
     if (item.review_first) {
       var pill = textEl("span", "review first");
       pill.className = "pill lifecycle-ready";
-      row.appendChild(pill);
+      row.appendChild(explain(pill, "flag", "review first"));
     }
+    var notes = el("div");
+    notes.className = "ready-notes";
     item.notes.forEach(function (note) {
-      row.appendChild(classedText("span", "note: " + note, "muted"));
+      notes.appendChild(classedText("p", "note: " + note, "muted"));
     });
+    row.appendChild(notes);
     return row;
   }
 
@@ -2142,7 +2147,7 @@ var NO_SESSION_MESSAGE = "session token not loaded, reload the page";
         return queue.scope === "raid:" + state.raidFilter;
       }),
       ready_for_you: data.ready_for_you.filter(function (item) {
-        return item.scope === scope;
+        return item.scopes.indexOf(scope) !== -1;
       }),
     };
   }

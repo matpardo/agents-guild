@@ -641,6 +641,7 @@ def _ready_item(conn, projects_dir, scope, entry, main_rows):
         "url": "https://github.com/{}/pull/{}".format(entry["repo"], entry["number"]),
         "party": entry["party"],
         "scope": scope,
+        "scopes": [scope],
         "review_first": entry["action"] == merge_queue.REVIEW_ACTION,
         "checks": _checks_text(entry),
         "notes": [_one_line(note) for note in notes(projects_dir, entry, main_rows)],
@@ -648,15 +649,14 @@ def _ready_item(conn, projects_dir, scope, entry, main_rows):
 
 
 def ready_for_you(conn, projects_dir, scopes):
-    items = []
-    seen = set()
+    by_ref = {}
     for scope, scoped in scopes:
         for entry in merge_queue.ready_for_person(scoped["queue"], scoped["main"]):
-            if entry["ref"] in seen:
+            if entry["ref"] in by_ref:
+                by_ref[entry["ref"]]["scopes"].append(scope)
                 continue
-            seen.add(entry["ref"])
-            items.append(_ready_item(conn, projects_dir, scope, entry, scoped["main"]))
-    return items
+            by_ref[entry["ref"]] = _ready_item(conn, projects_dir, scope, entry, scoped["main"])
+    return list(by_ref.values())
 
 
 def _review_md_lines(item):

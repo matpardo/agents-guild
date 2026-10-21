@@ -792,7 +792,7 @@ def _ready_for_you_lines(ctx, painter, party_filter, raid_filter):
     if party_filter is not None:
         items = [item for item in items if item["party"] == party_filter]
     if raid_filter is not None:
-        items = [item for item in items if item["scope"] == "raid:{}".format(raid_filter)]
+        items = [item for item in items if "raid:{}".format(raid_filter) in item["scopes"]]
     if not items:
         return [painter.paint("READY FOR YOU · nothing", "green"), ""]
     lines = [painter.paint("READY FOR YOU · {}".format(len(items)), "bold")]

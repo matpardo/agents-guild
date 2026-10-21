@@ -47,6 +47,9 @@ class TooltipCoverageTests(unittest.TestCase):
     def test_pr_flags(self):
         self.assertCovers("flag", [name for _, name, _ in board._FLAG_STYLES])
 
+    def test_ready_item_review_first_pill(self):
+        self.assertCovers("flag", ["review first"])
+
     def test_queue_states(self):
         self.assertCovers(
             "queueState",

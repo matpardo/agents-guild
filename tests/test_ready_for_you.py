@@ -59,7 +59,7 @@ class ModelTests(ReadyForYouTestCase):
         self.sync_gh("sess-1")
         self.assertEqual(self.model()["ready_for_you"], [{
             "ref": "acme/app#1", "title": "Add thing", "url": "https://github.com/acme/app/pull/1",
-            "party": "alpha", "scope": "party:alpha", "review_first": True, "checks": "1 passing", "notes": [],
+            "party": "alpha", "scope": "party:alpha", "scopes": ["party:alpha"], "review_first": True, "checks": "1 passing", "notes": [],
         }])
 
     def test_pr_in_two_raids_appears_once(self):
@@ -67,7 +67,10 @@ class ModelTests(ReadyForYouTestCase):
         self.sync_gh("sess-1")
         for raid in ("r1", "r2"):
             self.run_cli(["raid", "join", raid, "--until-leave"], "sess-1", self.repo_dir)
-        self.assertEqual(self.web_refs(), ["acme/app#1"])
+        items = self.model()["ready_for_you"]
+        self.assertEqual([item["ref"] for item in items], ["acme/app#1"])
+        self.assertEqual(sorted(s for s in items[0]["scopes"] if s.startswith("raid:")), ["raid:r1", "raid:r2"])
+        self.assertIn(items[0]["scope"], items[0]["scopes"])
 
     def test_ci_label_note_is_carried(self):
         self._set_project_config({"human_ready": {"ci_label": "run-ci"}})
@@ -112,6 +115,14 @@ class CliSectionTests(ReadyForYouTestCase):
         self.run_cli(["raid", "join", "ci", "--until-leave"], "sess-2", self.repo_dir)
         self.assertEqual(self.section_refs(["--raid", "ci"]), ["acme/app#3"])
 
+    def test_raid_filter_on_the_second_raid(self):
+        self.track_ready("sess-1", 1, "qa/T01")
+        self.sync_gh("sess-1")
+        for raid in ("r1", "r2"):
+            self.run_cli(["raid", "join", raid, "--until-leave"], "sess-1", self.repo_dir)
+        self.assertEqual(self.section_refs(["--raid", "r2"]), ["acme/app#1"])
+        self.assertEqual(self.section_refs(["--raid", "r1"]), ["acme/app#1"])
+
 
 class AcceptanceTests(ReadyForYouTestCase):
     def test_cli_web_and_review_md_list_the_same_prs_in_order(self):
@@ -121,3 +132,13 @@ class AcceptanceTests(ReadyForYouTestCase):
         self.assertEqual([i["ref"] for i in self.model()["ready_for_you"] if i["party"] == "alpha"], expected)
         self.assertEqual(_REVIEW_REF_RE.findall(self.review_md(["--party", "alpha"])), expected)
         self.assertEqual(self.section_refs([]), self.web_refs())
+
+    def test_second_raid_matches_across_cli_web_and_review_md(self):
+        self.track_ready("sess-1", 1, "qa/T01")
+        self.sync_gh("sess-1")
+        for raid in ("r1", "r2"):
+            self.run_cli(["raid", "join", raid, "--until-leave"], "sess-1", self.repo_dir)
+        web = [i["ref"] for i in self.model()["ready_for_you"] if "raid:r2" in i["scopes"]]
+        self.assertEqual(web, ["acme/app#1"])
+        self.assertEqual(self.section_refs(["--raid", "r2"]), web)
+        self.assertEqual(_REVIEW_REF_RE.findall(self.review_md(["--raid", "r2"])), web)
