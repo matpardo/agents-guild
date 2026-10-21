@@ -74,6 +74,6 @@ updated: 2026-10-21
 ## T10 — Dev worktrees inside the base clone
 
 **Depends on:** —
-**Status:** [ ] todo
+**Status:** [x] done — #194
 
 **What:** Replace the fixed `agents-guild-dev` sibling worktree with one worktree per feature branch at `.claude/worktrees/<branch>` inside the base clone. The project config lists only the base clone in `paths`, since project resolution matches any ancestor of the working directory. ADR `20261021_worktrees-inside-base-clone` supersedes `20261008_base-clone-install`.
