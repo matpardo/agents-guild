@@ -37,3 +37,13 @@ updated: 2026-10-21
 
 **Acceptance:**
 - [x] `GUILD.md` tells agents to delete an idea once it is turned into work.
+
+## T04 — Idea form inputs
+
+**Depends on:** T02
+**Status:** [x] done — #190
+
+**What:** The web deadline is typed as `YYYY-MM-DD` and the project select lists every registered project.
+
+**Acceptance:**
+- [x] The deadline input is a text field asking for `YYYY-MM-DD`, and the select lists all registered projects with a `no project` choice.

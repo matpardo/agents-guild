@@ -35,7 +35,7 @@ setTimeout(() => {
   doc.getElementById("raid-filter").value = raidF;
   doc.getElementById("party-filter").h.change({ target: { value: partyF } });
   doc.getElementById("raid-filter").h.change({ target: { value: raidF } });
-  const tree = (n) => ({ tag: n.tag, className: n.className || "", text: n._text, children: n.children.map(tree) });
+  const tree = (n) => ({ tag: n.tag, className: n.className || "", type: n.type || "", placeholder: n.placeholder || "", text: n._text, children: n.children.map(tree) });
   setTimeout(() => {
     const out = doc.getElementById(outId);
     console.log(mode === "tree" ? JSON.stringify(tree(out)) : out.textContent);

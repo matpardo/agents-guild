@@ -13,6 +13,10 @@ class WebIdeaTests(WebWriteTestCase):
         data.update(overrides)
         return self._post_json("/api/ideas/create", self._good_headers(), data)
 
+    def test_board_lists_every_registered_project_name(self):
+        response, body = self._get("/api/board", self._host())
+        self.assertEqual(json.loads(body)["project_names"], ["acme"])
+
     def test_create_edit_delete(self):
         response, payload = self._create(deadline="2000-01-01", project="acme")
         self.assertEqual(response.status, 200, payload)

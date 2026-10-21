@@ -73,7 +73,7 @@ class WebDriftScriptTests(unittest.TestCase):
 _HARNESS = Path(__file__).resolve().parent / "web_drift_harness.js"
 _MISSING = object()
 _BOARD = {
-    "generated_at": "now", "asks": [], "notices": [], "ideas": [], "memory": [], "blocked": [], "merge_queues": [], "ready_for_you": [],
+    "generated_at": "now", "asks": [], "notices": [], "ideas": [], "project_names": [], "memory": [], "blocked": [], "merge_queues": [], "ready_for_you": [],
     "projects": [], "raids": [{"name": "r", "members": ["c"]}],
     "parties": [
         {
@@ -277,6 +277,33 @@ class WebNoticeAndRaidBehaviorTests(unittest.TestCase):
         out = self._rendered(board, "ideas")
         self.assertIn("due 2099-01-01", out)
         self.assertNotIn("overdue", out)
+
+    def _idea_form_inputs(self):
+        board = dict(self._board(False), ideas=[], project_names=["acme", "zeta"])
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "board.json"
+            path.write_text(json.dumps(board))
+            out = subprocess.run(
+                ["node", str(_HARNESS), str(_APP_JS_PATH), str(path), "all", "all", "ideas", "tree"],
+                capture_output=True, text=True, timeout=30, check=True,
+            ).stdout
+        found = []
+
+        def walk(node):
+            found.append(node)
+            for child in node["children"]:
+                walk(child)
+
+        walk(json.loads(out))
+        return found
+
+    def test_idea_deadline_input_is_a_text_field_asking_for_iso_dates(self):
+        deadline = [n for n in self._idea_form_inputs() if "idea-deadline" in n["className"]][0]
+        self.assertEqual((deadline["type"], deadline["placeholder"]), ("text", "deadline YYYY-MM-DD"))
+
+    def test_idea_project_select_lists_every_registered_project_and_names_the_empty_choice(self):
+        options = [n["text"] for n in self._idea_form_inputs() if n["tag"] == "option"]
+        self.assertEqual(options, ["no project", "acme", "zeta"])
 
     def test_ideas_survive_the_party_filter(self):
         with tempfile.TemporaryDirectory() as tmp:

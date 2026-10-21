@@ -1096,5 +1096,6 @@ def board_model(ctx):
         "merge_queues": merge_queue_commands.board_models(ctx.projects_dir, ctx.now, scopes),
         "ready_for_you": merge_queue_commands.ready_for_you(ctx.conn, ctx.projects_dir, scopes),
         "projects": _project_models(ctx, party_rows, projects_by_name),
+        "project_names": sorted(projects_by_name),
     }
 
