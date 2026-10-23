@@ -9,7 +9,8 @@ _EPICS_DIR = _SDD_ROOT / "epics"
 _DECISIONS_DIR = _SDD_ROOT / "decisions"
 _README = (_SDD_ROOT.parent / "README.md").read_text()
 _GUILD_MD = (_SDD_ROOT.parent / "GUILD.md").read_text()
-_NEW_VOCABULARY = "20261004_vocabulary-short-sessions"
+_SHORT_SESSIONS_VOCABULARY = "20261004_vocabulary-short-sessions"
+_NEW_VOCABULARY = "20261023_adventurers-and-open-quests"
 _STATUSES = {"draft", "active", "done", "archived"}
 _SPEC_KEYS = {"epic", "type", "title", "status", "owner", "created", "updated"}
 _CHILD_KEYS = {"epic", "type", "title", "status", "updated"}
@@ -88,13 +89,15 @@ class SddDocsTests(unittest.TestCase):
 class VocabularyDecisionTests(unittest.TestCase):
     def test_old_vocabulary_points_at_the_new_one(self):
         old = (_DECISIONS_DIR / "20260927_vocabulary.md").read_text()
-        self.assertIn("- **Status:** superseded by {}".format(_NEW_VOCABULARY), old)
+        self.assertIn("- **Status:** superseded by {}".format(_SHORT_SESSIONS_VOCABULARY), old)
+        short = (_DECISIONS_DIR / "{}.md".format(_SHORT_SESSIONS_VOCABULARY)).read_text()
+        self.assertIn("- **Status:** superseded by {}".format(_NEW_VOCABULARY), short)
 
     def test_new_vocabulary_is_accepted_and_names_every_term(self):
         new = (_DECISIONS_DIR / "{}.md".format(_NEW_VOCABULARY)).read_text()
         self.assertIn("- **Status:** accepted", new)
-        self.assertIn("Supersedes `20260927_vocabulary`", new)
-        for term in ("guild", "party", "leader", "generation", "keeper", "quest", "raid lead", "brief"):
+        self.assertIn("- **Supersedes:** {}".format(_SHORT_SESSIONS_VOCABULARY), new)
+        for term in ("guild", "party", "leader", "generation", "adventurer", "quest", "open quest", "brief"):
             self.assertIn("| {} |".format(term), new)
 
     def test_readme_glossary_matches(self):
