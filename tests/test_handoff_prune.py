@@ -100,7 +100,7 @@ class HandoffPruneRuleTests(PruneFixture):
 
     def test_closed_party_without_retention_config_is_kept_and_counted(self):
         self._handoff("sess-1", 1)
-        self.run_cli(["party", "close", "alpha", "--force"], None, None)
+        self.run_cli(["party", "close", "alpha", "--force", "--pending", "none"], None, None)
         _, plan = self._plan(timeutil.utcnow() + timedelta(days=4000))
         actions = plan.actions
         kept = plan.kept_without_retention
@@ -109,7 +109,7 @@ class HandoffPruneRuleTests(PruneFixture):
 
     def test_closed_party_deleted_exactly_at_retention_boundary(self):
         self._handoff("sess-1", 1)
-        self.run_cli(["party", "close", "alpha", "--force"], None, None)
+        self.run_cli(["party", "close", "alpha", "--force", "--pending", "none"], None, None)
         self._set_retention(30)
         closed_at = self._closed_at()
         _, plan = self._plan(closed_at + timedelta(days=30) - timedelta(seconds=1))
@@ -121,7 +121,7 @@ class HandoffPruneRuleTests(PruneFixture):
 
     def test_party_without_project_is_kept_and_counted(self):
         self._handoff("sess-1", 1)
-        self.run_cli(["party", "close", "alpha", "--force"], None, None)
+        self.run_cli(["party", "close", "alpha", "--force", "--pending", "none"], None, None)
         self._sql("UPDATE parties SET project = NULL WHERE name = 'alpha'", ())
         _, plan = self._plan(timeutil.utcnow() + timedelta(days=4000))
         actions = plan.actions
@@ -130,7 +130,7 @@ class HandoffPruneRuleTests(PruneFixture):
 
     def test_unreadable_project_config_keeps_handoff_without_raising(self):
         self._handoff("sess-1", 1)
-        self.run_cli(["party", "close", "alpha", "--force"], None, None)
+        self.run_cli(["party", "close", "alpha", "--force", "--pending", "none"], None, None)
         (self.config_home / "guild" / "projects" / "acme.json").write_text("{not json")
         _, plan = self._plan(timeutil.utcnow() + timedelta(days=4000))
         actions = plan.actions
@@ -228,7 +228,7 @@ class HandoffPruneRobustnessTests(PruneFixture):
 
     def test_malformed_close_timestamp_keeps_handoff_and_reports(self):
         self._handoff("sess-1", 1)
-        self.run_cli(["party", "close", "alpha", "--force"], None, None)
+        self.run_cli(["party", "close", "alpha", "--force", "--pending", "none"], None, None)
         self._set_retention(30)
         self._sql("UPDATE events SET ts = 'garbage' WHERE kind = 'party.closed'", ())
         _, plan = self._plan(timeutil.utcnow() + timedelta(days=4000))

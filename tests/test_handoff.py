@@ -416,7 +416,7 @@ class RunForPartyTests(GuildTestCase):
             handoff_commands.run_for_party(ctx, "nope")
 
     def test_closed_party_raises(self):
-        self.run_cli(["party", "close", "alpha", "--force"], None, self.repo_dir)
+        self.run_cli(["party", "close", "alpha", "--force", "--pending", "none"], None, self.repo_dir)
         ctx = _build_context(None, None)
         with self.assertRaises(GuildError) as raised:
             handoff_commands.run_for_party(ctx, "alpha")

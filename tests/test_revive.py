@@ -239,7 +239,7 @@ class ListTests(ReviveBase):
         self.assertNotIn("--permission-mode", out)
 
     def test_closed_party_not_listed(self):
-        self.run_cli(["party", "close", "beta"], "sess-b", self.work_b)
+        self.run_cli(["party", "close", "beta", "--pending", "none"], "sess-b", self.work_b)
         out = self._revive([], False, True, self._tmux(), None)
         self.assertNotIn("beta", out)
 
@@ -273,13 +273,13 @@ class ListTests(ReviveBase):
         self.assertIn("launched beta (fresh)", out)
 
     def test_closed_party_rejected_by_name(self):
-        self.run_cli(["party", "close", "beta"], "sess-b", self.work_b)
+        self.run_cli(["party", "close", "beta", "--pending", "none"], "sess-b", self.work_b)
         with self.assertRaises(GuildError):
             self._revive(["beta"], False, False, self._tmux(), None)
 
     def test_no_active_parties(self):
-        self.run_cli(["party", "close", "alpha", "--force"], "sess-a", self.work_a)
-        self.run_cli(["party", "close", "beta"], "sess-b", self.work_b)
+        self.run_cli(["party", "close", "alpha", "--force", "--pending", "none"], "sess-a", self.work_a)
+        self.run_cli(["party", "close", "beta", "--pending", "none"], "sess-b", self.work_b)
         out = self._revive([], False, True, self._tmux(), None)
         self.assertEqual(out, "no active parties")
 

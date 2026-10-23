@@ -2,7 +2,7 @@
 epic: adventurers
 type: spec
 title: Adventurers do one job and report what is pending
-status: active
+status: done
 owner: matpardo
 created: 2026-10-23
 updated: 2026-10-23
@@ -27,8 +27,8 @@ Sessions outside a party leave no trace in guild: the human cannot see what they
 - An adventurer may track its PRs (`--task <its task>` or `--card`; the PR records the adventurer), post notices, add ideas and open asks, and creates open quests once `quest-board` lands. It never takes or owns a quest, adds tasks or changes a task: its task is done when SDD says so. Any command that needs a party refuses it with "adventurers do one job; quests and tasks belong to parties".
 - A session is a party leader, an adventurer or unbound: `party start` and `party resume` refuse an active adventurer; `adventurer start` refuses a leader.
 - The Stop hook records `session.stopped` for adventurers too.
-- The board and the web list adventurers with job, live or stopped, PRs and pending report, and flag one that stopped without reporting. A party whose leader is gone without a handoff gets the same flag.
-- `guild party close` requires `--pending`.
+- The board and the web list adventurers with job, live or stopped, PRs and pending report, and flag one that stopped without reporting. A done adventurer stays listed until `guild adventurer dismiss <id>` (web: Dismiss button). A party whose leader is gone without a handoff gets the same flag.
+- `guild party close` requires `--pending`, validated like `--learned` and stored on the `party.closed` event.
 - The unbound hint tells the session to ask the human, before any work on a registered project, whether it is a party or an adventurer.
 - `README.md` and `GUILD.md` change with the code.
 
@@ -40,10 +40,10 @@ Sessions outside a party leave no trace in guild: the human cannot see what they
 
 ## Success criteria
 
-- [ ] An adventurer appears on the CLI and web board from `adventurer start` until it is dismissed.
-- [ ] A stopped adventurer with no report, and a gone leader with no handoff, are flagged.
-- [ ] An adventurer cannot take a quest or change a task that is not its own.
-- [ ] Adventurer state survives `guild rebuild`.
+- [x] An adventurer appears on the CLI and web board from `adventurer start` until it is dismissed.
+- [x] A stopped adventurer with no report, and a gone leader with no handoff, are flagged.
+- [x] An adventurer cannot take a quest or change a task that is not its own.
+- [x] Adventurer state survives `guild rebuild`.
 
 ## Security and data
 

@@ -124,5 +124,5 @@ class StatuslineBlockedTests(GuildTestCase):
 
     def test_closed_party_not_counted(self):
         self._block("sess-2")
-        self.run_cli(["party", "close"], "sess-2", self.repo_dir)
+        self.run_cli(["party", "close", "--pending", "none"], "sess-2", self.repo_dir)
         self.assertNotIn("blocked", self._statusline("sess-1"))

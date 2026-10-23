@@ -1,7 +1,7 @@
 import sqlite3
 from pathlib import Path
 
-from guild import config, db, events, handoff_prune, identity, names, paths, sanitize, session_info
+from guild import config, db, events, handoff_prune, identity, names, paths, pii, sanitize, session_info
 from guild.commands import claim as claim_commands
 from guild.commands import next as next_commands
 from guild.commands import quest as quest_commands
@@ -227,7 +227,7 @@ def _prune_lines(ctx):
     return ["pruned {} handoff file(s)".format(deleted)]
 
 
-def close(ctx, name, force):
+def close(ctx, name, force, pending):
     party = _close_target(ctx, name)
     row = ctx.conn.execute(
         "SELECT project, generation, state FROM parties WHERE name = ?", (party,)
@@ -236,6 +236,11 @@ def close(ctx, name, force):
         raise GuildError("unknown party '{}'".format(party), 1)
     if row["state"] == "closed":
         raise GuildError("party '{}' is already closed".format(party), 1)
+    if not pending.strip():
+        raise GuildError("--pending must not be empty", 1)
+    pii.validate_field(
+        pending, "--pending", pii.HANDOFF_FIELD_MAX_LENGTH, pii.project_patterns(ctx.projects_dir, row["project"])
+    )
     unfinished = _quests_unfinished_work(ctx, party)
     if unfinished and not force:
         raise GuildError(
@@ -256,7 +261,7 @@ def close(ctx, name, force):
             row["project"],
             "party.closed",
             "local",
-            {"party": party, "generation": row["generation"]},
+            {"party": party, "generation": row["generation"], "pending": pending},
         )
     lines = ["party '{}' closed: {}".format(party, summary)]
     lines.extend("closed with unfinished work: {}".format(problem) for problem in unfinished)

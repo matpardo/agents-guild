@@ -9,6 +9,7 @@ from pathlib import Path
 from urllib.parse import parse_qs, urlsplit
 
 from guild import ask_detail, context, db, origin, paths, timeutil
+from guild.commands import adventurer as adventurer_commands
 from guild.commands import ask as ask_commands
 from guild.commands import board as board_commands
 from guild.commands import compact as compact_commands
@@ -44,6 +45,7 @@ _TASK_MOVE_RE = re.compile(r"^/api/quests/([^/]+)/tasks/([^/]+)/move$")
 _PARTY_HANDOFF_RE = re.compile(r"^/api/parties/([^/]+)/hand-off$")
 _IDEA_ACTION_RE = re.compile(r"^/api/ideas/([^/]+)/(edit|delete)$")
 _IDEA_CREATE_PATH = "/api/ideas/create"
+_ADVENTURER_DISMISS_RE = re.compile(r"^/api/adventurers/([^/]+)/dismiss$")
 _COMPACT_PATH = "/api/compact"
 _SEEN_ALL_PATH = "/api/notices/seen-all"
 _NOTICE_CREATE_PATH = "/api/notices/create"
@@ -185,6 +187,14 @@ def _run_idea_action(action, idea_id, payload):
             return idea_commands.delete(ctx, idea_id)
         fields = {key: payload[key] for key in _IDEA_TEXT_KEYS if key in payload}
         return idea_commands.edit(ctx, idea_id, fields)
+    finally:
+        ctx.conn.close()
+
+
+def _run_adventurer_dismiss(adventurer_id):
+    ctx = _action_context()
+    try:
+        return adventurer_commands.dismiss(ctx, adventurer_id)
     finally:
         ctx.conn.close()
 
@@ -392,6 +402,14 @@ class BoardRequestHandler(http_server.BaseHTTPRequestHandler):
                 return self._not_found()
             post_action = "edit-idea" if action == "edit" else "delete-idea"
             return self._post_action(post_action, lambda payload: _run_idea_action(action, int(idea_id), payload))
+        adventurer_match = _ADVENTURER_DISMISS_RE.match(path)
+        if adventurer_match is not None:
+            adventurer_id = adventurer_match.group(1)
+            if not _ASK_ID_RE.match(adventurer_id):
+                return self._not_found()
+            return self._post_action(
+                "dismiss-adventurer", lambda payload: _run_adventurer_dismiss(int(adventurer_id))
+            )
         if path == _COMPACT_PATH:
             return self._post_action("compact", lambda payload: _run_compact())
         if path == _SEEN_ALL_PATH:

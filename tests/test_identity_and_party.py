@@ -131,7 +131,7 @@ class PartyStartResumeCloseTests(GuildTestCase):
 
     def test_resume_closed_party_fails(self):
         self.run_cli(["party", "start", "alpha"], "sess-1", None)
-        self.run_cli(["party", "close"], "sess-1", None)
+        self.run_cli(["party", "close", "--pending", "none"], "sess-1", None)
         code, out, err = self.run_cli(["party", "resume", "alpha"], "sess-2", None)
         self.assertEqual(code, 1)
         self.assertIn("closed", err)
@@ -168,13 +168,13 @@ class PartyStartResumeCloseTests(GuildTestCase):
         self.assertIn("generation 2", out)
 
     def test_close_requires_binding(self):
-        code, out, err = self.run_cli(["party", "close"], "sess-1", None)
+        code, out, err = self.run_cli(["party", "close", "--pending", "none"], "sess-1", None)
         self.assertEqual(code, 1)
         self.assertIn("session not bound", err)
 
     def test_close_unbinds_party(self):
         self.run_cli(["party", "start", "alpha"], "sess-1", None)
-        code, out, err = self.run_cli(["party", "close"], "sess-1", None)
+        code, out, err = self.run_cli(["party", "close", "--pending", "none"], "sess-1", None)
         self.assertEqual(code, 0)
         code, out, err = self.run_cli(["whoami"], "sess-1", None)
         self.assertIn("party: (unbound)", out)

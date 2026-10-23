@@ -42,6 +42,14 @@ class PublishableTextTests(GuildTestCase):
         self.assertEqual(code, 0, err)
         self.assertIsNone(_TRACE_RE.search(track_out))
 
+    def test_pending_reports_are_rejected_when_they_carry_a_secret_or_email(self):
+        self.run_cli(["adventurer", "start", "fix typo"], "adv-1", self.repo_dir)
+        for pending in ("mail me@x.com", " "):
+            code, out, err = self.run_cli(["adventurer", "done", "--pending", pending], "adv-1", self.repo_dir)
+            self.assertEqual(code, 1, pending)
+        code, out, err = self.run_cli(["party", "close", "alpha", "--pending", "mail me@x.com"], None, None)
+        self.assertEqual(code, 1)
+
     def test_quest_done_output_has_no_traces(self):
         self.run_cli(["task", "start", "demo/T01"], "sess-1", self.repo_dir)
         self.run_cli(["task", "done", "demo/T01"], "sess-1", self.repo_dir)

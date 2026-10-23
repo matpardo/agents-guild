@@ -49,7 +49,7 @@ class PartyStatusTests(GuildTestCase):
         self.run_cli(["ask", "ok?", "--context", "x", "--ref", "task:aq/T01"], "sess-1", self.repo_dir)
 
     def test_closed(self):
-        self.run_cli(["party", "close"], "sess-1", self.repo_dir)
+        self.run_cli(["party", "close", "--pending", "none"], "sess-1", self.repo_dir)
         self.assertEqual(self._derive(), {"status": "closed", "since": None, "detail": None})
 
     def test_awaiting_leader_without_work_is_idle(self):

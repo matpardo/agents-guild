@@ -80,7 +80,7 @@ class StatePruneTests(GuildTestCase):
         self.assertEqual(self._marker_actions(), [])
 
     def test_closed_party_leader_marker_is_deleted(self):
-        self.run_cli(["party", "close", "alpha"], None, None)
+        self.run_cli(["party", "close", "alpha", "--pending", "none"], None, None)
         self._marker(self.ctx_dir, _LEADER, 5 * _DAY)
         self.assertEqual(len(self._marker_actions()), 1)
 

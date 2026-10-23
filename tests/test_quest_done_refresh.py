@@ -43,5 +43,5 @@ class QuestDoneRefreshTests(QuestDoneTestCase):
         self.run_cli(["task", "done", "wave4-r/T02", "--summary", "shipped"], "sess-1", self.repo_dir)
         self._write_epic("wave4", "jira: DEMO-20\nstatus: active\n", _DONE_EPIC)
         before = self._synced_count()
-        self.run_cli(["party", "close", "alpha"], None, None)
+        self.run_cli(["party", "close", "alpha", "--pending", "none"], None, None)
         self.assertEqual(self._synced_count(), before + 1)

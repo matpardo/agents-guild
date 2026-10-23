@@ -80,7 +80,7 @@ def _render(board, party_filter, raid_filter, out_id, mode):
 
 _MISSING = object()
 _BOARD = {
-    "generated_at": "now", "asks": [], "notices": [], "ideas": [], "project_names": [], "memory": [], "blocked": [], "merge_queues": [], "ready_for_you": [],
+    "generated_at": "now", "asks": [], "notices": [], "ideas": [], "adventurers": [], "project_names": [], "memory": [], "blocked": [], "merge_queues": [], "ready_for_you": [],
     "projects": [], "raids": [{"name": "r", "members": ["c"]}],
     "parties": [
         {
@@ -207,6 +207,53 @@ class WebMainRowBehaviorTests(unittest.TestCase):
         text = self._text("billing")
         self.assertIn("MAIN BLOCKED (billing) o/r \u2192 re-run main once billing is fixed", text)
         self.assertNotIn("MAIN RED", text)
+
+
+def _adventurer(**overrides):
+    entry = {
+        "id": 1, "project": "acme", "job": "fix typo", "task": "demo/T02", "state": "active", "pending": None,
+        "live": False, "stopped_without_report": True, "prs": [],
+    }
+    return dict(entry, **overrides)
+
+
+@unittest.skipIf(shutil.which("node") is None, "node not installed")
+class WebAdventurerBehaviorTests(unittest.TestCase):
+    def _text(self, adventurers, party_filter="all"):
+        return _render(dict(_BOARD, adventurers=adventurers), party_filter, "all", "adventurers", "text")
+
+    def test_active_stopped_adventurer_shows_job_state_and_the_flag(self):
+        out = self._text([_adventurer()])
+        for expected in ("adventurer 1 fix typo", "acme", "task demo/T02", "stopped", "stopped without report"):
+            self.assertIn(expected, out)
+        self.assertNotIn("Dismiss", out)
+
+    def test_live_adventurer_has_no_flag(self):
+        out = self._text([_adventurer(live=True, stopped_without_report=False)])
+        self.assertIn("live", out)
+        self.assertNotIn("stopped without report", out)
+
+    def test_done_adventurer_shows_pending_and_a_dismiss_button(self):
+        out = self._text([_adventurer(state="done", pending="ping the owner", stopped_without_report=False)])
+        self.assertIn("pending: ping the owner", out)
+        self.assertIn("Dismiss", out)
+        self.assertNotIn("stopped without report", out)
+
+    def test_adventurers_survive_the_party_filter(self):
+        self.assertIn("fix typo", self._text([_adventurer()], "a"))
+
+    def test_dismiss_posts_through_send_post(self):
+        self.assertIn('"/api/adventurers/" + adventurerId + "/dismiss"', _APP_JS)
+        self.assertIn("sendPost(adventurerDismissUrl(adventurerId), {})", _APP_JS)
+
+    def test_empty_section_renders_nothing(self):
+        self.assertEqual(self._text([]).strip(), "")
+
+    def test_party_card_shows_the_flag_only_when_set(self):
+        parties = [dict(_BOARD["parties"][0], stopped_without_report=flag) for flag in (True, False)]
+        parties[1]["name"] = "c"
+        out = _render(dict(_BOARD, parties=parties), "all", "all", "parties", "text")
+        self.assertEqual(out.count("stopped without report"), 1)
 
 
 @unittest.skipIf(shutil.which("node") is None, "node not installed")

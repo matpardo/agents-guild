@@ -123,7 +123,7 @@ guild wire-settings   # merge guild hooks and permission rules into ~/.claude/se
 
 guild party start <name>                         # refused while this session leads another active party
 guild party resume <party> [--session <name>]   # --session: from a human terminal only
-guild party close [<party>] [--force]  # <party>: from a terminal, or your own party; --force overrides the quest done gate
+guild party close [<party>] --pending "<text>" [--force]  # <party>: from a terminal, or your own party; --pending none when nothing is left; --force overrides the quest done gate
 
 guild quest add <slug> --title "..." --epic <slug> [--tasks T09,T07b]   # without --tasks: an empty epic quest
 guild quest add <slug> --title "..." --no-epic [--tasks A,B [--titles "First,Second"]]
@@ -170,6 +170,7 @@ guild ideas [<id> | --project <name>]   # sorted by deadline, no deadline last; 
 
 guild adventurer start "<job>" [--task <epic>/<tid>]   # this session becomes an adventurer; never a party leader
 guild adventurer done --pending "<text>"                # ends it; `--pending none` is the explicit empty report
+guild adventurer dismiss <id>                           # removes a done adventurer from the board
 guild adventurers [<id>]                                # active ones, then recent done ones; <id> shows one in full
 
 guild claim <area> --ttl <dur>          # area, or task:<epic>/<tid> / task:<quest>/<tid>
@@ -354,6 +355,11 @@ refuses, listing every quest with tasks not done or epic drift, and `--force`
 closes anyway, reporting each such quest as `closed with unfinished work`.
 Before judging drift, close refreshes the SDD snapshot once per project with an
 `sdd` block, as `guild sync --source sdd` would.
+
+`--pending "<text>"` is required: it says what is left pending (`none` when
+nothing is). The text goes through the same email, secret and project-pattern
+checks as `handoff --learned` and is stored on the `party.closed` event. The
+web board has no party close action.
 Closing cascades in the same event: the party's active quests become `done`,
 its open asks are dismissed and its claims are released. Tracked PRs stay
 tracked for history and are listed if still open. `guild quest done <slug>`
@@ -1236,6 +1242,16 @@ that needs a party (quests, tasks, handoff, claims, `next`) refuses with
 `adventurers do one job; quests and tasks belong to parties`. An adventurer's
 task is done when the SDD says so. Adventurer ids, jobs and pending reports are
 local: do not copy them into PRs, commits or cards.
+
+`guild board` and the web board list adventurers in their own section (`guild
+board` hides it under `--party` and `--raid`): id, job, project, task, live or
+stopped, pending report once done, and their PRs. A done adventurer stays
+listed until `guild adventurer dismiss <id>` (the web Dismiss button calls the
+same function; dismiss refuses an adventurer that is not done). An active
+adventurer whose session is gone carries the flag `stopped without report`.
+The same flag marks an active party whose leader session is gone without a
+`guild handoff` (the party is not `awaiting-leader`), in the CLI board and as a
+pill on the web party card.
 
 ### Marking notices seen
 
