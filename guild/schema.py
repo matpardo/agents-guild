@@ -10,6 +10,7 @@ PROJECTION_TABLES = (
     "asks",
     "notices",
     "ideas",
+    "idea_links",
     "adventurers",
     "claims",
     "raid_members",
@@ -200,6 +201,14 @@ _CREATE_STATEMENTS = (
         pending TEXT,
         started_at TEXT NOT NULL,
         done_at TEXT
+    )
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS idea_links (
+        idea_id INTEGER NOT NULL,
+        party TEXT NOT NULL,
+        linked_at TEXT NOT NULL,
+        PRIMARY KEY (idea_id, party)
     )
     """,
     """

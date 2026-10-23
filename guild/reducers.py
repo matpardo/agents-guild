@@ -507,6 +507,20 @@ def _idea_edited(conn, event):
 
 def _idea_deleted(conn, event):
     conn.execute("DELETE FROM ideas WHERE id = ?", (event["payload"]["id"],))
+    conn.execute("DELETE FROM idea_links WHERE idea_id = ?", (event["payload"]["id"],))
+
+
+def _idea_linked(conn, event):
+    payload = event["payload"]
+    conn.execute(
+        "INSERT OR IGNORE INTO idea_links (idea_id, party, linked_at) VALUES (?, ?, ?)",
+        (payload["id"], payload["party"], event["ts"]),
+    )
+
+
+def _idea_unlinked(conn, event):
+    payload = event["payload"]
+    conn.execute("DELETE FROM idea_links WHERE idea_id = ? AND party = ?", (payload["id"], payload["party"]))
 
 
 def _claim_created(conn, event):
@@ -758,6 +772,8 @@ _REDUCERS = {
     "idea.created": _idea_created,
     "idea.edited": _idea_edited,
     "idea.deleted": _idea_deleted,
+    "idea.linked": _idea_linked,
+    "idea.unlinked": _idea_unlinked,
     "adventurer.started": _adventurer_started,
     "adventurer.done": _adventurer_done,
     "adventurer.dismissed": _adventurer_dismissed,

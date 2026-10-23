@@ -60,6 +60,7 @@ var NO_SESSION_MESSAGE = "session token not loaded, reload the page";
     ideaDrafts: {},
     ideaStatuses: {},
     ideaBusy: {},
+    ideaLinkChoices: {},
     adventurerStatuses: {},
     adventurerBusy: {},
     raidPauseOpen: {},
@@ -1418,11 +1419,76 @@ var NO_SESSION_MESSAGE = "session token not loaded, reload the page";
     return parts.join(" · ");
   }
 
-  function renderIdeaView(article, idea) {
+  function ideaPartyLabel(party) {
+    return party.state === "closed" ? party.name + " (closed)" : party.name;
+  }
+
+  function renderIdeaParty(idea, party, busy) {
+    var item = el("span");
+    item.className = "idea-party";
+    item.appendChild(textEl("span", ideaPartyLabel(party)));
+    item.appendChild(
+      ideaActionButton("Unlink", busy, function () {
+        postIdea("/api/ideas/" + idea.id + "/unlink", { party: party.name }, idea.id, function () {});
+      })
+    );
+    return item;
+  }
+
+  function renderIdeaLinkSelect(idea, partyNames, busy) {
+    var linked = idea.parties.map(function (party) {
+      return party.name;
+    });
+    var choices = partyNames.filter(function (name) {
+      return linked.indexOf(name) === -1;
+    });
+    var select = el("select");
+    select.dataset.focusKey = "idea-" + idea.id + "-link";
+    choices.forEach(function (name) {
+      select.appendChild(option(name));
+    });
+    if (choices.indexOf(state.ideaLinkChoices[idea.id]) !== -1) {
+      select.value = state.ideaLinkChoices[idea.id];
+    }
+    select.disabled = busy || choices.length === 0;
+    select.addEventListener("change", function () {
+      state.ideaLinkChoices[idea.id] = select.value;
+    });
+    return select;
+  }
+
+  function renderIdeaLinks(idea, partyNames) {
+    var busy = state.ideaBusy[idea.id] === true;
+    var links = el("div");
+    links.className = "notice-actions idea-links";
+    if (idea.parties.length > 0) {
+      links.appendChild(textEl("span", "worked by:"));
+    }
+    appendAll(
+      links,
+      idea.parties.map(function (party) {
+        return renderIdeaParty(idea, party, busy);
+      })
+    );
+    var select = renderIdeaLinkSelect(idea, partyNames, busy);
+    links.appendChild(select);
+    links.appendChild(
+      ideaActionButton("Link", select.disabled, function () {
+        var party = state.ideaLinkChoices[idea.id] || select.value;
+        postIdea("/api/ideas/" + idea.id + "/link", { party: party }, idea.id, function () {
+          delete state.ideaLinkChoices[idea.id];
+        });
+      })
+    );
+    return links;
+  }
+
+  function renderIdeaView(article, idea, partyNames) {
     var busy = state.ideaBusy[idea.id] === true;
     article.appendChild(textEl("h3", "#" + idea.id + " " + idea.title));
     article.appendChild(classedText("p", ideaMeta(idea), "muted"));
     article.appendChild(textEl("p", idea.description));
+    article.appendChild(renderIdeaLinks(idea, partyNames));
     var actions = el("div");
     actions.className = "notice-actions";
     actions.appendChild(
@@ -1469,18 +1535,18 @@ var NO_SESSION_MESSAGE = "session token not loaded, reload the page";
     article.appendChild(actions);
   }
 
-  function renderIdea(idea, projectNames) {
+  function renderIdea(idea, projectNames, partyNames) {
     var article = el("article");
     article.className = idea.overdue ? "card idea idea-overdue" : "card idea";
     if (state.ideaDrafts[idea.id] === undefined) {
-      renderIdeaView(article, idea);
+      renderIdeaView(article, idea, partyNames);
       return article;
     }
     renderIdeaEdit(article, idea, projectNames);
     return article;
   }
 
-  function renderIdeas(ideas, projectNames) {
+  function renderIdeas(ideas, projectNames, partyNames) {
     var section = document.getElementById("ideas");
     clear(section);
     var details = el("details");
@@ -1496,7 +1562,7 @@ var NO_SESSION_MESSAGE = "session token not loaded, reload the page";
     appendAll(
       details,
       ideas.map(function (idea) {
-        return renderIdea(idea, projectNames);
+        return renderIdea(idea, projectNames, partyNames);
       })
     );
     section.appendChild(details);
@@ -2264,6 +2330,15 @@ var NO_SESSION_MESSAGE = "session token not loaded, reload the page";
       details.appendChild(partyDrift);
     }
 
+    if (party.ideas.length > 0) {
+      var ideasText = party.ideas
+        .map(function (idea) {
+          return "#" + idea.id + " " + idea.title;
+        })
+        .join(", ");
+      details.appendChild(textEl("p", "ideas: " + ideasText));
+    }
+
     appendAll(details, party.quests.map(renderQuest));
 
     var orphanPrs = renderPrList(party.prs);
@@ -2700,6 +2775,16 @@ var NO_SESSION_MESSAGE = "session token not loaded, reload the page";
     renderFn.apply(null, args);
   }
 
+  function activePartyNames(parties) {
+    return parties
+      .filter(function (party) {
+        return party.state === "active";
+      })
+      .map(function (party) {
+        return party.name;
+      });
+  }
+
   function render(data, onlyIfChanged) {
     rememberFocus();
     document.getElementById("generated-at").textContent = "generated at " + data.generated_at;
@@ -2709,7 +2794,7 @@ var NO_SESSION_MESSAGE = "session token not loaded, reload the page";
     renderSection("asks", [filtered.asks, filtered.blocked, filtered.parties], renderAsks, onlyIfChanged);
     renderSection("ready", [filtered.ready_for_you], renderReadyForYou, onlyIfChanged);
     renderSection("notices", [filtered.notices, filtered.projects, filtered.raids], renderNotices, onlyIfChanged);
-    renderSection("ideas", [filtered.ideas, data.project_names], renderIdeas, onlyIfChanged);
+    renderSection("ideas", [filtered.ideas, data.project_names, activePartyNames(data.parties)], renderIdeas, onlyIfChanged);
     renderSection("adventurers", [filtered.adventurers], renderAdventurers, onlyIfChanged);
     renderSection("memory", [filtered.memory], renderMemory, onlyIfChanged);
     renderSection("raids", [filtered.raids], renderRaids, onlyIfChanged);

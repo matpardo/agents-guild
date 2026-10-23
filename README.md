@@ -171,6 +171,8 @@ guild notices
 guild idea add "<title>" --description "<text>" [--requester <text>] [--deadline YYYY-MM-DD] [--project <name>]
 guild idea edit <id> [--title ..] [--description ..] [--requester ..|--no-requester] [--deadline ..|--no-deadline] [--project ..|--no-project]
 guild idea delete <id>
+guild idea link <id> [--party <name>]     # a session links its own party; the human terminal needs --party
+guild idea unlink <id> [--party <name>]
 guild ideas [<id> | --project <name>]   # sorted by deadline, no deadline last; overdue marked; <id> shows one in full
 
 guild adventurer start "<job>" [--task <epic>/<tid>]   # this session becomes an adventurer; never a party leader
@@ -1202,9 +1204,14 @@ a deadline (`YYYY-MM-DD`) and a registered project. The human and any session
 can add, edit and delete ideas; they are local and never broadcast. `guild
 ideas` lists them by deadline ascending with the ones without deadline last
 (ties by creation), and marks `overdue` the ones whose deadline is before
-today. When an idea becomes code, a spec, a card or work in progress, the
-session that did it runs `guild idea delete <id>`: a deleted idea stays in the
-event log and `guild rebuild` deletes it again. Idea ids are local; do not copy
+today. When a party starts work from an idea it runs `guild idea link <id>`;
+`guild idea unlink <id>` drops the link. A session links only its own party;
+from the human terminal `--party <name>` is required. The party must exist and
+not be closed, and linking twice is refused. `guild ideas` and `guild ideas
+<id>` show `worked by: <party>, ...` (closed parties marked `(closed)`) and each
+party block in `guild board` lists its `ideas`. Once the work is done the
+session runs `guild idea delete <id>`, which also removes the links: a deleted
+idea stays in the event log and `guild rebuild` deletes it again. Idea ids are local; do not copy
 them into PRs, commits or cards. Title, description and requester go through
 the same email, secret and project-pattern checks as other free text.
 
@@ -1216,7 +1223,10 @@ card. `POST /api/ideas/create` (body `{"title", "description"}` plus optional
 requester, deadline or project) and `POST /api/ideas/<id>/delete` (body `{}`)
 run the same functions as the CLI; invalid input answers `422` with the
 message, a wrong type `400`. The project select lists every registered
-project, and the deadline is typed as `YYYY-MM-DD`.
+project, and the deadline is typed as `YYYY-MM-DD`. Each idea shows its linked
+parties with `Unlink`, and a select of active parties with `Link`; the party
+card lists its ideas. `POST /api/ideas/<id>/link` and `/unlink` (body
+`{"party"}`) run the same functions as the CLI.
 
 ### Adventurers
 

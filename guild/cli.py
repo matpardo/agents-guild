@@ -402,6 +402,20 @@ def _handle_idea_delete(ctx, args):
     return 0
 
 
+def _handle_idea_link(ctx, args):
+    from guild.commands import idea as idea_commands
+
+    _print(idea_commands.link(ctx, args.id, args.party))
+    return 0
+
+
+def _handle_idea_unlink(ctx, args):
+    from guild.commands import idea as idea_commands
+
+    _print(idea_commands.unlink(ctx, args.id, args.party))
+    return 0
+
+
 def _handle_ideas(ctx, args):
     from guild.commands import idea as idea_commands
 
@@ -1030,6 +1044,13 @@ def _add_idea_parser(subparsers):
     delete = actions.add_parser("delete", help="delete an idea once it became code, spec, card or quest")
     delete.add_argument("id", type=int)
     delete.set_defaults(handler=_handle_idea_delete)
+
+    link = actions.add_parser("link", help="link an idea to the party working on it")
+    unlink = actions.add_parser("unlink", help="remove the link between an idea and a party")
+    for parser_, handler in ((link, _handle_idea_link), (unlink, _handle_idea_unlink)):
+        parser_.add_argument("id", type=int)
+        parser_.add_argument("--party", help="required from the human terminal; a session uses its own party")
+        parser_.set_defaults(handler=handler)
 
 
 def _add_adventurer_parser(subparsers):

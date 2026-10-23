@@ -43,7 +43,7 @@ _RAID_ACTION_RE = re.compile(r"^/api/raids/([^/]+)/(pause|resume)$")
 _MEMORY_ACTION_RE = re.compile(r"^/api/memory/([^/]+)/([1-9][0-9]*)/rm$")
 _TASK_MOVE_RE = re.compile(r"^/api/quests/([^/]+)/tasks/([^/]+)/move$")
 _PARTY_HANDOFF_RE = re.compile(r"^/api/parties/([^/]+)/hand-off$")
-_IDEA_ACTION_RE = re.compile(r"^/api/ideas/([^/]+)/(edit|delete)$")
+_IDEA_ACTION_RE = re.compile(r"^/api/ideas/([^/]+)/(edit|delete|link|unlink)$")
 _IDEA_CREATE_PATH = "/api/ideas/create"
 _ADVENTURER_DISMISS_RE = re.compile(r"^/api/adventurers/([^/]+)/dismiss$")
 _COMPACT_PATH = "/api/compact"
@@ -185,6 +185,10 @@ def _run_idea_action(action, idea_id, payload):
     try:
         if action == "delete":
             return idea_commands.delete(ctx, idea_id)
+        if action == "link":
+            return idea_commands.link_for_party(ctx, idea_id, payload["party"])
+        if action == "unlink":
+            return idea_commands.unlink_for_party(ctx, idea_id, payload["party"])
         fields = {key: payload[key] for key in _IDEA_TEXT_KEYS if key in payload}
         return idea_commands.edit(ctx, idea_id, fields)
     finally:
@@ -354,6 +358,8 @@ class BoardRequestHandler(http_server.BaseHTTPRequestHandler):
             raise _RequestRejected(400, "text, to and ttl must be strings")
         if action in ("create-idea", "edit-idea"):
             self._check_idea_payload(action, payload)
+        if action in ("link-idea", "unlink-idea") and not isinstance(payload.get("party"), str):
+            raise _RequestRejected(400, "party must be a string")
         if action == "move" and not isinstance(payload.get("to"), str):
             raise _RequestRejected(400, "to must be a string")
         if action == "block" and not isinstance(payload.get("reason"), str):
@@ -400,7 +406,7 @@ class BoardRequestHandler(http_server.BaseHTTPRequestHandler):
             idea_id, action = idea_match.groups()
             if not _ASK_ID_RE.match(idea_id):
                 return self._not_found()
-            post_action = "edit-idea" if action == "edit" else "delete-idea"
+            post_action = action + "-idea"
             return self._post_action(post_action, lambda payload: _run_idea_action(action, int(idea_id), payload))
         adventurer_match = _ADVENTURER_DISMISS_RE.match(path)
         if adventurer_match is not None:

@@ -744,6 +744,10 @@ def _party_section(ctx, painter, party_row, project_config):
             "{} ({})".format(row["area"], timeutil.time_left_label(ctx.now, row["expires_at"])) for row in claims
         )
         lines.append(painter.paint("  claims: {}".format(claim_text), "dim"))
+    for idea in idea_commands.linked_ideas(ctx, party_row["name"]):
+        lines.append(
+            painter.paint("  ideas: #{} {}".format(idea["id"], sanitize.strip_control_sequences(idea["title"])), "dim")
+        )
     raids = raid_commands.member_raids(ctx.conn, ctx.now, party_row["name"])
     if raids:
         raid_text = ", ".join(
@@ -980,6 +984,10 @@ def _idea_model(ctx, row):
         "project": row["project"],
         "created_at": row["created_at"],
         "overdue": idea_commands.is_overdue(ctx.now, row["deadline"]),
+        "parties": [
+            {"name": party["name"], "state": party["state"]}
+            for party in idea_commands.linked_parties(ctx, row["id"])
+        ],
     }
 
 
@@ -1107,6 +1115,10 @@ def _party_model(ctx, party_row, project_config):
         "has_live_leader": party_status.has_live_leader(ctx, party_row),
         "stopped_without_report": _party_stopped_without_report(ctx, party_row),
         "quests": quest_models,
+        "ideas": [
+            {"id": row["id"], "title": sanitize.strip_control_sequences(row["title"])}
+            for row in idea_commands.linked_ideas(ctx, party_row["name"])
+        ],
         "prs": [_pr_model(ctx, pr_row, project_config) for pr_row in orphan_prs],
         "raids": [
             {
