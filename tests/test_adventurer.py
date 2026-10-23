@@ -188,6 +188,18 @@ class AdventurerPermissionTests(AdventurerTestCase):
         row = self.rows("SELECT party, adventurer, task_quest FROM prs WHERE number = 2")[0]
         self.assertEqual((row["party"], row["adventurer"], row["task_quest"]), ("", 1, None))
 
+    def test_done_prints_final_report(self):
+        self.start("adv-1", "fix typo", "--task", "demo-epic/T02")
+        self.cli(["pr", "track", "acme/app#2", "--task", "demo-epic/T02", "--what", "fixes typo", "--waits", "r"], "adv-1")
+        code, out, err = self.cli(["adventurer", "done", "--pending", "none"], "adv-1")
+        self.assertEqual(code, 0, err)
+        self.assertIn("adventurer 1 done", out)
+        self.assertIn("final report for adventurer 1", out)
+        self.assertIn("job: x", out)
+        self.assertIn("task: demo-epic/T02", out)
+        self.assertIn("acme/app#2 | fixes typo | open", out)
+        self.assertIn("pending: none", out)
+
     def test_pr_track_on_a_free_job_needs_a_card(self):
         self.cli(["adventurer", "done", "--pending", "none"], "adv-1")
         self.start("adv-2", "free job")

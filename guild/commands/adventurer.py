@@ -2,7 +2,7 @@ import glob
 import os
 from pathlib import Path
 
-from guild import config, db, events, health_jobs, identity, pii, refs, resume, tmux_windows
+from guild import config, db, events, final_report, health_jobs, identity, pii, refs, resume, tmux_windows
 from guild.commands import quest as quest_commands
 from guild.errors import GuildError
 from guild.ids import next_id
@@ -151,7 +151,7 @@ def done(ctx, pending):
             "local",
             {"id": adventurer["id"], "pending": pending},
         )
-    return "adventurer {} done".format(adventurer["id"])
+    return "adventurer {} done\n{}".format(adventurer["id"], final_report.adventurer_report(ctx, adventurer, pending))
 
 
 def dismiss(ctx, adventurer_id):

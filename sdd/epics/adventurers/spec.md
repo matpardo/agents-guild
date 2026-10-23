@@ -28,6 +28,7 @@ Sessions outside a party leave no trace in guild: the human cannot see what they
 - A session is a party leader, an adventurer or unbound: `party start` and `party resume` refuse an active adventurer; `adventurer start` refuses a leader.
 - The Stop hook records `session.stopped` for adventurers too.
 - The board and the web list adventurers with job, live or stopped, PRs and pending report, and flag one that stopped without reporting. A done adventurer stays listed until `guild adventurer dismiss <id>` (web: Dismiss button). A party whose leader is gone without a handoff gets the same flag.
+- `guild party close` and `guild adventurer done` print a final report block (PRs with state, quests with done/total tasks, linked ideas, pending) read from existing state; the session ends with a report to the human built from it (decisión del dev, 2026-10-23).
 - `guild party close` requires `--pending`, validated like `--learned` and stored on the `party.closed` event.
 - The unbound hint tells the session to ask the human, before any work on a registered project, whether it is a party or an adventurer.
 - `README.md` and `GUILD.md` change with the code.
