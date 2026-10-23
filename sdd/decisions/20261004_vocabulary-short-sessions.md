@@ -1,7 +1,7 @@
 # ADR: Vocabulary for short sessions (leader, generation, keeper, raid lead, brief)
 
 - **Date:** 2026-10-04
-- **Status:** accepted
+- **Status:** superseded by 20261023_adventurers-and-open-quests
 
 ## Context
 

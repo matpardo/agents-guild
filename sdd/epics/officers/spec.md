@@ -2,10 +2,10 @@
 epic: officers
 type: spec
 title: Deterministic watchers that call a model only to fix
-status: draft
+status: archived
 owner: matpardo
 created: 2026-10-04
-updated: 2026-10-04
+updated: 2026-10-23
 ---
 
 # Spec: Deterministic watchers that call a model only to fix
@@ -36,3 +36,7 @@ Leaders spend tokens checking the merge queue, CI, tracker and SDD drift, and op
 ## Security and data
 
 Same as `dispatcher`: opt-in, logged, one launch per party.
+
+## Decisions
+
+- Archived: recurring checks are health jobs the human launches as adventurers (decisión del dev, 2026-10-23). See `health-adventurers` and `sdd/decisions/20261023_adventurers-and-open-quests.md`.
