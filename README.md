@@ -1419,6 +1419,8 @@ step. Reads are `GET`; the only writes are `POST /api/asks/<id>/answer`
 `POST /api/notices/seen-all` (body `{}`), `POST /api/notices/create`,
 `POST /api/raids/<name>/pause`, `POST /api/raids/<name>/resume`,
 `POST /api/parties/<name>/hand-off` (body `{}`),
+`POST /api/quests/create-open`, `POST /api/quests/<slug>/take`,
+`POST /api/quests/<slug>/release`,
 `POST /api/prs/<owner>/<repo>/<n>/block` (body `{"reason": "<text>"}`) and
 `.../unblock`, with `<id>` and `<n>` positive integers
 (otherwise `404`); every other method,
@@ -1861,6 +1863,23 @@ and claim.
   no queued task.
 - An adventurer may start on a task of an open quest: `adventurer start --task
   <epic>/<tid>` (or `<quest>/<tid>` for a no-epic open quest).
+
+`guild board` prints a `QUEST BOARD` block per such project: each open quest with
+its task count and the number of free tasks per epic.
+
+The web board has a `quest board` section for every registered project with
+synced epics or open quests, even with no party (`quest_boards` in
+`/api/board`: `name`, `open_quests`, `free_tasks` per epic and the active
+`parties` of the project). Each open quest lists its tasks (an
+adventurer-held task is marked) with a party select and `Assign`; each epic
+with free tasks has a checkbox per task, a slug, a title and `Create open
+quest`. A party card shows `Release` on a quest whose tasks are all queued with
+no open PR or claim (`releasable` in the quest model). The routes call the
+same functions as the CLI: `POST /api/quests/create-open` (body `{"project",
+"slug", "title", "epic", "tasks": ["T01", ...]}`), `POST
+/api/quests/<slug>/take` (body `{"party"}`) and `POST
+/api/quests/<slug>/release` (body `{}`). A refusal answers `422` with the
+message, a wrong type `400`.
 
 ## Identity
 

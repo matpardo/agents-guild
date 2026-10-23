@@ -8,6 +8,8 @@ from guild.commands import brief as brief_commands
 from guild.commands import claim as claim_commands
 from guild.commands import drift as drift_commands
 from guild.commands import idea as idea_commands
+from guild.commands import quest as quest_commands
+from guild.commands import quest_board
 from guild.commands import memory as memory_commands
 from guild.commands import merge_queue as merge_queue_commands
 from guild.commands import next as next_commands
@@ -698,6 +700,16 @@ def _project_lines(ctx, painter, party_rows, projects_by_name):
     return lines
 
 
+def _quest_board_lines(ctx, painter, projects_by_name):
+    lines = []
+    for model in quest_board.models(ctx, projects_by_name):
+        summary = quest_board.summary_lines(model)
+        lines.append("{} {}".format(painter.paint("━━", "cyan"), painter.paint(summary[0], "bold")))
+        lines.extend(summary[1:])
+        lines.append("")
+    return lines
+
+
 def _party_section(ctx, painter, party_row, project_config):
     lines = [
         "{} {}  {}".format(
@@ -886,6 +898,7 @@ def render_board(ctx, party_filter, raid_filter, color, width):
     if party_filter is None and raid_filter is None:
         lines.extend(_adventurer_lines(ctx, painter))
     lines.extend(_project_lines(ctx, painter, party_rows, projects_by_name))
+    lines.extend(_quest_board_lines(ctx, painter, projects_by_name))
     for party_row in party_rows:
         lines.extend(
             _party_section(ctx, painter, party_row, projects_by_name.get(party_row["project"]))
@@ -1055,6 +1068,7 @@ def _quest_model(ctx, project, quest_row, prs_by_task, project_config):
         "title": sanitize.strip_control_sequences(quest_row["title"]),
         "move_targets": _move_targets(ctx.conn, quest_row),
         "close_blockers": _close_blockers(ctx, quest_row),
+        "releasable": not quest_commands.release_blockers(ctx, quest_row),
         "tasks": tasks,
     }
 
@@ -1181,5 +1195,6 @@ def board_model(ctx):
         "ready_for_you": merge_queue_commands.ready_for_you(ctx.conn, ctx.projects_dir, scopes),
         "projects": _project_models(ctx, party_rows, projects_by_name),
         "project_names": sorted(projects_by_name),
+        "quest_boards": quest_board.models(ctx, projects_by_name),
     }
 

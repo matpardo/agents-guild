@@ -16,6 +16,7 @@ from guild.commands import compact as compact_commands
 from guild.commands import handoff as handoff_commands
 from guild.commands import history as history_commands
 from guild.commands import idea as idea_commands
+from guild.commands import quest as quest_commands
 from guild.commands import memory as memory_commands
 from guild.commands import notice as notice_commands
 from guild.commands import pr as pr_commands
@@ -45,6 +46,8 @@ _TASK_MOVE_RE = re.compile(r"^/api/quests/([^/]+)/tasks/([^/]+)/move$")
 _PARTY_HANDOFF_RE = re.compile(r"^/api/parties/([^/]+)/hand-off$")
 _IDEA_ACTION_RE = re.compile(r"^/api/ideas/([^/]+)/(edit|delete|link|unlink)$")
 _IDEA_CREATE_PATH = "/api/ideas/create"
+_QUEST_ACTION_RE = re.compile(r"^/api/quests/([^/]+)/(take|release)$")
+_QUEST_CREATE_PATH = "/api/quests/create-open"
 _ADVENTURER_DISMISS_RE = re.compile(r"^/api/adventurers/([^/]+)/dismiss$")
 _COMPACT_PATH = "/api/compact"
 _SEEN_ALL_PATH = "/api/notices/seen-all"
@@ -191,6 +194,26 @@ def _run_idea_action(action, idea_id, payload):
             return idea_commands.unlink_for_party(ctx, idea_id, payload["party"])
         fields = {key: payload[key] for key in _IDEA_TEXT_KEYS if key in payload}
         return idea_commands.edit(ctx, idea_id, fields)
+    finally:
+        ctx.conn.close()
+
+
+def _run_quest_create(payload):
+    ctx = _action_context()
+    try:
+        return quest_commands.add_open(
+            ctx, payload["project"], payload["slug"], payload["title"], payload["epic"], payload["tasks"]
+        )
+    finally:
+        ctx.conn.close()
+
+
+def _run_quest_action(action, slug, payload):
+    ctx = _action_context()
+    try:
+        if action == "take":
+            return quest_commands.take_for_party(ctx, slug, payload["party"])
+        return quest_commands.release_for_owner(ctx, slug)
     finally:
         ctx.conn.close()
 
@@ -350,6 +373,14 @@ class BoardRequestHandler(http_server.BaseHTTPRequestHandler):
             if key in payload and not isinstance(payload[key], str) and payload[key] is not None:
                 raise _RequestRejected(400, "{} must be a string or null".format(key))
 
+    def _check_quest_payload(self, payload):
+        for key in ("project", "slug", "title", "epic"):
+            if not isinstance(payload.get(key), str):
+                raise _RequestRejected(400, "{} must be a string".format(key))
+        tasks = payload.get("tasks")
+        if not isinstance(tasks, list) or not all(isinstance(tid, str) for tid in tasks):
+            raise _RequestRejected(400, "tasks must be a list of strings")
+
     def _read_action_payload(self, action):
         payload = self._read_json_object()
         if action == "answer" and not isinstance(payload.get("answer"), str):
@@ -358,7 +389,9 @@ class BoardRequestHandler(http_server.BaseHTTPRequestHandler):
             raise _RequestRejected(400, "text, to and ttl must be strings")
         if action in ("create-idea", "edit-idea"):
             self._check_idea_payload(action, payload)
-        if action in ("link-idea", "unlink-idea") and not isinstance(payload.get("party"), str):
+        if action == "create-quest":
+            self._check_quest_payload(payload)
+        if action in ("link-idea", "unlink-idea", "take-quest") and not isinstance(payload.get("party"), str):
             raise _RequestRejected(400, "party must be a string")
         if action == "move" and not isinstance(payload.get("to"), str):
             raise _RequestRejected(400, "to must be a string")
@@ -408,6 +441,12 @@ class BoardRequestHandler(http_server.BaseHTTPRequestHandler):
                 return self._not_found()
             post_action = action + "-idea"
             return self._post_action(post_action, lambda payload: _run_idea_action(action, int(idea_id), payload))
+        if path == _QUEST_CREATE_PATH:
+            return self._post_action("create-quest", _run_quest_create)
+        quest_match = _QUEST_ACTION_RE.match(path)
+        if quest_match is not None:
+            slug, action = quest_match.groups()
+            return self._post_action(action + "-quest", lambda payload: _run_quest_action(action, slug, payload))
         adventurer_match = _ADVENTURER_DISMISS_RE.match(path)
         if adventurer_match is not None:
             adventurer_id = adventurer_match.group(1)

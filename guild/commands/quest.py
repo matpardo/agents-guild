@@ -281,33 +281,13 @@ def _require_followup_source(ctx, binding, source):
         )
 
 
-def add(ctx, slug, title, epic, tasks_csv, titles_csv, no_epic, followups_of, open_quest):
-    names.validate_name(slug, "quest slug")
-    if open_quest and followups_of is not None:
-        raise GuildError("--followups-of cannot be combined with --open", 1)
-    if followups_of is not None and (no_epic or epic is not None):
-        raise GuildError("--followups-of cannot be combined with --epic or --no-epic", 1)
-    free = no_epic or followups_of is not None
-    if no_epic and epic is not None:
-        raise GuildError("--no-epic cannot be combined with --epic", 1)
-    if titles_csv is not None and (not free or tasks_csv is None):
-        raise GuildError("--titles requires --no-epic (or --followups-of) and --tasks", 1)
-    if not free and epic is None:
-        raise GuildError("epic quests require --epic, or pass --no-epic", 1)
+def _require_new_slug(ctx, slug):
     existing = ctx.conn.execute("SELECT slug FROM quests WHERE slug = ?", (slug,)).fetchone()
     if existing is not None:
         raise GuildError("quest '{}' already exists".format(slug), 1)
-    binding = None if open_quest else identity.require_binding(ctx.conn, ctx.session_id)
-    party = None if open_quest else binding["party"]
-    project = config.require_project(ctx.cwd, ctx.projects_dir)
-    if followups_of is not None:
-        _require_followup_source(ctx, binding, followups_of)
-    tasks = []
-    if free and tasks_csv is not None:
-        tasks = _free_tasks(tasks_csv, titles_csv)
-    if not free:
-        tasks = _resolve_epic_tasks(ctx.conn, project, epic, tasks_csv or "")
-        reject_taken_tasks(ctx.conn, ctx.now, project, epic, tasks, "" if open_quest else party, False)
+
+
+def _record_added(ctx, party, project, slug, title, epic, tasks, followups_of):
     with db.writing(ctx.conn):
         events.record(
             ctx.conn,
@@ -329,6 +309,45 @@ def add(ctx, slug, title, epic, tasks_csv, titles_csv, no_epic, followups_of, op
             },
         )
     return "quest '{}' added".format(slug)
+
+
+def add_open(ctx, project, slug, title, epic, tids):
+    names.validate_name(slug, "quest slug")
+    _require_new_slug(ctx, slug)
+    config.load_project(ctx.projects_dir, project)
+    if not tids:
+        raise GuildError("select at least one task", 1)
+    tasks = _resolve_epic_tasks(ctx.conn, project, epic, ",".join(tids))
+    reject_taken_tasks(ctx.conn, ctx.now, project, epic, tasks, "", False)
+    return _record_added(ctx, None, project, slug, title, epic, tasks, None)
+
+
+def add(ctx, slug, title, epic, tasks_csv, titles_csv, no_epic, followups_of, open_quest):
+    names.validate_name(slug, "quest slug")
+    if open_quest and followups_of is not None:
+        raise GuildError("--followups-of cannot be combined with --open", 1)
+    if followups_of is not None and (no_epic or epic is not None):
+        raise GuildError("--followups-of cannot be combined with --epic or --no-epic", 1)
+    free = no_epic or followups_of is not None
+    if no_epic and epic is not None:
+        raise GuildError("--no-epic cannot be combined with --epic", 1)
+    if titles_csv is not None and (not free or tasks_csv is None):
+        raise GuildError("--titles requires --no-epic (or --followups-of) and --tasks", 1)
+    if not free and epic is None:
+        raise GuildError("epic quests require --epic, or pass --no-epic", 1)
+    _require_new_slug(ctx, slug)
+    binding = None if open_quest else identity.require_binding(ctx.conn, ctx.session_id)
+    party = None if open_quest else binding["party"]
+    project = config.require_project(ctx.cwd, ctx.projects_dir)
+    if followups_of is not None:
+        _require_followup_source(ctx, binding, followups_of)
+    tasks = []
+    if free and tasks_csv is not None:
+        tasks = _free_tasks(tasks_csv, titles_csv)
+    if not free:
+        tasks = _resolve_epic_tasks(ctx.conn, project, epic, tasks_csv or "")
+        reject_taken_tasks(ctx.conn, ctx.now, project, epic, tasks, "" if open_quest else party, False)
+    return _record_added(ctx, party, project, slug, title, epic, tasks, followups_of)
 
 
 def _load_quest(conn, slug):
@@ -375,7 +394,7 @@ def take_for_party(ctx, slug, party):
     return _take(ctx, slug, row["name"], row["project"])
 
 
-def _release_blockers(ctx, row):
+def release_blockers(ctx, row):
     blockers = []
     tasks = ctx.conn.execute(
         "SELECT tid, state FROM quest_tasks WHERE quest = ? ORDER BY tid", (row["slug"],)
@@ -405,7 +424,7 @@ def _release(ctx, row):
         raise GuildError("quest '{}' is already open".format(row["slug"]), 1)
     if row["state"] != "active":
         raise GuildError("quest '{}' is already {}".format(row["slug"], row["state"]), 1)
-    blockers = _release_blockers(ctx, row)
+    blockers = release_blockers(ctx, row)
     if blockers:
         raise GuildError(
             "quest '{}' cannot be released: {}".format(row["slug"], "; ".join(blockers)), 1

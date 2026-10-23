@@ -2,7 +2,7 @@
 epic: quest-board
 type: tasks
 title: Prepare quests ahead for parties to take
-status: active
+status: done
 updated: 2026-10-23
 ---
 
@@ -62,12 +62,12 @@ updated: 2026-10-23
 ## T06 — Quest board on the web
 
 **Depends on:** T03, T04
-**Status:** [ ] pending
+**Status:** [x] done — #204
 
 **What:** a quest board section: create an open quest from an epic's free tasks, assign to a party, release. Routes call the same command functions through `sendPost`.
 
 **Acceptance:**
-- [ ] The node harness covers the section; the CLI and the web produce the same events.
+- [x] The node harness covers the section; the CLI and the web produce the same events.
 
 ## T07 — Quest board docs
 
