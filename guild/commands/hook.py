@@ -165,6 +165,16 @@ _NOTIFICATION_WAITS = {
 }
 
 
+def _session_actor(ctx):
+    binding = identity.resolve_binding(ctx.conn, ctx.session_id)
+    if binding is not None:
+        return binding
+    adventurer = identity.resolve_adventurer(ctx.conn, ctx.session_id)
+    if adventurer is None:
+        return None
+    return {"party": None, "project": adventurer["project"]}
+
+
 def _mark_working(ctx, binding):
     if binding is None:
         return
@@ -174,7 +184,7 @@ def _mark_working(ctx, binding):
 
 
 def stop(ctx):
-    binding = identity.resolve_binding(ctx.conn, ctx.session_id)
+    binding = _session_actor(ctx)
     if binding is None:
         return
     with db.writing(ctx.conn):
@@ -301,9 +311,10 @@ def _nudge_text(ctx, binding, lead):
 
 def prompt_submit(ctx):
     binding = identity.resolve_binding(ctx.conn, ctx.session_id)
+    adventurer = identity.resolve_adventurer(ctx.conn, ctx.session_id)
     message_lines, seq = inbox_commands.new_lines(ctx, binding)
     lines = inbox_commands.framed(message_lines)
-    if binding is None:
+    if binding is None and adventurer is None:
         marker = _hint_marker_path(ctx)
         if not marker.exists():
             marker.parent.mkdir(parents=True, exist_ok=True)
@@ -317,7 +328,7 @@ def prompt_submit(ctx):
     )
     with db.writing(ctx.conn):
         inbox_commands.advance_cursor(ctx.conn, identity.cursor_key(ctx.session_id), seq)
-        _mark_working(ctx, binding)
+        _mark_working(ctx, _session_actor(ctx))
     return "\n".join(lines)
 
 
@@ -333,7 +344,7 @@ def post_tool_use(ctx):
     )
     with db.writing(ctx.conn):
         inbox_commands.advance_cursor(ctx.conn, identity.cursor_key(ctx.session_id), seq)
-        _mark_working(ctx, binding)
+        _mark_working(ctx, _session_actor(ctx))
     if not lines:
         return None
     return json.dumps(

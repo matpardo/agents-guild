@@ -32,16 +32,31 @@ def _task_fields(ctx, task_ref):
     return quest, tid
 
 
+def _adventurer_work(adventurer, task_ref, card):
+    if card is not None or (task_ref is not None and task_ref == adventurer["task"]):
+        return
+    raise GuildError("an adventurer tracks PRs with --card or --task equal to its own task", 1)
+
+
+def _tracking_fields(ctx, task_ref, card):
+    adventurer = identity.resolve_adventurer(ctx.conn, ctx.session_id)
+    if adventurer is None:
+        binding = identity.require_binding(ctx.conn, ctx.session_id)
+        quest, tid = _task_fields(ctx, task_ref)
+        return binding["party"], binding["party"], None, quest, tid
+    _adventurer_work(adventurer, task_ref, card)
+    return "", None, adventurer["id"], None, None
+
+
 def track(ctx, ref, task_ref, card, what, waits, needs_human_pr_review, fixes_main, fixes_flaky):
     repo, number = refs.parse_pr_ref(ref)
-    binding = identity.require_binding(ctx.conn, ctx.session_id)
+    party, actor_party, adventurer_id, quest, tid = _tracking_fields(ctx, task_ref, card)
     project = config.require_project(ctx.cwd, ctx.projects_dir)
     project_data = config.load_project(ctx.projects_dir, project)
     if repo not in project_data["github"]["repos"]:
         raise GuildError(
             "repo '{}' is not in project '{}' github.repos".format(repo, project), 1
         )
-    quest, tid = _task_fields(ctx, task_ref)
     existing = ctx.conn.execute(
         "SELECT repo FROM prs WHERE repo = ? AND number = ?", (repo, number)
     ).fetchone()
@@ -56,7 +71,7 @@ def track(ctx, ref, task_ref, card, what, waits, needs_human_pr_review, fixes_ma
             ctx.conn,
             ctx.now,
             ctx.origin,
-            binding["party"],
+            actor_party,
             ctx.session_id,
             project,
             "pr.tracked",
@@ -64,7 +79,8 @@ def track(ctx, ref, task_ref, card, what, waits, needs_human_pr_review, fixes_ma
             {
                 "repo": repo,
                 "number": number,
-                "party": binding["party"],
+                "party": party,
+                "adventurer": adventurer_id,
                 "task_quest": quest,
                 "task_tid": tid,
                 "card": card,

@@ -1,4 +1,5 @@
 from guild import config, db, events, identity, refs, timeutil
+from guild.commands import quest as quest_commands
 from guild.errors import GuildError
 
 _TASK_AREA_PREFIX = "task:"
@@ -9,10 +10,20 @@ def _validate_area(area):
         refs.parse_task_ref(area[len(_TASK_AREA_PREFIX):])
 
 
+def _task_adventurer(ctx, project, area):
+    if not area.startswith(_TASK_AREA_PREFIX):
+        return None
+    epic, tid = refs.parse_task_ref(area[len(_TASK_AREA_PREFIX):])
+    return quest_commands.adventurer_holder(ctx.conn, project, epic, tid)
+
+
 def claim(ctx, area, ttl, agent_type):
     _validate_area(area)
     binding = identity.require_binding(ctx.conn, ctx.session_id)
     project = config.require_project(ctx.cwd, ctx.projects_dir)
+    adventurer_id = _task_adventurer(ctx, project, area)
+    if adventurer_id is not None:
+        raise GuildError("area '{}' is held by adventurer {}".format(area, adventurer_id), 1)
     row = ctx.conn.execute(
         "SELECT party, expires_at FROM claims WHERE project = ? AND area = ?", (project, area)
     ).fetchone()
@@ -46,6 +57,9 @@ def claim(ctx, area, ttl, agent_type):
 def check(ctx, area):
     project = config.require_project(ctx.cwd, ctx.projects_dir)
     binding = identity.resolve_binding(ctx.conn, ctx.session_id)
+    adventurer_id = _task_adventurer(ctx, project, area)
+    if adventurer_id is not None:
+        return "held by adventurer {}".format(adventurer_id), 1
     row = ctx.conn.execute(
         "SELECT party, expires_at FROM claims WHERE project = ? AND area = ?", (project, area)
     ).fetchone()

@@ -44,14 +44,22 @@ def _drift_lines(ctx, binding):
     return lines
 
 
+def _adventurer_line(adventurer):
+    line = "{}: {}".format(identity.adventurer_label(adventurer["id"]), adventurer["job"])
+    if adventurer["task"] is not None:
+        line += " (task {})".format(adventurer["task"])
+    return line + "; before you stop run `guild adventurer done --pending \"<text>\"`"
+
+
 def render_brief(ctx):
     if ctx.session_id is None:
         return ["brief is the per-session view for agents; from a terminal use `guild board` and `guild asks`"]
     binding = identity.resolve_binding(ctx.conn, ctx.session_id)
     active = notice_commands.active_notices(ctx.conn, ctx.now)
+    adventurer = identity.resolve_adventurer(ctx.conn, ctx.session_id)
     if binding is None:
         project = _resolve_project(ctx)
-        lines = [UNBOUND_HINT]
+        lines = [_adventurer_line(adventurer)] if adventurer is not None else [UNBOUND_HINT]
         lines.extend(targeting_lines(active, project, set()))
         lines.extend(_base_warning_lines(ctx, project))
         lines.append(pii.LOCAL_ONLY_REMINDER)

@@ -392,6 +392,30 @@ def _handle_ideas(ctx, args):
     return 0
 
 
+def _handle_adventurer_start(ctx, args):
+    from guild.commands import adventurer as adventurer_commands
+
+    _print(adventurer_commands.start(ctx, args.job, args.task))
+    return 0
+
+
+def _handle_adventurer_done(ctx, args):
+    from guild.commands import adventurer as adventurer_commands
+
+    _print(adventurer_commands.done(ctx, args.pending))
+    return 0
+
+
+def _handle_adventurers(ctx, args):
+    from guild.commands import adventurer as adventurer_commands
+
+    if args.adventurer_id is not None:
+        _print_lines(adventurer_commands.show(ctx, args.adventurer_id))
+        return 0
+    _print_lines(adventurer_commands.list_adventurers(ctx))
+    return 0
+
+
 def _handle_claim(ctx, args):
     from guild.commands import claim as claim_commands
 
@@ -965,6 +989,20 @@ def _add_idea_parser(subparsers):
     delete.set_defaults(handler=_handle_idea_delete)
 
 
+def _add_adventurer_parser(subparsers):
+    parser = subparsers.add_parser("adventurer", help="start or finish a one-job session")
+    actions = parser.add_subparsers(dest="adventurer_action", required=True, metavar="<subcommand>")
+
+    start = actions.add_parser("start", help="register this session as an adventurer")
+    start.add_argument("job", help="what this session does")
+    start.add_argument("--task", help="synced SDD task as <epic>/<tid>")
+    start.set_defaults(handler=_handle_adventurer_start)
+
+    done = actions.add_parser("done", help="end the adventurer and report what is pending")
+    done.add_argument("--pending", required=True, help="what is left to do, or none")
+    done.set_defaults(handler=_handle_adventurer_done)
+
+
 def _add_memory_parser(subparsers):
     parser = subparsers.add_parser("memory", help="add, list or remove items in a party's memory")
     actions = parser.add_subparsers(dest="memory_action", required=True, metavar="<subcommand>")
@@ -1126,6 +1164,12 @@ def build_parser():
     ideas.add_argument("idea_id", type=int, nargs="?")
     ideas.add_argument("--project", help="only ideas of this project")
     ideas.set_defaults(handler=_handle_ideas)
+
+    _add_adventurer_parser(subparsers)
+
+    adventurers = subparsers.add_parser("adventurers", help="list adventurers, or show one in detail")
+    adventurers.add_argument("adventurer_id", type=int, nargs="?")
+    adventurers.set_defaults(handler=_handle_adventurers)
 
     claim = subparsers.add_parser("claim", help="claim a shared area or task, or check a claim")
     claim.add_argument("area")

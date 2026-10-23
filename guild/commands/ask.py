@@ -41,7 +41,10 @@ def _validate_refs(ctx, project, project_config, ref_list):
             row = ctx.conn.execute(
                 "SELECT tid FROM quest_tasks WHERE quest = ? AND tid = ?", (quest, tid)
             ).fetchone()
-            if row is None:
+            held = ctx.conn.execute(
+                "SELECT id FROM adventurers WHERE task = ?", (parsed[len("task:"):],)
+            ).fetchone()
+            if row is None and held is None:
                 raise GuildError("ask ref '{}' does not match a known task".format(raw), 1)
     return normalized
 
@@ -112,8 +115,8 @@ def _resolve_auto_ref(ref_list, in_progress):
 
 
 def create(ctx, question, context_text, ref_list, option_list):
-    binding = identity.require_binding(ctx.conn, ctx.session_id)
-    in_progress = _in_progress_tasks(ctx.conn, binding["party"])
+    actor_party = identity.require_actor(ctx.conn, ctx.session_id)
+    in_progress = _in_progress_tasks(ctx.conn, actor_party)
     ref_list, auto_ref = _resolve_auto_ref(ref_list, in_progress)
     if not ref_list:
         raise GuildError(
@@ -131,19 +134,19 @@ def create(ctx, question, context_text, ref_list, option_list):
             ctx.conn,
             ctx.now,
             ctx.origin,
-            binding["party"],
+            actor_party,
             ctx.session_id,
             project,
             "ask.created",
             "local",
             {
                 "id": ask_id,
-                "party": binding["party"],
+                "party": actor_party,
                 "question": question,
                 "context": context_text,
                 "refs": normalized_refs,
                 "options": option_list,
-                "snapshot": _origin_snapshot(ctx, binding["party"], project, in_progress),
+                "snapshot": _origin_snapshot(ctx, actor_party, project, in_progress),
             },
         )
     lines = ["ask #{} created".format(ask_id)]

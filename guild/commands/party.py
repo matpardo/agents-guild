@@ -65,6 +65,14 @@ def locate_if_changed(ctx, binding, permission_mode):
 
 
 def _refuse_other_party(conn, session_id, name):
+    adventurer = identity.resolve_adventurer(conn, session_id)
+    if adventurer is not None:
+        raise GuildError(
+            "session is adventurer {}: a session is a leader or an adventurer, never both".format(
+                adventurer["id"]
+            ),
+            1,
+        )
     binding = identity.resolve_binding(conn, session_id)
     if binding is None or binding["party"] == name:
         return

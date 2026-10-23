@@ -4,7 +4,7 @@ from pathlib import Path
 from guild import pii
 from tests.testutil import GuildTestCase
 
-_TRACE_RE = re.compile(r"guild|ask #[0-9]|notice #[0-9]|idea #[0-9]", re.IGNORECASE)
+_TRACE_RE = re.compile(r"guild|ask #[0-9]|notice #[0-9]|idea #[0-9]|adventurer [0-9]", re.IGNORECASE)
 _REPO_ROOT = Path(__file__).resolve().parents[1]
 
 
@@ -32,6 +32,15 @@ class PublishableTextTests(GuildTestCase):
         self.assertEqual(code, 0, err)
         self.assertIsNone(_TRACE_RE.search(track_out))
         self.assertIsNone(_TRACE_RE.search(set_out))
+
+    def test_adventurer_pr_track_output_has_no_traces(self):
+        self.run_cli(["adventurer", "start", "fix typo"], "adv-1", self.repo_dir)
+        code, track_out, err = self.run_cli(
+            ["pr", "track", "acme/app#1", "--card", "ABC-1", "--what", "x", "--waits", "y"],
+            "adv-1", self.repo_dir,
+        )
+        self.assertEqual(code, 0, err)
+        self.assertIsNone(_TRACE_RE.search(track_out))
 
     def test_quest_done_output_has_no_traces(self):
         self.run_cli(["task", "start", "demo/T01"], "sess-1", self.repo_dir)

@@ -235,8 +235,8 @@ def _pr_tracked(conn, event):
         "INSERT INTO prs (repo, number, party, task_quest, task_tid, card, what, waits, lifecycle,"
         " branch, title, gh_state, gh_draft, checks_failing, checks_passing, seeded, synced_at,"
         " mergeable, review_comment_count, last_notified_comment_count, last_activity_at,"
-        " needs_ask_answer, needs_human_pr_review, fixes_main, fixes_flaky)"
-        " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, ?, NULL, NULL, 0, 0, ?, ?, ?, ?, ?)",
+        " needs_ask_answer, needs_human_pr_review, fixes_main, fixes_flaky, adventurer)"
+        " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, ?, NULL, NULL, 0, 0, ?, ?, ?, ?, ?, ?)",
         (
             payload["repo"],
             payload["number"],
@@ -257,6 +257,7 @@ def _pr_tracked(conn, event):
             values["needs_human_pr_review"],
             values["fixes_main"],
             values["fixes_flaky"],
+            payload.get("adventurer"),
         ),
     )
 
@@ -594,11 +595,28 @@ _WAIT_STATUS = {
 }
 
 
+def _adventurer_started(conn, event):
+    payload = event["payload"]
+    conn.execute(
+        "INSERT INTO adventurers (id, session_id, project, job, task, state, pending, started_at, done_at)"
+        " VALUES (?, ?, ?, ?, ?, 'active', NULL, ?, NULL)",
+        (payload["id"], event["session_id"], event["project"], payload["job"], payload["task"], event["ts"]),
+    )
+
+
+def _adventurer_done(conn, event):
+    payload = event["payload"]
+    conn.execute(
+        "UPDATE adventurers SET state = 'done', pending = ?, done_at = ? WHERE id = ?",
+        (payload["pending"], event["ts"], payload["id"]),
+    )
+
+
 def _set_session_status(conn, event, status, detail):
     conn.execute(
         "INSERT OR REPLACE INTO session_status (session_id, party, status, detail, since)"
         " VALUES (?, ?, ?, ?, ?)",
-        (event["session_id"], event["party"], status, detail, event["ts"]),
+        (event["session_id"], event["party"] or "", status, detail, event["ts"]),
     )
 
 
@@ -725,6 +743,8 @@ _REDUCERS = {
     "idea.created": _idea_created,
     "idea.edited": _idea_edited,
     "idea.deleted": _idea_deleted,
+    "adventurer.started": _adventurer_started,
+    "adventurer.done": _adventurer_done,
     "claim.created": _claim_created,
     "claim.released": _claim_released,
     "raid.joined": _raid_joined,
