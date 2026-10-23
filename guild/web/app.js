@@ -1624,6 +1624,36 @@ var NO_SESSION_MESSAGE = "session token not loaded, reload the page";
     appendAll(section, adventurers.map(renderAdventurer));
   }
 
+  function healthJobMeta(job) {
+    var parts = [job.project, job.state, "every " + job.every];
+    parts.push("last done " + (job.last_done === null ? "never" : job.last_done));
+    return parts.join(" \u00b7 ");
+  }
+
+  function renderHealthJob(job) {
+    var article = el("article");
+    article.className = "card health-job";
+    article.appendChild(textEl("h3", job.name));
+    article.appendChild(classedText("p", healthJobMeta(job), "muted"));
+    if (job.state === "due") {
+      article.appendChild(classedText("code", job.launch, "launch-command"));
+    }
+    return article;
+  }
+
+  function renderHealthJobs(jobs) {
+    var section = document.getElementById("health-jobs");
+    clear(section);
+    var pending = jobs.filter(function (job) {
+      return job.state !== "ok";
+    });
+    if (pending.length === 0) {
+      return;
+    }
+    section.appendChild(textEl("h2", "health jobs (" + pending.length + ")"));
+    appendAll(section, pending.map(renderHealthJob));
+  }
+
   function renderMemoryItem(item) {
     var article = el("article");
     article.className = "card memory";
@@ -2612,6 +2642,7 @@ var NO_SESSION_MESSAGE = "session token not loaded, reload the page";
       generated_at: data.generated_at,
       ideas: data.ideas,
       adventurers: data.adventurers,
+      health_jobs: data.health_jobs,
       asks: data.asks.filter(function (ask) {
         return ask.party === state.partyFilter;
       }),
@@ -2682,6 +2713,7 @@ var NO_SESSION_MESSAGE = "session token not loaded, reload the page";
       generated_at: data.generated_at,
       ideas: data.ideas,
       adventurers: data.adventurers,
+      health_jobs: data.health_jobs,
       asks: data.asks.filter(function (ask) {
         return members.indexOf(ask.party) !== -1;
       }),
@@ -2989,6 +3021,7 @@ var NO_SESSION_MESSAGE = "session token not loaded, reload the page";
     renderSection("notices", [filtered.notices, filtered.projects, filtered.raids], renderNotices, onlyIfChanged);
     renderSection("ideas", [filtered.ideas, data.project_names, activePartyNames(data.parties)], renderIdeas, onlyIfChanged);
     renderSection("adventurers", [filtered.adventurers], renderAdventurers, onlyIfChanged);
+    renderSection("health-jobs", [filtered.health_jobs], renderHealthJobs, onlyIfChanged);
     renderSection("memory", [filtered.memory], renderMemory, onlyIfChanged);
     renderSection("raids", [filtered.raids], renderRaids, onlyIfChanged);
     renderSection("merge-queues", [filtered.merge_queues], renderMergeQueues, onlyIfChanged);

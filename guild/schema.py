@@ -380,6 +380,7 @@ _COLUMN_MIGRATIONS = (
     ("prs", "needs_human_pr_review", "INTEGER"),
     ("prs", "card", "TEXT"),
     ("prs", "adventurer", "INTEGER"),
+    ("adventurers", "health_job", "TEXT"),
     ("asks", "snapshot", "TEXT"),
     ("asks", "answered_at", "TEXT"),
     ("leaders", "handoff_consumed_at", "TEXT"),

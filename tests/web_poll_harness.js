@@ -40,7 +40,7 @@ async function run({ src, scenario }) {
   const idea = { id: 1, title: "Dark mode", description: "night owls", requester: null, deadline: null,
     project: null, overdue: false, parties: [] };
   let board = { generated_at: "now", parties: [], raids: [], asks: [], blocked: [], notices: [], projects: [],
-    memory: [], merge_queues: [], drift: [], ready_for_you: [], ideas: [], adventurers: [], project_names: [] };
+    memory: [], merge_queues: [], drift: [], ready_for_you: [], ideas: [], adventurers: [], health_jobs: [], project_names: [] };
   const intervals = [];
   const ctx = { document: doc, window: {}, console, setTimeout,
     setInterval(fn) { intervals.push(fn); },

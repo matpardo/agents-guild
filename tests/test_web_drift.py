@@ -80,7 +80,7 @@ def _render(board, party_filter, raid_filter, out_id, mode):
 
 _MISSING = object()
 _BOARD = {
-    "generated_at": "now", "asks": [], "notices": [], "ideas": [], "adventurers": [], "project_names": [], "memory": [], "blocked": [], "merge_queues": [], "ready_for_you": [],
+    "generated_at": "now", "asks": [], "notices": [], "ideas": [], "adventurers": [], "health_jobs": [], "project_names": [], "memory": [], "blocked": [], "merge_queues": [], "ready_for_you": [],
     "projects": [], "quest_boards": [], "raids": [{"name": "r", "members": ["c"]}],
     "parties": [
         {
@@ -207,6 +207,37 @@ class WebMainRowBehaviorTests(unittest.TestCase):
         text = self._text("billing")
         self.assertIn("MAIN BLOCKED (billing) o/r \u2192 re-run main once billing is fixed", text)
         self.assertNotIn("MAIN RED", text)
+
+
+def _health_job(**overrides):
+    job = {"project": "acme", "name": "red-main", "state": "due", "last_done": None, "every": "1d",
+           "launch": "guild adventurer launch red-main"}
+    return dict(job, **overrides)
+
+
+@unittest.skipIf(shutil.which("node") is None, "node not installed")
+class WebHealthJobBehaviorTests(unittest.TestCase):
+    def _text(self, jobs, party_filter="all"):
+        return _render(dict(_BOARD, health_jobs=jobs), party_filter, "all", "health-jobs", "text")
+
+    def test_due_job_shows_the_launch_command(self):
+        out = self._text([_health_job()])
+        for expected in ("red-main", "due", "acme", "guild adventurer launch red-main", "never"):
+            self.assertIn(expected, out)
+
+    def test_running_job_shows_running_without_launch_command(self):
+        out = self._text([_health_job(state="running")])
+        self.assertIn("running", out)
+        self.assertNotIn("guild adventurer launch", out)
+
+    def test_ok_job_is_hidden(self):
+        self.assertEqual(self._text([_health_job(state="ok", last_done="2026-10-23T00:00:00+00:00")]), "")
+
+    def test_jobs_survive_the_party_filter(self):
+        self.assertIn("red-main", self._text([_health_job()], "a"))
+
+    def test_there_is_no_launch_post_from_the_web(self):
+        self.assertNotIn("/api/health", _APP_JS)
 
 
 def _adventurer(**overrides):

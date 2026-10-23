@@ -431,7 +431,15 @@ def _handle_ideas(ctx, args):
 def _handle_adventurer_start(ctx, args):
     from guild.commands import adventurer as adventurer_commands
 
-    _print(adventurer_commands.start(ctx, args.job, args.task))
+    _print(adventurer_commands.start(ctx, args.job, args.task, args.health_job))
+    return 0
+
+
+def _handle_adventurer_launch(ctx, args):
+    from guild import tmux_windows
+    from guild.commands import adventurer as adventurer_commands
+
+    _print(adventurer_commands.launch(ctx, args.name, tmux_windows.Tmux()))
     return 0
 
 
@@ -1057,9 +1065,14 @@ def _add_adventurer_parser(subparsers):
     actions = parser.add_subparsers(dest="adventurer_action", required=True, metavar="<subcommand>")
 
     start = actions.add_parser("start", help="register this session as an adventurer")
-    start.add_argument("job", help="what this session does")
+    start.add_argument("job", nargs="?", help="what this session does; omit with --job")
     start.add_argument("--task", help="synced SDD task as <epic>/<tid>")
+    start.add_argument("--job", dest="health_job", help="health job of the project config, instead of a job text")
     start.set_defaults(handler=_handle_adventurer_start)
+
+    launch = actions.add_parser("launch", help="open a tmux window running a health job (human terminal only)")
+    launch.add_argument("name", help="health job name")
+    launch.set_defaults(handler=_handle_adventurer_launch)
 
     done = actions.add_parser("done", help="end the adventurer and report what is pending")
     done.add_argument("--pending", required=True, help="what is left to do, or none")
@@ -1475,6 +1488,7 @@ def _run_stateful_hook(hook_name, stdin_data):
             text = hook_commands.session_start(
                 ctx,
                 os.environ.get("GUILD_RESUME") or None,
+                os.environ.get("GUILD_ADVENTURER_JOB") or None,
                 stdin_data.get("permission_mode"),
                 stdin_data.get("source"),
             )
