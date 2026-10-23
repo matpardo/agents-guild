@@ -2,7 +2,7 @@
 epic: health-adventurers
 type: spec
 title: Health jobs the human launches as adventurers
-status: draft
+status: done
 owner: matpardo
 created: 2026-10-23
 updated: 2026-10-23
@@ -34,9 +34,9 @@ Keeping a project healthy (red main, flaky tests, SDD and tracker drift, depende
 
 ## Success criteria
 
-- [ ] An invalid `health_jobs` entry fails to load the project config.
-- [ ] A job past its `every` shows as due in the CLI and the web, and stops being due after an adventurer on it reports.
-- [ ] No code path launches a health job without a human command.
+- [x] An invalid `health_jobs` entry fails to load the project config.
+- [x] A job past its `every` shows as due in the CLI and the web, and stops being due after an adventurer on it reports.
+- [x] No code path launches a health job without a human command.
 
 ## Security and data
 

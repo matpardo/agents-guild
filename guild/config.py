@@ -231,6 +231,36 @@ def _validate_lifecycle_config(data):
         _validate_lifecycle_entry(event, entry)
 
 
+def _validate_health_job(job):
+    if not isinstance(job, dict) or set(job) != {"name", "command", "every"}:
+        raise GuildError("entries must be objects with exactly 'name', 'command' and 'every'", 1)
+    if not isinstance(job["name"], str) or not job["name"]:
+        raise GuildError("'name' must be a non-empty string", 1)
+    names.validate_name(job["name"], "health job name")
+    command = job["command"]
+    if not isinstance(command, str) or not command.strip() or command.startswith("-"):
+        raise GuildError("'command' must be a non-empty string that does not start with '-'", 1)
+    if not isinstance(job["every"], str):
+        raise GuildError("'every' must be a duration like 12h or 3d", 1)
+    timeutil.parse_duration(job["every"])
+
+
+def _validate_health_jobs_config(data):
+    jobs = data.get("health_jobs")
+    if jobs is None:
+        return
+    if not isinstance(jobs, list):
+        raise GuildError("project config 'health_jobs' must be a list", 1)
+    for job in jobs:
+        try:
+            _validate_health_job(job)
+        except GuildError as error:
+            raise GuildError("project config 'health_jobs': {}".format(error.message), 1)
+    job_names = [job["name"] for job in jobs]
+    if len(set(job_names)) != len(job_names):
+        raise GuildError("project config 'health_jobs' names must be unique", 1)
+
+
 def validate_project_config(data):
     for key in _REQUIRED_KEYS:
         if key not in data:
@@ -255,6 +285,7 @@ def validate_project_config(data):
     _validate_next_config(data)
     _validate_human_ready_config(data)
     _validate_handoff_retention_config(data)
+    _validate_health_jobs_config(data)
     _validate_max_open_prs_config(data, "max_open_prs")
     _validate_max_open_prs_config(data, "max_open_prs_per_party")
     _validate_max_open_prs_config(data, "max_open_prs_per_file")

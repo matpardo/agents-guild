@@ -621,9 +621,17 @@ _WAIT_STATUS = {
 def _adventurer_started(conn, event):
     payload = event["payload"]
     conn.execute(
-        "INSERT INTO adventurers (id, session_id, project, job, task, state, pending, started_at, done_at)"
-        " VALUES (?, ?, ?, ?, ?, 'active', NULL, ?, NULL)",
-        (payload["id"], event["session_id"], event["project"], payload["job"], payload["task"], event["ts"]),
+        "INSERT INTO adventurers (id, session_id, project, job, task, health_job, state, pending, started_at, done_at)"
+        " VALUES (?, ?, ?, ?, ?, ?, 'active', NULL, ?, NULL)",
+        (
+            payload["id"],
+            event["session_id"],
+            event["project"],
+            payload["job"],
+            payload["task"],
+            payload.get("health_job"),
+            event["ts"],
+        ),
     )
 
 

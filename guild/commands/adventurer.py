@@ -1,4 +1,8 @@
-from guild import config, db, events, identity, pii, refs
+import glob
+import os
+from pathlib import Path
+
+from guild import config, db, events, health_jobs, identity, pii, refs, resume, tmux_windows
 from guild.commands import quest as quest_commands
 from guild.errors import GuildError
 from guild.ids import next_id
@@ -60,11 +64,24 @@ def _validate_text(ctx, project, name, value, limit):
     pii.validate_field(value, name, limit, pii.project_patterns(ctx.projects_dir, project))
 
 
-def start(ctx, job, task):
+def _resolve_start_job(job, task, health_job):
+    if health_job is None:
+        if job is None:
+            raise GuildError("adventurer start requires a job text or --job <name>", 1)
+        return job
+    if job is not None or task is not None:
+        raise GuildError("--job cannot be combined with a job text or --task", 1)
+    return health_job
+
+
+def start(ctx, job, task, health_job):
     if ctx.session_id is None:
         raise GuildError("adventurer start requires a Claude Code session", 1)
+    job = _resolve_start_job(job, task, health_job)
     _require_free_session(ctx.conn, ctx.session_id)
     project = config.require_project(ctx.cwd, ctx.projects_dir)
+    if health_job is not None:
+        health_jobs.require_job(config.load_project(ctx.projects_dir, project), health_job)
     _validate_text(ctx, project, "adventurer job", job, pii.ADVENTURER_JOB_MAX_LENGTH)
     _validate_task(ctx, project, task)
     adventurer_id = next_id(ctx.conn, "adventurers")
@@ -78,9 +95,43 @@ def start(ctx, job, task):
             project,
             "adventurer.started",
             "local",
-            {"id": adventurer_id, "job": job, "task": task},
+            {"id": adventurer_id, "job": job, "task": task, "health_job": health_job},
         )
     return "adventurer {} started".format(adventurer_id)
+
+
+def _first_path(project_data):
+    pattern = os.path.expanduser(project_data["paths"][0])
+    parts = []
+    for part in Path(pattern).parts:
+        if glob.has_magic(part):
+            break
+        parts.append(part)
+    return str(Path(*parts))
+
+
+def launch(ctx, job_name, tmux):
+    if ctx.session_id is not None:
+        raise GuildError("adventurer launch runs from the human terminal, not inside a Claude Code session", 1)
+    project = config.require_project(ctx.cwd, ctx.projects_dir)
+    project_data = config.load_project(ctx.projects_dir, project)
+    job = health_jobs.require_job(project_data, job_name)
+    cwd = _first_path(project_data)
+    if not os.path.isdir(cwd):
+        raise GuildError("project path '{}' does not exist".format(cwd), 1)
+    if not tmux.installed():
+        raise GuildError("tmux not found: install tmux (e.g. sudo apt install tmux)", 1)
+    session_is_up = tmux_windows.session_exists(tmux)
+    window_name = "health-" + job_name
+    if session_is_up and window_name in tmux_windows.window_names(tmux):
+        raise GuildError("window '{}' already exists".format(window_name), 1)
+    command = resume.health_command(job_name, job["command"])
+    window_id = tmux_windows.create_window(tmux, window_name, cwd, command, session_is_up)
+    if window_id is None:
+        raise GuildError("tmux could not create the window", 1)
+    tmux_windows.pin_window_name(tmux, window_id)
+    tmux_windows.set_session_options(tmux)
+    return "launched {} in {}: tmux attach -t {}".format(job_name, cwd, tmux_windows.SESSION)
 
 
 def done(ctx, pending):

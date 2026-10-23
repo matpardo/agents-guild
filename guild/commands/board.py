@@ -2,7 +2,7 @@ import json
 import shlex
 import textwrap
 
-from guild import config, ctx_pressure, identity, links, merge_queue, party_progress, party_status, party_waits, pii, pr_asks, resume
+from guild import config, ctx_pressure, health_jobs, identity, links, merge_queue, party_progress, party_status, party_waits, pii, pr_asks, resume
 from guild import paths, sanitize, session_info, session_status, timeutil
 from guild.commands import brief as brief_commands
 from guild.commands import claim as claim_commands
@@ -823,6 +823,13 @@ def _adventurer_lines(ctx, painter):
     return lines
 
 
+def _health_job_lines(painter, projects_by_name, ctx):
+    pending = health_jobs.pending_lines(health_jobs.models(ctx, projects_by_name))
+    if not pending:
+        return []
+    return [painter.paint("HEALTH JOBS · {}".format(len(pending)), "bold"), *pending, ""]
+
+
 def _party_rows_for_names(conn, party_names):
     if not party_names:
         return []
@@ -897,6 +904,7 @@ def render_board(ctx, party_filter, raid_filter, color, width):
     projects_by_name = {project["name"]: project for project in config.load_all_projects(ctx.projects_dir)}
     if party_filter is None and raid_filter is None:
         lines.extend(_adventurer_lines(ctx, painter))
+        lines.extend(_health_job_lines(painter, projects_by_name, ctx))
     lines.extend(_project_lines(ctx, painter, party_rows, projects_by_name))
     lines.extend(_quest_board_lines(ctx, painter, projects_by_name))
     for party_row in party_rows:
@@ -1179,6 +1187,7 @@ def board_model(ctx):
         "adventurers": [
             _adventurer_model(ctx, row, live_ids, projects_by_name) for row in _adventurer_rows(ctx.conn)
         ],
+        "health_jobs": health_jobs.models(ctx, projects_by_name),
         "memory": [
             _memory_item_model(item)
             for item in memory_commands.all_items(None)

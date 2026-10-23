@@ -177,6 +177,8 @@ guild idea unlink <id> [--party <name>]
 guild ideas [<id> | --project <name>]   # sorted by deadline, no deadline last; overdue marked; <id> shows one in full
 
 guild adventurer start "<job>" [--task <epic>/<tid>]   # this session becomes an adventurer; never a party leader
+guild adventurer start --job <name>                     # the same for a health job of the project config; no job text, no --task
+guild adventurer launch <name>                          # human terminal only: tmux window running a health job in the project's first path
 guild adventurer done --pending "<text>"                # ends it; `--pending none` is the explicit empty report
 guild adventurer dismiss <id>                           # removes a done adventurer from the board
 guild adventurers [<id>]                                # active ones, then recent done ones; <id> shows one in full
@@ -1269,6 +1271,34 @@ The same flag marks an active party whose leader session is gone without a
 `guild handoff` (the party is not `awaiting-leader`), in the CLI board and as a
 pill on the web party card.
 
+### Health jobs
+
+`health_jobs` in the project config (see "Project config") names recurring
+jobs. A job is `due` when no adventurer on it has reported (`done`, dismissed
+or not) or the latest report is older than `every`; it is `running` while an
+adventurer on it is active, and `ok` otherwise. This is computed on read from
+the adventurers table: nothing runs on a timer and nothing launches by itself.
+
+`guild board` lists due and running jobs per project in a `HEALTH JOBS` section
+(hidden under `--party` and `--raid`) and the web shows the same in `health
+jobs`; a due job carries the command to run, `guild adventurer launch <name>`,
+as text to copy. The web has no launch button.
+
+`guild adventurer launch <name>` is for the human terminal and refuses inside a
+Claude Code session. Run from a checkout of the project, it opens a tmux window
+named `health-<name>` in the first entry of the project's `paths` (the part
+before the first glob character) and runs `claude` there with the job's
+`command` as the first prompt, quoted for the shell the same way `guild revive`
+quotes its commands, and with `GUILD_ADVENTURER_JOB=<name>` in that process's
+environment. It refuses when tmux is missing or the window already exists.
+
+The `SessionStart` hook reads `GUILD_ADVENTURER_JOB`: in a new (`startup`)
+session that is not a party leader or an adventurer yet, it starts the
+adventurer for that job, the same function as `guild adventurer start --job
+<name>`. When it cannot, the hook output says why (`GUILD_ADVENTURER_JOB=<name>
+not applied: ...`). `start --job` takes the job name as the adventurer's job
+text and refuses a job text, `--task` or a name missing from `health_jobs`.
+
 ### Marking notices seen
 
 `guild notice seen <id>` marks an active notice as seen so new messages stand
@@ -1970,7 +2000,11 @@ generation after it too.
   "lifecycle": {
     "on_pr_merged": {"command": ["scripts/cleanup-merged.sh", "--dry-run"], "timeout_minutes": 30},
     "on_pr_closed": {"command": ["scripts/cleanup-merged.sh"], "timeout_minutes": 30}
-  }
+  },
+  "health_jobs": [
+    {"name": "red-main", "command": "/check-main", "every": "1d"},
+    {"name": "drift", "command": "/check-drift", "every": "3d"}
+  ]
 }
 ```
 
@@ -2005,6 +2039,7 @@ All keys. The loader rejects a wrong type with a clear error for every key excep
 - `shared_area_claim_ttl` (duration `30m`/`8h`/`3d`, required with `shared_areas`): the TTL the guards claim a matched area for.
 - `migration_paths` (list of globs, absent: the migration clash check is skipped and no extra `gh` call is made): matched with `fnmatch` against changed file paths, e.g. `db/migrate/*`. See "Migration version clash" under `sync`.
 - `fast_forward_base` (boolean, absent or `false`: no clone is ever modified): `true` makes `sync --source gh` fast-forward the local base branch of merged repos (see "Base branch fast-forward" under `sync`).
+- `health_jobs` (list of `{"name", "command", "every"}`, absent: no jobs): recurring jobs that keep the project healthy (see "Health jobs"). `name` is a unique slug, `command` a non-empty string that does not start with `-`, the prompt or skill the job's session runs first, and `every` a duration like `30m`, `12h` or `3d`. Any other shape fails to load with an error naming `health_jobs`.
 - `lifecycle` (object, absent: no command ever runs): commands run on PR lifecycle events (see "Lifecycle commands"). Keys are `on_pr_merged` and `on_pr_closed`, any other key fails to load. Each value has exactly `command` (non-empty list of non-empty strings, never a shell string) and `timeout_minutes` (integer from 1 to 1440, required).
 
 ### SDD parsing rules

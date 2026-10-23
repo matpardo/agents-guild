@@ -10,6 +10,7 @@ from pathlib import Path
 
 from guild import config, ctx_pressure, db, identity, localbase, names, paths, session_status, timeutil, tmux_windows
 from guild.adapters import github
+from guild.commands import adventurer as adventurer_commands
 from guild.commands import brief as brief_commands
 from guild.commands import claim as claim_commands
 from guild.commands import inbox as inbox_commands
@@ -108,6 +109,19 @@ def _auto_resume_lines(ctx, resume_party, permission_mode):
     if row["state"] != "awaiting-leader":
         return ["{}: party is {}".format(label, row["state"])]
     return [party_commands.resume(ctx, resume_party, None, permission_mode).splitlines()[0]]
+
+
+def _auto_adventurer_lines(ctx, health_job, source):
+    if health_job is None or source != "startup":
+        return []
+    if identity.resolve_binding(ctx.conn, ctx.session_id) is not None:
+        return []
+    if identity.resolve_adventurer(ctx.conn, ctx.session_id) is not None:
+        return []
+    try:
+        return [adventurer_commands.start(ctx, None, None, health_job)]
+    except GuildError as error:
+        return ["GUILD_ADVENTURER_JOB={} not applied: {}".format(health_job, error.message)]
 
 
 def _membership_warning_marker_path(ctx, raid_name, expires_at):
@@ -234,8 +248,9 @@ def notification(ctx, notification_type, message, push_runner):
     _run_push(ctx, binding, wait, push_runner)
 
 
-def session_start(ctx, resume_party, permission_mode, source):
+def session_start(ctx, resume_party, health_job, permission_mode, source):
     lines = _auto_resume_lines(ctx, resume_party, permission_mode)
+    lines.extend(_auto_adventurer_lines(ctx, health_job, source))
     binding = identity.resolve_binding(ctx.conn, ctx.session_id)
     if binding is not None:
         party_commands.locate_if_changed(ctx, binding, permission_mode)

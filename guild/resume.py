@@ -32,6 +32,12 @@ def fresh_command(party, next_generation, model, permission_mode, prompt):
     )
 
 
+def health_command(job_name, prompt):
+    return "GUILD_ADVENTURER_JOB={} claude -n {} {}".format(
+        shlex.quote(job_name), shlex.quote("health-" + job_name), shlex.quote(prompt)
+    )
+
+
 def tab_command(party, cwd, command):
     return "printf '\\033]0;%s\\007' {} && cd {} && {}".format(
         shlex.quote(party), shlex.quote(cwd), command
