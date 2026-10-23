@@ -3,7 +3,7 @@ epic: ideas
 type: tasks
 title: Ideas backlog
 status: done
-updated: 2026-10-21
+updated: 2026-10-23
 ---
 
 # Tasks: Ideas backlog
@@ -47,3 +47,15 @@ updated: 2026-10-21
 
 **Acceptance:**
 - [x] The deadline input is a text field asking for `YYYY-MM-DD`, and the select lists all registered projects with a `no project` choice.
+
+## T05 — Link ideas to parties
+
+**Depends on:** T01
+**Status:** [x] done — #203
+
+**What:** `guild idea link|unlink` and `POST /api/ideas/<id>/link|unlink` tie an idea to the parties working on it; `guild ideas`, `guild board` and the web show both sides, and `GUILD.md` tells a party to link the idea it starts from.
+
+**Acceptance:**
+- [x] A session links and unlinks its own party; the human terminal passes `--party`; unknown or closed parties, unknown ideas and double links are refused.
+- [x] `guild ideas` shows `worked by:` and the party block in `guild board` lists its ideas, and the links survive `guild rebuild` and vanish with the idea.
+- [x] The web links and unlinks through the same functions as the CLI.

@@ -62,3 +62,33 @@ class WebIdeaTests(WebWriteTestCase):
         headers["Origin"] = "http://evil.example"
         self.assertEqual(self._post_json("/api/ideas/create", headers, body)[0].status, 403)
         self.assertEqual(self._ideas(), [])
+
+
+class WebIdeaLinkTests(WebWriteTestCase):
+    def setUp(self):
+        super().setUp()
+        self._post_json("/api/ideas/create", self._good_headers(), {"title": "Dark mode", "description": "d"})
+
+    def _link(self, action, **data):
+        return self._post_json("/api/ideas/1/" + action, self._good_headers(), data)
+
+    def _board(self):
+        return json.loads(self._get("/api/board", self._host())[1])
+
+    def test_link_and_unlink(self):
+        response, payload = self._link("link", party="alpha")
+        self.assertEqual(response.status, 200, payload)
+        board = self._board()
+        self.assertEqual(board["ideas"][0]["parties"], [{"name": "alpha", "state": "active"}])
+        self.assertEqual(board["parties"][0]["ideas"], [{"id": 1, "title": "Dark mode"}])
+        response, payload = self._link("unlink", party="alpha")
+        self.assertEqual(response.status, 200, payload)
+        self.assertEqual(self._board()["ideas"][0]["parties"], [])
+
+    def test_refusals_are_422_and_bad_types_400(self):
+        self.assertEqual(self._link("link", party="ghost")[0].status, 422)
+        self._link("link", party="alpha")
+        self.assertEqual(self._link("link", party="alpha")[0].status, 422)
+        self.assertEqual(self._link("unlink", party="zeta")[0].status, 422)
+        self.assertEqual(self._link("link", party=3)[0].status, 400)
+        self.assertEqual(self._link("link")[0].status, 400)

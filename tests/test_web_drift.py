@@ -86,7 +86,7 @@ _BOARD = {
         {
             "name": name, "raids": [], "quests": [], "prs": [], "claims": [], "state": "active", "generation": 1,
             "status": {"name": "idle", "label": "idle"}, "remaining": {"all_done": True}, "ctx": None,
-            "resume_command": None, "caps": None, "drift": {"findings": [], "more": 0}, "leader_session_name": None, "waits": [],
+            "resume_command": None, "caps": None, "drift": {"findings": [], "more": 0}, "leader_session_name": None, "waits": [], "ideas": [],
         }
         for name in ("a", "c")
     ],
@@ -275,6 +275,7 @@ class WebNoticeAndRaidBehaviorTests(unittest.TestCase):
         idea = {
             "id": 1, "title": "Dark mode", "description": "night owls", "requester": "ana",
             "deadline": "2000-01-01", "project": "acme", "created_at": "now", "overdue": True,
+            "parties": [],
         }
         return dict(idea, **overrides)
 
@@ -283,6 +284,34 @@ class WebNoticeAndRaidBehaviorTests(unittest.TestCase):
         out = self._rendered(board, "ideas")
         for expected in ("#1 Dark mode", "night owls", "from ana", "due 2000-01-01 (overdue)", "Edit", "Delete", "Add idea"):
             self.assertIn(expected, out)
+
+    def test_idea_shows_linked_parties_with_unlink_and_link_choices(self):
+        idea = self._idea(parties=[{"name": "a", "state": "active"}, {"name": "old", "state": "closed"}])
+        board = dict(self._board(False), ideas=[idea])
+        out = self._rendered(board, "ideas")
+        for expected in ("worked by:", "a", "old (closed)", "Unlink", "Link"):
+            self.assertIn(expected, out)
+        tree = json.loads(_render(board, "all", "all", "ideas", "tree"))
+        selects = []
+
+        def walk(node):
+            if node["tag"] == "select":
+                selects.append([child["text"] for child in node["children"]])
+            for child in node["children"]:
+                walk(child)
+
+        walk(tree)
+        self.assertIn(["c"], selects)
+
+    def test_idea_without_parties_has_no_worked_by(self):
+        out = self._rendered(dict(self._board(False), ideas=[self._idea()]), "ideas")
+        self.assertNotIn("worked by", out)
+        self.assertIn("Link", out)
+
+    def test_party_card_lists_its_ideas(self):
+        party = dict(_BOARD["parties"][0], ideas=[{"id": 1, "title": "Dark mode"}])
+        out = self._rendered(dict(_BOARD, parties=[party]), "parties")
+        self.assertIn("ideas: #1 Dark mode", out)
 
     def test_idea_not_overdue_has_no_overdue_mark(self):
         board = dict(self._board(False), ideas=[self._idea(overdue=False, deadline="2099-01-01")])

@@ -88,6 +88,82 @@ def delete(ctx, idea_id):
     return "idea #{} deleted".format(idea_id)
 
 
+def _require_open_party(ctx, party):
+    row = ctx.conn.execute("SELECT state FROM parties WHERE name = ?", (party,)).fetchone()
+    if row is None:
+        raise GuildError("unknown party '{}'".format(party), 1)
+    if row["state"] == "closed":
+        raise GuildError("party '{}' is closed".format(party), 1)
+
+
+def _is_linked(ctx, idea_id, party):
+    row = ctx.conn.execute(
+        "SELECT 1 FROM idea_links WHERE idea_id = ? AND party = ?", (idea_id, party)
+    ).fetchone()
+    return row is not None
+
+
+def link_for_party(ctx, idea_id, party):
+    _require_idea(ctx, idea_id)
+    _require_open_party(ctx, party)
+    if _is_linked(ctx, idea_id, party):
+        raise GuildError("idea #{} is already linked to party '{}'".format(idea_id, party), 1)
+    _record(ctx, "idea.linked", {"id": idea_id, "party": party})
+    return "idea #{} linked to party '{}'".format(idea_id, party)
+
+
+def unlink_for_party(ctx, idea_id, party):
+    _require_idea(ctx, idea_id)
+    if not _is_linked(ctx, idea_id, party):
+        raise GuildError("idea #{} is not linked to party '{}'".format(idea_id, party), 1)
+    _record(ctx, "idea.unlinked", {"id": idea_id, "party": party})
+    return "idea #{} unlinked from party '{}'".format(idea_id, party)
+
+
+def _resolve_party(ctx, party):
+    if ctx.session_id is None:
+        if party is None:
+            raise GuildError("pass --party <name>: no session to take the party from", 1)
+        return party
+    own_party = identity.require_binding(ctx.conn, ctx.session_id)["party"]
+    if party is not None and party != own_party:
+        raise GuildError("a session acts only for its own party '{}'".format(own_party), 1)
+    return own_party
+
+
+def link(ctx, idea_id, party):
+    return link_for_party(ctx, idea_id, _resolve_party(ctx, party))
+
+
+def unlink(ctx, idea_id, party):
+    return unlink_for_party(ctx, idea_id, _resolve_party(ctx, party))
+
+
+def linked_parties(ctx, idea_id):
+    return ctx.conn.execute(
+        "SELECT idea_links.party AS name, COALESCE(parties.state, 'closed') AS state"
+        " FROM idea_links LEFT JOIN parties ON parties.name = idea_links.party"
+        " WHERE idea_links.idea_id = ? ORDER BY idea_links.linked_at ASC, idea_links.party ASC",
+        (idea_id,),
+    ).fetchall()
+
+
+def linked_ideas(ctx, party):
+    return ctx.conn.execute(
+        "SELECT ideas.id AS id, ideas.title AS title FROM idea_links"
+        " JOIN ideas ON ideas.id = idea_links.idea_id WHERE idea_links.party = ? ORDER BY ideas.id ASC",
+        (party,),
+    ).fetchall()
+
+
+def _worked_by(ctx, idea_id):
+    parties = linked_parties(ctx, idea_id)
+    if not parties:
+        return []
+    labels = [row["name"] + (" (closed)" if row["state"] == "closed" else "") for row in parties]
+    return ["worked by: " + ", ".join(labels)]
+
+
 def is_overdue(now, deadline):
     return deadline is not None and deadline < now.date().isoformat()
 
@@ -105,14 +181,14 @@ def _list_line(ctx, row):
         parts.append("overdue")
     label = ", ".join(part for part in parts if part is not None)
     suffix = " ({})".format(label) if label else ""
-    return "#{} {}{}".format(row["id"], row["title"], suffix)
+    return ["#{} {}{}".format(row["id"], row["title"], suffix)] + ["  " + line for line in _worked_by(ctx, row["id"])]
 
 
 def list_ideas(ctx, project):
     rows = sorted_rows(ctx, project)
     if not rows:
         return ["no ideas"]
-    return [_list_line(ctx, row) for row in rows]
+    return [line for row in rows for line in _list_line(ctx, row)]
 
 
 def show(ctx, idea_id):
@@ -123,5 +199,6 @@ def show(ctx, idea_id):
             lines.append("{}: {}".format(label, row[label]))
     if is_overdue(ctx.now, row["deadline"]):
         lines.append("overdue")
+    lines.extend(_worked_by(ctx, idea_id))
     lines.append("created: {}".format(row["created_at"]))
     return lines
