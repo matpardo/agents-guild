@@ -2,7 +2,7 @@
 epic: adventurers
 type: spec
 title: Adventurers do one job and report what is pending
-status: draft
+status: active
 owner: matpardo
 created: 2026-10-23
 updated: 2026-10-23
@@ -20,11 +20,12 @@ Sessions outside a party leave no trace in guild: the human cannot see what they
 
 ## Scope
 
-- An adventurer is one session, one project and one job. The job is free text, one task of an open quest (`<quest>/<tid>`) or one synced SDD task (`<epic>/<tid>`).
-- `guild adventurer start "<job>" [--task <ref>]` registers the session; the project comes from the cwd. A task is claimed for the adventurer with the claims guild already has, so `quest add`, `quest take`, `claim check` and `guild next` skip it.
+- An adventurer is one session, one project and one job. The job is free text; it may be tied to one synced SDD task (`<epic>/<tid>`). Tasks of open quests come with `quest-board`.
+- `guild adventurer start "<job>" [--task <epic>/<tid>]` registers the session; the project comes from the cwd. The adventurer row holds the task, not a claim: `adventurer start` refuses an unknown task, a task in an active quest, a task under a live `task:<epic>/<tid>` claim and a task another active adventurer holds; `quest add`, `task add`, `claim` and `claim check` treat a task held by an active adventurer as taken.
 - `guild adventurer done --pending "<text>"` ends it; `--pending none` is the explicit empty report. The text passes the same checks as `--learned`.
 - `guild adventurers [id]` lists them; the web shows the same.
-- An adventurer may track its PRs (`--task <its task>` or `--card`), mark its own task done, post notices, add ideas, open asks and create open quests (see `quest-board`). It never takes or owns a quest, adds tasks or changes another task.
+- An adventurer may track its PRs (`--task <its task>` or `--card`; the PR records the adventurer), post notices, add ideas and open asks, and creates open quests once `quest-board` lands. It never takes or owns a quest, adds tasks or changes a task: its task is done when SDD says so. Any command that needs a party refuses it with "adventurers do one job; quests and tasks belong to parties".
+- A session is a party leader, an adventurer or unbound: `party start` and `party resume` refuse an active adventurer; `adventurer start` refuses a leader.
 - The Stop hook records `session.stopped` for adventurers too.
 - The board and the web list adventurers with job, live or stopped, PRs and pending report, and flag one that stopped without reporting. A party whose leader is gone without a handoff gets the same flag.
 - `guild party close` requires `--pending`.
@@ -46,4 +47,4 @@ Sessions outside a party leave no trace in guild: the human cannot see what they
 
 ## Security and data
 
-Adventurers are local events. Job and pending text go through the email, secret and project-pattern checks of other fields and never leave the CLI. Web writes need the session token like every other write. An adventurer's claims expire like any claim.
+Adventurers are local events. Job and pending text go through the email, secret and project-pattern checks of other fields and never leave the CLI. Web writes need the session token like every other write. An adventurer holds its task until `adventurer done`.

@@ -62,12 +62,26 @@ def _claim_holders(conn, now, project, epic, party):
     return holders
 
 
+def adventurer_holder(conn, project, epic, tid):
+    row = conn.execute(
+        "SELECT id FROM adventurers WHERE project = ? AND task = ? AND state = 'active'",
+        (project, "{}/{}".format(epic, tid)),
+    ).fetchone()
+    if row is None:
+        return None
+    return row["id"]
+
+
 def reject_taken_tasks(conn, now, project, epic, tasks, party):
     quest_holders = _quest_holders(conn, project, epic, party)
     claim_holders = _claim_holders(conn, now, project, epic, party)
     conflicts = []
     for task in tasks:
         tid = task["tid"]
+        adventurer_id = adventurer_holder(conn, project, epic, tid)
+        if adventurer_id is not None:
+            conflicts.append("{} is held by adventurer {}".format(tid, adventurer_id))
+            continue
         quest_holder = quest_holders.get(tid)
         if quest_holder is not None:
             conflicts.append(

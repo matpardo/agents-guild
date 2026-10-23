@@ -44,8 +44,7 @@ def _validate_fields(ctx, fields, project):
 
 
 def _record(ctx, kind, payload):
-    binding = identity.resolve_binding(ctx.conn, ctx.session_id)
-    actor_party = binding["party"] if binding is not None else None
+    actor_party, _ = identity.resolve_actor(ctx.conn, ctx.session_id)
     project = config.resolve_project(ctx.cwd, config.load_all_projects(ctx.projects_dir))
     with db.writing(ctx.conn):
         events.record(

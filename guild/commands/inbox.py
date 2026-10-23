@@ -28,7 +28,7 @@ def advance_cursor(conn, session_id, seq):
 def new_lines(ctx, binding):
     last_seq = _cursor_seq(ctx.conn, identity.cursor_key(ctx.session_id))
     new_events = events.events_after(ctx.conn, last_seq)
-    caller_party = binding["party"] if binding is not None else None
+    caller_party, _ = identity.resolve_actor(ctx.conn, ctx.session_id)
     project = binding["project"] if binding is not None else config.resolve_project(
         ctx.cwd, config.load_all_projects(ctx.projects_dir)
     )

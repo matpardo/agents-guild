@@ -3,11 +3,28 @@ from guild.errors import GuildError
 HUMAN_LABEL = "human"
 UNBOUND_SESSION_LABEL = "unbound session"
 
+ADVENTURER_LABEL = "adventurer {}"
+
 UNBOUND_HINT = (
     "session not bound: continuing a party's work \u2192 `guild party resume <party>`;"
-    " otherwise ask the human before `guild party start` or `guild quest add`"
-    " (one-off changes stay unbound)"
+    " otherwise ask the human whether the work is a party (`guild party start <name>`)"
+    " or an adventurer (`guild adventurer start \"<job>\"`) before working on a registered project"
 )
+ADVENTURER_REFUSAL = "adventurers do one job; quests and tasks belong to parties"
+
+
+def adventurer_label(adventurer_id):
+    return ADVENTURER_LABEL.format(adventurer_id)
+
+
+def resolve_adventurer(conn, session_id):
+    if session_id is None:
+        return None
+    return conn.execute(
+        "SELECT id, project, job, task FROM adventurers WHERE session_id = ? AND state = 'active'"
+        " ORDER BY id DESC",
+        (session_id,),
+    ).fetchone()
 
 
 def resolve_binding(conn, session_id):
@@ -38,9 +55,18 @@ def double_bindings(conn, project):
 
 def require_binding(conn, session_id):
     binding = resolve_binding(conn, session_id)
-    if binding is None:
-        raise GuildError(UNBOUND_HINT, 1)
-    return binding
+    if binding is not None:
+        return binding
+    if resolve_adventurer(conn, session_id) is not None:
+        raise GuildError(ADVENTURER_REFUSAL, 1)
+    raise GuildError(UNBOUND_HINT, 1)
+
+
+def require_actor(conn, session_id):
+    adventurer = resolve_adventurer(conn, session_id)
+    if adventurer is not None:
+        return adventurer_label(adventurer["id"])
+    return require_binding(conn, session_id)["party"]
 
 
 def cursor_key(session_id):
@@ -55,6 +81,9 @@ def resolve_actor(conn, session_id):
     binding = resolve_binding(conn, session_id)
     if binding is not None:
         return binding["party"], False
+    adventurer = resolve_adventurer(conn, session_id)
+    if adventurer is not None:
+        return adventurer_label(adventurer["id"]), False
     return None, True
 
 

@@ -31,6 +31,9 @@ are updated in the same PR as the code.
   person).
 - **party** — a durable work lineage that survives session handoffs. Session
   names change; the party does not. Owns quests, PRs and claims.
+- **adventurer** — one session doing one job on one project: a synced SDD
+  task or a one-off change. No generations, no handoff; it ends with `guild
+  adventurer done --pending`. Never owns a quest.
 - **leader** — the live session of a party: zero or one. An attribute of
   `party`, not a command of its own.
 - **generation** — one session of a party; a handoff or `guild revive` starts
@@ -164,6 +167,10 @@ guild idea add "<title>" --description "<text>" [--requester <text>] [--deadline
 guild idea edit <id> [--title ..] [--description ..] [--requester ..|--no-requester] [--deadline ..|--no-deadline] [--project ..|--no-project]
 guild idea delete <id>
 guild ideas [<id> | --project <name>]   # sorted by deadline, no deadline last; overdue marked; <id> shows one in full
+
+guild adventurer start "<job>" [--task <epic>/<tid>]   # this session becomes an adventurer; never a party leader
+guild adventurer done --pending "<text>"                # ends it; `--pending none` is the explicit empty report
+guild adventurers [<id>]                                # active ones, then recent done ones; <id> shows one in full
 
 guild claim <area> --ttl <dur>          # area, or task:<epic>/<tid> / task:<quest>/<tid>
 guild claim check <area>                # read-only, no event; exit 0 free/yours, exit 1 someone else's
@@ -1200,6 +1207,36 @@ run the same functions as the CLI; invalid input answers `422` with the
 message, a wrong type `400`. The project select lists every registered
 project, and the deadline is typed as `YYYY-MM-DD`.
 
+### Adventurers
+
+An adventurer is one session doing one job on one project: `guild adventurer
+start "<job>"` registers the session (the project comes from the cwd and must
+be registered), and `--task <epic>/<tid>` ties it to one synced SDD task. A
+session is a party leader, an adventurer or unbound, never two: `adventurer
+start` refuses a session that leads a party or is already an adventurer, and
+`party start` / `party resume` refuse an active adventurer.
+
+`--task` refuses an unknown task, a task in an active quest, a task under a
+live `task:<epic>/<tid>` claim and a task another active adventurer holds.
+The adventurer does not take a claim: its row holds the task, and `quest add`,
+`task add`, `guild claim task:...` and `guild claim check task:...` treat it as
+taken (`held by adventurer <id>`) until the adventurer is done.
+
+`guild adventurer done --pending "<text>"` ends it. `--pending` is required;
+`none` is the explicit empty report. The text goes through the same email,
+secret and project-pattern checks as `handoff --learned`. `guild adventurers`
+lists the active adventurers and the ten most recent finished ones with job,
+task, project, state and pending report; `guild adventurers <id>` shows one.
+
+An adventurer can track its PRs (`guild pr track ... --card <KEY>`, or `--task`
+equal to its own `<epic>/<tid>`; the PR records the adventurer and an empty
+party), post notices, add ideas and open asks (labelled `adventurer <id>`), and
+the Stop hook records `session.stopped` for it like for a leader. Any command
+that needs a party (quests, tasks, handoff, claims, `next`) refuses with
+`adventurers do one job; quests and tasks belong to parties`. An adventurer's
+task is done when the SDD says so. Adventurer ids, jobs and pending reports are
+local: do not copy them into PRs, commits or cards.
+
 ### Marking notices seen
 
 `guild notice seen <id>` marks an active notice as seen so new messages stand
@@ -2191,10 +2228,10 @@ permission prompt, which stalls the session until a human answers it.
 the opt-in binding commands above. A blanket `Bash(guild:*)` or
 `Bash(guild *)` entry also satisfies `guild doctor`.
 
-**Opt-in binding.** A session never needs a party: one-off changes stay
-unbound. The unbound hint only says to resume a party when the work continues
-one, and to ask the human before creating a party or a quest. The
-`permissions.ask` rules make Claude Code ask the human before every
+**Opt-in binding.** A session never needs a party. The unbound hint says to
+resume a party when the work continues one, and otherwise to ask the human
+whether the work is a party or an adventurer before working on a registered
+project. The `permissions.ask` rules make Claude Code ask the human before every
 `guild party start` and `guild quest add`, whatever the model decides.
 
 **Commit guard (git).** `pre-edit` only sees the Edit/Write family of tools.

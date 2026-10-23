@@ -10,6 +10,7 @@ PROJECTION_TABLES = (
     "asks",
     "notices",
     "ideas",
+    "adventurers",
     "claims",
     "raid_members",
     "raid_pauses",
@@ -187,6 +188,19 @@ _CREATE_STATEMENTS = (
     )
     """,
     """
+    CREATE TABLE IF NOT EXISTS adventurers (
+        id INTEGER PRIMARY KEY,
+        session_id TEXT NOT NULL,
+        project TEXT NOT NULL,
+        job TEXT NOT NULL,
+        task TEXT,
+        state TEXT NOT NULL,
+        pending TEXT,
+        started_at TEXT NOT NULL,
+        done_at TEXT
+    )
+    """,
+    """
     CREATE TABLE IF NOT EXISTS claims (
         project TEXT NOT NULL,
         area TEXT NOT NULL,
@@ -354,6 +368,7 @@ _COLUMN_MIGRATIONS = (
     ("prs", "needs_ask_answer", "INTEGER"),
     ("prs", "needs_human_pr_review", "INTEGER"),
     ("prs", "card", "TEXT"),
+    ("prs", "adventurer", "INTEGER"),
     ("asks", "snapshot", "TEXT"),
     ("asks", "answered_at", "TEXT"),
     ("leaders", "handoff_consumed_at", "TEXT"),
