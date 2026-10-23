@@ -92,6 +92,27 @@ def done(ctx, pending):
     return "adventurer {} done".format(adventurer["id"])
 
 
+def dismiss(ctx, adventurer_id):
+    row = ctx.conn.execute("SELECT project, state FROM adventurers WHERE id = ?", (adventurer_id,)).fetchone()
+    if row is None:
+        raise GuildError("unknown adventurer {}".format(adventurer_id), 1)
+    if row["state"] != "done":
+        raise GuildError("adventurer {} is {}, not done".format(adventurer_id, row["state"]), 1)
+    with db.writing(ctx.conn):
+        events.record(
+            ctx.conn,
+            ctx.now,
+            ctx.origin,
+            None,
+            ctx.session_id,
+            row["project"],
+            "adventurer.dismissed",
+            "local",
+            {"id": adventurer_id},
+        )
+    return "adventurer {} dismissed".format(adventurer_id)
+
+
 def _list_line(row):
     parts = [row["project"], row["state"], row["task"] and "task " + row["task"]]
     line = "{} {} ({})".format(row["id"], row["job"], ", ".join(part for part in parts if part))

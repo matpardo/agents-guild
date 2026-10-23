@@ -612,6 +612,10 @@ def _adventurer_done(conn, event):
     )
 
 
+def _adventurer_dismissed(conn, event):
+    conn.execute("UPDATE adventurers SET state = 'dismissed' WHERE id = ?", (event["payload"]["id"],))
+
+
 def _set_session_status(conn, event, status, detail):
     conn.execute(
         "INSERT OR REPLACE INTO session_status (session_id, party, status, detail, since)"
@@ -745,6 +749,7 @@ _REDUCERS = {
     "idea.deleted": _idea_deleted,
     "adventurer.started": _adventurer_started,
     "adventurer.done": _adventurer_done,
+    "adventurer.dismissed": _adventurer_dismissed,
     "claim.created": _claim_created,
     "claim.released": _claim_released,
     "raid.joined": _raid_joined,

@@ -839,3 +839,8 @@ li.finding-guard {
 .card.idea.idea-overdue {
   border-left: 4px solid var(--danger);
 }
+
+.pill.stopped-without-report {
+  border: 1px solid var(--danger);
+  color: var(--danger);
+}

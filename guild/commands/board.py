@@ -3,7 +3,7 @@ import shlex
 import textwrap
 
 from guild import config, ctx_pressure, identity, links, merge_queue, party_progress, party_status, party_waits, pii, pr_asks, resume
-from guild import paths, sanitize, session_status, timeutil
+from guild import paths, sanitize, session_info, session_status, timeutil
 from guild.commands import brief as brief_commands
 from guild.commands import claim as claim_commands
 from guild.commands import drift as drift_commands
@@ -710,6 +710,8 @@ def _party_section(ctx, painter, party_row, project_config):
     lines.append(
         painter.paint("  status: {}".format(party_status.label(ctx, status)), _STATUS_STYLES[status["status"]])
     )
+    if _party_stopped_without_report(ctx, party_row):
+        lines.append(painter.paint("  " + STOPPED_WITHOUT_REPORT, "red"))
     waits = party_waits.for_party(ctx, party_row)
     if waits:
         lines.append(painter.paint("  waits on: {}".format("; ".join(wait["label"] for wait in waits)), "yellow"))
@@ -753,6 +755,54 @@ def _party_section(ctx, painter, party_row, project_config):
             for row in raids
         )
         lines.append(painter.paint("  raids: {}".format(raid_text), "dim"))
+    lines.append("")
+    return lines
+
+
+STOPPED_WITHOUT_REPORT = "stopped without report"
+
+
+def _party_stopped_without_report(ctx, party_row):
+    return party_row["state"] == "active" and not party_status.has_live_leader(ctx, party_row)
+
+
+def _adventurer_rows(conn):
+    return conn.execute(
+        "SELECT * FROM adventurers WHERE state IN ('active', 'done') ORDER BY id ASC"
+    ).fetchall()
+
+
+def _adventurer_pr_rows(conn, adventurer_id):
+    return conn.execute(
+        pr_asks.PRS_WITH_ASK_SQL + " WHERE adventurer = ? ORDER BY repo ASC, number ASC", (adventurer_id,)
+    ).fetchall()
+
+
+def _adventurer_stopped(row, live_ids):
+    return row["state"] == "active" and row["session_id"] not in live_ids
+
+
+def _adventurer_lines(ctx, painter):
+    rows = _adventurer_rows(ctx.conn)
+    if not rows:
+        return []
+    live_ids = session_info.live_session_ids(ctx.sessions_dir)
+    lines = [painter.paint("ADVENTURERS · {}".format(len(rows)), "bold")]
+    for row in rows:
+        parts = [row["project"], row["state"], row["task"] and "task " + row["task"]]
+        lines.append(
+            "  adventurer {} {} ({})".format(
+                row["id"],
+                sanitize.strip_control_sequences(row["job"]),
+                ", ".join(part for part in parts if part),
+            )
+        )
+        if _adventurer_stopped(row, live_ids):
+            lines.append(painter.paint("    " + STOPPED_WITHOUT_REPORT, "red"))
+        if row["state"] == "done":
+            lines.extend(painter.wrap("pending: {}".format(sanitize.strip_control_sequences(row["pending"])), "    "))
+        for pr_row in _adventurer_pr_rows(ctx.conn, row["id"]):
+            lines.extend(_pr_lines(ctx, painter, pr_row, "    "))
     lines.append("")
     return lines
 
@@ -829,6 +879,8 @@ def render_board(ctx, party_filter, raid_filter, color, width):
     lines.extend(_ready_for_you_lines(ctx, painter, party_filter, raid_filter))
     lines.extend(_notices_section(ctx, painter, notice_rows))
     projects_by_name = {project["name"]: project for project in config.load_all_projects(ctx.projects_dir)}
+    if party_filter is None and raid_filter is None:
+        lines.extend(_adventurer_lines(ctx, painter))
     lines.extend(_project_lines(ctx, painter, party_rows, projects_by_name))
     for party_row in party_rows:
         lines.extend(
@@ -928,6 +980,21 @@ def _idea_model(ctx, row):
         "project": row["project"],
         "created_at": row["created_at"],
         "overdue": idea_commands.is_overdue(ctx.now, row["deadline"]),
+    }
+
+
+def _adventurer_model(ctx, row, live_ids, projects_by_name):
+    project_config = projects_by_name.get(row["project"])
+    return {
+        "id": row["id"],
+        "project": row["project"],
+        "job": sanitize.strip_control_sequences(row["job"]),
+        "task": row["task"],
+        "state": row["state"],
+        "pending": _optional_text(row["pending"]),
+        "live": row["session_id"] in live_ids,
+        "stopped_without_report": _adventurer_stopped(row, live_ids),
+        "prs": [_pr_model(ctx, pr_row, project_config) for pr_row in _adventurer_pr_rows(ctx.conn, row["id"])],
     }
 
 
@@ -1038,6 +1105,7 @@ def _party_model(ctx, party_row, project_config):
         "resume_command": _resume_command(ctx, party_row),
         "leader_session_name": _leader_session_name(ctx.conn, party_row["name"]),
         "has_live_leader": party_status.has_live_leader(ctx, party_row),
+        "stopped_without_report": _party_stopped_without_report(ctx, party_row),
         "quests": quest_models,
         "prs": [_pr_model(ctx, pr_row, project_config) for pr_row in orphan_prs],
         "raids": [
@@ -1074,6 +1142,7 @@ def board_model(ctx):
     notice_rows = notice_commands.active_notices(ctx.conn, ctx.now)
     project_names = sorted({row["project"] for row in party_rows if row["project"] is not None})
     live_party_names = {row["name"] for row in party_rows}
+    live_ids = session_info.live_session_ids(ctx.sessions_dir)
     scopes = merge_queue_commands.board_scopes(ctx.conn, ctx.now, live_party_names)
     return {
         "generated_at": timeutil.to_iso(ctx.now),
@@ -1081,6 +1150,9 @@ def board_model(ctx):
         "notices": [_notice_model(ctx, row) for row in notice_rows],
         "new_notice_count": notice_commands.count_new(notice_rows),
         "ideas": [_idea_model(ctx, row) for row in idea_commands.sorted_rows(ctx, None)],
+        "adventurers": [
+            _adventurer_model(ctx, row, live_ids, projects_by_name) for row in _adventurer_rows(ctx.conn)
+        ],
         "memory": [
             _memory_item_model(item)
             for item in memory_commands.all_items(None)

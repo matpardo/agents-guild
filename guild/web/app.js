@@ -16,6 +16,7 @@
   var EMPTY_ANSWER_MESSAGE = "write an answer first";
   var DEFAULT_BRANCHES = ["main", "master"];
   var BLOCKED_EXTERNAL_TEXT = "blocked: manual";
+  var STOPPED_WITHOUT_REPORT_TEXT = "stopped without report";
 var NO_SESSION_MESSAGE = "session token not loaded, reload the page";
   var sessionToken = null;
 
@@ -59,6 +60,8 @@ var NO_SESSION_MESSAGE = "session token not loaded, reload the page";
     ideaDrafts: {},
     ideaStatuses: {},
     ideaBusy: {},
+    adventurerStatuses: {},
+    adventurerBusy: {},
     raidPauseOpen: {},
     raidStatuses: {},
     raidBusy: {},
@@ -338,6 +341,10 @@ var NO_SESSION_MESSAGE = "session token not loaded, reload the page";
     return "/api/memory/" + party + "/" + seq + "/rm";
   }
 
+  function adventurerDismissUrl(adventurerId) {
+    return "/api/adventurers/" + adventurerId + "/dismiss";
+  }
+
   function partyHandoffUrl(party) {
     return "/api/parties/" + party + "/hand-off";
   }
@@ -429,6 +436,26 @@ var NO_SESSION_MESSAGE = "session token not loaded, reload the page";
         delete state.partyHandoffStatuses[partyName];
       } else {
         state.partyHandoffStatuses[partyName] = errorMessage(result.body);
+      }
+      fetchBoard();
+    });
+  }
+
+  function postAdventurerDismiss(adventurerId) {
+    if (sessionToken === null) {
+      state.adventurerStatuses[adventurerId] = NO_SESSION_MESSAGE;
+      fetchBoard();
+      return;
+    }
+    state.adventurerBusy[adventurerId] = true;
+    state.adventurerStatuses[adventurerId] = "sending...";
+    fetchBoard();
+    sendPost(adventurerDismissUrl(adventurerId), {}).then(function (result) {
+      delete state.adventurerBusy[adventurerId];
+      if (result.ok) {
+        delete state.adventurerStatuses[adventurerId];
+      } else {
+        state.adventurerStatuses[adventurerId] = errorMessage(result.body);
       }
       fetchBoard();
     });
@@ -1475,6 +1502,58 @@ var NO_SESSION_MESSAGE = "session token not loaded, reload the page";
     section.appendChild(details);
   }
 
+  function adventurerMeta(adventurer) {
+    var parts = [adventurer.project, adventurer.state];
+    if (adventurer.task !== null) {
+      parts.push("task " + adventurer.task);
+    }
+    parts.push(adventurer.live ? "live" : "stopped");
+    return parts.join(" · ");
+  }
+
+  function renderAdventurerDismiss(adventurer) {
+    var actions = el("div");
+    actions.className = "notice-actions";
+    var button = textEl("button", "Dismiss");
+    button.type = "button";
+    button.disabled = state.adventurerBusy[adventurer.id] === true;
+    button.addEventListener("click", function () {
+      postAdventurerDismiss(adventurer.id);
+    });
+    actions.appendChild(button);
+    actions.appendChild(classedText("span", state.adventurerStatuses[adventurer.id] || "", "ask-status"));
+    return actions;
+  }
+
+  function renderAdventurer(adventurer) {
+    var article = el("article");
+    article.className = "card adventurer";
+    article.appendChild(textEl("h3", "adventurer " + adventurer.id + " " + adventurer.job));
+    article.appendChild(classedText("p", adventurerMeta(adventurer), "muted"));
+    if (adventurer.stopped_without_report) {
+      article.appendChild(classedText("span", STOPPED_WITHOUT_REPORT_TEXT, "pill stopped-without-report"));
+    }
+    if (adventurer.state === "done") {
+      article.appendChild(textEl("p", "pending: " + adventurer.pending));
+      article.appendChild(renderAdventurerDismiss(adventurer));
+    }
+    var prs = renderPrList(adventurer.prs);
+    if (prs) {
+      article.appendChild(prs);
+    }
+    return article;
+  }
+
+  function renderAdventurers(adventurers) {
+    var section = document.getElementById("adventurers");
+    clear(section);
+    if (adventurers.length === 0) {
+      return;
+    }
+    section.appendChild(textEl("h2", "adventurers (" + adventurers.length + ")"));
+    appendAll(section, adventurers.map(renderAdventurer));
+  }
+
   function renderMemoryItem(item) {
     var article = el("article");
     article.className = "card memory";
@@ -2142,6 +2221,9 @@ var NO_SESSION_MESSAGE = "session token not loaded, reload the page";
     summary.appendChild(renderRoleBadge(party.raids));
     summary.appendChild(renderStatusBadge(party.status));
     summary.appendChild(renderRemainingBadge(party.remaining));
+    if (party.stopped_without_report) {
+      summary.appendChild(classedText("span", STOPPED_WITHOUT_REPORT_TEXT, "pill stopped-without-report"));
+    }
     if (party.ctx !== null) {
       var ctxSource = party.ctx.source === "configured" ? "" : " (" + party.ctx.source + ")";
       var ctxBadge = textEl("span", "context " + party.ctx.pct + "% / " + party.ctx.threshold + "%" + ctxSource);
@@ -2261,6 +2343,7 @@ var NO_SESSION_MESSAGE = "session token not loaded, reload the page";
     return {
       generated_at: data.generated_at,
       ideas: data.ideas,
+      adventurers: data.adventurers,
       asks: data.asks.filter(function (ask) {
         return ask.party === state.partyFilter;
       }),
@@ -2330,6 +2413,7 @@ var NO_SESSION_MESSAGE = "session token not loaded, reload the page";
     return {
       generated_at: data.generated_at,
       ideas: data.ideas,
+      adventurers: data.adventurers,
       asks: data.asks.filter(function (ask) {
         return members.indexOf(ask.party) !== -1;
       }),
@@ -2626,6 +2710,7 @@ var NO_SESSION_MESSAGE = "session token not loaded, reload the page";
     renderSection("ready", [filtered.ready_for_you], renderReadyForYou, onlyIfChanged);
     renderSection("notices", [filtered.notices, filtered.projects, filtered.raids], renderNotices, onlyIfChanged);
     renderSection("ideas", [filtered.ideas, data.project_names], renderIdeas, onlyIfChanged);
+    renderSection("adventurers", [filtered.adventurers], renderAdventurers, onlyIfChanged);
     renderSection("memory", [filtered.memory], renderMemory, onlyIfChanged);
     renderSection("raids", [filtered.raids], renderRaids, onlyIfChanged);
     renderSection("merge-queues", [filtered.merge_queues], renderMergeQueues, onlyIfChanged);

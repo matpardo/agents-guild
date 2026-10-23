@@ -2,7 +2,7 @@
 epic: adventurers
 type: tasks
 title: Adventurers do one job and report what is pending
-status: active
+status: done
 updated: 2026-10-23
 ---
 
@@ -52,20 +52,20 @@ updated: 2026-10-23
 ## T05 — Adventurers and missing reports on the board
 
 **Depends on:** T02
-**Status:** [ ] pending
+**Status:** [x] done — #200
 
-**What:** an adventurers section in `guild board` and the web with job, live or stopped, PRs and pending report; a `stopped without report` flag for adventurers and for parties whose leader is gone without a handoff; `guild party close` requires `--pending`. Web writes go through `sendPost` and the same command functions.
+**What:** an adventurers section in `guild board` and the web with job, live or stopped, PRs and pending report, kept until `guild adventurer dismiss <id>` (web Dismiss button); a `stopped without report` flag for adventurers and for parties whose leader is gone without a handoff; `guild party close` requires `--pending`. Web writes go through `sendPost` and the same command functions.
 
 **Acceptance:**
-- [ ] The node harness covers the section and the flag.
-- [ ] `party close` without `--pending` fails from the CLI and the web.
+- [x] The node harness covers the section and the flag.
+- [x] `party close` without `--pending` fails from the CLI (the web has no party close action).
 
 ## T06 — Adventurer docs
 
 **Depends on:** T04
-**Status:** [ ] pending
+**Status:** [x] done — #200
 
 **What:** `GUILD.md` rules: ask party or adventurer first, and every session that stops reports what is pending. `README.md` command reference. The first PR already ships the adventurer rules and commands; this task closes what is left.
 
 **Acceptance:**
-- [ ] `tests/test_no_traces.py` covers adventurer ids and pending text.
+- [x] `tests/test_no_traces.py` covers adventurer ids and pending text.

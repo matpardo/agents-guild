@@ -362,21 +362,21 @@ class RaidPartyCloseTests(GuildTestCase):
         return row
 
     def test_close_leaves_all_raids(self):
-        code, out, err = self.run_cli(["party", "close", "alpha"], None, None)
+        code, out, err = self.run_cli(["party", "close", "alpha", "--pending", "none"], None, None)
         self.assertEqual(code, 0, err)
         self.assertIsNone(
             self._row("SELECT raid FROM raid_members WHERE raid = ? AND party = ?", ("ci", "alpha"))
         )
 
     def test_close_leaves_until_leave_raid(self):
-        code, out, err = self.run_cli(["party", "close", "alpha"], None, None)
+        code, out, err = self.run_cli(["party", "close", "alpha", "--pending", "none"], None, None)
         self.assertEqual(code, 0, err)
         self.assertIsNone(
             self._row("SELECT raid FROM raid_members WHERE raid = ? AND party = ?", ("ci-ul", "alpha"))
         )
 
     def test_rebuild_reproduces_raid_cascade(self):
-        self.run_cli(["party", "close", "alpha"], None, None)
+        self.run_cli(["party", "close", "alpha", "--pending", "none"], None, None)
         self.run_cli(["rebuild"], None, None)
         self.assertIsNone(
             self._row("SELECT raid FROM raid_members WHERE raid = ? AND party = ?", ("ci", "alpha"))

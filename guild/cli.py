@@ -95,7 +95,7 @@ def _handle_party_resume(ctx, args):
 def _handle_party_close(ctx, args):
     from guild.commands import party as party_commands
 
-    _print(party_commands.close(ctx, args.name, args.force))
+    _print(party_commands.close(ctx, args.name, args.force, args.pending))
     return 0
 
 
@@ -403,6 +403,13 @@ def _handle_adventurer_done(ctx, args):
     from guild.commands import adventurer as adventurer_commands
 
     _print(adventurer_commands.done(ctx, args.pending))
+    return 0
+
+
+def _handle_adventurer_dismiss(ctx, args):
+    from guild.commands import adventurer as adventurer_commands
+
+    _print(adventurer_commands.dismiss(ctx, args.id))
     return 0
 
 
@@ -805,6 +812,7 @@ def _add_party_parser(subparsers):
     close = actions.add_parser("close", help="close a party; refuses while its quests are unfinished unless --force")
     close.add_argument("name", nargs="?")
     close.add_argument("--force", action="store_true", help="override the quest done gate")
+    close.add_argument("--pending", required=True, help="what is left pending; 'none' if nothing")
     close.set_defaults(handler=_handle_party_close)
 
 
@@ -1001,6 +1009,10 @@ def _add_adventurer_parser(subparsers):
     done = actions.add_parser("done", help="end the adventurer and report what is pending")
     done.add_argument("--pending", required=True, help="what is left to do, or none")
     done.set_defaults(handler=_handle_adventurer_done)
+
+    dismiss = actions.add_parser("dismiss", help="remove a done adventurer from the board")
+    dismiss.add_argument("id", type=int)
+    dismiss.set_defaults(handler=_handle_adventurer_dismiss)
 
 
 def _add_memory_parser(subparsers):

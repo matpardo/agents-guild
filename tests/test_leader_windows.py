@@ -52,7 +52,7 @@ class LeaderWindowsProjectionTests(LeaderWindowsBase):
 
     def test_close_removes_all_records(self):
         self._launched(1, "@1")
-        self.run_cli(["party", "close", "alpha"], None, None)
+        self.run_cli(["party", "close", "alpha", "--pending", "none"], None, None)
         self.assertEqual(self._windows(), [])
 
     def test_rebuild_reproduces_records(self):
