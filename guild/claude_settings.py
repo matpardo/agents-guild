@@ -17,10 +17,19 @@ EXPECTED_HOOKS = (
     ("PreCompact", "auto", "guild hook pre-compact"),
 )
 
-EXPECTED_ASK_RULES = ("Bash(guild party start:*)", "Bash(guild quest add:*)")
+EXPECTED_ASK_RULES = (
+    "Bash(guild party start:*)",
+    "Bash(guild party resume:*)",
+    "Bash(guild raid join:*)",
+    "Bash(guild adventurer start:*)",
+)
+
+RETIRED_ASK_RULES = ("Bash(guild quest add:*)",)
 
 EXPECTED_ALLOW_RULES = (
     "Bash(guild task:*)",
+    "Bash(guild quest:*)",
+    "Bash(guild adventurer:*)",
     "Bash(guild pr:*)",
     "Bash(guild finding:*)",
     "Bash(guild notice:*)",

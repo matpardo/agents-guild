@@ -94,7 +94,7 @@ After each merge, update the base clone with one command:
 It refuses if the base clone has local changes or is not on `main`,
 fast-forwards it to `origin/main`, lists the commits it brought, re-runs `install.sh` and runs
 `guild doctor`. It never edits project configs; through `install.sh` it
-re-runs `guild wire-settings`, which only adds what is missing.
+re-runs `guild wire-settings`, which only adds what is missing and drops retired ask rules.
 
 `guild doctor` checks, read-only, that every guild hook is wired in
 `~/.claude/settings.json` (including `Notification` and `Stop`), that its
@@ -2246,9 +2246,16 @@ which merges this block and keeps what is already there:
     ]
   },
   "permissions": {
-    "ask": ["Bash(guild party start:*)", "Bash(guild quest add:*)"],
+    "ask": [
+      "Bash(guild party start:*)",
+      "Bash(guild party resume:*)",
+      "Bash(guild raid join:*)",
+      "Bash(guild adventurer start:*)"
+    ],
     "allow": [
       "Bash(guild task:*)",
+      "Bash(guild quest:*)",
+      "Bash(guild adventurer:*)",
       "Bash(guild pr:*)",
       "Bash(guild finding:*)",
       "Bash(guild notice:*)",
@@ -2267,15 +2274,19 @@ which merges this block and keeps what is already there:
 
 The `allow` list keeps guild state commands from raising a Claude Code
 permission prompt, which stalls the session until a human answers it.
-`guild party start` and `guild quest add` stay out of it on purpose: they are
-the opt-in binding commands above. A blanket `Bash(guild:*)` or
+The `ask` rules win over `allow`, so `guild party start`, `guild party resume`,
+`guild raid join` and `guild adventurer start` always prompt: they bind a session
+or create a raid. `guild quest add` and `guild task add` need no approval.
+`guild wire-settings` removes the retired `Bash(guild quest add:*)` ask rule and
+`guild doctor` warns while it is still there. A blanket `Bash(guild:*)` or
 `Bash(guild *)` entry also satisfies `guild doctor`.
 
 **Opt-in binding.** A session never needs a party. The unbound hint says to
 resume a party when the work continues one, and otherwise to ask the human
 whether the work is a party or an adventurer before working on a registered
 project. The `permissions.ask` rules make Claude Code ask the human before every
-`guild party start` and `guild quest add`, whatever the model decides.
+`guild party start`, `guild party resume`, `guild raid join` and
+`guild adventurer start`, whatever the model decides.
 
 **Commit guard (git).** `pre-edit` only sees the Edit/Write family of tools.
 Agents that write files through Bash (`cat > file <<EOF`, `python3 -`,

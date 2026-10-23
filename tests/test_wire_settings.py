@@ -95,6 +95,28 @@ class WireSettingsTests(GuildTestCase):
         self._wire()
         self.assertEqual(self._settings()["permissions"]["allow"], ["Bash(guild:*)"])
 
+    def test_retired_ask_rule_is_removed(self):
+        self._write({"permissions": {"ask": ["Bash(guild quest add:*)", "Bash(other:*)"]}})
+        code, out, err = self._wire()
+        self.assertEqual(code, 0, err)
+        self.assertIn("removed ask rule Bash(guild quest add:*)", out)
+        ask = self._settings()["permissions"]["ask"]
+        self.assertNotIn("Bash(guild quest add:*)", ask)
+        self.assertEqual(ask[0], "Bash(other:*)")
+
+    def test_binding_commands_ask_and_quest_add_is_allowed(self):
+        self._wire()
+        permissions = self._settings()["permissions"]
+        for rule in (
+            "Bash(guild party start:*)",
+            "Bash(guild party resume:*)",
+            "Bash(guild raid join:*)",
+            "Bash(guild adventurer start:*)",
+        ):
+            self.assertIn(rule, permissions["ask"])
+        self.assertIn("Bash(guild quest:*)", permissions["allow"])
+        self.assertNotIn("Bash(guild quest add:*)", permissions["ask"])
+
     def test_invalid_json_is_refused_and_left_untouched(self):
         self.settings_path.parent.mkdir(parents=True)
         self.settings_path.write_text("{not json")
