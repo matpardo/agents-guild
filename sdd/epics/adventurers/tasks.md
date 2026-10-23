@@ -79,3 +79,14 @@ updated: 2026-10-23
 
 **Acceptance:**
 - [x] A wired settings file prompts for every binding command and never for `guild quest add`.
+
+## T08 — Final report when work ends
+
+**Depends on:** T05
+**Status:** [x] done — #207
+
+**What:** `guild party close` and `guild adventurer done` print a final report block after their result line: the PRs tracked (`<repo>#<n> | what | state`), quests with done/total tasks, linked ideas and the pending text for a party; job, task, PRs and pending for an adventurer. `GUILD.md` tells the session to end with a report to the human built from it (decisión del dev, 2026-10-23).
+
+**Acceptance:**
+- [x] `party close` lists merged and open PRs, quests and a linked idea.
+- [x] `adventurer done` lists its PRs.

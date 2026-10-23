@@ -1,7 +1,7 @@
 import sqlite3
 from pathlib import Path
 
-from guild import config, db, events, handoff_prune, identity, names, paths, pii, sanitize, session_info
+from guild import config, db, events, final_report, handoff_prune, identity, names, paths, pii, sanitize, session_info
 from guild.commands import claim as claim_commands
 from guild.commands import next as next_commands
 from guild.commands import quest as quest_commands
@@ -268,4 +268,5 @@ def close(ctx, name, force, pending):
     lines.extend(_prune_lines(ctx))
     if open_prs:
         lines.append("tracked PRs still open: {}".format(", ".join(open_prs)))
+    lines.append(final_report.party_report(ctx, party, pending))
     return "\n".join(lines)

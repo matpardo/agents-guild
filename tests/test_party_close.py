@@ -82,6 +82,32 @@ class PartyCloseTests(GuildTestCase):
         self.assertEqual(code, 0, err)
         self.assertIn("tracked PRs still open: acme/app#1", out)
 
+    def test_close_prints_final_report(self):
+        for number in (1, 2):
+            self.write_gh_fixture(
+                "view_acme-app_{}".format(number),
+                {"state": "OPEN", "isDraft": True, "headRefName": "feature/x", "title": "t"},
+            )
+            self.run_cli(
+                ["pr", "track", "acme/app#{}".format(number), "--task", "demo/T01", "--what", "does {}".format(number),
+                 "--waits", "y"],
+                "sess-1", self.repo_dir,
+            )
+        conn = sqlite3.connect(str(self.data_home / "guild" / "guild.db"))
+        conn.execute("UPDATE prs SET lifecycle = 'merged' WHERE number = 1")
+        conn.commit()
+        conn.close()
+        self.run_cli(["idea", "add", "Better thing", "--description", "d"], "sess-1", self.repo_dir)
+        self.run_cli(["idea", "link", "1", "--party", "alpha"], "sess-1", self.repo_dir)
+        code, out, err = self.run_cli(["party", "close", "alpha", "--pending", "check the docs"], None, None)
+        self.assertEqual(code, 0, err)
+        self.assertIn("final report for party 'alpha'", out)
+        self.assertIn("acme/app#1 | does 1 | merged", out)
+        self.assertIn("acme/app#2 | does 2 | open", out)
+        self.assertIn("quest demo: 1/1 tasks done", out)
+        self.assertIn("idea #1: Better thing", out)
+        self.assertIn("pending: check the docs", out)
+
     def test_close_unknown_or_closed_party_fails(self):
         code, out, err = self.run_cli(["party", "close", "ghost", "--pending", "none"], None, None)
         self.assertEqual(code, 1)

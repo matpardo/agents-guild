@@ -370,6 +370,11 @@ Before judging drift, close refreshes the SDD snapshot once per project with an
 nothing is). The text goes through the same email, secret and project-pattern
 checks as `handoff --learned` and is stored on the `party.closed` event. The
 web board has no party close action.
+After the close line, close prints a final report block read from existing
+state: each PR the party tracked (`<repo>#<n> | what | state`, state `merged`,
+`closed` or `open`), each quest with its done/total tasks, the ideas linked to
+the party and the pending text. The session ends with a report to the human
+built from it.
 Closing cascades in the same event: the party's active quests become `done`,
 its open asks are dismissed and its claims are released. Tracked PRs stay
 tracked for history and are listed if still open. `guild quest done <slug>`
@@ -1251,6 +1256,8 @@ taken (`held by adventurer <id>`) until the adventurer is done.
 secret and project-pattern checks as `handoff --learned`. `guild adventurers`
 lists the active adventurers and the ten most recent finished ones with job,
 task, project, state and pending report; `guild adventurers <id>` shows one.
+`adventurer done` also prints a final report block: job, task, the PRs the
+adventurer tracked (`<repo>#<n> | what | state`) and the pending text.
 
 An adventurer can track its PRs (`guild pr track ... --task` equal to its own
 `<epic>/<tid>` when it holds a task, `--card <KEY>` alone for a free job; the PR records the adventurer and an empty
