@@ -14,12 +14,26 @@ def resolve_binding(conn, session_id):
     if session_id is None:
         return None
     row = conn.execute(
-        "SELECT name, project, generation FROM parties WHERE leader_session_id = ? AND state = 'active'",
+        "SELECT parties.name AS name, parties.project AS project, parties.generation AS generation"
+        " FROM parties LEFT JOIN leaders ON leaders.party = parties.name AND leaders.generation = parties.generation"
+        " WHERE parties.leader_session_id = ? AND parties.state = 'active'"
+        " ORDER BY leaders.started_at DESC, parties.name",
         (session_id,),
     ).fetchone()
     if row is None:
         return None
     return {"party": row["name"], "project": row["project"], "generation": row["generation"]}
+
+
+def double_bindings(conn, project):
+    rows = conn.execute(
+        "SELECT leader_session_id, GROUP_CONCAT(name, ', ') AS names, COUNT(*) AS total FROM"
+        " (SELECT leader_session_id, name FROM parties WHERE state = 'active'"
+        " AND (? IS NULL OR project = ?) ORDER BY name)"
+        " GROUP BY leader_session_id HAVING total > 1 ORDER BY names",
+        (project, project),
+    ).fetchall()
+    return ["session leads {} active parties: {}".format(row["total"], row["names"]) for row in rows]
 
 
 def require_binding(conn, session_id):

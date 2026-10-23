@@ -2,7 +2,7 @@
 epic: party-identity
 type: spec
 title: A session leads one party for its whole life
-status: draft
+status: done
 owner: matpardo
 created: 2026-10-23
 updated: 2026-10-23
@@ -23,7 +23,7 @@ A bound session can run `guild party start` or `guild party resume` for a second
 - `guild party start` and `guild party resume` refuse when the session already leads another active party, or is an adventurer (see `adventurers`).
 - `resolve_binding` is deterministic for databases that already hold the double binding.
 - `guild drift` reports a session that leads more than one active party; `guild doctor` shows the same finding.
-- Resuming the party the session already leads stays a no-op.
+- Resuming the party the session already leads stays allowed.
 - `README.md` and `GUILD.md` change with the code.
 
 ## Out of scope
@@ -33,9 +33,9 @@ A bound session can run `guild party start` or `guild party resume` for a second
 
 ## Success criteria
 
-- [ ] A test reproduces the switch, fails before the fix and passes after.
-- [ ] A bound session cannot become the leader of a second party from the CLI or the web.
-- [ ] An existing double binding shows up in `guild drift` and `guild doctor`.
+- [x] A test reproduces the switch, fails before the fix and passes after.
+- [x] A bound session cannot become the leader of a second party from the CLI or the web.
+- [x] An existing double binding shows up in `guild drift` and `guild doctor`.
 
 ## Security and data
 

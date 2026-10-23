@@ -1,4 +1,4 @@
-from guild import db, identity, paths
+from guild import db, events, identity, paths, timeutil
 from tests.testutil import GuildTestCase
 
 
@@ -136,6 +136,37 @@ class PartyStartResumeCloseTests(GuildTestCase):
         self.assertEqual(code, 1)
         self.assertIn("closed", err)
 
+    def test_bound_session_cannot_start_second_party(self):
+        self.run_cli(["party", "start", "alpha"], "sess-1", None)
+        code, out, err = self.run_cli(["party", "start", "beta"], "sess-1", None)
+        self.assertEqual(code, 1)
+        self.assertIn("session already leads party 'alpha'", err)
+        code, out, err = self.run_cli(["whoami"], "sess-1", None)
+        self.assertIn("party: alpha", out)
+
+    def test_bound_session_cannot_resume_another_party(self):
+        self.run_cli(["party", "start", "alpha"], "sess-1", None)
+        self.run_cli(["party", "start", "beta"], "sess-2", None)
+        code, out, err = self.run_cli(["party", "resume", "beta"], "sess-1", None)
+        self.assertEqual(code, 1)
+        self.assertIn("session already leads party 'alpha'", err)
+        code, out, err = self.run_cli(["whoami"], "sess-1", None)
+        self.assertIn("party: alpha", out)
+
+    def test_resume_by_session_name_refuses_bound_session(self):
+        self.write_session(4243, "sess-1", "alpha-g1")
+        self.run_cli(["party", "start", "alpha"], "sess-1", None)
+        self.run_cli(["party", "start", "beta"], "sess-2", None)
+        code, out, err = self.run_cli(["party", "resume", "beta", "--session", "alpha-g1"], None, None)
+        self.assertEqual(code, 1)
+        self.assertIn("session already leads party 'alpha'", err)
+
+    def test_leader_resumes_own_party(self):
+        self.run_cli(["party", "start", "alpha"], "sess-1", None)
+        code, out, err = self.run_cli(["party", "resume", "alpha"], "sess-1", None)
+        self.assertEqual(code, 0, err)
+        self.assertIn("generation 2", out)
+
     def test_close_requires_binding(self):
         code, out, err = self.run_cli(["party", "close"], "sess-1", None)
         self.assertEqual(code, 1)
@@ -193,3 +224,30 @@ if __name__ == "__main__":
     import unittest
 
     unittest.main()
+
+
+class DoubleBindingTests(GuildTestCase):
+    def setUp(self):
+        super().setUp()
+        self.repo_dir = self.register_project("acme", ["acme/app"])
+        self.run_cli(["party", "start", "alpha"], "sess-1", self.repo_dir)
+        self.run_cli(["party", "start", "beta"], "sess-2", self.repo_dir)
+        self.conn = db.connect(paths.db_path())
+        with db.writing(self.conn):
+            events.record(
+                self.conn, timeutil.utcnow(), "test@host", "beta", "sess-1", "acme",
+                "party.resumed", "local", {"party": "beta", "generation": 2, "session_name": None},
+            )
+
+    def test_binding_is_the_most_recent_leadership(self):
+        for _ in range(5):
+            self.assertEqual(identity.resolve_binding(self.conn, "sess-1")["party"], "beta")
+
+    def test_doctor_reports_double_binding(self):
+        code, out, err = self.run_cli(["doctor"], None, None)
+        self.assertIn("warn    session leads 2 active parties: alpha, beta", out)
+
+    def test_drift_reports_double_binding(self):
+        code, out, err = self.run_cli(["drift"], "sess-1", self.repo_dir)
+        self.assertIn("session leads several parties (1)", out)
+        self.assertIn("session leads 2 active parties: alpha, beta", out)

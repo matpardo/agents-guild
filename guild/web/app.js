@@ -215,6 +215,7 @@ var NO_SESSION_MESSAGE = "session token not loaded, reload the page";
       "task started, card not started": "A task is in progress but its card was never started.",
       "PR closed unmerged": "A PR was closed without merging while its task is still open.",
       "party has no running leader": "A party with open work has no running leader session.",
+      "session leads several parties": "One session leads more than one active party.",
       "epic done with open work": "The epic is marked done but still has open work.",
       "quest task not in SDD": "A quest task has no matching task in the SDD.",
       "task done, SDD not done": "A task is done in guild but not in the SDD.",
