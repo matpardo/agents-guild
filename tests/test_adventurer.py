@@ -177,19 +177,31 @@ class AdventurerPermissionTests(AdventurerTestCase):
             self.assertIn("adventurers do one job", err, argv)
             self.assertNotIn("session not bound", err, argv)
 
-    def test_pr_track_accepts_card_or_own_task_and_refuses_other_work(self):
+    def test_pr_track_on_a_task_accepts_only_its_own_task(self):
         code, out, err = self.cli(["pr", "track", "acme/app#1", "--card", "ABC-1", "--what", "w", "--waits", "r"], "adv-1")
-        self.assertEqual(code, 0, err)
+        self.assertEqual(code, 1)
+        self.assertIn("--task equal to its own task", err)
+        code, out, err = self.cli(["pr", "track", "acme/app#3", "--task", "demo-epic/T01", "--what", "w", "--waits", "r"], "adv-1")
+        self.assertEqual(code, 1)
         code, out, err = self.cli(["pr", "track", "acme/app#2", "--task", "demo-epic/T02", "--what", "w", "--waits", "r"], "adv-1")
         self.assertEqual(code, 0, err)
         row = self.rows("SELECT party, adventurer, task_quest FROM prs WHERE number = 2")[0]
         self.assertEqual((row["party"], row["adventurer"], row["task_quest"]), ("", 1, None))
-        code, out, err = self.cli(["pr", "track", "acme/app#3", "--task", "demo-epic/T01", "--what", "w", "--waits", "r"], "adv-1")
+
+    def test_pr_track_on_a_free_job_needs_a_card(self):
+        self.cli(["adventurer", "done", "--pending", "none"], "adv-1")
+        self.start("adv-2", "free job")
+        code, out, err = self.cli(["pr", "track", "acme/app#1", "--task", "demo-epic/T02", "--what", "w", "--waits", "r"], "adv-2")
         self.assertEqual(code, 1)
+        self.assertIn("--card alone", err)
+        code, out, err = self.cli(["pr", "track", "acme/app#1", "--card", "ABC-1", "--what", "w", "--waits", "r"], "adv-2")
+        self.assertEqual(code, 0, err)
 
     def test_adventurer_prs_do_not_break_party_views(self):
-        self.cli(["pr", "track", "acme/app#1", "--card", "ABC-1", "--what", "w", "--waits", "r"], "adv-1")
         self.cli(["pr", "track", "acme/app#2", "--task", "demo-epic/T02", "--what", "w", "--waits", "r"], "adv-1")
+        self.cli(["adventurer", "done", "--pending", "none"], "adv-1")
+        self.start("adv-2", "free job")
+        self.cli(["pr", "track", "acme/app#1", "--card", "ABC-1", "--what", "w", "--waits", "r"], "adv-2")
         self.cli(["party", "start", "alpha"], "sess-1")
         code, out, err = self.cli(["sync", "--source", "gh"], None)
         self.assertEqual(code, 0, err)

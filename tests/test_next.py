@@ -736,10 +736,7 @@ class WipOneTests(NextTestCase):
             "view_acme-app_2",
             {"state": "OPEN", "isDraft": True, "headRefName": "feature/2", "title": "t"},
         )
-        self.run_cli(
-            ["pr", "track", "acme/app#2", "--card", "ACME-2", "--what", "x", "--waits", "y"],
-            "sess-1", self.repo_dir,
-        )
+        self.track_legacy_card_pr("alpha", "acme/app", 2, "ACME-2", "x", "y", "feature/2")
         self._update_pr("ci_label = 1, checks_passing = 1")
         self.run_cli(["merge-queue", "pin", "acme/app#2", "--before", "acme/app#1"], "sess-1", self.repo_dir)
         self.assertEqual(
@@ -814,6 +811,11 @@ class WipOneTests(NextTestCase):
         self.assertNotIn("task demo/T02", out)
 
     def test_loose_card_pr_holds_new_task(self):
-        self._track("ready", ["--card", "ACME-1"])
+        self.write_gh_fixture(
+            "view_acme-app_1",
+            {"state": "OPEN", "isDraft": False, "headRefName": "feature/1", "title": "t"},
+        )
+        self.track_legacy_card_pr("alpha", "acme/app", 1, "ACME-1", "x", "y", "feature/1")
+        self.run_cli(["pr", "set", "acme/app#1", "--lifecycle", "ready"], "sess-1", self.repo_dir)
         self._update_pr("comments_after_head = 1, ci_label = 1, checks_passing = 1")
         self.assertIn("is not human-ready", self._next(["next"]))

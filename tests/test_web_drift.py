@@ -239,6 +239,21 @@ class WebAdventurerBehaviorTests(unittest.TestCase):
         self.assertIn("Dismiss", out)
         self.assertNotIn("stopped without report", out)
 
+    def test_adventurer_pr_shows_under_the_adventurer_and_not_under_a_party(self):
+        pr = {
+            "repo": "o/r", "number": 7, "lifecycle": "draft", "what": "typo fix", "task": None, "card": "ABC-1",
+            "card_url": None, "waits": "review", "branch": "fix/typo", "url": None, "base_branch": None,
+            "needs_ask_answer": False, "needs_human_pr_review": False, "fixes_main": False, "fixes_flaky": False,
+            "blocked_external": None, "ask_id": None, "review_reasons": [], "checks_failing": 0, "checks_passing": 0,
+            "checks_pending": 0,
+        }
+        board = dict(_BOARD, adventurers=[_adventurer(prs=[pr])])
+        adventurer_out = _render(board, "all", "all", "adventurers", "text")
+        self.assertIn("typo fix", adventurer_out)
+        parties_out = _render(board, "all", "all", "parties", "text")
+        self.assertNotIn("typo fix", parties_out)
+        self.assertNotIn("PRs outside active tasks", parties_out)
+
     def test_adventurers_survive_the_party_filter(self):
         self.assertIn("fix typo", self._text([_adventurer()], "a"))
 

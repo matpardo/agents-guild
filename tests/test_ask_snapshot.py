@@ -121,10 +121,7 @@ class SnapshotContentTests(AskSnapshotBase):
             "view_acme-app_2",
             {"state": "OPEN", "isDraft": True, "headRefName": "feature/2", "title": "t"},
         )
-        self.run_cli(
-            ["pr", "track", "acme/app#2", "--card", "PROJ-99", "--what", "x", "--waits", "y"],
-            "sess-1", self.repo_dir,
-        )
+        self.track_legacy_card_pr("alpha", "acme/app", 2, "PROJ-99", "x", "y", "feature/2")
         conn = db.connect(paths.db_path())
         with db.writing(conn):
             conn.execute(

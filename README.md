@@ -142,7 +142,8 @@ guild task block <quest>/<tid> --reason "..."
 guild task done  <quest>/<tid> [--summary "..."]   # epic quests: also mark it done in the epic's tasks.md
 guild task move  <quest>/<tid>[,<tid>...] --to <quest>   # queued or blocked tasks, same epic, to another party's quest
 
-guild pr track <owner/repo>#<n> (--task <quest>/<tid> | --card <KEY>) --what "..." --waits "..." [--needs-human-pr-review]
+guild pr track <owner/repo>#<n> (--task <quest>/<tid> [--card <KEY>] | --card <KEY>) --what "..." --waits "..." [--needs-human-pr-review]
+                               # a party needs --task; an adventurer on a task needs --task equal to its own, on a free job --card alone
                                [--fixes-main] [--fixes-flaky]
 guild pr set   <owner/repo>#<n> [--lifecycle draft|converging|ready] [--waits "..."]
                                [--needs-ask-answer | --no-needs-ask-answer]   # manual override; an open ask on the PR also counts
@@ -443,7 +444,7 @@ When the PR's linked card is not done, or its SDD task is not marked done,
 the notice ends with `Owner follow-up: move <KEY> to Done; mark <tid> done in
 <epic> tasks.md.` (only the parts that apply).
 
-A PR tracked with `--card` shows `<card>: <what>` in place of `<quest>/<tid>: <what>`;
+A PR tracked with `--card` (an adventurer's, or a legacy party row) shows `<card>: <what>` in place of `<quest>/<tid>: <what>`;
 a PR with neither (seeded) shows just `<what>`.
 
 If the project config has a `shared_areas` key (globs relative to the repo
@@ -1249,8 +1250,8 @@ secret and project-pattern checks as `handoff --learned`. `guild adventurers`
 lists the active adventurers and the ten most recent finished ones with job,
 task, project, state and pending report; `guild adventurers <id>` shows one.
 
-An adventurer can track its PRs (`guild pr track ... --card <KEY>`, or `--task`
-equal to its own `<epic>/<tid>`; the PR records the adventurer and an empty
+An adventurer can track its PRs (`guild pr track ... --task` equal to its own
+`<epic>/<tid>` when it holds a task, `--card <KEY>` alone for a free job; the PR records the adventurer and an empty
 party), post notices, add ideas and open asks (labelled `adventurer <id>`), and
 the Stop hook records `session.stopped` for it like for a leader. Any command
 that needs a party (quests, tasks, handoff, claims, `next`) refuses with
@@ -1343,7 +1344,7 @@ and its `wait:` text when `max_open_prs_per_party` is set, model key
 then one collapsible block per party with its own drift (the same
 findings and cap of 5 as the session brief, then `N more`; hidden when
 empty), quests, tasks and
-PRs, plus PRs outside active tasks, raids and claims. A party filter, a state
+PRs, plus PRs outside active tasks (legacy loose rows and PRs on queued tasks; adventurer PRs show under the adventurer), raids and claims. A party filter, a state
 filter (`all`/`fixes-main`/`fixes-flaky`/`needs-ask-answer`/`needs-human-pr-review`/`converging`/`ready`/`draft`/`merged`) and a
 raid filter (`all` plus one option per raid, narrowing parties, asks and
 notices the same way `guild board --raid` does) narrow what is shown; the
@@ -2225,7 +2226,7 @@ command).
 
 The rules ship with the CLI, so they change in the same commit as the commands they describe.
 
-They also state the loose-work rules: a PR without a task is tracked with `--card`, a task can be added to any open quest of the party without asking, and the agent keeps the epic's `tasks.md` in sync after `task add` and `task done` on an epic quest.
+They also state the loose-work rules: a party's PR always has a task (`pr track` refuses without `--task`; loose one-off work is an adventurer), a task can be added to any open quest of the party without asking, and the agent keeps the epic's `tasks.md` in sync after `task add` and `task done` on an epic quest.
 
 They also state the visibility rule: guild is optional and invisible outside the local CLI. `guild brief` (and so the session-start hook) and `guild ask` repeat it in one line.
 

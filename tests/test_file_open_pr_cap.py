@@ -55,10 +55,7 @@ class FileOpenPrCapTestCase(GuildTestCase):
         slug = repo.replace("/", "-")
         view = dict(_OPEN_VIEW, headRefName=branch)
         self.write_gh_fixture("view_{}_{}".format(slug, number), dict(view, isDraft=True))
-        self.run_cli(
-            ["pr", "track", "{}#{}".format(repo, number), "--card", "ACME-{}".format(number), "--what", "x", "--waits", "y"],
-            session_id, self.repo_dir,
-        )
+        self.track_legacy_card_pr({"sess-1": "alpha", "sess-2": "beta"}[session_id], repo, number, "ACME-{}".format(number), "x", "y", branch)
         self.write_gh_fixture("view_{}_{}".format(slug, number), view)
         self.write_gh_fixture("view_files_{}_{}".format(slug, number), _diff(paths))
 
