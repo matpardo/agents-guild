@@ -5,6 +5,7 @@ from guild import config, merge_queue, pr_asks, resolve, sanitize, timeutil
 from guild.commands import drift as drift_commands
 from guild.commands import merge_queue as merge_queue_commands
 from guild.commands import pr as pr_commands
+from guild.commands import quest as quest_commands
 from guild.commands import raid as raid_commands
 
 
@@ -224,7 +225,7 @@ def _claim_holder(conn, now, project, area, party):
 
 def _queued_tasks(conn, project, party):
     quest_rows = conn.execute(
-        "SELECT slug, epic FROM quests WHERE party = ? AND state = 'active' ORDER BY slug ASC", (party,)
+        "SELECT slug, project, epic FROM quests WHERE party = ? AND state = 'active' ORDER BY slug ASC", (party,)
     ).fetchall()
     items = []
     for quest_row in quest_rows:
@@ -244,6 +245,7 @@ def _queued_tasks(conn, project, party):
             items.append(
                 {
                     "quest": quest_row["slug"],
+                    "quest_row": quest_row,
                     "epic": quest_row["epic"],
                     "tid": task_row["tid"],
                     "title": task_row["title"],
@@ -255,6 +257,19 @@ def _queued_tasks(conn, project, party):
     return items
 
 
+def _open_quest_offer(conn, project, party):
+    if project is None or _queued_tasks(conn, project, party):
+        return None
+    row = conn.execute(
+        "SELECT slug FROM quests WHERE project = ? AND party IS NULL AND state = 'active'"
+        " ORDER BY rowid ASC",
+        (project,),
+    ).fetchone()
+    if row is None:
+        return None
+    return "take open quest {}".format(row["slug"])
+
+
 def _disagreement_line(epic, tid, disagreements):
     parts = ", ".join("{}={}".format(source, "done" if opinion else "pending") for source, opinion in disagreements)
     return "{}/{}: {}".format(epic, tid, parts)
@@ -264,6 +279,9 @@ def _evaluate_next_task(conn, now, project, party):
     disagreements = []
     blocked = []
     for item in _queued_tasks(conn, project, party):
+        if quest_commands.task_adventurer(conn, item["quest_row"], item["tid"]) is not None:
+            blocked.append("{}/{}: held by an adventurer".format(item["quest"], item["tid"]))
+            continue
         if item["epic"] is not None and item["deps"]:
             pending = []
             for dep_tid in item["deps"]:
@@ -306,7 +324,7 @@ def _drift_line(finding):
     return "update tracker/SDD: {}".format(finding)
 
 
-def _render_all(candidates, drift, next_task, wait, disagreements):
+def _render_all(candidates, drift, next_task, wait, offer, disagreements):
     lines = []
     for row, reason, _ in candidates:
         lines.append("PR {}: {}".format(_pr_label(row), reason))
@@ -319,6 +337,8 @@ def _render_all(candidates, drift, next_task, wait, disagreements):
         )
     if wait is not None:
         lines.append(wait)
+    if offer is not None:
+        lines.append(offer)
     for line in disagreements:
         lines.append("disagreement: {}".format(line))
     if not lines:
@@ -326,7 +346,7 @@ def _render_all(candidates, drift, next_task, wait, disagreements):
     return lines
 
 
-def _render_single(ctx, candidates, drift, next_task, wait, disagreements, blocked, acknowledge):
+def _render_single(ctx, candidates, drift, next_task, wait, offer, disagreements, blocked, acknowledge):
     if candidates:
         row, reason, should_ack = candidates[0]
         if should_ack and acknowledge:
@@ -351,6 +371,11 @@ def _render_single(ctx, candidates, drift, next_task, wait, disagreements, block
         return lines
     if wait is not None:
         lines = [wait]
+        for line in disagreements:
+            lines.append("disagreement: {}".format(line))
+        return lines
+    if offer is not None:
+        lines = [offer]
         for line in disagreements:
             lines.append("disagreement: {}".format(line))
         return lines
@@ -423,9 +448,10 @@ def run(ctx, binding, show_all, acknowledge):
     candidates, next_task, wait, disagreements, blocked = _collect(ctx, party, project)
 
     drift = _party_drift(ctx, party, project)
+    offer = _open_quest_offer(ctx.conn, project, party)
 
     if show_all:
-        return _render_all(candidates, drift, next_task, wait, disagreements)
+        return _render_all(candidates, drift, next_task, wait, offer, disagreements)
     return _render_single(
-        ctx, candidates, drift, next_task, wait, disagreements, blocked, acknowledge
+        ctx, candidates, drift, next_task, wait, offer, disagreements, blocked, acknowledge
     )

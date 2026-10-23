@@ -117,6 +117,15 @@ def _quest_added(conn, event):
         )
 
 
+def _quest_taken(conn, event):
+    payload = event["payload"]
+    conn.execute("UPDATE quests SET party = ? WHERE slug = ?", (payload["party"], payload["slug"]))
+
+
+def _quest_released(conn, event):
+    conn.execute("UPDATE quests SET party = NULL WHERE slug = ?", (event["payload"]["slug"],))
+
+
 def _task_added(conn, event):
     payload = event["payload"]
     conn.execute(
@@ -724,6 +733,8 @@ _REDUCERS = {
     "leader.window_launched": _leader_window_launched,
     "quest.added": _quest_added,
     "quest.done": _quest_done,
+    "quest.taken": _quest_taken,
+    "quest.released": _quest_released,
     "quest.marked_incomplete": _quest_marked_incomplete,
     "task.added": _task_added,
     "task.started": _task_started,

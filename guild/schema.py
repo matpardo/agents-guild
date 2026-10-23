@@ -37,6 +37,17 @@ _RAID_MEMBERS_TABLE = """
     )
     """
 
+_QUESTS_TABLE = """
+    CREATE TABLE IF NOT EXISTS quests (
+        slug TEXT PRIMARY KEY,
+        project TEXT,
+        party TEXT,
+        epic TEXT,
+        title TEXT NOT NULL,
+        state TEXT NOT NULL
+    )
+    """
+
 _CREATE_STATEMENTS = (
     """
     CREATE TABLE IF NOT EXISTS events (
@@ -72,16 +83,7 @@ _CREATE_STATEMENTS = (
         PRIMARY KEY (party, generation)
     )
     """,
-    """
-    CREATE TABLE IF NOT EXISTS quests (
-        slug TEXT PRIMARY KEY,
-        project TEXT,
-        party TEXT NOT NULL,
-        epic TEXT,
-        title TEXT NOT NULL,
-        state TEXT NOT NULL
-    )
-    """,
+    _QUESTS_TABLE,
     """
     CREATE TABLE IF NOT EXISTS quest_tasks (
         quest TEXT NOT NULL,
@@ -426,6 +428,34 @@ def _relax_raid_expiry(conn):
     conn.execute("COMMIT")
 
 
+def _quest_party_is_not_null(conn):
+    rows = conn.execute("PRAGMA table_info(quests)").fetchall()
+    return any(row["name"] == "party" and row["notnull"] for row in rows)
+
+
+def _rebuild_quests(conn):
+    conn.execute("ALTER TABLE quests RENAME TO quests_legacy")
+    conn.execute(_QUESTS_TABLE)
+    conn.execute(
+        "INSERT INTO quests (slug, project, party, epic, title, state)"
+        " SELECT slug, project, party, epic, title, state FROM quests_legacy"
+    )
+    conn.execute("DROP TABLE quests_legacy")
+
+
+def _relax_quest_party(conn):
+    if not _quest_party_is_not_null(conn):
+        return
+    conn.execute("BEGIN IMMEDIATE")
+    try:
+        if _quest_party_is_not_null(conn):
+            _rebuild_quests(conn)
+    except Exception:
+        conn.execute("ROLLBACK")
+        raise
+    conn.execute("COMMIT")
+
+
 def _parties_has_keeper(conn):
     return any(row["name"] == "keeper" for row in conn.execute("PRAGMA table_info(parties)"))
 
@@ -501,6 +531,7 @@ def create_all(conn):
     for statement in _CREATE_STATEMENTS:
         conn.execute(statement)
     _relax_raid_expiry(conn)
+    _relax_quest_party(conn)
     for table, column, ddl_type in _COLUMN_MIGRATIONS:
         _add_column_if_missing(conn, table, column, ddl_type)
     _drop_keeper(conn)

@@ -35,12 +35,23 @@ def _require_task(conn, project, epic, tid):
         )
 
 
+def _is_open_free_quest_task(conn, project, slug, tid):
+    row = conn.execute(
+        "SELECT 1 FROM quests q JOIN quest_tasks qt ON qt.quest = q.slug"
+        " WHERE q.slug = ? AND q.project = ? AND q.party IS NULL AND q.state = 'active'"
+        " AND q.epic IS NULL AND qt.tid = ?",
+        (slug, project, tid),
+    ).fetchone()
+    return row is not None
+
+
 def _validate_task(ctx, project, task):
     if task is None:
         return
     epic, tid = refs.parse_task_ref(task)
-    _require_task(ctx.conn, project, epic, tid)
-    quest_commands.reject_taken_tasks(ctx.conn, ctx.now, project, epic, [{"tid": tid}], "")
+    if not _is_open_free_quest_task(ctx.conn, project, epic, tid):
+        _require_task(ctx.conn, project, epic, tid)
+    quest_commands.reject_taken_tasks(ctx.conn, ctx.now, project, epic, [{"tid": tid}], "", True)
 
 
 def _validate_text(ctx, project, name, value, limit):

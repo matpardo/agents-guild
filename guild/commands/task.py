@@ -15,6 +15,10 @@ def _load_quest(ctx, quest):
 
 
 def _require_owner(binding, quest_row):
+    if quest_row["party"] is None:
+        raise GuildError(
+            "quest '{}' is open: run `guild quest take {}`".format(quest_row["slug"], quest_row["slug"]), 1
+        )
     if quest_row["party"] != binding["party"]:
         raise GuildError(
             "quest '{}' is owned by party '{}'".format(quest_row["slug"], quest_row["party"]), 1
@@ -49,7 +53,7 @@ def add(ctx, quest, tid, title):
         raise GuildError("task '{}/{}' already exists".format(quest, tid), 1)
     if quest_row["epic"] is not None:
         quest_commands.reject_taken_tasks(
-            ctx.conn, ctx.now, quest_row["project"], quest_row["epic"], [{"tid": tid}], binding["party"]
+            ctx.conn, ctx.now, quest_row["project"], quest_row["epic"], [{"tid": tid}], binding["party"], False
         )
     with db.writing(ctx.conn):
         events.record(
@@ -75,6 +79,9 @@ def start(ctx, quest, tid, summary):
     task_row = _load_task(ctx, quest, tid)
     if task_row["state"] == "done":
         raise GuildError("task '{}/{}' is already done".format(quest, tid), 1)
+    adventurer_id = quest_commands.task_adventurer(ctx.conn, quest_row, tid)
+    if adventurer_id is not None:
+        raise GuildError("task '{}/{}' is held by adventurer {}".format(quest, tid, adventurer_id), 1)
     with db.writing(ctx.conn):
         events.record(
             ctx.conn,
@@ -154,6 +161,8 @@ def _require_move_target(source_row, target_row, target):
         raise GuildError("unknown quest '{}'".format(target), 1)
     if target_row["slug"] == source_row["slug"]:
         raise GuildError("target quest is the source quest", 1)
+    if target_row["party"] is None:
+        raise GuildError("quest '{}' is open".format(target), 1)
     for row in (source_row, target_row):
         if row["state"] != "active":
             raise GuildError("quest '{}' is done".format(row["slug"]), 1)
