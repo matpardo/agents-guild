@@ -3,7 +3,7 @@ import shutil
 import sys
 from pathlib import Path
 
-from guild import claude_settings, config, ctx_pressure, localbase, paths, tmux_windows
+from guild import claude_settings, config, ctx_pressure, identity, localbase, paths, tmux_windows
 from guild.adapters import github
 from guild.commands import statusline as statusline_commands
 from guild.commands import timer as timer_commands
@@ -196,6 +196,7 @@ def run(ctx, scan_prs):
     if global_config is not None:
         checks.extend(_handoff_line(ctx.state_dir, global_config))
     checks.extend(_project_lines(ctx.projects_dir, ctx.state_dir, global_config))
+    checks.extend((True, "warn    {}".format(finding)) for finding in identity.double_bindings(ctx.conn, None))
     if scan_prs:
         checks.extend(_scan_lines(ctx))
     healthy = all(passed for passed, _ in checks)

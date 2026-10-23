@@ -64,10 +64,20 @@ def locate_if_changed(ctx, binding, permission_mode):
         )
 
 
+def _refuse_other_party(conn, session_id, name):
+    binding = identity.resolve_binding(conn, session_id)
+    if binding is None or binding["party"] == name:
+        return
+    raise GuildError(
+        "session already leads party '{}': a session never switches party".format(binding["party"]), 1
+    )
+
+
 def start(ctx, name):
     names.validate_name(name, "party name")
     if ctx.session_id is None:
         raise GuildError("party start requires a Claude Code session", 1)
+    _refuse_other_party(ctx.conn, ctx.session_id, name)
     existing = ctx.conn.execute("SELECT name FROM parties WHERE name = ?", (name,)).fetchone()
     if existing is not None:
         raise GuildError(
@@ -108,6 +118,7 @@ def _resolve_resume_session_id(ctx, session_name):
 def resume(ctx, name, session_name, permission_mode):
     names.validate_name(name, "party name")
     session_id = _resolve_resume_session_id(ctx, session_name)
+    _refuse_other_party(ctx.conn, session_id, name)
     row = ctx.conn.execute(
         "SELECT project, generation, state FROM parties WHERE name = ?", (name,)
     ).fetchone()

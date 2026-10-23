@@ -1,6 +1,6 @@
 import re
 
-from guild import session_info
+from guild import identity, session_info
 
 _DEFAULT_PARTY_SCOPE = ("state", ("active", "awaiting-leader"))
 
@@ -362,6 +362,7 @@ def _collect_epic_scoped(conn, project, epics, party_scope):
 def _collect(conn, project, epics, party_scope, sessions_dir):
     groups = _collect_epic_scoped(conn, project, epics, party_scope)
     groups.insert(8, ("party has no running leader", _rule_party_without_leader(conn, project, sessions_dir)))
+    groups.insert(9, ("session leads several parties", identity.double_bindings(conn, project)))
     return groups
 
 

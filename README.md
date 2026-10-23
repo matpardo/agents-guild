@@ -98,7 +98,7 @@ re-runs `guild wire-settings`, which only adds what is missing.
 `~/.claude/GUILD.md` exists and that every project config loads; it exits 1
 and names what is missing. It also checks that the guild state commands are in
 `permissions.allow` (see "Hooks"); a missing allow rule is a `warn` line and
-never changes the exit code. On Linux with `systemctl` it also warns for each of the five systemd timers (see "`guild sync-timer`") that is missing or drifted from its unit template, with `run timers.sh`; an interval you chose is not drift. It also warns about a leftover `guild-dispatch.timer` or `guild-dispatch.service` unit file (`install.sh` removes both) and about a project config that still has a `dispatcher` key (ignored, safe to delete). With a global `handoff_margin` (see "Global config") and a recorded compaction it prints `ok      handoff at 76% (compaction 85% − 10%)`, plus a `warn` when that handoff sits less than 5 points above the starting percentage of the latest session (the handoff would fire on a fresh session, so sessions hand off at that start + 5 instead); without a margin it warns when a project's `handoff_threshold` is at or above the last compaction (recorded by the `PreCompact` hook), since that threshold never fires. An invalid `guild.json` fails the check.
+never changes the exit code. It also warns for a session that leads more than one active party (`session leads 2 active parties: a, b`). On Linux with `systemctl` it also warns for each of the five systemd timers (see "`guild sync-timer`") that is missing or drifted from its unit template, with `run timers.sh`; an interval you chose is not drift. It also warns about a leftover `guild-dispatch.timer` or `guild-dispatch.service` unit file (`install.sh` removes both) and about a project config that still has a `dispatcher` key (ignored, safe to delete). With a global `handoff_margin` (see "Global config") and a recorded compaction it prints `ok      handoff at 76% (compaction 85% − 10%)`, plus a `warn` when that handoff sits less than 5 points above the starting percentage of the latest session (the handoff would fire on a fresh session, so sessions hand off at that start + 5 instead); without a margin it warns when a project's `handoff_threshold` is at or above the last compaction (recorded by the `PreCompact` hook), since that threshold never fires. An invalid `guild.json` fails the check.
 
 `guild doctor --scan-prs` additionally lists the open PRs of every project's
 `github.repos` through `gh` and scans title, body, comments and commit
@@ -118,7 +118,7 @@ guild doctor [--scan-prs]   # read-only checks: hooks, permission rules, GUILD.m
 guild init-project <name> --config <file.json>
 guild wire-settings   # merge guild hooks and permission rules into ~/.claude/settings.json
 
-guild party start <name>
+guild party start <name>                         # refused while this session leads another active party
 guild party resume <party> [--session <name>]   # --session: from a human terminal only
 guild party close [<party>] [--force]  # <party>: from a terminal, or your own party; --force overrides the quest done gate
 
@@ -1147,7 +1147,7 @@ SDD not done`, `task started, card not started`) runs only on epics referenced b
 `active` quest of the project, and every PR rule (`merged PR, task not
 done`, `PR open, card not started`, `PR merged, card not done`, `PR closed unmerged`) runs only on PRs
 tracked by a party that is `active` or `awaiting-leader`. `party has no
-running leader` is unaffected by scope, always project-wide. `--all` drops
+running leader` and `session leads several parties` are unaffected by scope, always project-wide. `--all` drops
 this default and reports the whole project (the audit mode). `--epic <slug>`
 restricts every epic-scoped rule to that epic, regardless of quest state;
 `--epic` and `--all` are mutually exclusive. The first line always states
@@ -1168,6 +1168,7 @@ naming the refs and what each source says:
 | `task started, card not started` | a quest task is `active` in guild and its SDD card has `status_category == new`; says to move the card to In Progress |
 | `PR closed unmerged` | a tracked PR has lifecycle `closed` |
 | `party has no running leader` | an `active` party's `leader_session_id` is not the id of any session file under the Claude sessions dir (`awaiting-leader` parties are not findings) |
+| `session leads several parties` | one session id leads more than one `active` party of the project (a double binding from before `party start` and `party resume` refused a second party); `guild doctor` shows the same finding as a `warn` |
 | `epic done with open work` | the epic's `sdd_status == done` but it still has a non-done quest task, or an open tracked PR linked to it |
 | `quest task not in SDD` | a task of an epic quest has no synced task with that tid in the epic's `tasks.md` (typically added with `guild task add` and never written to the SDD) |
 | `task done, SDD not done` | a task of an epic quest is `done` in guild while the epic's synced `sdd_status` for that tid is not `done` |
