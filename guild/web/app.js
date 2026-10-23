@@ -61,6 +61,10 @@ var NO_SESSION_MESSAGE = "session token not loaded, reload the page";
     ideaStatuses: {},
     ideaBusy: {},
     ideaLinkChoices: {},
+    questForms: {},
+    questStatuses: {},
+    questBusy: {},
+    questTakeChoices: {},
     adventurerStatuses: {},
     adventurerBusy: {},
     raidPauseOpen: {},
@@ -1725,6 +1729,180 @@ var NO_SESSION_MESSAGE = "session token not loaded, reload the page";
     appendAll(section, drift.map(renderDriftEntry));
   }
 
+  function postQuest(url, payload, key, onSuccess) {
+    if (sessionToken === null) {
+      state.questStatuses[key] = NO_SESSION_MESSAGE;
+      fetchBoard();
+      return;
+    }
+    state.questBusy[key] = true;
+    state.questStatuses[key] = "sending...";
+    fetchBoard();
+    sendPost(url, payload).then(function (result) {
+      delete state.questBusy[key];
+      state.questStatuses[key] = result.ok ? "" : errorMessage(result.body);
+      if (result.ok) {
+        onSuccess();
+      }
+      fetchBoard();
+    });
+  }
+
+  function questTaskText(task) {
+    var text = task.tid + " " + task.title;
+    return task.adventurer === null ? text : text + " (held by adventurer " + task.adventurer + ")";
+  }
+
+  function renderQuestAssign(quest, parties) {
+    var busy = state.questBusy[quest.slug] === true;
+    var actions = el("div");
+    actions.className = "notice-actions";
+    var select = el("select");
+    select.dataset.focusKey = "quest-" + quest.slug + "-party";
+    parties.forEach(function (name) {
+      select.appendChild(option(name));
+    });
+    if (parties.indexOf(state.questTakeChoices[quest.slug]) !== -1) {
+      select.value = state.questTakeChoices[quest.slug];
+    }
+    select.disabled = busy || parties.length === 0;
+    select.addEventListener("change", function () {
+      state.questTakeChoices[quest.slug] = select.value;
+    });
+    actions.appendChild(select);
+    actions.appendChild(
+      ideaActionButton("Assign", select.disabled, function () {
+        var party = state.questTakeChoices[quest.slug] || select.value;
+        postQuest("/api/quests/" + quest.slug + "/take", { party: party }, quest.slug, function () {
+          delete state.questTakeChoices[quest.slug];
+        });
+      })
+    );
+    actions.appendChild(classedText("span", state.questStatuses[quest.slug] || "", "ask-status"));
+    return actions;
+  }
+
+  function renderOpenQuest(quest, parties) {
+    var article = el("article");
+    article.className = "card open-quest";
+    article.appendChild(textEl("h4", quest.slug + " \u2014 " + quest.title));
+    article.appendChild(classedText("p", quest.epic === null ? "no epic" : "epic " + quest.epic, "muted"));
+    var list = el("ul");
+    list.className = "task-list";
+    appendAll(
+      list,
+      quest.tasks.map(function (task) {
+        return textEl("li", questTaskText(task));
+      })
+    );
+    article.appendChild(list);
+    article.appendChild(renderQuestAssign(quest, parties));
+    return article;
+  }
+
+  function questForm(formKey) {
+    if (state.questForms[formKey] === undefined) {
+      state.questForms[formKey] = { slug: "", title: "", tids: {} };
+    }
+    return state.questForms[formKey];
+  }
+
+  function questFormInput(form, formKey, field, placeholder, disabled) {
+    var input = el("input");
+    input.dataset.focusKey = "quest-" + formKey + "-" + field;
+    input.type = "text";
+    input.className = "block-reason quest-" + field;
+    input.placeholder = placeholder;
+    input.value = form[field];
+    input.disabled = disabled;
+    input.addEventListener("input", function () {
+      form[field] = input.value;
+    });
+    return input;
+  }
+
+  function renderFreeTask(form, formKey, task, disabled) {
+    var label = el("label");
+    label.className = "free-task";
+    var box = el("input");
+    box.type = "checkbox";
+    box.dataset.focusKey = "quest-" + formKey + "-" + task.tid;
+    box.checked = form.tids[task.tid] === true;
+    box.disabled = disabled;
+    box.addEventListener("change", function () {
+      form.tids[task.tid] = box.checked;
+    });
+    label.appendChild(box);
+    label.appendChild(textEl("span", task.tid + " " + task.title));
+    return label;
+  }
+
+  function renderFreeEpic(project, entry) {
+    var formKey = project.name + "/" + entry.epic;
+    var form = questForm(formKey);
+    var busy = state.questBusy[formKey] === true;
+    var block = el("div");
+    block.className = "free-epic";
+    block.appendChild(textEl("h4", "free tasks \u2014 " + entry.epic));
+    appendAll(
+      block,
+      entry.tasks.map(function (task) {
+        return renderFreeTask(form, formKey, task, busy);
+      })
+    );
+    var actions = el("div");
+    actions.className = "notice-actions";
+    actions.appendChild(questFormInput(form, formKey, "slug", "quest slug", busy));
+    actions.appendChild(questFormInput(form, formKey, "title", "title", busy));
+    actions.appendChild(
+      ideaActionButton("Create open quest", busy, function () {
+        var tids = entry.tasks
+          .map(function (task) {
+            return task.tid;
+          })
+          .filter(function (tid) {
+            return form.tids[tid] === true;
+          });
+        var payload = { project: project.name, slug: form.slug, title: form.title, epic: entry.epic, tasks: tids };
+        postQuest("/api/quests/create-open", payload, formKey, function () {
+          delete state.questForms[formKey];
+        });
+      })
+    );
+    actions.appendChild(classedText("span", state.questStatuses[formKey] || "", "ask-status"));
+    block.appendChild(actions);
+    return block;
+  }
+
+  function renderProjectQuestBoard(project) {
+    var article = el("article");
+    article.className = "card quest-board";
+    article.appendChild(textEl("h3", project.name));
+    appendAll(
+      article,
+      project.open_quests.map(function (quest) {
+        return renderOpenQuest(quest, project.parties);
+      })
+    );
+    appendAll(
+      article,
+      project.free_tasks.map(function (entry) {
+        return renderFreeEpic(project, entry);
+      })
+    );
+    return article;
+  }
+
+  function renderQuestBoard(projects) {
+    var section = document.getElementById("quest-board");
+    clear(section);
+    if (projects.length === 0) {
+      return;
+    }
+    section.appendChild(textEl("h2", "quest board"));
+    appendAll(section, projects.map(renderProjectQuestBoard));
+  }
+
   function renderProject(project) {
     var article = el("article");
     article.className = "card project";
@@ -2186,6 +2364,18 @@ var NO_SESSION_MESSAGE = "session token not loaded, reload the page";
     return wrapper;
   }
 
+  function renderQuestRelease(quest) {
+    var actions = el("div");
+    actions.className = "notice-actions";
+    actions.appendChild(
+      ideaActionButton("Release", state.questBusy[quest.slug] === true, function () {
+        postQuest("/api/quests/" + quest.slug + "/release", {}, quest.slug, function () {});
+      })
+    );
+    actions.appendChild(classedText("span", state.questStatuses[quest.slug] || "", "ask-status"));
+    return actions;
+  }
+
   function renderQuest(quest) {
     var article = el("div");
     article.className = "quest";
@@ -2202,6 +2392,9 @@ var NO_SESSION_MESSAGE = "session token not loaded, reload the page";
       })
     );
     article.appendChild(list);
+    if (quest.releasable) {
+      article.appendChild(renderQuestRelease(quest));
+    }
     return article;
   }
 
@@ -2801,6 +2994,7 @@ var NO_SESSION_MESSAGE = "session token not loaded, reload the page";
     renderSection("merge-queues", [filtered.merge_queues], renderMergeQueues, onlyIfChanged);
     renderSection("drift", [filtered.drift], renderDrift, onlyIfChanged);
     renderSection("projects", [filtered.projects], renderProjects, onlyIfChanged);
+    renderSection("quest-board", [data.quest_boards], renderQuestBoard, onlyIfChanged);
     renderSection("parties", [filtered.parties], renderParties, onlyIfChanged);
     restoreFocus();
   }

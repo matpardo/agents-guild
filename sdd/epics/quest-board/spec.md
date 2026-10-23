@@ -2,7 +2,7 @@
 epic: quest-board
 type: spec
 title: Prepare quests ahead for parties to take
-status: active
+status: done
 owner: matpardo
 created: 2026-10-23
 updated: 2026-10-23
@@ -36,10 +36,10 @@ A quest exists only once a party creates it, so planned work lives in SDD and in
 
 ## Success criteria
 
-- [ ] An open quest created in the CLI or the web is taken by a party and shows under it.
-- [ ] `guild quest board` and the web list every synced task no quest covers.
-- [ ] A party with nothing queued is offered an open quest of its project.
-- [ ] Open, taken and released quests survive `guild rebuild`.
+- [x] An open quest created in the CLI or the web is taken by a party and shows under it.
+- [x] `guild quest board` and the web list every synced task no quest covers.
+- [x] A party with nothing queued is offered an open quest of its project.
+- [x] Open, taken and released quests survive `guild rebuild`.
 
 ## Security and data
 

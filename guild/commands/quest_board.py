@@ -11,33 +11,33 @@ def _resolve_project(ctx, project):
     return project
 
 
-def _task_line(conn, project, quest_row, task_row):
-    line = "    {} {}".format(task_row["tid"], task_row["title"])
-    adventurer_id = quest_commands.adventurer_holder(
-        conn, project, quest_row["epic"] or quest_row["slug"], task_row["tid"]
-    )
-    if adventurer_id is None:
-        return line
-    return "{} (held by adventurer {})".format(line, adventurer_id)
-
-
-def _open_quest_lines(conn, project):
+def _open_quest_models(conn, project):
     quests = conn.execute(
         "SELECT slug, epic, title FROM quests WHERE project = ? AND party IS NULL AND state = 'active'"
         " ORDER BY rowid ASC",
         (project,),
     ).fetchall()
-    if not quests:
-        return ["  none"]
-    lines = []
+    models = []
     for quest_row in quests:
-        scope = "epic {}".format(quest_row["epic"]) if quest_row["epic"] else "no epic"
-        lines.append("  {} ({}): {}".format(quest_row["slug"], scope, quest_row["title"]))
         tasks = conn.execute(
             "SELECT tid, title FROM quest_tasks WHERE quest = ? ORDER BY tid", (quest_row["slug"],)
         ).fetchall()
-        lines.extend(_task_line(conn, project, quest_row, task_row) for task_row in tasks)
-    return lines
+        models.append({
+            "slug": quest_row["slug"],
+            "epic": quest_row["epic"],
+            "title": quest_row["title"],
+            "tasks": [
+                {
+                    "tid": task_row["tid"],
+                    "title": task_row["title"],
+                    "adventurer": quest_commands.adventurer_holder(
+                        conn, project, quest_row["epic"] or quest_row["slug"], task_row["tid"]
+                    ),
+                }
+                for task_row in tasks
+            ],
+        })
+    return models
 
 
 def _covered_tids(conn, project, epic):
@@ -78,25 +78,96 @@ def _free_task_rows(ctx, project, epic):
     return free
 
 
-def _free_task_lines(ctx, project):
+def _free_task_models(ctx, project):
     epics = ctx.conn.execute(
         "SELECT epic FROM epics WHERE project = ? AND COALESCE(sdd_status, '') NOT IN (?, ?) ORDER BY epic",
         (project,) + _HIDDEN_EPIC_STATUSES,
     ).fetchall()
-    lines = []
+    models = []
     for epic_row in epics:
         free = _free_task_rows(ctx, project, epic_row["epic"])
-        if not free:
-            continue
-        lines.append("  {}:".format(epic_row["epic"]))
-        lines.extend("    {} {}".format(row["tid"], row["title"]) for row in free)
+        if free:
+            models.append({
+                "epic": epic_row["epic"],
+                "tasks": [{"tid": row["tid"], "title": row["title"]} for row in free],
+            })
+    return models
+
+
+def _active_party_names(conn, project):
+    rows = conn.execute(
+        "SELECT name FROM parties WHERE project = ? AND state = 'active' ORDER BY name", (project,)
+    ).fetchall()
+    return [row["name"] for row in rows]
+
+
+def data(ctx, project):
+    return {
+        "open_quests": _open_quest_models(ctx.conn, project),
+        "free_tasks": _free_task_models(ctx, project),
+        "parties": _active_party_names(ctx.conn, project),
+    }
+
+
+def _has_work(conn, project):
+    row = conn.execute(
+        "SELECT 1 FROM epics WHERE project = ? UNION ALL"
+        " SELECT 1 FROM quests WHERE project = ? AND party IS NULL AND state = 'active' LIMIT 1",
+        (project, project),
+    ).fetchone()
+    return row is not None
+
+
+def models(ctx, project_names):
+    return [
+        dict(data(ctx, name), name=name)
+        for name in sorted(project_names)
+        if _has_work(ctx.conn, name)
+    ]
+
+
+def _task_line(task):
+    line = "    {} {}".format(task["tid"], task["title"])
+    if task["adventurer"] is None:
+        return line
+    return "{} (held by adventurer {})".format(line, task["adventurer"])
+
+
+def _open_quest_lines(quests):
+    if not quests:
+        return ["  none"]
+    lines = []
+    for quest in quests:
+        scope = "epic {}".format(quest["epic"]) if quest["epic"] else "no epic"
+        lines.append("  {} ({}): {}".format(quest["slug"], scope, quest["title"]))
+        lines.extend(_task_line(task) for task in quest["tasks"])
+    return lines
+
+
+def _free_task_lines(epics):
+    lines = []
+    for entry in epics:
+        lines.append("  {}:".format(entry["epic"]))
+        lines.extend("    {} {}".format(task["tid"], task["title"]) for task in entry["tasks"])
     return lines or ["  none"]
+
+
+def summary_lines(model):
+    lines = ["{} QUEST BOARD".format(model["name"])]
+    for quest in model["open_quests"]:
+        lines.append("  open quest {} ({} tasks)".format(quest["slug"], len(quest["tasks"])))
+    for entry in model["free_tasks"]:
+        lines.append("  free tasks {}: {}".format(entry["epic"], len(entry["tasks"])))
+    if len(lines) == 1:
+        lines.append("  none")
+    return lines
 
 
 def board(ctx, project):
     name = _resolve_project(ctx, project)
+    model = data(ctx, name)
     lines = ["project {}".format(name), "open quests:"]
-    lines.extend(_open_quest_lines(ctx.conn, name))
+    lines.extend(_open_quest_lines(model["open_quests"]))
     lines.append("free tasks:")
-    lines.extend(_free_task_lines(ctx, name))
+    lines.extend(_free_task_lines(model["free_tasks"]))
     return lines

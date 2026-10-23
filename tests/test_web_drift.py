@@ -81,7 +81,7 @@ def _render(board, party_filter, raid_filter, out_id, mode):
 _MISSING = object()
 _BOARD = {
     "generated_at": "now", "asks": [], "notices": [], "ideas": [], "adventurers": [], "project_names": [], "memory": [], "blocked": [], "merge_queues": [], "ready_for_you": [],
-    "projects": [], "raids": [{"name": "r", "members": ["c"]}],
+    "projects": [], "quest_boards": [], "raids": [{"name": "r", "members": ["c"]}],
     "parties": [
         {
             "name": name, "raids": [], "quests": [], "prs": [], "claims": [], "state": "active", "generation": 1,
@@ -576,3 +576,68 @@ class WebReadyForYouBehaviorTests(unittest.TestCase):
         notes = item["children"][-1]
         self.assertEqual((notes["tag"], notes["className"]), ("div", "ready-notes"))
         self.assertIn("note: CI label x not on the PR", json.dumps(notes))
+
+
+_QUEST_BOARD = {
+    "open_quests": [{
+        "slug": "pre", "epic": "demo", "title": "Pre work",
+        "tasks": [{"tid": "T01", "title": "First", "adventurer": None}, {"tid": "T02", "title": "Second", "adventurer": 7}],
+    }],
+    "free_tasks": [{"epic": "demo", "tasks": [{"tid": "T03", "title": "Third"}, {"tid": "T04", "title": "Fourth"}]}],
+    "parties": ["a", "c"], "name": "acme",
+}
+
+
+@unittest.skipIf(shutil.which("node") is None, "node not installed")
+class WebQuestBoardBehaviorTests(unittest.TestCase):
+    def _text(self, quest_board, out_id="quest-board"):
+        board = dict(_BOARD, quest_boards=[quest_board])
+        return _render(board, "all", "all", out_id, "text")
+
+    def test_lists_open_quest_tasks_and_marks_the_held_one(self):
+        out = self._text(_QUEST_BOARD)
+        for expected in ("quest board", "acme", "pre", "Pre work", "T01 First", "T02 Second (held by adventurer 7)", "Assign"):
+            self.assertIn(expected, out)
+
+    def test_assign_select_offers_the_active_parties(self):
+        board = dict(_BOARD, quest_boards=[_QUEST_BOARD])
+        tree = json.loads(_render(board, "all", "all", "quest-board", "tree"))
+        selects = []
+
+        def walk(node):
+            if node["tag"] == "select":
+                selects.append(node)
+            for child in node["children"]:
+                walk(child)
+
+        walk(tree)
+        self.assertEqual([option["text"] for option in selects[0]["children"]], ["a", "c"])
+
+    def test_free_tasks_get_checkboxes_and_a_create_button(self):
+        out = self._text(_QUEST_BOARD)
+        for expected in ("free tasks", "T03 Third", "T04 Fourth", "Create open quest"):
+            self.assertIn(expected, out)
+
+    def test_project_with_no_parties_still_renders_with_a_disabled_assign(self):
+        out = self._text(dict(_QUEST_BOARD, parties=[]), "quest-board")
+        self.assertIn("Assign", out)
+        self.assertIn("Create open quest", out)
+
+    def test_empty_board_shows_no_forms(self):
+        out = self._text({"name": "acme", "open_quests": [], "free_tasks": [], "parties": []})
+        self.assertNotIn("Assign", out)
+        self.assertNotIn("Create open quest", out)
+
+    def test_party_quest_shows_release_only_when_releasable(self):
+        def parties(releasable):
+            quest = {"slug": "q", "title": "Q", "tasks": [], "close_blockers": None, "move_targets": [], "releasable": releasable}
+            return [dict(_BOARD["parties"][0], quests=[quest])]
+
+        shown = _render(dict(_BOARD, parties=parties(True)), "all", "all", "parties", "text")
+        hidden = _render(dict(_BOARD, parties=parties(False)), "all", "all", "parties", "text")
+        self.assertIn("Release", shown)
+        self.assertNotIn("Release", hidden)
+
+    def test_writes_go_through_send_post(self):
+        for expected in ('"/api/quests/create-open"', '"/api/quests/" + quest.slug + "/take"', '"/api/quests/" + quest.slug + "/release"'):
+            self.assertIn(expected, _APP_JS)
