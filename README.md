@@ -39,7 +39,8 @@ are updated in the same PR as the code.
 - **generation** — one session of a party; a handoff or `guild revive` starts
   the next.
 - **quest** — a party's current assignment: a slice of an epic, a whole epic,
-  or a stream with no epic at all (e.g. "fix CI costs").
+  or a stream with no epic at all (e.g. "fix CI costs"). Owned by zero or one
+  party; a quest no party owns is an open quest.
 - **epic** — a planning unit owned by external docs/trackers; guild reads it
   and never writes to it.
 - **task** — a step of an epic, or a step of a no-epic quest. Guild tracks
@@ -128,6 +129,10 @@ guild party close [<party>] --pending "<text>" [--force]  # <party>: from a term
 guild quest add <slug> --title "..." --epic <slug> [--tasks T09,T07b]   # without --tasks: an empty epic quest
 guild quest add <slug> --title "..." --no-epic [--tasks A,B [--titles "First,Second"]]
 guild quest add <slug> --title "..." --followups-of <quest> [--tasks A,B [--titles ...]]
+guild quest add <slug> --open --title "..." (--epic <slug> --tasks T09 | --no-epic --tasks A,B --titles "First,Second")   # open quest no party owns; works with no session
+guild quest take <slug>      # your party takes an open quest of its project
+guild quest release <slug>   # owner party returns a quest with only queued tasks to the board
+guild quest board [--project <name>]   # open quests and the synced SDD tasks no quest covers
 guild quest done <slug> [--accept-drift] [--force]   # refuses while tasks are not done; --force overrides
 guild quest incomplete <slug> --reason "..."          # a done quest that was not really finished
 
@@ -1824,6 +1829,28 @@ drops `--quest` from `party start`: a party is created empty, and
 chicken-and-egg requirement (the quest would have to exist before the party
 that owns it) and matches how every other owned resource (task, PR, ask,
 claim) is attached to a party — via its own creation command.
+
+## Quest board
+
+Plan work before any party exists. `guild quest add <slug> --open ...` creates
+a quest with no party, from the human's terminal, a party or an adventurer. It
+runs the same checks as a plain `quest add`: the epic and tasks must be
+synced, and a task another quest, claim or adventurer holds is refused. A
+task inside an open quest counts as taken for every other quest, `task add`
+and claim.
+
+- `guild quest board [--project <name>]` lists the open quests and, per synced
+  epic in SDD order (done and archived epics skipped), the tasks no quest
+  covers, no claim holds, no adventurer holds and SDD does not mark done.
+- `guild quest take <slug>` gives an open quest of the session's project to its
+  party. A task an adventurer holds stays with the adventurer: `guild next`
+  skips it and `task start` refuses it until `adventurer done`.
+- `guild quest release <slug>` returns the quest to the board. The owner only,
+  and only while every task is queued with no open PR and no claim.
+- `guild next` answers `take open quest <slug>` (oldest first) to a party with
+  no queued task.
+- An adventurer may start on a task of an open quest: `adventurer start --task
+  <epic>/<tid>` (or `<quest>/<tid>` for a no-epic open quest).
 
 ## Identity
 

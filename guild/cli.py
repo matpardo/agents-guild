@@ -117,8 +117,30 @@ def _handle_quest_add(ctx, args):
     from guild.commands import quest as quest_commands
 
     _print(quest_commands.add(
-        ctx, args.slug, args.title, args.epic, args.tasks, args.titles, args.no_epic, args.followups_of
+        ctx, args.slug, args.title, args.epic, args.tasks, args.titles, args.no_epic, args.followups_of,
+        args.open
     ))
+    return 0
+
+
+def _handle_quest_take(ctx, args):
+    from guild.commands import quest as quest_commands
+
+    _print(quest_commands.take(ctx, args.slug))
+    return 0
+
+
+def _handle_quest_release(ctx, args):
+    from guild.commands import quest as quest_commands
+
+    _print(quest_commands.release(ctx, args.slug))
+    return 0
+
+
+def _handle_quest_board(ctx, args):
+    from guild.commands import quest_board
+
+    _print_lines(quest_board.board(ctx, args.project))
     return 0
 
 
@@ -817,7 +839,7 @@ def _add_party_parser(subparsers):
 
 
 def _add_quest_parser(subparsers):
-    parser = subparsers.add_parser("quest", help="add, finish or reopen quests")
+    parser = subparsers.add_parser("quest", help="add, take, release or finish quests, and list the quest board")
     actions = parser.add_subparsers(dest="quest_action", required=True, metavar="<subcommand>")
 
     add = actions.add_parser("add", help="add a quest, optionally with tasks")
@@ -828,7 +850,20 @@ def _add_quest_parser(subparsers):
     add.add_argument("--titles", help="comma-separated titles, one per task")
     add.add_argument("--no-epic", action="store_true", help="create a quest outside any epic")
     add.add_argument("--followups-of", help="quest this one follows up")
+    add.add_argument("--open", action="store_true", help="create an open quest no party owns yet")
     add.set_defaults(handler=_handle_quest_add)
+
+    take = actions.add_parser("take", help="take an open quest of your project for your party")
+    take.add_argument("slug")
+    take.set_defaults(handler=_handle_quest_take)
+
+    release = actions.add_parser("release", help="return a quest with no started task to the quest board")
+    release.add_argument("slug")
+    release.set_defaults(handler=_handle_quest_release)
+
+    board = actions.add_parser("board", help="list open quests and the SDD tasks no quest covers")
+    board.add_argument("--project", help="project to list; default is the project of the current directory")
+    board.set_defaults(handler=_handle_quest_board)
 
     done = actions.add_parser("done", help="mark a quest done; refuses while tasks are not done unless --force")
     done.add_argument("slug")

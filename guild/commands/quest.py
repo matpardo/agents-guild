@@ -32,12 +32,15 @@ def _resolve_epic_tasks(conn, project, epic, tasks_csv):
     return tasks
 
 
-def _quest_holders(conn, project, epic, party):
+def _quest_holders(conn, project, epic, party, allow_open_quests):
+    party_filter = "(q.party IS NULL OR q.party != ?)"
+    if allow_open_quests:
+        party_filter = "(q.party IS NOT NULL AND q.party != ?)"
     rows = conn.execute(
         "SELECT q.slug AS slug, q.party AS party, qt.tid AS tid"
         " FROM quests q JOIN quest_tasks qt ON qt.quest = q.slug"
-        " WHERE q.project = ? AND q.epic = ? AND q.state = 'active' AND q.party != ?"
-        " ORDER BY q.slug, qt.tid",
+        " WHERE q.project = ? AND q.epic = ? AND q.state = 'active' AND " + party_filter
+        + " ORDER BY q.slug, qt.tid",
         (project, epic, party),
     ).fetchall()
     holders = {}
@@ -72,8 +75,24 @@ def adventurer_holder(conn, project, epic, tid):
     return row["id"]
 
 
-def reject_taken_tasks(conn, now, project, epic, tasks, party):
-    quest_holders = _quest_holders(conn, project, epic, party)
+def task_adventurer(conn, quest_row, tid):
+    return adventurer_holder(conn, quest_row["project"], quest_row["epic"] or quest_row["slug"], tid)
+
+
+def open_quest_holder(conn, project, epic, tid):
+    row = conn.execute(
+        "SELECT q.slug AS slug FROM quests q JOIN quest_tasks qt ON qt.quest = q.slug"
+        " WHERE q.project = ? AND q.party IS NULL AND q.state = 'active' AND qt.tid = ?"
+        " AND (q.epic = ? OR (q.epic IS NULL AND q.slug = ?)) ORDER BY q.slug",
+        (project, tid, epic, epic),
+    ).fetchone()
+    if row is None:
+        return None
+    return row["slug"]
+
+
+def reject_taken_tasks(conn, now, project, epic, tasks, party, allow_open_quests):
+    quest_holders = _quest_holders(conn, project, epic, party, allow_open_quests)
     claim_holders = _claim_holders(conn, now, project, epic, party)
     conflicts = []
     for task in tasks:
@@ -83,6 +102,9 @@ def reject_taken_tasks(conn, now, project, epic, tasks, party):
             conflicts.append("{} is held by adventurer {}".format(tid, adventurer_id))
             continue
         quest_holder = quest_holders.get(tid)
+        if quest_holder is not None and quest_holder["party"] is None:
+            conflicts.append("{} is in open quest {}".format(tid, quest_holder["slug"]))
+            continue
         if quest_holder is not None:
             conflicts.append(
                 "{} is in quest {} of party {}".format(tid, quest_holder["slug"], quest_holder["party"])
@@ -259,8 +281,10 @@ def _require_followup_source(ctx, binding, source):
         )
 
 
-def add(ctx, slug, title, epic, tasks_csv, titles_csv, no_epic, followups_of):
+def add(ctx, slug, title, epic, tasks_csv, titles_csv, no_epic, followups_of, open_quest):
     names.validate_name(slug, "quest slug")
+    if open_quest and followups_of is not None:
+        raise GuildError("--followups-of cannot be combined with --open", 1)
     if followups_of is not None and (no_epic or epic is not None):
         raise GuildError("--followups-of cannot be combined with --epic or --no-epic", 1)
     free = no_epic or followups_of is not None
@@ -273,7 +297,8 @@ def add(ctx, slug, title, epic, tasks_csv, titles_csv, no_epic, followups_of):
     existing = ctx.conn.execute("SELECT slug FROM quests WHERE slug = ?", (slug,)).fetchone()
     if existing is not None:
         raise GuildError("quest '{}' already exists".format(slug), 1)
-    binding = identity.require_binding(ctx.conn, ctx.session_id)
+    binding = None if open_quest else identity.require_binding(ctx.conn, ctx.session_id)
+    party = None if open_quest else binding["party"]
     project = config.require_project(ctx.cwd, ctx.projects_dir)
     if followups_of is not None:
         _require_followup_source(ctx, binding, followups_of)
@@ -282,13 +307,13 @@ def add(ctx, slug, title, epic, tasks_csv, titles_csv, no_epic, followups_of):
         tasks = _free_tasks(tasks_csv, titles_csv)
     if not free:
         tasks = _resolve_epic_tasks(ctx.conn, project, epic, tasks_csv or "")
-        reject_taken_tasks(ctx.conn, ctx.now, project, epic, tasks, binding["party"])
+        reject_taken_tasks(ctx.conn, ctx.now, project, epic, tasks, "" if open_quest else party, False)
     with db.writing(ctx.conn):
         events.record(
             ctx.conn,
             ctx.now,
             ctx.origin,
-            binding["party"],
+            party,
             ctx.session_id,
             project,
             "quest.added",
@@ -296,7 +321,7 @@ def add(ctx, slug, title, epic, tasks_csv, titles_csv, no_epic, followups_of):
             {
                 "slug": slug,
                 "project": project,
-                "party": binding["party"],
+                "party": party,
                 "epic": epic,
                 "title": title,
                 "tasks": tasks,
@@ -304,3 +329,111 @@ def add(ctx, slug, title, epic, tasks_csv, titles_csv, no_epic, followups_of):
             },
         )
     return "quest '{}' added".format(slug)
+
+
+def _load_quest(conn, slug):
+    row = conn.execute(
+        "SELECT slug, project, party, epic, state FROM quests WHERE slug = ?", (slug,)
+    ).fetchone()
+    if row is None:
+        raise GuildError("unknown quest '{}'".format(slug), 1)
+    return row
+
+
+def _take(ctx, slug, party, project):
+    row = _load_quest(ctx.conn, slug)
+    if row["party"] is not None or row["state"] != "active":
+        raise GuildError("quest '{}' is not open".format(slug), 1)
+    if row["project"] != project:
+        raise GuildError("quest '{}' belongs to project '{}'".format(slug, row["project"]), 1)
+    with db.writing(ctx.conn):
+        events.record(
+            ctx.conn,
+            ctx.now,
+            ctx.origin,
+            party,
+            ctx.session_id,
+            project,
+            "quest.taken",
+            "local",
+            {"slug": slug, "party": party},
+        )
+    return "quest '{}' taken".format(slug)
+
+
+def take(ctx, slug):
+    binding = identity.require_binding(ctx.conn, ctx.session_id)
+    return _take(ctx, slug, binding["party"], binding["project"])
+
+
+def take_for_party(ctx, slug, party):
+    row = ctx.conn.execute("SELECT name, project, state FROM parties WHERE name = ?", (party,)).fetchone()
+    if row is None:
+        raise GuildError("unknown party '{}'".format(party), 1)
+    if row["state"] != "active":
+        raise GuildError("party '{}' is {}".format(party, row["state"]), 1)
+    return _take(ctx, slug, row["name"], row["project"])
+
+
+def _release_blockers(ctx, row):
+    blockers = []
+    tasks = ctx.conn.execute(
+        "SELECT tid, state FROM quest_tasks WHERE quest = ? ORDER BY tid", (row["slug"],)
+    ).fetchall()
+    blockers.extend("{} is {}".format(task["tid"], task["state"]) for task in tasks if task["state"] != "queued")
+    prs = ctx.conn.execute(
+        "SELECT repo, number FROM prs WHERE task_quest = ?"
+        " AND COALESCE(gh_state, 'OPEN') = 'OPEN' AND lifecycle NOT IN ('merged', 'closed')",
+        (row["slug"],),
+    ).fetchall()
+    blockers.extend("open PR {}#{}".format(pr["repo"], pr["number"]) for pr in prs)
+    prefix = _TASK_CLAIM_PREFIX.format(row["epic"] or row["slug"])
+    claims = ctx.conn.execute(
+        "SELECT area, expires_at FROM claims WHERE project = ? AND party = ?", (row["project"], row["party"])
+    ).fetchall()
+    task_tids = {task["tid"] for task in tasks}
+    for claim in claims:
+        if not claim["area"].startswith(prefix) or timeutil.is_expired(ctx.now, claim["expires_at"]):
+            continue
+        if claim["area"][len(prefix):] in task_tids:
+            blockers.append("claim {}".format(claim["area"]))
+    return blockers
+
+
+def _release(ctx, row):
+    if row["party"] is None:
+        raise GuildError("quest '{}' is already open".format(row["slug"]), 1)
+    if row["state"] != "active":
+        raise GuildError("quest '{}' is already {}".format(row["slug"], row["state"]), 1)
+    blockers = _release_blockers(ctx, row)
+    if blockers:
+        raise GuildError(
+            "quest '{}' cannot be released: {}".format(row["slug"], "; ".join(blockers)), 1
+        )
+    with db.writing(ctx.conn):
+        events.record(
+            ctx.conn,
+            ctx.now,
+            ctx.origin,
+            row["party"],
+            ctx.session_id,
+            row["project"],
+            "quest.released",
+            "local",
+            {"slug": row["slug"], "party": row["party"]},
+        )
+    return "quest '{}' released".format(row["slug"])
+
+
+def release(ctx, slug):
+    binding = identity.require_binding(ctx.conn, ctx.session_id)
+    row = _load_quest(ctx.conn, slug)
+    if row["party"] != binding["party"]:
+        raise GuildError(
+            "quest '{}' is not owned by party '{}'".format(slug, binding["party"]), 1
+        )
+    return _release(ctx, row)
+
+
+def release_for_owner(ctx, slug):
+    return _release(ctx, _load_quest(ctx.conn, slug))

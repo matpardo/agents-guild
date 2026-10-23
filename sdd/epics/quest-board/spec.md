@@ -2,7 +2,7 @@
 epic: quest-board
 type: spec
 title: Prepare quests ahead for parties to take
-status: draft
+status: active
 owner: matpardo
 created: 2026-10-23
 updated: 2026-10-23
@@ -20,10 +20,10 @@ A quest exists only once a party creates it, so planned work lives in SDD and in
 
 ## Scope
 
-- A quest may have no party: an open quest. `quests.party` becomes nullable.
+- A quest may have no party: an open quest (`quests.party` NULL, nullable by migration). A task inside an open quest counts as taken for other quests, `task add` and claims; an adventurer may still start on it with `adventurer start --task`.
 - `guild quest add --open` creates one from the human's terminal (no session), from a party session or from an adventurer. It keeps today's checks: synced epic and tasks, and tasks taken by another quest or claim are refused.
 - `guild quest take <slug>` gives an open quest to the session's party. A task an adventurer holds stays with the adventurer; the party gets the rest and `guild next` skips the held one.
-- `guild quest release <slug>` returns a quest with no started task to the board.
+- `guild quest release <slug>` returns a quest to the board while every task is queued, with no open PR and no claim.
 - `guild quest board [--project <name>]` lists open quests and, per synced epic, the tasks no quest covers.
 - `guild next` offers "take open quest X" to a party with nothing queued.
 - The web board gets a quest board section: create an open quest from an epic's free tasks, assign it to a party, release it. Every write goes through `sendPost` and the same `guild/commands` functions.
