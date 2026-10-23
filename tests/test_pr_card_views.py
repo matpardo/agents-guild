@@ -17,11 +17,7 @@ class CardPrViewsTestCase(GuildTestCase):
         config_file.write_text(json.dumps(data))
         self.run_cli(["party", "start", "alpha"], "sess-1", self.repo_dir)
         self.write_gh_fixture("view_acme-app_1", _OPEN_VIEW)
-        code, out, err = self.run_cli(
-            ["pr", "track", "acme/app#1", "--card", "ABC-123", "--what", "fix ci", "--waits", "review"],
-            "sess-1", self.repo_dir,
-        )
-        self.assertEqual(code, 0, err)
+        self.track_legacy_card_pr("alpha", "acme/app", 1, "ABC-123", "fix ci", "review", "feature/x")
 
     def _model(self):
         conn = db.connect(paths.db_path())
@@ -36,6 +32,33 @@ class CardPrViewsTestCase(GuildTestCase):
 
 
 class CardPrBoardTests(CardPrViewsTestCase):
+    def test_pr_on_a_queued_task_is_listed_outside_active_tasks(self):
+        self.run_cli(["quest", "add", "demo", "--title", "Demo", "--no-epic", "--tasks", "T01"], "sess-1", self.repo_dir)
+        self.write_gh_fixture("view_acme-app_2", _OPEN_VIEW)
+        code, out, err = self.run_cli(
+            ["pr", "track", "acme/app#2", "--task", "demo/T01", "--what", "queued work", "--waits", "review"],
+            "sess-1", self.repo_dir,
+        )
+        self.assertEqual(code, 0, err)
+        code, out, err = self.run_cli(["board"], None, None)
+        self.assertIn("queued work", out.split("PRs outside active tasks")[1])
+        self.assertEqual([pr["number"] for pr in self._model()["parties"][0]["prs"]], [1, 2])
+
+    def test_adventurer_pr_is_not_listed_under_the_party(self):
+        self.write_gh_fixture("view_acme-app_3", _OPEN_VIEW)
+        self.run_cli(["adventurer", "start", "fix typo"], "adv-1", self.repo_dir)
+        code, out, err = self.run_cli(
+            ["pr", "track", "acme/app#3", "--card", "ABC-9", "--what", "typo fix", "--waits", "review"],
+            "adv-1", self.repo_dir,
+        )
+        self.assertEqual(code, 0, err)
+        model = self._model()
+        self.assertEqual([pr["number"] for pr in model["parties"][0]["prs"]], [1])
+        self.assertEqual([pr["number"] for pr in model["adventurers"][0]["prs"]], [3])
+        code, out, err = self.run_cli(["board"], None, None)
+        party_block = out.split("adventurer 1")[0]
+        self.assertNotIn("typo fix", party_block)
+
     def test_cli_board_lists_the_card_under_prs_outside_active_tasks(self):
         code, out, err = self.run_cli(["board"], None, None)
         self.assertIn("PRs outside active tasks", out)

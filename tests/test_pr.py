@@ -161,9 +161,27 @@ class PrTrackCardTests(GuildTestCase):
             session_id, self.repo_dir,
         )
 
-    def test_card_without_task_stores_null_task_fields_and_the_card(self):
+    def _start_party_with_task(self):
         self.run_cli(["party", "start", "alpha"], "sess-1", self.repo_dir)
+        self.run_cli(["quest", "add", "demo", "--title", "Demo", "--no-epic", "--tasks", "T01"], "sess-1", self.repo_dir)
+
+    def test_card_without_task_is_rejected_for_a_party(self):
+        self._start_party_with_task()
         code, out, err = self._track("sess-1", ["--card", "ABC-123"])
+        self.assertEqual(code, 1)
+        self.assertIn("a party's PR belongs to one of its tasks", err)
+        self.assertIn("guild task add", err)
+        self.assertIn("guild quest add <slug> --no-epic", err)
+
+    def test_neither_task_nor_card_is_rejected_for_a_party(self):
+        self._start_party_with_task()
+        code, out, err = self._track("sess-1", [])
+        self.assertEqual(code, 1)
+        self.assertIn("a party's PR belongs to one of its tasks", err)
+
+    def test_task_together_with_card_stores_both(self):
+        self._start_party_with_task()
+        code, out, err = self._track("sess-1", ["--task", "demo/T01", "--card", "ABC-123"])
         self.assertEqual(code, 0, err)
         conn = sqlite3.connect(str(self.data_home / "guild" / "guild.db"))
         conn.row_factory = sqlite3.Row
@@ -171,20 +189,8 @@ class PrTrackCardTests(GuildTestCase):
         conn.close()
         self.assertEqual(
             (row["task_quest"], row["task_tid"], row["card"], row["party"]),
-            (None, None, "ABC-123", "alpha"),
+            ("demo", "T01", "ABC-123", "alpha"),
         )
-
-    def test_task_together_with_card_is_rejected(self):
-        self.run_cli(["party", "start", "alpha"], "sess-1", self.repo_dir)
-        code, out, err = self._track("sess-1", ["--task", "demo/T01", "--card", "ABC-123"])
-        self.assertEqual(code, 2)
-        self.assertIn("not allowed with argument", err)
-
-    def test_neither_task_nor_card_is_rejected(self):
-        self.run_cli(["party", "start", "alpha"], "sess-1", self.repo_dir)
-        code, out, err = self._track("sess-1", [])
-        self.assertEqual(code, 2)
-        self.assertIn("one of the arguments --task --card is required", err)
 
     def test_unbound_session_is_rejected(self):
         code, out, err = self._track("sess-1", ["--card", "ABC-123"])

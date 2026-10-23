@@ -2,7 +2,7 @@
 epic: quest-bound-work
 type: spec
 title: A party's work always belongs to a quest
-status: draft
+status: done
 owner: matpardo
 created: 2026-10-23
 updated: 2026-10-23
@@ -32,9 +32,9 @@ Every PR a party opens belongs to one of its quest tasks, so the board never sho
 
 ## Success criteria
 
-- [ ] A party cannot track a new PR without a task, from the CLI or the web.
-- [ ] An adventurer tracks a PR with `--task` or `--card`.
-- [ ] Old loose PRs still show and replay in `guild rebuild`.
+- [x] A party cannot track a new PR without a task, from the CLI or the web.
+- [x] An adventurer tracks a PR with `--task` or `--card`.
+- [x] Old loose PRs still show and replay in `guild rebuild`.
 
 ## Security and data
 

@@ -555,9 +555,7 @@ class CardLagTests(DriftTestCase):
             "view_acme-app_{}".format(number),
             {"state": "OPEN", "isDraft": True, "headRefName": "feature/{}".format(number), "title": "t"},
         )
-        argv = ["pr", "track", "acme/app#{}".format(number), "--card", card, "--what", "x", "--waits", "y"]
-        code, out, err = self.run_cli(argv, "sess-1", self.repo_dir)
-        self.assertEqual(code, 0, err)
+        self.track_legacy_card_pr("alpha", "acme/app", number, card, "x", "y", "feature/{}".format(number))
 
     def test_started_task_with_new_card_is_a_finding(self):
         self._record_cards([self._card("DEMO-90", "new", status="To Do")])

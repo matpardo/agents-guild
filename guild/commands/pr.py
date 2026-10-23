@@ -33,15 +33,25 @@ def _task_fields(ctx, task_ref):
 
 
 def _adventurer_work(adventurer, task_ref, card):
-    if card is not None or (task_ref is not None and task_ref == adventurer["task"]):
+    if adventurer["task"] is not None:
+        if task_ref == adventurer["task"]:
+            return
+        raise GuildError("an adventurer on a task tracks PRs with --task equal to its own task", 1)
+    if card is not None and task_ref is None:
         return
-    raise GuildError("an adventurer tracks PRs with --card or --task equal to its own task", 1)
+    raise GuildError("an adventurer with a free job tracks PRs with --card alone", 1)
 
 
 def _tracking_fields(ctx, task_ref, card):
     adventurer = identity.resolve_adventurer(ctx.conn, ctx.session_id)
     if adventurer is None:
         binding = identity.require_binding(ctx.conn, ctx.session_id)
+        if task_ref is None:
+            raise GuildError(
+                "a party's PR belongs to one of its tasks: add one with `guild task add <quest>/<tid>` "
+                "or `guild quest add <slug> --no-epic`",
+                1,
+            )
         quest, tid = _task_fields(ctx, task_ref)
         return binding["party"], binding["party"], None, quest, tid
     _adventurer_work(adventurer, task_ref, card)

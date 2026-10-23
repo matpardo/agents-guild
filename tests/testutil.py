@@ -9,7 +9,7 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
-from guild import cli
+from guild import cli, db, events, paths, timeutil
 from guild.cli import main
 from tests import fake_acli, fake_gh
 
@@ -138,6 +138,23 @@ class GuildTestCase(unittest.TestCase):
             if cwd is not None:
                 os.chdir(original_cwd)
         return exit_code, stdout.getvalue(), stderr.getvalue()
+
+    def track_legacy_card_pr(self, party, repo, number, card, what, waits, branch):
+        conn = db.connect(paths.db_path())
+        try:
+            with db.writing(conn):
+                events.record(
+                    conn, timeutil.utcnow(), "test@host", party, None, "acme", "pr.tracked", "guild",
+                    {
+                        "repo": repo, "number": number, "party": party, "adventurer": None,
+                        "task_quest": None, "task_tid": None, "card": card, "what": what,
+                        "waits": waits, "lifecycle": "draft", "needs_human_pr_review": 0,
+                        "fixes_main": 0, "fixes_flaky": 0, "branch": branch, "title": "t",
+                        "gh_state": "OPEN", "gh_draft": True, "seeded": 0,
+                    },
+                )
+        finally:
+            conn.close()
 
     def run_hook(self, hook_name, stdin_payload):
         stdout = io.StringIO()

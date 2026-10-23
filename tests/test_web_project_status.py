@@ -25,12 +25,7 @@ class ProjectStatusTestCase(BoardModelTestCase):
 
     def _track(self, number):
         self.write_gh_fixture("view_acme-app_{}".format(number), _VIEW)
-        code, _, err = self.run_cli(
-            ["pr", "track", "acme/app#{}".format(number), "--card", "ACME-{}".format(number),
-             "--what", "x", "--waits", "y"],
-            "sess-1", self.repo_dir,
-        )
-        self.assertEqual(code, 0, err)
+        self.track_legacy_card_pr("alpha", "acme/app", number, "ACME-{}".format(number), "x", "y", "feature/x")
 
     def _touch(self, number, path):
         ctx = self._ctx()

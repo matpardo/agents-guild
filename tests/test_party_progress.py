@@ -26,9 +26,7 @@ class PartyProgressTests(GuildTestCase):
 
     def _track_loose(self, number):
         self.write_gh_fixture("view_acme-app_{}".format(number), _OPEN_VIEW)
-        self._cli(
-            ["pr", "track", "acme/app#{}".format(number), "--card", "ABC-1", "--what", "w", "--waits", "r"]
-        )
+        self.track_legacy_card_pr("alpha", "acme/app", number, "ABC-1", "w", "r", "feature/x")
 
     def test_counts_queued_active_blocked_and_done(self):
         self._add_quest("demo", ["A", "B", "C", "D"])

@@ -263,16 +263,12 @@ class GhMergeNoticeTests(GuildTestCase):
         matches = [line for line in out.splitlines() if "acme/app#1 merged in main" in line]
         self.assertEqual(len(matches), 2)
 
-    def _track_loose(self, session_id, number, extra):
+    def _track_loose(self, number, card):
         self.write_gh_fixture(
             "view_acme-app_{}".format(number),
             {"state": "OPEN", "isDraft": True, "headRefName": "feature/y", "title": "t"},
         )
-        code, out, err = self.run_cli(
-            ["pr", "track", "acme/app#{}".format(number), "--what", "fix the pipe", "--waits", "y"] + extra,
-            session_id, self.repo_dir,
-        )
-        self.assertEqual(code, 0, err)
+        self.track_legacy_card_pr("alpha", "acme/app", number, card, "fix the pipe", "y", "feature/y")
         self.write_gh_fixture(
             "view_acme-app_{}".format(number),
             {
@@ -284,7 +280,7 @@ class GhMergeNoticeTests(GuildTestCase):
     def test_merge_notice_of_a_card_pr_shows_the_card(self):
         self.run_cli(["raid", "join", "release", "--ttl", "1h"], "sess-1", self.repo_dir)
         self.run_cli(["raid", "join", "release", "--ttl", "1h"], "sess-2", self.repo_dir)
-        self._track_loose("sess-1", 2, ["--card", "ABC-123"])
+        self._track_loose(2, "ABC-123")
         self.run_cli(["sync", "--source", "gh"], "sess-1", self.repo_dir)
         code, out, err = self.run_cli(["inbox", "--since-last"], "sess-2", self.repo_dir)
         self.assertIn("acme/app#2 merged in main (ABC-123: fix the pipe)", out)
