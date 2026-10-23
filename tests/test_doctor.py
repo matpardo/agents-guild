@@ -21,22 +21,9 @@ _ALL_HOOKS = {
     ],
 }
 
-_ASK_RULES = ["Bash(guild party start:*)", "Bash(guild quest add:*)"]
+_ASK_RULES = list(claude_settings.EXPECTED_ASK_RULES)
 
-_ALLOW_RULES = [
-    "Bash(guild task:*)",
-    "Bash(guild pr:*)",
-    "Bash(guild finding:*)",
-    "Bash(guild notice:*)",
-    "Bash(guild ask:*)",
-    "Bash(guild next:*)",
-    "Bash(guild claim:*)",
-    "Bash(guild release:*)",
-    "Bash(guild raid:*)",
-    "Bash(guild handoff:*)",
-    "Bash(guild sync:*)",
-    "Bash(guild memory:*)",
-]
+_ALLOW_RULES = list(claude_settings.EXPECTED_ALLOW_RULES)
 
 
 class DoctorTests(GuildTestCase):
@@ -73,19 +60,26 @@ class DoctorTests(GuildTestCase):
         self.assertNotIn("missing", out)
 
     def test_missing_ask_rule_fails_and_names_it(self):
-        self._write_full_settings(_ALL_HOOKS, ["Bash(guild quest add:*)"], _ALLOW_RULES)
+        self._write_full_settings(_ALL_HOOKS, ["Bash(guild raid join:*)"], _ALLOW_RULES)
         self._link_rules()
         code, out, err = self.run_cli(["doctor"], None, None)
         self.assertEqual(code, 1)
         self.assertIn("missing ask rule Bash(guild party start:*)", out)
-        self.assertIn("ok      ask rule Bash(guild quest add:*)", out)
+        self.assertIn("ok      ask rule Bash(guild raid join:*)", out)
+
+    def test_retired_ask_rule_warns(self):
+        self._write_full_settings(_ALL_HOOKS, _ASK_RULES + ["Bash(guild quest add:*)"], _ALLOW_RULES)
+        self._link_rules()
+        code, out, err = self.run_cli(["doctor"], None, None)
+        self.assertEqual(code, 0, out + err)
+        self.assertIn("warn    retired ask rule Bash(guild quest add:*) (run guild wire-settings)", out)
 
     def test_settings_without_permissions_reports_both_ask_rules(self):
         (self.home / ".claude" / "settings.json").write_text(json.dumps({"hooks": _ALL_HOOKS}))
         self._link_rules()
         code, out, err = self.run_cli(["doctor"], None, None)
         self.assertEqual(code, 1)
-        self.assertEqual(out.count("missing ask rule"), 2)
+        self.assertEqual(out.count("missing ask rule"), len(claude_settings.EXPECTED_ASK_RULES))
 
     def test_missing_hook_fails_and_names_it(self):
         hooks = dict(_ALL_HOOKS)
@@ -101,7 +95,7 @@ class DoctorTests(GuildTestCase):
         code, out, err = self.run_cli(["doctor"], None, None)
         self.assertEqual(code, 1)
         self.assertEqual(out.count("missing hook"), 10)
-        self.assertEqual(out.count("missing ask rule"), 2)
+        self.assertEqual(out.count("missing ask rule"), len(claude_settings.EXPECTED_ASK_RULES))
 
     def test_missing_notification_and_stop_hooks_fail_and_name_them(self):
         hooks = dict(_ALL_HOOKS)

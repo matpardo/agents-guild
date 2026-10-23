@@ -33,6 +33,15 @@ def _add_rules(settings, kind, expected_rules):
     return added
 
 
+def _remove_retired_ask_rules(settings):
+    configured = settings.get("permissions", {}).get("ask", [])
+    retired = [rule for rule in configured if rule in claude_settings.RETIRED_ASK_RULES]
+    if not retired:
+        return []
+    settings["permissions"]["ask"] = [rule for rule in configured if rule not in retired]
+    return ["removed ask rule {}".format(rule) for rule in retired]
+
+
 def _add_allow_rules(settings):
     configured = settings.get("permissions", {}).get("allow", [])
     if any(rule in configured for rule in claude_settings.BLANKET_ALLOW_RULES):
@@ -45,6 +54,7 @@ def run():
     settings = claude_settings.load_settings(settings_path)
     original = settings_path.read_bytes() if settings_path.is_file() else None
     added = _add_hooks(settings)
+    added.extend(_remove_retired_ask_rules(settings))
     added.extend(_add_rules(settings, "ask", claude_settings.EXPECTED_ASK_RULES))
     added.extend(_add_allow_rules(settings))
     if not added:

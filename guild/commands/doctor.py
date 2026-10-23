@@ -35,6 +35,9 @@ def _ask_rule_lines(settings):
         present = rule in configured
         status = "ok     " if present else "missing"
         lines.append((present, "{} ask rule {}".format(status, rule)))
+    for rule in claude_settings.RETIRED_ASK_RULES:
+        if rule in configured:
+            lines.append((True, "warn    retired ask rule {} (run guild wire-settings)".format(rule)))
     return lines
 
 

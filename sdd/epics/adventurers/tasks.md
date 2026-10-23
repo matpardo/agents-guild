@@ -69,3 +69,13 @@ updated: 2026-10-23
 
 **Acceptance:**
 - [x] `tests/test_no_traces.py` covers adventurer ids and pending text.
+
+## T07 — Binding commands ask, quest add does not
+
+**Depends on:** T02
+**Status:** [x] done — #202
+
+**What:** `permissions.ask` holds `party start`, `party resume`, `raid join` and `adventurer start`; `quest` and `adventurer` join the allow list. `guild wire-settings` removes the retired `quest add` ask rule and `guild doctor` warns while it remains (decisión del dev, 2026-10-23).
+
+**Acceptance:**
+- [x] A wired settings file prompts for every binding command and never for `guild quest add`.
