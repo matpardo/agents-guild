@@ -21,7 +21,7 @@ Each guild lives on one machine. Requests between teams arrive as md files copie
 ## Scope
 
 - A hub that any machine runs with `guild realm serve`, including one that runs a guild. It is a file store with no commands: one status file per guild and one inbox per guild.
-- HTTPS with a self-signed certificate pinned by its SHA-256 fingerprint; one token per member guild, stored as a hash on the hub. The sender comes from the token, never from the body.
+- HTTPS with a self-signed certificate pinned by its SHA-256 fingerprint, TLS 1.3 only; one token per member guild, stored as a hash on the hub. The sender comes from the token, never from the body.
 - Guilds connect only outbound to the hub; the hub never reads or writes a guild database. Nothing remote writes into a guild.
 - `guild realm push` sends a status of counts only (per project: parties, open quests, open PRs, ready PRs, open asks, red main). `guild realm status` and the web board show every guild's status.
 - `guild realm send|inbox|fetch|drop` carry md files to another guild's inbox. The inbox is for the human: hooks never inject a file into a session.

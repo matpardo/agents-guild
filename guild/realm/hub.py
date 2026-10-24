@@ -291,7 +291,7 @@ def make_server(config):
     paths.ensure_private_dir(_status_dir(server))
     paths.ensure_private_dir(server.store_dir / "inbox")
     context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
-    context.minimum_version = ssl.TLSVersion.TLSv1_2
+    context.minimum_version = ssl.TLSVersion.TLSv1_3
     context.load_cert_chain(config["cert"], config["key"])
     server.socket = context.wrap_socket(server.socket, server_side=True, do_handshake_on_connect=False)
     return server

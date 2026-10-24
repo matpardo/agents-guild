@@ -183,6 +183,18 @@ class RealmHubTests(GuildTestCase):
         for _ in slots:
             self.server.connection_slots.release()
 
+    def test_client_capped_at_tls12_is_refused(self):
+        context = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
+        context.maximum_version = ssl.TLSVersion.TLSv1_2
+        context.check_hostname = False
+        context.verify_mode = ssl.CERT_NONE
+        connection = http.client.HTTPSConnection("127.0.0.1", self.port, context=context, timeout=10)
+        try:
+            with self.assertRaises(ssl.SSLError):
+                connection.connect()
+        finally:
+            connection.close()
+
     def test_handle_error_is_quiet_for_tls_and_connection_errors(self):
         for error in (ssl.SSLError("x"), ConnectionResetError(), TimeoutError()):
             stderr = io.StringIO()

@@ -2,7 +2,10 @@ import http.client
 import json
 import os
 import shutil
+import socket
+import ssl
 import stat
+import threading
 import unittest
 from unittest import mock
 
@@ -11,7 +14,7 @@ from guild.commands import doctor as doctor_commands
 from guild.commands import realm as realm_commands
 from guild.context import RunContext
 from guild.errors import GuildError
-from guild.realm import client, clientconfig, pin, snapshot, status
+from guild.realm import client, clientconfig, hubconfig, pin, snapshot, status
 from tests import realm_hub_fixture
 from tests.testutil import GuildTestCase
 
@@ -112,10 +115,54 @@ class RealmClientTests(GuildTestCase):
         sent.assert_not_called()
         self.assertIn("fingerprint mismatch: expected {}, got {}".format(wrong, self.fingerprint), raised.exception.message)
 
+    def _serve(self, wrap):
+        listener = socket.socket()
+        listener.bind(("127.0.0.1", 0))
+        listener.listen(1)
+        self.addCleanup(listener.close)
+
+        def accept():
+            try:
+                peer, _ = listener.accept()
+            except OSError:
+                return
+            try:
+                wrap(peer)
+            except OSError:
+                pass
+            finally:
+                peer.close()
+
+        thread = threading.Thread(target=accept, daemon=True)
+        thread.start()
+        self.addCleanup(thread.join)
+        return "https://127.0.0.1:{}".format(listener.getsockname()[1])
+
+    def _assert_tls_refused(self, url):
+        config = {"url": url, "fingerprint": self.fingerprint, "guild": "alpha", "token": self.tokens["alpha"]}
+        with mock.patch.object(http.client.HTTPSConnection, "request") as sent:
+            with self.assertRaises(GuildError) as raised:
+                client.request(config, "GET", "/status", None)
+        sent.assert_not_called()
+        self.assertEqual(
+            "realm hub refused the TLS 1.3 handshake (downgrade or not a realm hub)", raised.exception.message
+        )
+
+    def test_tls12_only_hub_is_refused_before_the_token_is_sent(self):
+        hub_config = hubconfig.load()
+        context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+        context.maximum_version = ssl.TLSVersion.TLSv1_2
+        context.load_cert_chain(hub_config["cert"], hub_config["key"])
+        self._assert_tls_refused(self._serve(lambda peer: context.wrap_socket(peer, server_side=True)))
+
+    def test_plain_http_peer_is_refused_before_the_token_is_sent(self):
+        self._assert_tls_refused(self._serve(lambda peer: peer.sendall(b"HTTP/1.0 400 Bad Request\r\n\r\n")))
+
     def test_unreachable_hub_is_a_guild_error(self):
         config = {"url": "https://127.0.0.1:1", "fingerprint": self.fingerprint, "guild": "alpha", "token": "t"}
-        with self.assertRaises(GuildError):
+        with self.assertRaises(GuildError) as raised:
             client.request(config, "GET", "/status", None)
+        self.assertIn("realm hub unreachable: ", raised.exception.message)
 
     def test_oversize_response_is_refused(self):
         config = {"url": self.url, "fingerprint": self.fingerprint, "guild": "alpha", "token": self.tokens["alpha"]}
