@@ -2,6 +2,8 @@ from guild.commands import idea as idea_commands
 
 _CLOSED_LIFECYCLES = ("merged", "closed")
 
+STALE_PR_NOTE = "(PR state as of last sync)"
+
 
 def _pr_lines(rows):
     lines = []

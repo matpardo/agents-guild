@@ -145,6 +145,26 @@ class PartyCloseTests(GuildTestCase):
         self.assertEqual(code, 0, err)
         self.assertEqual(self._row("SELECT state FROM parties WHERE name = ?", ("alpha",))["state"], "closed")
 
+    def test_close_refreshes_a_stale_pr_merged_on_github(self):
+        self._track_open_pr()
+        self.write_gh_fixture(
+            "view_acme-app_1",
+            {"state": "MERGED", "isDraft": False, "headRefName": "feature/x", "title": "t", "mergedAt": "2026-01-01T00:00:00Z"},
+        )
+        self.run_cli(["dismiss", "1"], None, None)
+        code, out, err = self.run_cli(["party", "close", "alpha", "--pending", "none"], None, None)
+        self.assertEqual(code, 0, err)
+        self.assertIn("acme/app#1 | x | merged", out)
+        self.assertNotIn("tracked PRs still open", out)
+
+    def test_close_notes_the_last_sync_when_gh_fails(self):
+        self._track_open_pr()
+        self.write_gh_error("view_acme-app_1", "boom")
+        code, out, err = self.run_cli(["party", "close", "alpha", "--force", "--pending", "none"], None, None)
+        self.assertEqual(code, 0, err)
+        self.assertIn("acme/app#1 | x | open", out)
+        self.assertIn("(PR state as of last sync)", out)
+
     def test_close_refuses_with_open_ask(self):
         code, out, err = self.run_cli(["party", "close", "alpha", "--pending", "none"], None, None)
         self.assertEqual(code, 1)
@@ -154,8 +174,13 @@ class PartyCloseTests(GuildTestCase):
 
     def test_close_refuses_with_open_pr_and_unseen_comments(self):
         self._track_open_pr()
+        comments = [{"author": {"login": "bot"}, "createdAt": "2026-10-20T11:00:00Z"} for _ in range(5)]
+        self.write_gh_fixture(
+            "view_acme-app_1",
+            {"state": "OPEN", "isDraft": True, "headRefName": "feature/x", "title": "t", "comments": comments},
+        )
         conn = sqlite3.connect(str(self.data_home / "guild" / "guild.db"))
-        conn.execute("UPDATE prs SET review_comment_count = 5, last_notified_comment_count = 2")
+        conn.execute("UPDATE prs SET last_notified_comment_count = 2")
         conn.execute("UPDATE asks SET state = 'dismissed'")
         conn.commit()
         conn.close()
