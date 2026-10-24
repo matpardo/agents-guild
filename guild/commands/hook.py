@@ -908,47 +908,116 @@ def pre_pr_owner(ctx, command):
     return None
 
 
-_GUILD_MODULE_INVOKERS = ("python", "python3")
 _DENIED_ANSWER_SUBCOMMANDS = ("answer", "dismiss")
 _ANSWER_DENY_REASON = (
     "guild: agents cannot answer or dismiss an ask; only a human may run this outside a session"
 )
+_REALM_DENY_REASON = (
+    "guild: agents cannot run realm commands other than status; only a human may run this outside a session"
+)
+_PYTHON_RE = re.compile(r"python(3(\.\d+)?)?")
+_GUILD_MODULES = ("guild", "guild.cli")
+_REALM_WRAPPERS = ("nohup", "time", "exec", "xargs", "env", "command", "sudo")
+_REALM_SHELLS = ("bash", "sh", "zsh", "dash")
+_SEGMENT_BREAKS = frozenset(("&&", "||", ";", ";;", "|", "|&", "&", "(", ")", "{", "}", "!", "$("))
 
 
-def _guild_subcommand(tokens):
+def _skip_wrappers(tokens):
+    while tokens:
+        if _ASSIGNMENT_TOKEN_RE.match(tokens[0]):
+            tokens = tokens[1:]
+            continue
+        if Path(tokens[0]).name not in _REALM_WRAPPERS:
+            return tokens
+        tokens = tokens[1:]
+        while tokens and (tokens[0].startswith("-") or tokens[0].isdigit()):
+            tokens = tokens[1:]
+    return tokens
+
+
+def _is_shell_c_cluster(token):
+    return token.startswith("-") and not token.startswith("--") and "c" in token[1:]
+
+
+def _hook_segments(command):
+    segments = []
+    current = []
+    for token in _tokenize_command(command) + [";"]:
+        if token in _SEGMENT_BREAKS or set(token) <= set("&|;()"):
+            segments.append(current)
+            current = []
+            continue
+        current.append(token.lstrip("`"))
+    expanded = []
+    for raw in segments:
+        tokens = _skip_wrappers(raw)
+        if len(tokens) >= 3 and Path(tokens[0]).name in _REALM_SHELLS:
+            cluster = next((index for index, token in enumerate(tokens[1:], 1) if _is_shell_c_cluster(token)), None)
+            if cluster is not None and cluster + 1 < len(tokens):
+                expanded.extend(_hook_segments(tokens[cluster + 1]))
+                continue
+        expanded.append(tokens)
+    return expanded
+
+
+def _guild_words(tokens):
     if not tokens:
-        return None
+        return []
     name = Path(tokens[0]).name
     if name == "guild":
         rest = tokens[1:]
-    elif name in _GUILD_MODULE_INVOKERS and tokens[1:3] == ["-m", "guild"]:
-        rest = tokens[3:]
+    elif _PYTHON_RE.fullmatch(name):
+        starts = [
+            index + 2 for index in range(len(tokens) - 1)
+            if tokens[index] == "-m" and tokens[index + 1] in _GUILD_MODULES
+        ]
+        if not starts:
+            return []
+        rest = tokens[starts[0]:]
     else:
-        return None
-    for token in rest:
-        if not token.startswith("-"):
-            return token
-    return None
+        return []
+    return [token for token in rest if not token.startswith("-")]
 
 
-def _answer_deny_result():
+def _deny_result(reason):
     return {
         "hookSpecificOutput": {
             "hookEventName": "PreToolUse",
             "permissionDecision": "deny",
-            "permissionDecisionReason": _ANSWER_DENY_REASON,
+            "permissionDecisionReason": reason,
         }
     }
 
 
+def _segment_deny_reason(tokens):
+    words = _guild_words(tokens)
+    if words[:1] and words[0] in _DENIED_ANSWER_SUBCOMMANDS:
+        return _ANSWER_DENY_REASON
+    if words[:1] == ["realm"] and words[1:2] != ["status"]:
+        return _REALM_DENY_REASON
+    return None
+
+
+def _unparseable_deny_reason(command):
+    if re.search(r"\bguild\b", command) is None:
+        return None
+    if re.search(r"\b(answer|dismiss)\b", command):
+        return _ANSWER_DENY_REASON
+    if re.search(r"\brealm\b", command):
+        return _REALM_DENY_REASON
+    return None
+
+
 def pre_answer(command):
     try:
-        segments = _push_segments(command)
+        segments = _hook_segments(command)
     except ValueError:
-        return None
+        reason = _unparseable_deny_reason(command)
+        return None if reason is None else _deny_result(reason)
     for tokens in segments:
-        if _guild_subcommand(tokens) in _DENIED_ANSWER_SUBCOMMANDS:
-            return _answer_deny_result()
+        reason = _segment_deny_reason(tokens)
+        if reason is not None:
+            return _deny_result(reason)
     return None
 
 

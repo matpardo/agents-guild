@@ -34,6 +34,18 @@ def projects_config_dir():
     return config_dir() / "projects"
 
 
+def realm_hub_config_path():
+    return config_dir() / "realm-hub.json"
+
+
+def realm_hub_pki_dir():
+    return config_dir() / "realm-hub"
+
+
+def realm_hub_store_dir():
+    return data_dir() / "realm-hub"
+
+
 def handoffs_dir():
     return data_dir() / "handoffs"
 

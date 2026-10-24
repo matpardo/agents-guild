@@ -18,7 +18,7 @@ updated: 2026-10-24
 ## T02 — Realm hub
 
 **Depends on:** T01
-**Status:** [ ] pending
+**Status:** [x] done
 
 **What:** `guild realm init|serve|member`: HTTPS file store with pinned certificate, per-guild tokens, routes and limits.
 
