@@ -9,8 +9,8 @@ class RaidPauseTestCase(GuildTestCase):
     def setUp(self):
         super().setUp()
         self.repo_dir = self.register_project("acme", ["acme/app"])
-        self.run_cli(["party", "start", "alpha"], "sess-1", self.repo_dir)
-        self.run_cli(["party", "start", "beta"], "sess-2", self.repo_dir)
+        self.run_cli(["party", "start", "alpha", "--reason", "test reason"], "sess-1", self.repo_dir)
+        self.run_cli(["party", "start", "beta", "--reason", "test reason"], "sess-2", self.repo_dir)
         self.run_cli(["raid", "join", "ci", "--ttl", "8h"], "sess-1", self.repo_dir)
         self.run_cli(["raid", "join", "ci", "--ttl", "8h"], "sess-2", self.repo_dir)
 
@@ -44,7 +44,7 @@ class PauseResumeCommandTests(RaidPauseTestCase):
         self.assertEqual(self._pause_row("ci")["paused_by"], "beta")
 
     def test_non_member_cannot_pause(self):
-        self.run_cli(["party", "start", "gamma"], "sess-3", self.repo_dir)
+        self.run_cli(["party", "start", "gamma", "--reason", "test reason"], "sess-3", self.repo_dir)
         code, out, err = self.run_cli(["raid", "pause", "ci"], "sess-3", self.repo_dir)
         self.assertEqual(code, 1)
         self.assertIn("not a member of raid 'ci'", err)
@@ -146,7 +146,7 @@ class PauseNextTests(RaidPauseTestCase):
         self.assertIn("T01", out)
 
     def test_next_unaffected_for_party_outside_raid(self):
-        self.run_cli(["party", "start", "gamma"], "sess-3", self.repo_dir)
+        self.run_cli(["party", "start", "gamma", "--reason", "test reason"], "sess-3", self.repo_dir)
         self._queue_task("sess-3", "solo")
         self.run_cli(["raid", "pause", "ci"], "sess-1", self.repo_dir)
         code, out, err = self.run_cli(["next"], "sess-3", self.repo_dir)

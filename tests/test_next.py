@@ -13,7 +13,7 @@ class NextTestCase(GuildTestCase):
     def setUp(self):
         super().setUp()
         self.repo_dir = self.register_project("acme", ["acme/app"])
-        self.run_cli(["party", "start", "alpha"], "sess-1", self.repo_dir)
+        self.run_cli(["party", "start", "alpha", "--reason", "test reason"], "sess-1", self.repo_dir)
 
     def _set_next_config(self, stale_hours):
         config_file = self.config_home / "guild" / "projects" / "acme.json"
@@ -295,7 +295,7 @@ class Tier4Tests(NextTestCase):
         self.assertIn("wave1/T02: open ask #1", out)
 
     def test_claim_by_other_party_blocks_task(self):
-        self.run_cli(["party", "start", "beta"], "sess-2", self.repo_dir)
+        self.run_cli(["party", "start", "beta", "--reason", "test reason"], "sess-2", self.repo_dir)
         self.run_cli(["claim", "task:compliance/T02", "--ttl", "8h"], "sess-2", self.repo_dir)
         code, out, err = self.run_cli(["next"], "sess-1", self.repo_dir)
         self.assertIn("nothing actionable", out)
@@ -375,7 +375,7 @@ class RaidMemberWorkTests(NextTestCase):
     def setUp(self):
         super().setUp()
         self.run_cli(["raid", "join", "ci", "--until-leave"], "sess-1", self.repo_dir)
-        self.run_cli(["party", "start", "beta"], "sess-2", self.repo_dir)
+        self.run_cli(["party", "start", "beta", "--reason", "test reason"], "sess-2", self.repo_dir)
         self.run_cli(["raid", "join", "ci", "--until-leave"], "sess-2", self.repo_dir)
         self.run_cli(["quest", "add", "bq", "--title", "B", "--no-epic"], "sess-2", self.repo_dir)
         self.run_cli(["task", "add", "bq/T01", "--title", "First"], "sess-2", self.repo_dir)

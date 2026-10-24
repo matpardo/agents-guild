@@ -9,7 +9,7 @@ class QuestAddValidationTests(GuildTestCase):
     def setUp(self):
         super().setUp()
         self.repo_dir = self.register_project("acme", ["acme/app"])
-        self.run_cli(["party", "start", "alpha"], "sess-1", self.repo_dir)
+        self.run_cli(["party", "start", "alpha", "--reason", "test reason"], "sess-1", self.repo_dir)
 
     def test_quest_add_without_project_fails(self):
         code, out, err = self.run_cli(
@@ -193,7 +193,7 @@ class QuestFollowupsTests(GuildTestCase):
     def setUp(self):
         super().setUp()
         self.repo_dir = self.register_project("acme", ["acme/app"])
-        self.run_cli(["party", "start", "alpha"], "sess-1", self.repo_dir)
+        self.run_cli(["party", "start", "alpha", "--reason", "test reason"], "sess-1", self.repo_dir)
         self.run_cli(["quest", "add", "src", "--title", "Source", "--no-epic"], "sess-1", self.repo_dir)
 
     def test_followups_creates_no_epic_quest_with_tasks(self):
@@ -234,7 +234,7 @@ class QuestFollowupsTests(GuildTestCase):
         self.assertIn("unknown quest 'ghost'", err)
 
     def test_followups_rejects_source_of_other_party(self):
-        self.run_cli(["party", "start", "beta"], "sess-2", self.repo_dir)
+        self.run_cli(["party", "start", "beta", "--reason", "test reason"], "sess-2", self.repo_dir)
         code, out, err = self.run_cli(
             ["quest", "add", "next", "--followups-of", "src", "--title", "Next"],
             "sess-2",
@@ -277,8 +277,8 @@ class QuestAddConflictTests(GuildTestCase):
     def setUp(self):
         super().setUp()
         self.repo_dir = self.register_project("acme", ["acme/app"])
-        self.run_cli(["party", "start", "alpha"], "sess-1", self.repo_dir)
-        self.run_cli(["party", "start", "beta"], "sess-2", self.repo_dir)
+        self.run_cli(["party", "start", "alpha", "--reason", "test reason"], "sess-1", self.repo_dir)
+        self.run_cli(["party", "start", "beta", "--reason", "test reason"], "sess-2", self.repo_dir)
         self.sync_sdd(
             self.repo_dir,
             "sess-1",
@@ -412,7 +412,7 @@ class TaskLifecycleTests(GuildTestCase):
     def setUp(self):
         super().setUp()
         self.repo_dir = self.register_project("acme", ["acme/app"])
-        self.run_cli(["party", "start", "alpha"], "sess-1", self.repo_dir)
+        self.run_cli(["party", "start", "alpha", "--reason", "test reason"], "sess-1", self.repo_dir)
         self.run_cli(
             ["quest", "add", "demo", "--title", "Demo", "--no-epic"], "sess-1", self.repo_dir
         )
@@ -466,7 +466,7 @@ class TaskLifecycleTests(GuildTestCase):
             "sess-1",
             self.repo_dir,
         )
-        self.run_cli(["party", "start", "beta"], "sess-2", self.repo_dir)
+        self.run_cli(["party", "start", "beta", "--reason", "test reason"], "sess-2", self.repo_dir)
         self.run_cli(
             ["quest", "add", "betaq", "--title", "B", "--epic", "compliance", "--tasks", "T01"],
             "sess-2",
@@ -528,7 +528,7 @@ class TaskLifecycleTests(GuildTestCase):
 
     def test_other_party_cannot_mutate_task(self):
         self.run_cli(["task", "add", "demo/T01", "--title", "First"], "sess-1", self.repo_dir)
-        self.run_cli(["party", "start", "beta"], "sess-2", self.repo_dir)
+        self.run_cli(["party", "start", "beta", "--reason", "test reason"], "sess-2", self.repo_dir)
         code, out, err = self.run_cli(["task", "start", "demo/T01"], "sess-2", self.repo_dir)
         self.assertEqual(code, 1)
         self.assertIn("owned by party", err)

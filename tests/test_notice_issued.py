@@ -19,8 +19,8 @@ class NoticeIssuedTests(GuildTestCase):
         time.tzset()
         self.addCleanup(time.tzset)
         self.repo_dir = self.register_project("acme", ["acme/app"])
-        self.run_cli(["party", "start", "alpha"], "sess-1", self.repo_dir)
-        self.run_cli(["party", "start", "beta"], "sess-2", self.repo_dir)
+        self.run_cli(["party", "start", "alpha", "--reason", "test reason"], "sess-1", self.repo_dir)
+        self.run_cli(["party", "start", "beta", "--reason", "test reason"], "sess-2", self.repo_dir)
         self._create_at(_OLDER, "older notice")
         self._create_at(_NEWER, "newer notice")
 

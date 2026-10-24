@@ -3,7 +3,7 @@ epic: adventurers
 type: tasks
 title: Adventurers do one job and report what is pending
 status: done
-updated: 2026-10-23
+updated: 2026-10-24
 ---
 
 # Tasks: Adventurers do one job and report what is pending
@@ -100,3 +100,16 @@ updated: 2026-10-23
 
 **Acceptance:**
 - [x] The unbound hint says to bind only when the work will change a repo.
+
+## T10 — Sessions bind themselves with a recorded reason
+
+**Depends on:** T09
+**Status:** [x] done
+
+**What:** `party start` and `adventurer start` need no human permission and require `--reason`, stored on the event, the party or adventurer row, the board and the web with the start time. `guild adventurer promote <party> --reason` turns the active adventurer into a party led by the same session; its PRs move to the party. `task add` and `quest add` take an optional `--reason`. `party resume` and `raid join` still raise a permission prompt (decisión del dev, 2026-10-24).
+
+**Acceptance:**
+- [x] `wire-settings` drops the retired start ask rules and keeps resume and raid join.
+- [x] Both starts refuse a missing, empty or sensitive reason.
+- [x] `adventurer promote` creates the party, ends the adventurer as promoted and moves its PRs.
+- [x] The board and the web show reason, start time and the adventurer a party came from.

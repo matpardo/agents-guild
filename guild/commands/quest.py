@@ -1,6 +1,6 @@
 import json
 
-from guild import config, db, events, identity, names, timeutil
+from guild import config, db, events, identity, names, pii, timeutil
 from guild.commands import achievement, drift, sync
 from guild.errors import GuildError
 
@@ -287,7 +287,19 @@ def _require_new_slug(ctx, slug):
         raise GuildError("quest '{}' already exists".format(slug), 1)
 
 
-def _record_added(ctx, party, project, slug, title, epic, tasks, followups_of):
+def _record_added(ctx, party, project, slug, title, epic, tasks, followups_of, reason):
+    payload = {
+        "slug": slug,
+        "project": project,
+        "party": party,
+        "epic": epic,
+        "title": title,
+        "tasks": tasks,
+        "followups_of": followups_of,
+    }
+    if reason is not None:
+        pii.validate_reason(reason, ctx.projects_dir, project)
+        payload["reason"] = reason
     with db.writing(ctx.conn):
         events.record(
             ctx.conn,
@@ -298,15 +310,7 @@ def _record_added(ctx, party, project, slug, title, epic, tasks, followups_of):
             project,
             "quest.added",
             "local",
-            {
-                "slug": slug,
-                "project": project,
-                "party": party,
-                "epic": epic,
-                "title": title,
-                "tasks": tasks,
-                "followups_of": followups_of,
-            },
+            payload,
         )
     return "quest '{}' added".format(slug)
 
@@ -319,10 +323,10 @@ def add_open(ctx, project, slug, title, epic, tids):
         raise GuildError("select at least one task", 1)
     tasks = _resolve_epic_tasks(ctx.conn, project, epic, ",".join(tids))
     reject_taken_tasks(ctx.conn, ctx.now, project, epic, tasks, "", False)
-    return _record_added(ctx, None, project, slug, title, epic, tasks, None)
+    return _record_added(ctx, None, project, slug, title, epic, tasks, None, None)
 
 
-def add(ctx, slug, title, epic, tasks_csv, titles_csv, no_epic, followups_of, open_quest):
+def add(ctx, slug, title, epic, tasks_csv, titles_csv, no_epic, followups_of, open_quest, reason):
     names.validate_name(slug, "quest slug")
     if open_quest and followups_of is not None:
         raise GuildError("--followups-of cannot be combined with --open", 1)
@@ -347,7 +351,7 @@ def add(ctx, slug, title, epic, tasks_csv, titles_csv, no_epic, followups_of, op
     if not free:
         tasks = _resolve_epic_tasks(ctx.conn, project, epic, tasks_csv or "")
         reject_taken_tasks(ctx.conn, ctx.now, project, epic, tasks, "" if open_quest else party, False)
-    return _record_added(ctx, party, project, slug, title, epic, tasks, followups_of)
+    return _record_added(ctx, party, project, slug, title, epic, tasks, followups_of, reason)
 
 
 def _load_quest(conn, slug):

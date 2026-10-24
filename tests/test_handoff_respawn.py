@@ -52,7 +52,7 @@ class FakeTmux:
 
 
 class RespawnBase(GuildTestCase):
-    start_args = ["party", "start", "alpha"]
+    start_args = ["party", "start", "alpha", "--reason", "test reason"]
 
     def setUp(self):
         super().setUp()

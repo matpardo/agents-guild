@@ -396,6 +396,9 @@ _COLUMN_MIGRATIONS = (
     ("prs", "head_sha", "TEXT"),
     ("notices", "unbound", "INTEGER"),
     ("main_status", "external", "TEXT"),
+    ("parties", "reason", "TEXT"),
+    ("parties", "from_adventurer", "INTEGER"),
+    ("adventurers", "reason", "TEXT"),
 )
 
 

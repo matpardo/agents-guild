@@ -18,15 +18,18 @@ EXPECTED_HOOKS = (
 )
 
 EXPECTED_ASK_RULES = (
-    "Bash(guild party start:*)",
     "Bash(guild party resume:*)",
     "Bash(guild raid join:*)",
+)
+
+RETIRED_ASK_RULES = (
+    "Bash(guild quest add:*)",
+    "Bash(guild party start:*)",
     "Bash(guild adventurer start:*)",
 )
 
-RETIRED_ASK_RULES = ("Bash(guild quest add:*)",)
-
 EXPECTED_ALLOW_RULES = (
+    "Bash(guild party:*)",
     "Bash(guild task:*)",
     "Bash(guild quest:*)",
     "Bash(guild adventurer:*)",

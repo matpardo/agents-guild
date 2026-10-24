@@ -51,7 +51,7 @@ class QuestBoardTestCase(GuildTestCase):
         )
 
     def start_party(self, name, session_id):
-        self.ok(["party", "start", name], session_id)
+        self.ok(["party", "start", name, "--reason", "test reason"], session_id)
 
 
 class OpenQuestSchemaTests(GuildTestCase):
@@ -83,7 +83,7 @@ class OpenQuestAddTests(QuestBoardTestCase):
     def test_party_and_adventurer_add_open_quests(self):
         self.start_party("alpha", "sess-1")
         self.open_quest("by-party", "T02", "sess-1")
-        self.ok(["adventurer", "start", "plan"], "adv-1")
+        self.ok(["adventurer", "start", "plan", "--reason", "test reason"], "adv-1")
         self.open_quest("by-adv", "T03", "adv-1")
         self.assertEqual(
             [r["slug"] for r in self.rows("SELECT slug FROM quests WHERE party IS NULL ORDER BY slug")],
@@ -122,7 +122,7 @@ class OpenQuestAddTests(QuestBoardTestCase):
             ["quest", "add", "x", "--open", "--title", "x", "--epic", "nope", "--tasks", "T01"], None
         )
         self.assertEqual(code, 1)
-        self.ok(["adventurer", "start", "job", "--task", "demo-epic/T03"], "adv-1")
+        self.ok(["adventurer", "start", "job", "--task", "demo-epic/T03", "--reason", "test reason"], "adv-1")
         code, out, err = self.cli(
             ["quest", "add", "x", "--open", "--title", "x", "--epic", "demo-epic", "--tasks", "T03"], None
         )
@@ -162,7 +162,7 @@ class TakeReleaseTests(QuestBoardTestCase):
     def test_take_refusals(self):
         self.open_quest("pre", "T02", None)
         self.assertEqual(self.cli(["quest", "take", "pre"], None)[0], 1)
-        self.ok(["adventurer", "start", "job"], "adv-1")
+        self.ok(["adventurer", "start", "job", "--reason", "test reason"], "adv-1")
         code, out, err = self.cli(["quest", "take", "pre"], "adv-1")
         self.assertEqual(code, 1)
         self.start_party("alpha", "sess-1")
@@ -179,7 +179,7 @@ class TakeReleaseTests(QuestBoardTestCase):
 
     def test_held_task_stays_and_is_skipped_until_adventurer_done(self):
         self.open_quest("pre", "T02,T03", None)
-        self.ok(["adventurer", "start", "job", "--task", "demo-epic/T02"], "adv-1")
+        self.ok(["adventurer", "start", "job", "--task", "demo-epic/T02", "--reason", "test reason"], "adv-1")
         self.assertEqual(self.rows("SELECT quest FROM quest_tasks WHERE tid = 'T02'")[0]["quest"], "pre")
         self.start_party("alpha", "sess-1")
         self.ok(["quest", "take", "pre"], "sess-1")
@@ -196,11 +196,11 @@ class TakeReleaseTests(QuestBoardTestCase):
             ["quest", "add", "free", "--open", "--title", "F", "--no-epic", "--tasks", "a,b", "--titles", "A,B"],
             None,
         )
-        self.ok(["adventurer", "start", "job", "--task", "free/a"], "adv-1")
-        code, out, err = self.cli(["adventurer", "start", "job2", "--task", "free/a"], "adv-2")
+        self.ok(["adventurer", "start", "job", "--task", "free/a", "--reason", "test reason"], "adv-1")
+        code, out, err = self.cli(["adventurer", "start", "job2", "--task", "free/a", "--reason", "test reason"], "adv-2")
         self.assertEqual(code, 1)
         self.assertIn("held by adventurer 1", err)
-        self.assertEqual(self.cli(["adventurer", "start", "job2", "--task", "free/zz"], "adv-2")[0], 1)
+        self.assertEqual(self.cli(["adventurer", "start", "job2", "--task", "free/zz", "--reason", "test reason"], "adv-2")[0], 1)
 
     def test_release_returns_untouched_quest(self):
         self.open_quest("pre", "T02", None)
@@ -259,7 +259,7 @@ class TakeReleaseTests(QuestBoardTestCase):
 
     def test_take_for_party_refuses_other_project_and_closed_party(self):
         other = self.register_project("beta", ["acme/other"])
-        self.run_cli(["party", "start", "gamma"], "sess-9", other)
+        self.run_cli(["party", "start", "gamma", "--reason", "test reason"], "sess-9", other)
         self.open_quest("pre", "T02", None)
         with self.assertRaises(GuildError):
             quest_commands.take_for_party(self.ctx(), "pre", "gamma")
@@ -279,7 +279,7 @@ class TakeReleaseTests(QuestBoardTestCase):
 class QuestBoardCommandTests(QuestBoardTestCase):
     def test_board_lists_open_quests_and_free_tasks(self):
         self.open_quest("pre", "T02", None)
-        self.ok(["adventurer", "start", "job", "--task", "demo-epic/T02"], "adv-1")
+        self.ok(["adventurer", "start", "job", "--task", "demo-epic/T02", "--reason", "test reason"], "adv-1")
         self.start_party("alpha", "sess-1")
         self.ok(["quest", "add", "mine", "--title", "m", "--epic", "demo-epic", "--tasks", "T03"], "sess-1")
         out = self.ok(["quest", "board"], None)
@@ -294,7 +294,7 @@ class QuestBoardCommandTests(QuestBoardTestCase):
     def test_board_hides_claimed_and_held_and_done_epics(self):
         self.start_party("alpha", "sess-1")
         self.ok(["claim", "task:demo-epic/T01", "--ttl", "1h"], "sess-1")
-        self.ok(["adventurer", "start", "job", "--task", "demo-epic/T02"], "adv-1")
+        self.ok(["adventurer", "start", "job", "--task", "demo-epic/T02", "--reason", "test reason"], "adv-1")
         out = self.ok(["quest", "board", "--project", "acme"], None)
         self.assertNotIn("T01", out)
         self.assertNotIn("T02", out)

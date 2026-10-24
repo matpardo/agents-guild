@@ -15,7 +15,7 @@ class TaskBriefBase(GuildTestCase):
     def setUp(self):
         super().setUp()
         self.repo_dir = self.register_project("acme", ["acme/app"])
-        self.run_cli(["party", "start", "alpha"], "sess-1", self.repo_dir)
+        self.run_cli(["party", "start", "alpha", "--reason", "test reason"], "sess-1", self.repo_dir)
         self.run_cli(["quest", "add", "demo", "--title", "Demo", "--no-epic"], "sess-1", self.repo_dir)
         self.run_cli(["task", "add", "demo/T01", "--title", "First"], "sess-1", self.repo_dir)
         self.run_cli(["task", "add", "demo/T02", "--title", "Second"], "sess-1", self.repo_dir)
@@ -272,7 +272,7 @@ class FieldAndBoundTests(TaskBriefBase):
 
     def test_very_long_party_name_stays_within_budget(self):
         name = "p" * 5000
-        self.run_cli(["party", "start", name], "sess-9", self.repo_dir)
+        self.run_cli(["party", "start", name, "--reason", "test reason"], "sess-9", self.repo_dir)
         self.run_cli(["quest", "add", "demo9", "--title", "D", "--no-epic"], "sess-9", self.repo_dir)
         self.run_cli(["task", "add", "demo9/T01", "--title", "First"], "sess-9", self.repo_dir)
         code, out, err = self.run_cli(["brief", "{}/demo9/T01".format(name)], None, None)
@@ -353,7 +353,7 @@ class ErrorTests(TaskBriefBase):
         self.assertFails("alpha/demo/T01", "party is closed")
 
     def test_foreign_quest(self):
-        self.run_cli(["party", "start", "beta"], "sess-2", self.repo_dir)
+        self.run_cli(["party", "start", "beta", "--reason", "test reason"], "sess-2", self.repo_dir)
         self.assertFails("beta/demo/T01", "quest not owned by party")
 
     def test_unknown_task(self):

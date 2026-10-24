@@ -32,7 +32,7 @@ class MemoryActionTests(MemoryWebTestCase):
         self.assertIn("unknown memory item", self._error(payload))
 
     def test_rm_from_the_web_is_allowed_on_any_party(self):
-        self.run_cli(["party", "start", "beta"], "sess-2", self.repo_dir)
+        self.run_cli(["party", "start", "beta", "--reason", "test reason"], "sess-2", self.repo_dir)
         self.run_cli(["memory", "add", "beta note"], "sess-2", self.repo_dir)
         response, payload = self._memory_rm("beta", 1)
         self.assertEqual(response.status, 200)

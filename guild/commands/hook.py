@@ -119,7 +119,9 @@ def _auto_adventurer_lines(ctx, health_job, source):
     if identity.resolve_adventurer(ctx.conn, ctx.session_id) is not None:
         return []
     try:
-        return [adventurer_commands.start(ctx, None, None, health_job)]
+        return [adventurer_commands.start(
+            ctx, None, None, health_job, "health job {} launched by the human".format(health_job)
+        )]
     except GuildError as error:
         return ["GUILD_ADVENTURER_JOB={} not applied: {}".format(health_job, error.message)]
 

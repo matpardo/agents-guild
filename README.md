@@ -98,7 +98,7 @@ re-runs `guild wire-settings`, which only adds what is missing and drops retired
 
 `guild doctor` checks, read-only, that every guild hook is wired in
 `~/.claude/settings.json` (including `Notification` and `Stop`), that its
-`permissions.ask` holds the opt-in binding rules (see "Hooks"), that
+`permissions.ask` holds the `party resume` and `raid join` rules (see "Hooks"), that
 `~/.claude/GUILD.md` exists and that every project config loads; it exits 1
 and names what is missing. It also checks that the guild state commands are in
 `permissions.allow` (see "Hooks"); a missing allow rule is a `warn` line and
@@ -122,11 +122,11 @@ guild doctor [--scan-prs]   # read-only checks: hooks, permission rules, GUILD.m
 guild init-project <name> --config <file.json>
 guild wire-settings   # merge guild hooks and permission rules into ~/.claude/settings.json
 
-guild party start <name>                         # refused while this session leads another active party
+guild party start <name> --reason "<why>"       # no permission prompt; refused while this session leads another active party
 guild party resume <party> [--session <name>]   # --session: from a human terminal only
 guild party close [<party>] --pending "<text>" [--force]  # <party>: from a terminal, or your own party; --pending none when nothing is left; --force overrides the quest done gate
 
-guild quest add <slug> --title "..." --epic <slug> [--tasks T09,T07b]   # without --tasks: an empty epic quest
+guild quest add <slug> --title "..." --epic <slug> [--tasks T09,T07b] [--reason "<why>"]   # without --tasks: an empty epic quest; --reason is optional on every quest add
 guild quest add <slug> --title "..." --no-epic [--tasks A,B [--titles "First,Second"]]
 guild quest add <slug> --title "..." --followups-of <quest> [--tasks A,B [--titles ...]]
 guild quest add <slug> --open --title "..." (--epic <slug> --tasks T09 | --no-epic --tasks A,B --titles "First,Second")   # open quest no party owns; works with no session
@@ -136,7 +136,7 @@ guild quest board [--project <name>]   # open quests and the synced SDD tasks no
 guild quest done <slug> [--accept-drift] [--force]   # refuses while tasks are not done; --force overrides
 guild quest incomplete <slug> --reason "..."          # a done quest that was not really finished
 
-guild task add <quest>/<tid> --title "..."          # open quests of your party, epic quests included
+guild task add <quest>/<tid> --title "..." [--reason "<why>"]   # open quests of your party, epic quests included
 guild task start <quest>/<tid> [--summary "..."]
 guild task block <quest>/<tid> --reason "..."
 guild task done  <quest>/<tid> [--summary "..."]   # epic quests: also mark it done in the epic's tasks.md
@@ -176,8 +176,9 @@ guild idea link <id> [--party <name>]     # a session links its own party; the h
 guild idea unlink <id> [--party <name>]
 guild ideas [<id> | --project <name>]   # sorted by deadline, no deadline last; overdue marked; <id> shows one in full
 
-guild adventurer start "<job>" [--task <epic>/<tid>]   # this session becomes an adventurer; never a party leader
-guild adventurer start --job <name>                     # the same for a health job of the project config; no job text, no --task
+guild adventurer start "<job>" --reason "<why>" [--task <epic>/<tid>]   # this session becomes an adventurer; no permission prompt
+guild adventurer start --job <name> --reason "<why>"    # the same for a health job of the project config; no job text, no --task
+guild adventurer promote <party> --reason "<why>"       # the active adventurer becomes the leader of a new party; its PRs move to it
 guild adventurer launch <name>                          # human terminal only: tmux window running a health job in the project's first path
 guild adventurer done --pending "<text>"                # ends it; `--pending none` is the explicit empty report
 guild adventurer dismiss <id>                           # removes a done adventurer from the board
@@ -1244,11 +1245,23 @@ card lists its ideas. `POST /api/ideas/<id>/link` and `/unlink` (body
 ### Adventurers
 
 An adventurer is one session doing one job on one project: `guild adventurer
-start "<job>"` registers the session (the project comes from the cwd and must
+start "<job>" --reason "<why>"` registers the session (the project comes from the cwd and must
 be registered), and `--task <epic>/<tid>` ties it to one synced SDD task. A
 session is a party leader, an adventurer or unbound, never two: `adventurer
 start` refuses a session that leads a party or is already an adventurer, and
 `party start` / `party resume` refuse an active adventurer.
+
+The session chooses the role itself when its work will change a repo: one PR
+job is an adventurer, several PRs or quests a party. `--reason` is required on
+`adventurer start` and `party start` (same email, secret and project-pattern
+checks as `--pending`), is stored on the event and shown on the board, in
+`guild adventurers <id>` and in the web with the start time. Neither start
+raises a permission prompt. When the work outgrows one job,
+`guild adventurer promote <party> --reason "<why>"` makes the same session the
+leader of a new party: the adventurer ends as `promoted`, its PRs move to the
+party and the party records the adventurer it came from. The adventurer's task
+is not moved: the leader adds it to a quest with `guild quest add ... --tasks`.
+This is the only way a session changes identity.
 
 `--task` refuses an unknown task, a task in an active quest, a task under a
 live `task:<epic>/<tid>` claim and a task another active adventurer holds.
@@ -1937,8 +1950,9 @@ message, a wrong type `400`.
 
 Actor resolution: `CLAUDE_CODE_SESSION_ID` (or, for hooks, the `session_id`
 field on stdin) → `leaders` table → party. An unbound session cannot write;
-it gets refused with a hint to run `guild party start <name>` or
-`guild party resume <party>`. Reads always work.
+it gets refused with a hint to run `guild party start <name> --reason "<why>"`,
+`guild adventurer start "<job>" --reason "<why>"` or `guild party resume <party>`.
+Reads always work.
 
 No session id at all (a plain terminal) resolves to the actor `human`,
 allowed for `answer`, `dismiss`, `notice create|close|seen|unseen`,
@@ -2333,12 +2347,11 @@ which merges this block and keeps what is already there:
   },
   "permissions": {
     "ask": [
-      "Bash(guild party start:*)",
       "Bash(guild party resume:*)",
-      "Bash(guild raid join:*)",
-      "Bash(guild adventurer start:*)"
+      "Bash(guild raid join:*)"
     ],
     "allow": [
+      "Bash(guild party:*)",
       "Bash(guild task:*)",
       "Bash(guild quest:*)",
       "Bash(guild adventurer:*)",
@@ -2360,20 +2373,22 @@ which merges this block and keeps what is already there:
 
 The `allow` list keeps guild state commands from raising a Claude Code
 permission prompt, which stalls the session until a human answers it.
-The `ask` rules win over `allow`, so `guild party start`, `guild party resume`,
-`guild raid join` and `guild adventurer start` always prompt: they bind a session
-or create a raid. `guild quest add` and `guild task add` need no approval.
-`guild wire-settings` removes the retired `Bash(guild quest add:*)` ask rule and
-`guild doctor` warns while it is still there. A blanket `Bash(guild:*)` or
+The `ask` rules win over `allow`, so `guild party resume` and `guild raid join`
+always prompt: they bind a session to an existing party or join a raid.
+`guild party start`, `guild adventurer start`, `guild quest add` and
+`guild task add` need no approval.
+`guild wire-settings` removes the retired `Bash(guild quest add:*)`,
+`Bash(guild party start:*)` and `Bash(guild adventurer start:*)` ask rules and
+`guild doctor` warns while they are still there. A blanket `Bash(guild:*)` or
 `Bash(guild *)` entry also satisfies `guild doctor`.
 
 **Opt-in binding.** A session never needs a party. The unbound hint says to
-resume a party when the work continues one, and otherwise to ask the human
-whether the work is a party or an adventurer only when the work will change a
-repo. Sessions that answer questions, investigate or run commands stay unbound.
-The `permissions.ask` rules make Claude Code ask the human before every
-`guild party start`, `guild party resume`, `guild raid join` and
-`guild adventurer start`, whatever the model decides.
+resume a party when the work continues one, and otherwise to pick a party or an
+adventurer itself, with a reason, only when the work will change a repo; it asks
+the human only when unsure. Sessions that answer questions, investigate or run
+commands stay unbound. The `permissions.ask` rules make Claude Code ask the human
+before every `guild party resume` and `guild raid join`, whatever the model
+decides.
 
 **Commit guard (git).** `pre-edit` only sees the Edit/Write family of tools.
 Agents that write files through Bash (`cat > file <<EOF`, `python3 -`,

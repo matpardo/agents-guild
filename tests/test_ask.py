@@ -10,7 +10,7 @@ class AskTests(GuildTestCase):
     def setUp(self):
         super().setUp()
         self.repo_dir = self.register_project("acme", ["acme/app"])
-        self.run_cli(["party", "start", "alpha"], "sess-1", self.repo_dir)
+        self.run_cli(["party", "start", "alpha", "--reason", "test reason"], "sess-1", self.repo_dir)
         self.run_cli(["quest", "add", "demo", "--title", "Demo", "--no-epic"], "sess-1", self.repo_dir)
         self.run_cli(["task", "add", "demo/T01", "--title", "First"], "sess-1", self.repo_dir)
         self.conn = db.connect(paths.db_path())
@@ -331,7 +331,7 @@ class AnswerPiiScopeTests(GuildTestCase):
         data = json.loads(config_file.read_text())
         data["pii_patterns"] = [r"\bID-\d{6}\b"]
         config_file.write_text(json.dumps(data))
-        self.run_cli(["party", "start", "alpha"], "sess-1", repo_dir)
+        self.run_cli(["party", "start", "alpha", "--reason", "test reason"], "sess-1", repo_dir)
         self.run_cli(["quest", "add", "demo", "--title", "Demo", "--no-epic"], "sess-1", repo_dir)
         self.run_cli(["task", "add", "demo/T01", "--title", "First"], "sess-1", repo_dir)
         self.run_cli(["ask", "who?", "--context", "c", "--ref", "task:demo/T01"], "sess-1", repo_dir)

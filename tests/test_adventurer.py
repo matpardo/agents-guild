@@ -16,7 +16,7 @@ class AdventurerTestCase(GuildTestCase):
         return self.run_cli(argv, session_id, self.repo_dir)
 
     def start(self, session_id, job, *extra):
-        return self.cli(["adventurer", "start", job] + list(extra), session_id)
+        return self.cli(["adventurer", "start", job, "--reason", "test reason"] + list(extra), session_id)
 
     def rows(self, sql):
         conn = sqlite3.connect(str(paths.db_path()))
@@ -45,11 +45,11 @@ class AdventurerCommandTests(AdventurerTestCase):
         self.assertEqual(self.start("adv-1", "mail me@x.com")[0], 1)
 
     def test_start_refuses_unregistered_project(self):
-        code, out, err = self.run_cli(["adventurer", "start", "x"], "adv-1", self.root)
+        code, out, err = self.run_cli(["adventurer", "start", "x", "--reason", "test reason"], "adv-1", self.root)
         self.assertEqual(code, 1)
 
     def test_start_refuses_party_leader_and_second_start(self):
-        self.cli(["party", "start", "alpha"], "sess-1")
+        self.cli(["party", "start", "alpha", "--reason", "test reason"], "sess-1")
         code, out, err = self.start("sess-1", "x")
         self.assertEqual(code, 1)
         self.assertIn("leads party", err)
@@ -59,9 +59,9 @@ class AdventurerCommandTests(AdventurerTestCase):
         self.assertIn("already an adventurer", err)
 
     def test_party_start_and_resume_refuse_an_adventurer(self):
-        self.cli(["party", "start", "alpha"], "sess-1")
+        self.cli(["party", "start", "alpha", "--reason", "test reason"], "sess-1")
         self.start("adv-1", "x")
-        for argv in (["party", "start", "beta"], ["party", "resume", "alpha"]):
+        for argv in (["party", "start", "beta", "--reason", "test reason"], ["party", "resume", "alpha"]):
             code, out, err = self.cli(argv, "adv-1")
             self.assertEqual(code, 1, argv)
             self.assertIn("adventurer", err)
@@ -69,7 +69,7 @@ class AdventurerCommandTests(AdventurerTestCase):
     def test_start_task_refusals(self):
         self.assertEqual(self.start("adv-1", "x", "--task", "demo-epic/T99")[0], 1)
         self.assertEqual(self.start("adv-1", "x", "--task", "bad")[0], 1)
-        self.cli(["party", "start", "alpha"], "sess-1")
+        self.cli(["party", "start", "alpha", "--reason", "test reason"], "sess-1")
         self.cli(["quest", "add", "qa", "--title", "qa", "--epic", "demo-epic", "--tasks", "T01"], "sess-1")
         code, out, err = self.start("adv-1", "x", "--task", "demo-epic/T01")
         self.assertEqual(code, 1)
@@ -126,7 +126,7 @@ class AdventurerCommandTests(AdventurerTestCase):
 class AdventurerHoldsTaskTests(AdventurerTestCase):
     def setUp(self):
         super().setUp()
-        self.cli(["party", "start", "alpha"], "sess-1")
+        self.cli(["party", "start", "alpha", "--reason", "test reason"], "sess-1")
         self.start("adv-1", "x", "--task", "demo-epic/T02")
 
     def test_quest_add_skips_the_held_task(self):
@@ -214,7 +214,7 @@ class AdventurerPermissionTests(AdventurerTestCase):
         self.cli(["adventurer", "done", "--pending", "none"], "adv-1")
         self.start("adv-2", "free job")
         self.cli(["pr", "track", "acme/app#1", "--card", "ABC-1", "--what", "w", "--waits", "r"], "adv-2")
-        self.cli(["party", "start", "alpha"], "sess-1")
+        self.cli(["party", "start", "alpha", "--reason", "test reason"], "sess-1")
         code, out, err = self.cli(["sync", "--source", "gh"], None)
         self.assertEqual(code, 0, err)
         for argv, session in (

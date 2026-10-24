@@ -1,4 +1,4 @@
-from guild import db, events, identity, timeutil
+from guild import db, events, identity, pii, timeutil
 from guild.commands import drift as drift_commands
 from guild.commands import next as next_commands
 from guild.commands import quest as quest_commands
@@ -40,7 +40,7 @@ def _with_sdd_hint(message, quest_row, hint_template, tid):
     return "{}\n{}".format(message, hint_template.format(tid, quest_row["epic"]))
 
 
-def add(ctx, quest, tid, title):
+def add(ctx, quest, tid, title, reason):
     quest_row = _load_quest(ctx, quest)
     binding = identity.require_binding(ctx.conn, ctx.session_id)
     _require_owner(binding, quest_row)
@@ -55,6 +55,10 @@ def add(ctx, quest, tid, title):
         quest_commands.reject_taken_tasks(
             ctx.conn, ctx.now, quest_row["project"], quest_row["epic"], [{"tid": tid}], binding["party"], False
         )
+    payload = {"quest": quest, "tid": tid, "title": title}
+    if reason is not None:
+        pii.validate_reason(reason, ctx.projects_dir, quest_row["project"])
+        payload["reason"] = reason
     with db.writing(ctx.conn):
         events.record(
             ctx.conn,
@@ -65,7 +69,7 @@ def add(ctx, quest, tid, title):
             quest_row["project"],
             "task.added",
             "local",
-            {"quest": quest, "tid": tid, "title": title},
+            payload,
         )
     return _with_sdd_hint(
         "task '{}/{}' added".format(quest, tid), quest_row, "add {} to {} tasks.md in the SDD", tid

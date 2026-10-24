@@ -259,6 +259,7 @@ var NO_SESSION_MESSAGE = "session token not loaded, reload the page";
       askBlocks: "How many references (tasks, PRs) still wait on this ask; 0 may mean the list is stale.",
       mainRed: "The main branch of this repo is failing; fix it before merging anything else.",
       mainBlocked: "CI cannot run on main because of an external cause; re-run main once it is fixed.",
+      bindingReason: "Why the session chose this role when it started; recorded by the session itself.",
       generation: "How many times the party's leader session was replaced.",
       ctxHigh: "The leader session is near its context limit and should run guild handoff soon.",
       ctx: "Context used by the leader session / the percentage at which it is nudged to run guild handoff.",
@@ -1578,6 +1579,7 @@ var NO_SESSION_MESSAGE = "session token not loaded, reload the page";
       parts.push("task " + adventurer.task);
     }
     parts.push(adventurer.live ? "live" : "stopped");
+    parts.push("started " + adventurer.started);
     return parts.join(" · ");
   }
 
@@ -1600,6 +1602,9 @@ var NO_SESSION_MESSAGE = "session token not loaded, reload the page";
     article.className = "card adventurer";
     article.appendChild(textEl("h3", "adventurer " + adventurer.id + " " + adventurer.job));
     article.appendChild(classedText("p", adventurerMeta(adventurer), "muted"));
+    if (adventurer.reason !== null) {
+      article.appendChild(explain(textEl("p", "reason: " + adventurer.reason), "ui", "bindingReason"));
+    }
     if (adventurer.stopped_without_report) {
       article.appendChild(classedText("span", STOPPED_WITHOUT_REPORT_TEXT, "pill stopped-without-report"));
     }
@@ -2497,6 +2502,23 @@ var NO_SESSION_MESSAGE = "session token not loaded, reload the page";
     return line;
   }
 
+  function partyOrigin(party) {
+    var parts = [];
+    if (party.started !== null) {
+      parts.push("started " + party.started);
+    }
+    if (party.from_adventurer !== null) {
+      parts.push("from adventurer " + party.from_adventurer);
+    }
+    if (party.reason !== null) {
+      parts.push("reason: " + party.reason);
+    }
+    if (parts.length === 0) {
+      return null;
+    }
+    return parts.join(" · ");
+  }
+
   function renderParty(party) {
     var details = el("details");
     details.className = "party";
@@ -2524,6 +2546,11 @@ var NO_SESSION_MESSAGE = "session token not loaded, reload the page";
     var leaderKey = party.leader_session_name ? "leader" : "noLeader";
     summary.appendChild(explain(textEl("span", party.leader_session_name || "no leader"), "ui", leaderKey));
     details.appendChild(summary);
+
+    var origin = partyOrigin(party);
+    if (origin !== null) {
+      details.appendChild(explain(textEl("p", origin), "ui", "bindingReason"));
+    }
 
     var partyWaits = renderPartyWaits(party.waits);
     if (partyWaits) {

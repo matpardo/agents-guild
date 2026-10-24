@@ -565,6 +565,15 @@ def _leader_session_name(conn, party_name):
     return leader["session_name"]
 
 
+def _party_started_label(conn, party_name):
+    row = conn.execute(
+        "SELECT started_at FROM leaders WHERE party = ? AND generation = 1", (party_name,)
+    ).fetchone()
+    if row is None:
+        return None
+    return timeutil.issued_label(row["started_at"])
+
+
 def _leader_label(ctx, party_row):
     session_name = _leader_session_name(ctx.conn, party_row["name"]) or "no leader"
     role = raid_commands.raid_role_label(
@@ -718,6 +727,8 @@ def _party_section(ctx, painter, party_row, project_config):
             painter.paint(_leader_label(ctx, party_row), "dim"),
         )
     ]
+    if party_row["reason"]:
+        lines.extend(painter.wrap("reason: {}".format(sanitize.strip_control_sequences(party_row["reason"])), "  "))
     status = party_status.derive(ctx, party_row)
     lines.append(
         painter.paint("  status: {}".format(party_status.label(ctx, status)), _STATUS_STYLES[status["status"]])
@@ -813,6 +824,8 @@ def _adventurer_lines(ctx, painter):
                 ", ".join(part for part in parts if part),
             )
         )
+        if row["reason"]:
+            lines.extend(painter.wrap("reason: {}".format(sanitize.strip_control_sequences(row["reason"])), "    "))
         if _adventurer_stopped(row, live_ids):
             lines.append(painter.paint("    " + STOPPED_WITHOUT_REPORT, "red"))
         if row["state"] == "done":
@@ -1021,6 +1034,8 @@ def _adventurer_model(ctx, row, live_ids, projects_by_name):
         "task": row["task"],
         "state": row["state"],
         "pending": _optional_text(row["pending"]),
+        "reason": _optional_text(row["reason"]),
+        "started": timeutil.issued_label(row["started_at"]),
         "live": row["session_id"] in live_ids,
         "stopped_without_report": _adventurer_stopped(row, live_ids),
         "prs": [_pr_model(ctx, pr_row, project_config) for pr_row in _adventurer_pr_rows(ctx.conn, row["id"])],
@@ -1126,6 +1141,9 @@ def _party_model(ctx, party_row, project_config):
         "name": party_row["name"],
         "state": party_row["state"],
         "generation": party_row["generation"],
+        "reason": _optional_text(party_row["reason"]),
+        "from_adventurer": party_row["from_adventurer"],
+        "started": _party_started_label(ctx.conn, party_row["name"]),
         "status": _status_model(ctx, party_row),
         "remaining": party_progress.remaining(ctx.conn, party_row["name"]),
         "waits": party_waits.for_party(ctx, party_row),

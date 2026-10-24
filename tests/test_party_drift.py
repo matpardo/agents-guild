@@ -6,7 +6,7 @@ class PartyDriftTestCase(DriftTestCase):
     def setUp(self):
         super().setUp()
         self.write_session(2, "sess-2", "beta-session")
-        self.run_cli(["party", "start", "beta"], "sess-2", self.repo_dir)
+        self.run_cli(["party", "start", "beta", "--reason", "test reason"], "sess-2", self.repo_dir)
         self._write_epic(
             "wave9", "status: active\n",
             "## T01 — First\n\n**JIRA:** DEMO-90\n**Deps:** —\n**Status:** [ ] pending\n",

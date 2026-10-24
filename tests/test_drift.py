@@ -24,7 +24,7 @@ class DriftTestCase(GuildTestCase):
         self.sdd_root = self.project_root / "sdd-docs"
         self._write_project_config()
         self.write_session(1, "sess-1", "alpha-session")
-        self.run_cli(["party", "start", "alpha"], "sess-1", self.repo_dir)
+        self.run_cli(["party", "start", "alpha", "--reason", "test reason"], "sess-1", self.repo_dir)
         self.conn = db.connect(paths.db_path())
 
     def _write_project_config(self):
@@ -276,14 +276,14 @@ class PrClosedUnmergedTests(DriftTestCase):
 
 class PartyWithoutLeaderTests(DriftTestCase):
     def test_active_party_with_no_matching_session_is_a_finding(self):
-        self.run_cli(["party", "start", "beta"], "sess-2", self.repo_dir)
+        self.run_cli(["party", "start", "beta", "--reason", "test reason"], "sess-2", self.repo_dir)
         code, out, err = self._drift()
         self.assertEqual(code, 0, err)
         self.assertIn("party has no running leader (1)", out)
         self.assertIn("party beta: leader session not running: resume or hand off", out)
 
     def test_awaiting_leader_party_is_not_a_finding(self):
-        self.run_cli(["party", "start", "beta"], "sess-2", self.repo_dir)
+        self.run_cli(["party", "start", "beta", "--reason", "test reason"], "sess-2", self.repo_dir)
         self.run_cli(
             ["handoff", "--in-flight", "still going", "--learned", "nothing new"],
             "sess-2", self.repo_dir,

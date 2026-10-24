@@ -34,7 +34,7 @@ class StatuslineTests(GuildTestCase):
 
     def test_shows_open_asks_and_notices(self):
         repo_dir = self.register_project("acme", ["acme/app"])
-        self.run_cli(["party", "start", "alpha"], "sess-1", repo_dir)
+        self.run_cli(["party", "start", "alpha", "--reason", "test reason"], "sess-1", repo_dir)
         self.run_cli(["quest", "add", "demo", "--title", "Demo", "--no-epic"], "sess-1", repo_dir)
         self.run_cli(["task", "add", "demo/T01", "--title", "First"], "sess-1", repo_dir)
         self.run_cli(
@@ -52,7 +52,7 @@ class StatuslineIdentityTests(GuildTestCase):
     def setUp(self):
         super().setUp()
         self.repo_dir = self.register_project("acme", ["acme/app"])
-        self.run_cli(["party", "start", "alpha"], "sess-1", self.repo_dir)
+        self.run_cli(["party", "start", "alpha", "--reason", "test reason"], "sess-1", self.repo_dir)
 
     def _statusline(self, session):
         code, out, err = self.run_cli(["statusline", "--session", session], None, None)
@@ -94,8 +94,8 @@ class StatuslineBlockedTests(GuildTestCase):
     def setUp(self):
         super().setUp()
         self.repo_dir = self.register_project("acme", ["acme/app"])
-        self.run_cli(["party", "start", "alpha"], "sess-1", self.repo_dir)
-        self.run_cli(["party", "start", "beta"], "sess-2", self.repo_dir)
+        self.run_cli(["party", "start", "alpha", "--reason", "test reason"], "sess-1", self.repo_dir)
+        self.run_cli(["party", "start", "beta", "--reason", "test reason"], "sess-2", self.repo_dir)
 
     def _block(self, session_id):
         self.run_hook(

@@ -34,7 +34,7 @@ class InstallScriptTests(unittest.TestCase):
         self.assertEqual((self.home / ".claude" / "GUILD.md").resolve(), _REPO_ROOT / "GUILD.md")
         settings = json.loads((self.home / ".claude" / "settings.json").read_text())
         self.assertIn("SessionStart", settings["hooks"])
-        self.assertIn("Bash(guild party start:*)", settings["permissions"]["ask"])
+        self.assertIn("Bash(guild party resume:*)", settings["permissions"]["ask"])
         self.assertIn("added hook Stop: guild hook stop", result.stdout)
 
     def test_rerun_reports_already_wired(self):
