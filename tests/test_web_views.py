@@ -132,6 +132,75 @@ class WebViewBehaviorTests(unittest.TestCase):
             with self.subTest(hash=hash_value):
                 self.assertEqual(self._hidden(hash_value), _PANE_IDS - ids)
 
+def _state_party(name, raids, status, **extra):
+    party = _party(name, raids)
+    party["status"] = {"name": status, "label": status}
+    party["remaining"] = {"all_done": False, "pending": 2, "extra_prs": 0, "quests": []}
+    party.update(extra)
+    return party
+
+
+def _walk(node, found):
+    found.append(node)
+    for child in node["children"]:
+        _walk(child, found)
+    return found
+
+
+_STATE_BOARD = dict(
+    _BOARD,
+    raids=[{"name": "r", "members": ["w", "q", "k"], "paused": False}],
+    parties=[
+        _state_party("w", ["r"], "working"),
+        _state_party("q", ["r"], "queued", stopped_without_report=True),
+        _state_party("k", ["r"], "waiting-ask"),
+        _state_party("p", [], "waiting-permission"),
+        _state_party("i", [], "idle"),
+        _state_party("h", [], "idle", ctx={"pct": 80, "threshold": 70, "source": "configured", "high": True}),
+    ],
+    asks=[{"party": "k"}, {"party": "k"}],
+)
+
+
+@unittest.skipIf(shutil.which("node") is None, "node not installed")
+class WebSidebarStateTests(unittest.TestCase):
+    def _nodes(self):
+        return _walk(json.loads(_render(_STATE_BOARD, "", "sidebar", "tree")), [])
+
+    def _text(self):
+        return _render(_STATE_BOARD, "", "sidebar", "text")
+
+    def test_party_rows_carry_a_status_badge_class(self):
+        classes = [node["className"] for node in self._nodes()]
+        for name in ("working", "queued", "waiting-ask", "waiting-permission", "idle"):
+            with self.subTest(status=name):
+                self.assertIn("status-badge status-" + name, classes)
+
+    def test_ask_count_pill_only_for_parties_with_asks(self):
+        pills = [node["text"] for node in self._nodes() if node["className"] == "pill ask-count"]
+        self.assertEqual(pills, ["2 asks"])
+
+    def test_stopped_without_report_pill(self):
+        pills = [node for node in self._nodes() if node["className"] == "pill stopped-without-report"]
+        self.assertEqual(len(pills), 1)
+
+    def test_left_work_badge(self):
+        self.assertIn("2 left", self._text())
+
+    def test_parties_sort_by_attention_inside_a_group(self):
+        text = self._text()
+        self.assertLess(text.index("waiting-ask"), text.index("working"))
+        self.assertLess(text.index("working"), text.index("queued"))
+
+    def test_solo_group_puts_permission_then_context_high_before_the_rest(self):
+        links = [node["text"] for node in self._nodes() if node["tag"] == "a" and node["text"] in ("p", "i", "h")]
+        self.assertEqual(links, ["p", "h", "i"])
+
+    def test_raid_header_shows_worst_member_state(self):
+        header = [node for node in self._nodes() if node["tag"] == "h3" and "raid r" in "".join(c["text"] for c in node["children"])]
+        badges = [c for c in _walk(header[0], []) if c["className"].startswith("status-badge")]
+        self.assertEqual([b["className"] for b in badges], ["status-badge status-waiting-ask"])
+
 
 if __name__ == "__main__":
     unittest.main()

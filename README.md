@@ -1355,7 +1355,10 @@ you, answered asks), `#party/<name>`, `#raid/<name>` (asks, merge queue, parties
 `#overview` (notices, raids, drift, projects). It lists parties grouped by raid (a party in
 two raids shows under both) and a `solo` group for parties outside raids, with counts for
 asks, ready PRs, blocked and context-high parties, active adventurers, ideas, open quests
-and new notices. A party view shows the whole merge queue of its raids, or its own queue
+and new notices. Each party row shows its state badge, its open asks, the work left and
+`stopped without report`; parties sort by attention (waiting on permission, waiting on an
+ask, context high, waiting on input, stopped with work, working, queued) and a raid header
+shows its worst member state. A party view shows the whole merge queue of its raids, or its own queue
 when it has no raid. The header keeps the PR state filter.
 
 **Party waits**: each party card shows a `waits on:` row with one pill per
