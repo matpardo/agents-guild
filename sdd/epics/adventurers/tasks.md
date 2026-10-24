@@ -90,3 +90,13 @@ updated: 2026-10-23
 **Acceptance:**
 - [x] `party close` lists merged and open PRs, quests and a linked idea.
 - [x] `adventurer done` lists its PRs.
+
+## T09 — Bind only for repo changes
+
+**Depends on:** T07
+**Status:** [x] done — #208
+
+**What:** The unbound hint, `GUILD.md` and `README.md` say a session becomes a party or an adventurer only when its work will change a repo; sessions that answer questions, investigate or run commands stay unbound (decisión del dev, 2026-10-23).
+
+**Acceptance:**
+- [x] The unbound hint says to bind only when the work will change a repo.
