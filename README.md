@@ -898,8 +898,8 @@ the open asks (model key `ready_for_you`). Both list the PRs picked by the same
 rule as `guild review-md`, in the board's queue order (raid queues first, then
 one per party outside raids), each PR once: `<ref> <title> · <party>`, `· review
 first` when the action is the human review one, and one indented `note:` line
-per note. `guild board --party` and the web party filter keep the PRs of that
-party; `guild board --raid` and the web raid filter keep every PR whose queue
+per note. `guild board --party` and the web party view keep the PRs of that
+party; `guild board --raid` and the web raid view keep every PR whose queue
 is in that raid, so a PR shows under each raid whose queue contains it.
 `guild review-md --party X` recomputes the queue over that party alone, while
 `guild board --party X` filters the board's list, so cross-party pins can make
@@ -1347,10 +1347,16 @@ guild web: http://127.0.0.1:<port>/
 The server serves the page files it loaded at start, so restart `guild web`
 after updating guild.
 
-**Layout**: on screens at least 1000px wide the page has two columns: the
-right one is sticky and always visible, holding the open asks and the merge
-queue; the left one holds notices, drift and the parties. On narrower
-screens it is a single column with asks and the merge queue first.
+**Layout**: the page is a sidebar next to a pane, using the full width; under 480px the
+sidebar sits above the pane. The sidebar links to the views, kept in the URL hash so a
+reload or the 15-second refresh keeps them: `#needs-you` (default: open asks, ready for
+you, answered asks), `#party/<name>`, `#raid/<name>` (asks, merge queue, parties, memory),
+`#adventurers` (adventurers and health jobs), `#ideas`, `#quests` (quest board) and
+`#overview` (notices, raids, drift, projects). It lists parties grouped by raid (a party in
+two raids shows under both) and a `solo` group for parties outside raids, with counts for
+asks, ready PRs, blocked and context-high parties, active adventurers, ideas, open quests
+and new notices. A party view shows the whole merge queue of its raids, or its own queue
+when it has no raid. The header keeps the PR state filter.
 
 **Party waits**: each party card shows a `waits on:` row with one pill per
 wait (model key `waits`), with a tooltip that explains the kind.
@@ -1362,12 +1368,12 @@ a "ready for you" list (see "Ready for you on the board"), the merge queue (one 
 open PRs: a `MAIN RED` row per red main, then numbered PR links with their
 label pills (`draft`, `converging`), the human-ready pill (`ready` or `ready (CI pending)`), checks, party, task, state, `unblocks N`, the action and the
 `next action` marker, the reasons as pills, a collapsible ready-check detail per PR (blockers, missing items, waits, gates and notes, the same content as `guild pr ready-check`) and a `next to merge: <ref> (<party>)` line, or `no PR ready to merge`, matching `guild merge-queue --head`; blocked PRs in place; read-only, the same order as
-`guild merge-queue`, with `synced N min ago`; the party filter keeps
-only that party's PRs and the raid filter only that raid's card; the model
+`guild merge-queue`, with `synced N min ago`; the party view shows
+the whole queue of its raids (or its own queue) and the raid view only that raid's card; the model
 key is `merge_queues`), drift findings for the default scope (grouped by rule, one block per
 project resolved from the parties shown, skipping parties without a
 project; each finding carries its owning `party` when known, and the party
-and raid filters keep only their parties' findings, hiding findings with no
+and raid views keep only their parties' findings, hiding findings with no
 party), a "projects" section (one card per project of the parties shown,
 model key `projects`: `open PRs N/cap` and the `wait:` text of `guild next`
 when `max_open_prs` is reached, `hot files` touched by at least
@@ -1381,9 +1387,9 @@ and its `wait:` text when `max_open_prs_per_party` is set, model key
 then one collapsible block per party with its own drift (the same
 findings and cap of 5 as the session brief, then `N more`; hidden when
 empty), quests, tasks and
-PRs, plus PRs outside active tasks (legacy loose rows and PRs on queued tasks; adventurer PRs show under the adventurer), raids and claims. A party filter, a state
-filter (`all`/`fixes-main`/`fixes-flaky`/`needs-ask-answer`/`needs-human-pr-review`/`converging`/`ready`/`draft`/`merged`) and a
-raid filter (`all` plus one option per raid, narrowing parties, asks and
+PRs, plus PRs outside active tasks (legacy loose rows and PRs on queued tasks; adventurer PRs show under the adventurer), raids and claims. A state
+filter (`all`/`fixes-main`/`fixes-flaky`/`needs-ask-answer`/`needs-human-pr-review`/`converging`/`ready`/`draft`/`merged`) in the header and the
+sidebar view (a party or a raid narrows parties, asks and
 notices the same way `guild board --raid` does) narrow what is shown; the
 page re-fetches `/api/board` every 15 seconds and repaints only the sections whose
 data changed, so a form you are typing in (an idea, a notice, an answer) keeps its
@@ -1780,8 +1786,8 @@ member), and claims held by those parties. An unknown raid name and a raid
 with no active members give the same clear error
 (`raid '<name>' has no active members`). `--raid` and `--party` are
 mutually exclusive. `guild web`'s board model gains a top-level
-`raids: [{name, members, paused}]` list, and the page gains a raid filter
-select (`all` plus one option per raid) that narrows parties, asks and
+`raids: [{name, members, paused}]` list, and the page gains a raid view
+(`#raid/<name>`) that narrows parties, asks and
 notices the same way the terminal `--raid` filter does.
 
 Every "unknown project" error — `guild notice create --to project:<name>`

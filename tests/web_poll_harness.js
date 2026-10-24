@@ -40,9 +40,9 @@ async function run({ src, scenario }) {
   const idea = { id: 1, title: "Dark mode", description: "night owls", requester: null, deadline: null,
     project: null, overdue: false, parties: [] };
   let board = { generated_at: "now", parties: [], raids: [], asks: [], blocked: [], notices: [], projects: [],
-    memory: [], merge_queues: [], drift: [], ready_for_you: [], ideas: [], adventurers: [], health_jobs: [], project_names: [] };
+    memory: [], merge_queues: [], drift: [], ready_for_you: [], ideas: [], adventurers: [], health_jobs: [], project_names: [], quest_boards: [], new_notice_count: 0 };
   const intervals = [];
-  const ctx = { document: doc, window: {}, console, setTimeout,
+  const ctx = { document: doc, window: {}, location: { hash: "" }, addEventListener() {}, console, setTimeout,
     setInterval(fn) { intervals.push(fn); },
     fetch: (url) => Promise.resolve({ ok: true, json: () => Promise.resolve(url === "/api/board" ? board : { token: "t" }) }) };
   ctx.window = ctx;

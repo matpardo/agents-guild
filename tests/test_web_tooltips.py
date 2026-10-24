@@ -128,7 +128,7 @@ class TooltipUsageTests(unittest.TestCase):
 
     def test_filters_are_explained_in_the_page(self):
         index = (_ROOT / "guild" / "web" / "index.html").read_text()
-        self.assertEqual(len(re.findall(r"<label title=", index)), 3)
+        self.assertEqual(len(re.findall(r"<label title=", index)), 1)
 
 
 if __name__ == "__main__":

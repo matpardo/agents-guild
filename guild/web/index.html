@@ -14,12 +14,6 @@
       <nav class="page-nav"><a href="/" aria-current="page">board</a> · <a href="/progress">in progress</a> · <a href="/history">achievements</a></nav>
       <p id="generated-at" class="muted"></p>
       <div id="filters" class="filters">
-        <label title="Show only this party.">
-          party
-          <select id="party-filter">
-            <option value="all">all</option>
-          </select>
-        </label>
         <label title="Show only PRs in this lifecycle or needing a human.">
           state
           <select id="state-filter">
@@ -34,35 +28,28 @@
             <option value="merged">merged</option>
           </select>
         </label>
-        <label title="Show only this raid and its members.">
-          raid
-          <select id="raid-filter">
-            <option value="all">all</option>
-          </select>
-        </label>
       </div>
     </div>
     <section id="resources" class="header-resources" aria-label="resources"></section>
   </div>
 </header>
 <main>
-  <div class="column column-left">
+  <nav id="sidebar" aria-label="views"></nav>
+  <div class="pane">
     <section id="asks" aria-label="asks"></section>
     <section id="ready-for-you" aria-label="ready for you"></section>
     <section id="answered-asks" aria-label="answered asks"></section>
-    <section id="notices" aria-label="notices"></section>
-    <section id="ideas" aria-label="ideas"></section>
+    <section id="merge-queues" aria-label="merge queue"></section>
+    <section id="parties" aria-label="parties"></section>
+    <section id="memory" aria-label="memory"></section>
     <section id="adventurers" aria-label="adventurers"></section>
     <section id="health-jobs" aria-label="health jobs"></section>
-    <section id="memory" aria-label="memory"></section>
+    <section id="ideas" aria-label="ideas"></section>
+    <section id="quest-board" aria-label="quest board"></section>
+    <section id="notices" aria-label="notices"></section>
     <section id="raids" aria-label="raids"></section>
     <section id="drift" aria-label="drift"></section>
     <section id="projects" aria-label="projects"></section>
-    <section id="quest-board" aria-label="quest board"></section>
-  </div>
-  <div class="column column-right">
-    <section id="merge-queues" aria-label="merge queue"></section>
-    <section id="parties" aria-label="parties"></section>
   </div>
 </main>
 <script src="/app.js" defer></script>

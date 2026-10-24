@@ -2619,21 +2619,6 @@ var NO_SESSION_MESSAGE = "session token not loaded, reload the page";
     return node;
   }
 
-  function refreshPartyFilterOptions(parties) {
-    var select = document.getElementById("party-filter");
-    var previous = select.value;
-    clear(select);
-    select.appendChild(option("all"));
-    parties.forEach(function (party) {
-      select.appendChild(option(party.name));
-    });
-    var stillPresent = Array.prototype.some.call(select.options, function (option) {
-      return option.value === previous;
-    });
-    select.value = stillPresent ? previous : "all";
-    state.partyFilter = select.value;
-  }
-
   function applyPartyFilter(data) {
     if (state.partyFilter === "all") {
       return data;
@@ -2679,21 +2664,6 @@ var NO_SESSION_MESSAGE = "session token not loaded, reload the page";
       .filter(function (queue) {
         return queue.queue.length > 0;
       });
-  }
-
-  function refreshRaidFilterOptions(raids) {
-    var select = document.getElementById("raid-filter");
-    var previous = select.value;
-    clear(select);
-    select.appendChild(option("all"));
-    raids.forEach(function (raid) {
-      select.appendChild(option(raid.name));
-    });
-    var stillPresent = Array.prototype.some.call(select.options, function (option) {
-      return option.value === previous;
-    });
-    select.value = stillPresent ? previous : "all";
-    state.raidFilter = select.value;
   }
 
   function raidMembers(raids, raidName) {
@@ -3010,12 +2980,174 @@ var NO_SESSION_MESSAGE = "session token not loaded, reload the page";
       });
   }
 
+  var VIEW_SECTIONS = {
+    "needs-you": ["asks", "ready-for-you", "answered-asks"],
+    party: ["asks", "merge-queues", "parties", "memory"],
+    raid: ["asks", "merge-queues", "parties", "memory"],
+    adventurers: ["adventurers", "health-jobs"],
+    ideas: ["ideas"],
+    quests: ["quest-board"],
+    overview: ["notices", "raids", "drift", "projects"],
+  };
+  var ALL_SECTION_IDS = [
+    "asks", "ready-for-you", "answered-asks", "notices", "ideas", "adventurers", "health-jobs",
+    "memory", "raids", "drift", "projects", "quest-board", "merge-queues", "parties",
+  ];
+  var DEFAULT_VIEW = { kind: "needs-you", name: "", hash: "needs-you" };
+
+  function currentView() {
+    var hash = window.location.hash.replace(/^#/, "");
+    var slash = hash.indexOf("/");
+    var kind = slash === -1 ? hash : hash.slice(0, slash);
+    var name = slash === -1 ? "" : hash.slice(slash + 1);
+    if (!VIEW_SECTIONS.hasOwnProperty(kind)) {
+      return DEFAULT_VIEW;
+    }
+    var named = kind === "party" || kind === "raid";
+    if (named !== (name !== "")) {
+      return DEFAULT_VIEW;
+    }
+    return { kind: kind, name: name, hash: hash };
+  }
+
+  function applyView(view) {
+    var shown = VIEW_SECTIONS[view.kind];
+    ALL_SECTION_IDS.forEach(function (id) {
+      document.getElementById(id).hidden = shown.indexOf(id) === -1;
+    });
+  }
+
+  function partyViewQueues(data, partyName) {
+    var party = data.parties.filter(function (candidate) {
+      return candidate.name === partyName;
+    });
+    if (party.length === 0) {
+      return [];
+    }
+    var scopes = party[0].raids.length > 0
+      ? party[0].raids.map(function (membership) {
+          return "raid:" + membership.raid;
+        })
+      : ["party:" + partyName];
+    return data.merge_queues.filter(function (queue) {
+      return scopes.indexOf(queue.scope) !== -1;
+    });
+  }
+
+  function sidebarModel(data) {
+    return {
+      asks: data.asks.length,
+      ready: data.ready_for_you.length,
+      blocked: data.blocked.length,
+      ctxHigh: ctxHighCount(data.parties),
+      raids: data.raids.map(function (raid) {
+        return { name: raid.name, paused: raid.paused, members: raid.members };
+      }),
+      solo: data.parties
+        .filter(function (party) {
+          return party.raids.length === 0;
+        })
+        .map(function (party) {
+          return party.name;
+        }),
+      adventurers: data.adventurers.filter(function (adventurer) {
+        return adventurer.state === "active";
+      }).length,
+      ideas: data.ideas.length,
+      openQuests: data.quest_boards.reduce(function (total, project) {
+        return total + project.open_quests.length;
+      }, 0),
+      newNotices: data.new_notice_count,
+    };
+  }
+
+  function sidebarLink(hash, label, currentHash) {
+    var anchor = textEl("a", label);
+    anchor.href = "#" + hash;
+    if (hash === currentHash) {
+      anchor.ariaCurrent = "page";
+    }
+    return anchor;
+  }
+
+  function sidebarItem(child) {
+    var item = el("li");
+    item.appendChild(child);
+    return item;
+  }
+
+  function sidebarPartyList(names, currentHash) {
+    var list = el("ul");
+    appendAll(
+      list,
+      names.map(function (name) {
+        return sidebarItem(sidebarLink("party/" + name, name, currentHash));
+      })
+    );
+    return list;
+  }
+
+  function sidebarRaidGroup(raid, currentHash) {
+    var group = el("li");
+    group.className = "sidebar-group";
+    var head = el("h3");
+    head.appendChild(sidebarLink("raid/" + raid.name, "raid " + raid.name, currentHash));
+    if (raid.paused) {
+      head.appendChild(classedText("span", " paused", "muted"));
+    }
+    group.appendChild(head);
+    group.appendChild(sidebarPartyList(raid.members, currentHash));
+    return group;
+  }
+
+  function sidebarNeedsText(model) {
+    return [
+      model.asks + " asks",
+      model.ready + " ready",
+      model.blocked + " blocked",
+      model.ctxHigh + " context high",
+    ].join(" · ");
+  }
+
+  function renderSidebar(model, currentHash) {
+    var nav = document.getElementById("sidebar");
+    clear(nav);
+    var top = el("ul");
+    var needs = sidebarItem(sidebarLink("needs-you", "needs you", currentHash));
+    needs.appendChild(classedText("p", sidebarNeedsText(model), "muted"));
+    top.appendChild(needs);
+    appendAll(
+      top,
+      model.raids.map(function (raid) {
+        return sidebarRaidGroup(raid, currentHash);
+      })
+    );
+    if (model.solo.length > 0) {
+      var solo = el("li");
+      solo.className = "sidebar-group";
+      solo.appendChild(textEl("h3", "solo"));
+      solo.appendChild(sidebarPartyList(model.solo, currentHash));
+      top.appendChild(solo);
+    }
+    top.appendChild(sidebarItem(sidebarLink("adventurers", "adventurers (" + model.adventurers + ")", currentHash)));
+    top.appendChild(sidebarItem(sidebarLink("ideas", "ideas (" + model.ideas + ")", currentHash)));
+    top.appendChild(sidebarItem(sidebarLink("quests", "quest board (" + model.openQuests + ")", currentHash)));
+    top.appendChild(sidebarItem(sidebarLink("overview", "overview (" + model.newNotices + " new)", currentHash)));
+    nav.appendChild(top);
+  }
+
   function render(data, onlyIfChanged) {
     rememberFocus();
     document.getElementById("generated-at").textContent = "generated at " + data.generated_at;
-    refreshPartyFilterOptions(data.parties);
-    refreshRaidFilterOptions(data.raids);
+    var view = currentView();
+    applyView(view);
+    state.partyFilter = view.kind === "party" ? view.name : "all";
+    state.raidFilter = view.kind === "raid" ? view.name : "all";
     var filtered = applyRaidFilter(applyPartyFilter(data));
+    if (view.kind === "party") {
+      filtered.merge_queues = partyViewQueues(data, view.name);
+    }
+    renderSection("sidebar", [sidebarModel(data), view.hash], renderSidebar, onlyIfChanged);
     renderSection("asks", [filtered.asks, filtered.blocked, filtered.parties], renderAsks, onlyIfChanged);
     renderSection("ready", [filtered.ready_for_you], renderReadyForYou, onlyIfChanged);
     renderSection("notices", [filtered.notices, filtered.projects, filtered.raids], renderNotices, onlyIfChanged);
@@ -3067,16 +3199,9 @@ var NO_SESSION_MESSAGE = "session token not loaded, reload the page";
   }
 
   document.addEventListener("DOMContentLoaded", function () {
-    document.getElementById("party-filter").addEventListener("change", function (event) {
-      state.partyFilter = event.target.value;
-      fetchBoard();
-    });
+    window.addEventListener("hashchange", fetchBoard);
     document.getElementById("state-filter").addEventListener("change", function (event) {
       state.stateFilter = event.target.value;
-      fetchBoard();
-    });
-    document.getElementById("raid-filter").addEventListener("change", function (event) {
-      state.raidFilter = event.target.value;
       fetchBoard();
     });
     renderAnsweredAsks();

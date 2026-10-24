@@ -18,7 +18,7 @@ function mk(tag) {
 }
 const tree = (n) => ({ tag: n.tag, className: n.className || "", type: n.type || "", placeholder: n.placeholder || "", text: n._text, children: n.children.map(tree) });
 const tick = () => new Promise((resolve) => setImmediate(resolve));
-async function render({ src, data, partyF, raidF, outId, mode }) {
+async function render({ src, data, hash, outId, mode }) {
   const byId = {};
   const doc = {
     getElementById: (id) => (byId[id] = byId[id] || mk(id.endsWith("-filter") ? "select" : "div")),
@@ -26,19 +26,16 @@ async function render({ src, data, partyF, raidF, outId, mode }) {
     addEventListener: (n, f) => { doc.h = f; },
     activeElement: null, querySelector: () => null, querySelectorAll: () => [],
   };
-  const ctx = { document: doc, window: {}, console, setInterval() {}, setTimeout() {},
+  const ctx = { document: doc, window: {}, location: { hash }, addEventListener(n, f) { ctx.hashchange = f; }, console, setInterval() {}, setTimeout() {},
     fetch: (url) => Promise.resolve({ json: () => Promise.resolve(url === "/api/board" ? data : { token: "t" }) }) };
   ctx.window = ctx;
   vm.createContext(ctx);
   vm.runInContext(fs.readFileSync(src, "utf8"), ctx);
   doc.h();
   await tick();
-  doc.getElementById("party-filter").value = partyF;
-  doc.getElementById("raid-filter").value = raidF;
-  doc.getElementById("party-filter").h.change({ target: { value: partyF } });
-  doc.getElementById("raid-filter").h.change({ target: { value: raidF } });
   await tick();
   const out = doc.getElementById(outId);
+  if (mode === "hidden") return JSON.stringify(Object.keys(byId).filter((id) => byId[id].hidden === true).sort());
   return mode === "tree" ? JSON.stringify(tree(out)) : out.textContent;
 }
 readline.createInterface({ input: process.stdin }).on("line", async (line) => {

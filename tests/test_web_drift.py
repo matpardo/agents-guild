@@ -72,16 +72,24 @@ class WebDriftScriptTests(unittest.TestCase):
 _HARNESS_NAME = "web_drift_harness.js"
 
 
+def _view_hash(party_filter, raid_filter):
+    if party_filter != "all":
+        return "#party/" + party_filter
+    if raid_filter != "all":
+        return "#raid/" + raid_filter
+    return ""
+
+
 def _render(board, party_filter, raid_filter, out_id, mode):
     return node_harness.request(_HARNESS_NAME, {
-        "src": str(_APP_JS_PATH), "data": board, "partyF": party_filter, "raidF": raid_filter, "outId": out_id, "mode": mode,
+        "src": str(_APP_JS_PATH), "data": board, "hash": _view_hash(party_filter, raid_filter), "outId": out_id, "mode": mode,
     })
 
 
 _MISSING = object()
 _BOARD = {
     "generated_at": "now", "asks": [], "notices": [], "ideas": [], "adventurers": [], "health_jobs": [], "project_names": [], "memory": [], "blocked": [], "merge_queues": [], "ready_for_you": [],
-    "projects": [], "quest_boards": [], "raids": [{"name": "r", "members": ["c"]}],
+    "projects": [], "quest_boards": [], "new_notice_count": 0, "raids": [{"name": "r", "members": ["c"]}],
     "parties": [
         {
             "name": name, "raids": [], "quests": [], "prs": [], "claims": [], "state": "active", "generation": 1,
