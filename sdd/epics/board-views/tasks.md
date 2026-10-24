@@ -3,7 +3,7 @@ epic: board-views
 type: tasks
 title: Sidebar and views on the web board
 status: done
-updated: 2026-10-23
+updated: 2026-10-24
 ---
 
 # Tasks: Sidebar and views on the web board
@@ -28,3 +28,10 @@ updated: 2026-10-23
 **Status:** [x] done — #211
 
 **What:** `guild/web/app.js`, `app.css`, `index.html`: resource values on the web board are coloured pills (disk percent, RAM available, deltas, `new`, flags, unmeasured states) from named thresholds; the header machine summary is one wrapped line of pills; the sidebar shows a compact disk pill.
+
+## T04 — Live needs-you counts
+
+**Depends on:** T01
+**Status:** [x] done
+
+**What:** `guild/web/app.js`, `app.css`: the board refreshes every 10 seconds instead of 15; each sidebar needs-you count above zero (asks, ready, blocked, context high) is a pill coloured by its type, a zero stays muted.

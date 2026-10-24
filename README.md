@@ -1354,13 +1354,13 @@ after updating guild.
 
 **Layout**: the page is a sidebar next to a pane, using the full width; under 480px the
 sidebar sits above the pane. The sidebar links to the views, kept in the URL hash so a
-reload or the 15-second refresh keeps them: `#needs-you` (default: open asks, ready for
+reload or the 10-second refresh keeps them: `#needs-you` (default: open asks, ready for
 you, answered asks), `#party/<name>`, `#raid/<name>` (asks, merge queue, parties, memory),
 `#adventurers` (adventurers and health jobs), `#ideas`, `#quests` (quest board) and
 `#overview` (notices, raids, drift, projects). It lists parties grouped by raid (a party in
 two raids shows under both) and a `solo` group for parties outside raids, with counts for
-asks, ready PRs, blocked and context-high parties, active adventurers, ideas, open quests
-and new notices. Each party row shows its state badge, its open asks, the work left and
+asks, ready PRs, blocked and context-high parties (a count above zero is a pill coloured by
+its type), active adventurers, ideas, open quests and new notices. Each party row shows its state badge, its open asks, the work left and
 `stopped without report`; parties sort by attention (waiting on permission, waiting on an
 ask, context high, waiting on input, stopped with work, working, queued) and a raid header
 shows its worst member state. A party view shows the whole merge queue of its raids, or its own queue
@@ -1399,7 +1399,7 @@ PRs, plus PRs outside active tasks (legacy loose rows and PRs on queued tasks; a
 filter (`all`/`fixes-main`/`fixes-flaky`/`needs-ask-answer`/`needs-human-pr-review`/`converging`/`ready`/`draft`/`merged`) in the header and the
 sidebar view (a party or a raid narrows parties, asks and
 notices the same way `guild board --raid` does) narrow what is shown; the
-page re-fetches `/api/board` every 15 seconds and repaints only the sections whose
+page re-fetches `/api/board` every 10 seconds and repaints only the sections whose
 data changed, so a form you are typing in (an idea, a notice, an answer) keeps its
 text and focus; it also keeps the current filters and which blocks are collapsed. PR links open
 `https://github.com/<repo>/pull/<n>` in a new tab; PR cards also show review pills (`N unresolved threads`, `changes requested`, `behind base`, `merge conflict`, the same reasons as the merge queue) and `on <base>` when the PR targets a branch other than `main` or `master`. A task also links to its
@@ -1458,7 +1458,7 @@ answer` and `guild dismiss`, acting as the human actor (no session): the
 same length cap, email and project `pii_patterns` rejection, "not open" and
 unknown-ask errors apply, and a rejected request shows the server's message
 under the buttons. An empty answer is not sent. Buttons are disabled while a
-request is in flight; on success the board is re-fetched. The 15-second
+request is in flight; on success the board is re-fetched. The 10-second
 refresh keeps whatever you typed (and the focus) in each answer field.
 Project `pii_patterns` are those of the project of the party that asked, wherever
 `guild web` (or `guild answer`) is started from.
