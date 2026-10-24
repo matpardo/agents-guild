@@ -91,3 +91,10 @@ updated: 2026-10-24
 **Status:** [x] done
 
 **What:** `guild party close` also refuses while the party has an open ask or an open tracked PR, listing each ask and each PR (with its unseen review comment count) together with any quest problems in one message; `--force` keeps closing anyway, dismissing the asks. The web board has no party close action.
+
+## T13 — State the ask length limits and when to read SDD from a git ref
+
+**Depends on:** T12
+**Status:** [x] done
+
+**What:** `guild ask --help` states the question and context length limits, `GUILD.md` and the README repeat them, and the README warns that the SDD `root` mode reads a possibly stale checkout while `git_repo` + `git_ref` reads the fetched ref.
