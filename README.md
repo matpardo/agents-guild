@@ -176,7 +176,7 @@ guild idea add "<title>" --description "<text>" [--requester <text>] [--deadline
 guild idea edit <id> [--title ..] [--description ..] [--requester ..|--no-requester] [--deadline ..|--no-deadline] [--project ..|--no-project]
 guild idea delete <id>
 guild idea link <id> [--party <name>]     # a session links its own party; the human terminal needs --party
-guild idea unlink <id> [--party <name>]
+guild idea unlink <id> [--party <name>]   # refused once the party tracks a PR
 guild ideas [<id> | --project <name>]   # sorted by deadline, no deadline last; overdue marked; <id> shows one in full
 
 guild adventurer start "<job>" --reason "<why>" [--task <epic>/<tid>]   # this session becomes an adventurer; no permission prompt
@@ -1237,7 +1237,7 @@ can add, edit and delete ideas; they are local and never broadcast. `guild
 ideas` lists them by deadline ascending with the ones without deadline last
 (ties by creation), and marks `overdue` the ones whose deadline is before
 today. When a party starts work from an idea it runs `guild idea link <id>`;
-`guild idea unlink <id>` drops the link. A session links only its own party;
+`guild idea unlink <id>` drops the link, and is refused once the party tracks a PR. A session links only its own party;
 from the human terminal `--party <name>` is required. The party must exist and
 not be closed, and linking twice is refused. `guild ideas` and `guild ideas
 <id>` show `worked by: <party>, ...` (closed parties marked `(closed)`) and each

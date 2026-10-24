@@ -114,8 +114,13 @@ def link_for_party(ctx, idea_id, party):
 
 def unlink_for_party(ctx, idea_id, party):
     _require_idea(ctx, idea_id)
-    if not _is_linked(ctx, idea_id, party):
+    link_row = next((row for row in linked_parties(ctx, idea_id) if row["name"] == party), None)
+    if link_row is None:
         raise GuildError("idea #{} is not linked to party '{}'".format(idea_id, party), 1)
+    if link_row["has_prs"]:
+        raise GuildError(
+            "idea #{} stays linked to party '{}': the party already tracks a PR".format(idea_id, party), 1
+        )
     _record(ctx, "idea.unlinked", {"id": idea_id, "party": party})
     return "idea #{} unlinked from party '{}'".format(idea_id, party)
 
@@ -141,7 +146,8 @@ def unlink(ctx, idea_id, party):
 
 def linked_parties(ctx, idea_id):
     return ctx.conn.execute(
-        "SELECT idea_links.party AS name, COALESCE(parties.state, 'closed') AS state"
+        "SELECT idea_links.party AS name, COALESCE(parties.state, 'closed') AS state,"
+        " EXISTS (SELECT 1 FROM prs WHERE prs.party = idea_links.party) AS has_prs"
         " FROM idea_links LEFT JOIN parties ON parties.name = idea_links.party"
         " WHERE idea_links.idea_id = ? ORDER BY idea_links.linked_at ASC, idea_links.party ASC",
         (idea_id,),

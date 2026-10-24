@@ -390,6 +390,14 @@ class WebNoticeAndRaidBehaviorTests(unittest.TestCase):
         walk(tree)
         self.assertIn(["c"], selects)
 
+    def test_party_tracking_a_pr_has_no_unlink_while_another_keeps_it(self):
+        idea = self._idea(
+            parties=[{"name": "a", "state": "active", "has_prs": True}, {"name": "b", "state": "active", "has_prs": False}]
+        )
+        tree = json.loads(_render(dict(self._board(False), ideas=[idea]), "all", "all", "ideas", "tree"))
+        unlinks = [n for n in self._tree_nodes(json.dumps(tree)) if n["text"] == "Unlink"]
+        self.assertEqual(len(unlinks), 1)
+
     def test_idea_without_parties_has_no_worked_by(self):
         out = self._rendered(dict(self._board(False), ideas=[self._idea()]), "ideas")
         self.assertNotIn("worked by", out)

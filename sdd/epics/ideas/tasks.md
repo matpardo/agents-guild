@@ -71,3 +71,15 @@ updated: 2026-10-24
 - [x] The web description field is a textarea and the view keeps its line breaks.
 - [x] `guild ideas <id>` and the web show `created` and, after an edit, `updated` in local time.
 - [x] An unlinked idea shows `not linked yet` in `guild ideas`, `guild ideas <id>` and the web.
+
+## T07 — Keep an idea linked once its party tracks a PR
+
+**Depends on:** T05
+**Status:** [x] done
+
+**What:** `guild idea unlink` and the web `Unlink` are refused once the party tracks a PR (any lifecycle); untracking the PRs releases the lock. Linking and `guild idea delete` stay allowed.
+
+**Acceptance:**
+- [x] `guild idea unlink` fails with a message naming the idea and the party while the party tracks a PR, for a session and for the human `--party` path; the link survives.
+- [x] After `guild pr untrack` the unlink works.
+- [x] The board model carries `has_prs` per linked party and the web shows no `Unlink` for it.

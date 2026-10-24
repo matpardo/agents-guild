@@ -1019,7 +1019,7 @@ def _idea_model(ctx, row):
         "dates": timeutil.dates_label(row["created_at"], row["updated_at"]),
         "overdue": idea_commands.is_overdue(ctx.now, row["deadline"]),
         "parties": [
-            {"name": party["name"], "state": party["state"]}
+            {"name": party["name"], "state": party["state"], "has_prs": bool(party["has_prs"])}
             for party in idea_commands.linked_parties(ctx, row["id"])
         ],
     }

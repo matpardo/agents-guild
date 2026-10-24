@@ -254,6 +254,7 @@ var NO_SESSION_MESSAGE = "session token not loaded, reload the page";
       hotFiles: "Files touched by as many open PRs as max_open_prs_per_file allows; expect merge conflicts.",
       findingClasses: "Review finding classes with the number of distinct PRs; at the threshold the class should become an architecture guard.",
       syncFreshness: "How long ago the SDD and the tracker were last synced successfully.",
+      ideaLinkedForGood: "Linked for good: the party tracks a PR.",
       noticeNew: "You have not marked this notice as seen yet.",
       noticeFlagged: "Non-human text matching an instruction or command pattern; shown as a caution, never blocked.",
       issued: "When the notice was issued, in local time.",
@@ -1523,7 +1524,12 @@ var NO_SESSION_MESSAGE = "session token not loaded, reload the page";
   function renderIdeaParty(idea, party, busy) {
     var item = el("span");
     item.className = "idea-party";
-    item.appendChild(textEl("span", ideaPartyLabel(party)));
+    var label = textEl("span", ideaPartyLabel(party));
+    item.appendChild(label);
+    if (party.has_prs) {
+      explain(label, "ui", "ideaLinkedForGood");
+      return item;
+    }
     item.appendChild(
       ideaActionButton("Unlink", busy, function () {
         postIdea("/api/ideas/" + idea.id + "/unlink", { party: party.name }, idea.id, function () {});
