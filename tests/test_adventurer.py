@@ -200,6 +200,24 @@ class AdventurerPermissionTests(AdventurerTestCase):
         self.assertIn("acme/app#2 | fixes typo | open", out)
         self.assertIn("pending: none", out)
 
+    def test_done_refreshes_a_stale_pr_to_merged(self):
+        self.start("adv-1", "fix typo", "--task", "demo-epic/T02")
+        self.cli(["pr", "track", "acme/app#2", "--task", "demo-epic/T02", "--what", "fixes typo", "--waits", "r"], "adv-1")
+        self.write_gh_fixture("view_acme-app_2", dict(OPEN_VIEW, state="MERGED", mergedAt="2026-01-01T00:00:00Z"))
+        code, out, err = self.cli(["adventurer", "done", "--pending", "none"], "adv-1")
+        self.assertEqual(code, 0, err)
+        self.assertIn("acme/app#2 | fixes typo | merged", out)
+        self.assertNotIn("as of last sync", out)
+
+    def test_done_notes_the_last_sync_when_gh_fails(self):
+        self.start("adv-1", "fix typo", "--task", "demo-epic/T02")
+        self.cli(["pr", "track", "acme/app#2", "--task", "demo-epic/T02", "--what", "fixes typo", "--waits", "r"], "adv-1")
+        self.write_gh_error("view_acme-app_2", "boom")
+        code, out, err = self.cli(["adventurer", "done", "--pending", "none"], "adv-1")
+        self.assertEqual(code, 0, err)
+        self.assertIn("acme/app#2 | fixes typo | open", out)
+        self.assertIn("(PR state as of last sync)", out)
+
     def test_pr_track_on_a_free_job_needs_a_card(self):
         self.cli(["adventurer", "done", "--pending", "none"], "adv-1")
         self.start("adv-2", "free job")

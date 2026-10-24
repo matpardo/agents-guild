@@ -582,6 +582,13 @@ def refresh_pr(ctx, repo, number, lifecycle_runner):
     return failures
 
 
+def refresh_prs(ctx, rows, lifecycle_runner):
+    failures = []
+    for row in rows:
+        failures.extend(refresh_pr(ctx, row["repo"], row["number"], lifecycle_runner))
+    return failures
+
+
 def _sync_gh(ctx, lifecycle_runner):
     rows = ctx.conn.execute(
         "SELECT * FROM prs WHERE lifecycle NOT IN ('merged', 'closed')"

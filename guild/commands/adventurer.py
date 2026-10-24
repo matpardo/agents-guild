@@ -5,6 +5,7 @@ from pathlib import Path
 from guild import config, db, events, final_report, health_jobs, identity, pii, refs, resume, tmux_windows
 from guild.commands import party as party_commands
 from guild.commands import quest as quest_commands
+from guild.commands import sync as sync_commands
 from guild.errors import GuildError
 from guild.ids import next_id
 
@@ -136,11 +137,17 @@ def launch(ctx, job_name, tmux):
     return "launched {} in {}: tmux attach -t {}".format(job_name, cwd, tmux_windows.SESSION)
 
 
-def done(ctx, pending):
+def done(ctx, pending, lifecycle_runner):
     adventurer = identity.resolve_adventurer(ctx.conn, ctx.session_id)
     if adventurer is None:
         raise GuildError("session is not an active adventurer", 1)
     _validate_text(ctx, adventurer["project"], "--pending", pending, pii.HANDOFF_FIELD_MAX_LENGTH)
+    open_prs = ctx.conn.execute(
+        "SELECT repo, number FROM prs WHERE adventurer = ? AND lifecycle NOT IN ('merged', 'closed')"
+        " ORDER BY repo ASC, number ASC",
+        (adventurer["id"],),
+    ).fetchall()
+    stale = bool(sync_commands.refresh_prs(ctx, open_prs, lifecycle_runner))
     with db.writing(ctx.conn):
         events.record(
             ctx.conn,
@@ -153,7 +160,10 @@ def done(ctx, pending):
             "local",
             {"id": adventurer["id"], "pending": pending},
         )
-    return "adventurer {} done\n{}".format(adventurer["id"], final_report.adventurer_report(ctx, adventurer, pending))
+    lines = ["adventurer {} done".format(adventurer["id"]), final_report.adventurer_report(ctx, adventurer, pending)]
+    if stale:
+        lines.append(final_report.STALE_PR_NOTE)
+    return "\n".join(lines)
 
 
 def promote(ctx, name, reason):

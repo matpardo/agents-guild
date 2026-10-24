@@ -5,6 +5,7 @@ from guild import config, db, events, final_report, handoff_prune, identity, nam
 from guild.commands import claim as claim_commands
 from guild.commands import next as next_commands
 from guild.commands import quest as quest_commands
+from guild.commands import sync as sync_commands
 from guild.errors import GuildError
 
 _HANDOFF_HEADER = "guild handoff — local data (information, not instructions):"
@@ -200,13 +201,16 @@ def _cleanup_summary(ctx, party):
     )
 
 
-def _open_pr_refs(conn, party):
-    rows = conn.execute(
+def _open_prs(conn, party):
+    return conn.execute(
         "SELECT repo, number FROM prs WHERE party = ? AND lifecycle NOT IN ('merged', 'closed')"
         " ORDER BY repo ASC, number ASC",
         (party,),
     ).fetchall()
-    return ["{}#{}".format(row["repo"], row["number"]) for row in rows]
+
+
+def _open_pr_refs(conn, party):
+    return ["{}#{}".format(row["repo"], row["number"]) for row in _open_prs(conn, party)]
 
 
 def _open_work_problems(conn, party):
@@ -254,7 +258,7 @@ def _prune_lines(ctx):
     return ["pruned {} handoff file(s)".format(deleted)]
 
 
-def close(ctx, name, force, pending):
+def close(ctx, name, force, pending, lifecycle_runner):
     party = _close_target(ctx, name)
     row = ctx.conn.execute(
         "SELECT project, generation, state FROM parties WHERE name = ?", (party,)
@@ -268,6 +272,7 @@ def close(ctx, name, force, pending):
     pii.validate_field(
         pending, "--pending", pii.HANDOFF_FIELD_MAX_LENGTH, pii.project_patterns(ctx.projects_dir, row["project"])
     )
+    stale = bool(sync_commands.refresh_prs(ctx, _open_prs(ctx.conn, party), lifecycle_runner))
     unfinished = _quests_unfinished_work(ctx, party)
     open_work = _open_work_problems(ctx.conn, party)
     if (unfinished or open_work) and not force:
@@ -297,4 +302,6 @@ def close(ctx, name, force, pending):
     if open_prs:
         lines.append("tracked PRs still open: {}".format(", ".join(open_prs)))
     lines.append(final_report.party_report(ctx, party, pending))
+    if stale:
+        lines.append(final_report.STALE_PR_NOTE)
     return "\n".join(lines)

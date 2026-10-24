@@ -113,3 +113,15 @@ updated: 2026-10-24
 - [x] Both starts refuse a missing, empty or sensitive reason.
 - [x] `adventurer promote` creates the party, ends the adventurer as promoted and moves its PRs.
 - [x] The board and the web show reason, start time and the adventurer a party came from.
+
+## T11 — Final reports read fresh PR states
+
+**Depends on:** T08
+**Status:** [x] done
+
+**What:** `adventurer done` and `party close` refresh each tracked open PR from GitHub before the open-work check and the final report, so a PR merged on GitHub is reported `merged`. When GitHub cannot be reached the report keeps the last synced state and adds `(PR state as of last sync)`.
+
+**Acceptance:**
+- [x] `adventurer done` reports a PR merged on GitHub as `merged` without a prior sync.
+- [x] `party close` without `--force` succeeds when the only open PR was merged on GitHub.
+- [x] A GitHub failure adds the last-sync note and does not abort the command.

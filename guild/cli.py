@@ -93,9 +93,10 @@ def _handle_party_resume(ctx, args):
 
 
 def _handle_party_close(ctx, args):
+    from guild import lifecycle
     from guild.commands import party as party_commands
 
-    _print(party_commands.close(ctx, args.name, args.force, args.pending))
+    _print(party_commands.close(ctx, args.name, args.force, args.pending, lifecycle.run_process))
     return 0
 
 
@@ -471,9 +472,10 @@ def _handle_adventurer_launch(ctx, args):
 
 
 def _handle_adventurer_done(ctx, args):
+    from guild import lifecycle
     from guild.commands import adventurer as adventurer_commands
 
-    _print(adventurer_commands.done(ctx, args.pending))
+    _print(adventurer_commands.done(ctx, args.pending, lifecycle.run_process))
     return 0
 
 
