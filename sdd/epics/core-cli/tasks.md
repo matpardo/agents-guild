@@ -77,3 +77,10 @@ updated: 2026-09-28
 **Status:** [x] done — #165
 
 **What:** `guild task move <quest>/<tid>[,<tid>...] --to <quest>` moves queued or blocked tasks to another active quest of the same project and epic, even one owned by another party, so a backlog can be split across parallel sessions; tasks with an open PR or a live claim stay. `guild quest add --epic` accepts no `--tasks` to open an empty quest that receives them. The board offers the same move on each queued or blocked task.
+
+## T11 — Survive a deleted working directory
+
+**Depends on:** T10
+**Status:** [x] done
+
+**What:** when the shell's working directory was deleted (for example a merged branch's worktree removed), commands and hooks resolve the project from the nearest existing parent of the shell's `PWD` or of the hook's `cwd` instead of crashing; without `PWD` the command fails with a clear message.
