@@ -1415,6 +1415,29 @@ def build_parser():
     return parser
 
 
+def _nearest_existing_dir(path):
+    while not path.is_dir() and path != path.parent:
+        path = path.parent
+    return path
+
+
+def _current_dir():
+    try:
+        return Path.cwd()
+    except FileNotFoundError:
+        shell_pwd = os.environ.get("PWD")
+        if not shell_pwd:
+            raise GuildError("the current directory was deleted and PWD is not set", 1)
+        return _nearest_existing_dir(Path(shell_pwd))
+
+
+def _hook_cwd(stdin_data):
+    stdin_cwd = stdin_data.get("cwd")
+    if stdin_cwd is None:
+        return _current_dir()
+    return _nearest_existing_dir(Path(stdin_cwd))
+
+
 def _build_context(session_id, cwd):
     conn = db.connect(paths.db_path())
     paths.ensure_private_dir(paths.state_dir())
@@ -1437,7 +1460,7 @@ def _run_pre_push_hook(stdin_data):
     try:
         tool_input = stdin_data.get("tool_input", {})
         command = tool_input.get("command", "")
-        cwd = Path(stdin_data.get("cwd", "."))
+        cwd = _hook_cwd(stdin_data)
         ctx = _build_context(stdin_data.get("session_id"), cwd)
         result = hook_commands.pre_push(ctx, command)
     except Exception as error:
@@ -1455,7 +1478,7 @@ def _run_pre_push_hook(stdin_data):
 def _run_pre_pr_owner_hook(stdin_data):
     try:
         command = stdin_data.get("tool_input", {}).get("command", "")
-        cwd = Path(stdin_data.get("cwd", str(Path.cwd())))
+        cwd = _hook_cwd(stdin_data)
         ctx = _build_context(stdin_data.get("session_id"), cwd)
         result = hook_commands.pre_pr_owner(ctx, command)
     except Exception as error:
@@ -1481,7 +1504,7 @@ def _run_pre_answer_hook(stdin_data):
 def _run_pre_edit_hook(stdin_data):
     try:
         session_id = stdin_data.get("session_id")
-        cwd = Path(stdin_data.get("cwd", str(Path.cwd())))
+        cwd = _hook_cwd(stdin_data)
         ctx = _build_context(session_id, cwd)
         tool_name = stdin_data.get("tool_name")
         tool_input = stdin_data.get("tool_input", {})
@@ -1498,7 +1521,7 @@ def _run_pre_edit_hook(stdin_data):
 def _run_stateful_hook(hook_name, stdin_data):
     try:
         session_id = stdin_data.get("session_id")
-        cwd = Path(stdin_data.get("cwd", str(Path.cwd())))
+        cwd = _hook_cwd(stdin_data)
         ctx = _build_context(session_id, cwd)
         if hook_name == "session-start":
             text = hook_commands.session_start(
@@ -1532,7 +1555,7 @@ def _run_stateful_hook(hook_name, stdin_data):
 
 def _run_pre_commit_hook():
     try:
-        cwd = Path.cwd()
+        cwd = _current_dir()
         ctx = _build_context(session_info.current_session_id(), cwd)
         reasons = hook_commands.pre_commit(ctx, hook_commands.staged_paths(cwd))
     except Exception as error:
@@ -1569,7 +1592,7 @@ def main(argv):
     if args.command == "hook":
         return _dispatch_hook(args)
     try:
-        ctx = _build_context(session_info.current_session_id(), Path.cwd())
+        ctx = _build_context(session_info.current_session_id(), _current_dir())
         return args.handler(ctx, args)
     except GuildError as error:
         sys.stderr.write("guild: {}\n".format(error.message))
