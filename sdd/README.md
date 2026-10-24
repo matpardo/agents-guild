@@ -44,7 +44,7 @@ Each task is a heading plus two fields, which is the shape guild reads (`guild s
 
 - Zero-padded ids: T01, T02… Suffixes are allowed (T03b).
 - `**Depends on:**` lists task ids of the same epic, or `—`.
-- Only the checkbox counts: `[x]` is done, anything else is pending. Add the PR after it: `[x] done — #12`.
+- Only the checkbox counts: `[x]` is done, anything else is pending. Write `[x] done`; text after it is free and not read.
 - Mark a task done in the PR that completes it.
 
 ## Using it with guild

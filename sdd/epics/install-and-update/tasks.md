@@ -91,3 +91,10 @@ updated: 2026-10-24
 **Status:** [x] done — #212
 
 **What:** A GitHub Actions workflow runs `TMPDIR=/dev/shm python3 tests/run_parallel.py` on Python 3.10 for every pull request and every push to `main`, with node present so the web harness tests run. Tests carry their own git identity, so the suite passes on a runner with no global git config. A PR merges only once its checks are green and the local suite passed (the repository plan has no branch protection, so this is a rule, not a setting).
+
+## T13 — Task check without the PR number
+
+**Depends on:** T11, T12
+**Status:** [x] done
+
+**What:** The SDD task of a PR lands `[x] done` in the change's single commit, with no PR number. Only the checkbox is read, so the number cost an amend and a force-push, and with CI a second run, for text nothing parses. Tasks already marked `— #<pr>` stay as they are.
