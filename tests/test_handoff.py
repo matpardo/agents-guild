@@ -290,6 +290,11 @@ def _init_git_repo(root):
         subprocess.run(command, cwd=str(remote_dir), check=True)
     work_dir = root / "work"
     subprocess.run(["git", "clone", "-q", str(remote_dir), str(work_dir)], check=True)
+    for command in (
+        ["git", "config", "user.email", "t@t.com"],
+        ["git", "config", "user.name", "t"],
+    ):
+        subprocess.run(command, cwd=str(work_dir), check=True)
     return work_dir
 
 

@@ -2641,6 +2641,10 @@ disk-backed `/tmp`. A single module still runs with
 `python3 -m unittest tests.test_<name>`, and the serial
 `python3 -m unittest discover -s tests` keeps working.
 
+CI (`.github/workflows/tests.yml`) runs the same command on Python 3.10
+for every pull request and every push to `main`. The suite needs no global
+git identity: each test that commits configures its own.
+
 Coverage (dev-only, not a runtime dependency):
 
 ```

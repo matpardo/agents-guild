@@ -776,6 +776,8 @@ class PrePushUnresolvedBranchTests(GuildTestCase):
         repo_dir = self.root / "repo-detached"
         repo_dir.mkdir(parents=True)
         subprocess.run(["git", "init", "-q"], cwd=str(repo_dir), check=True)
+        subprocess.run(["git", "config", "user.email", "t@t.com"], cwd=str(repo_dir), check=True)
+        subprocess.run(["git", "config", "user.name", "t"], cwd=str(repo_dir), check=True)
         subprocess.run(
             ["git", "commit", "--allow-empty", "-q", "-m", "init"], cwd=str(repo_dir), check=True
         )

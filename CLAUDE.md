@@ -30,3 +30,4 @@ Guild is a Python 3.10 stdlib-only CLI (`guild/`) with a browser board (`guild/w
 ## Commits and PRs
 
 - One-line conventional commits: `type: description`, English, imperative, lowercase after the type.
+- Merge a PR only after its CI checks are green (`gh pr checks <n> --watch`) and the full suite passed locally.
