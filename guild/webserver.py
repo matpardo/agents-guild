@@ -53,6 +53,7 @@ _QUEST_CREATE_PATH = "/api/quests/create-open"
 _ADVENTURER_DISMISS_RE = re.compile(r"^/api/adventurers/([^/]+)/dismiss$")
 _COMPACT_PATH = "/api/compact"
 _REALM_REFRESH_PATH = "/api/realm/refresh"
+_REALM_DOCTOR_PATH = "/api/realm/doctor"
 _REALM_INBOX_REFRESH_PATH = "/api/realm/inbox/refresh"
 _REALM_INBOX_ACTION_RE = re.compile(r"^/api/realm/inbox/([^/]+)/(fetch|drop)$")
 _SEEN_ALL_PATH = "/api/notices/seen-all"
@@ -271,6 +272,18 @@ def _run_realm_refresh():
         return realm_commands.realm_status_model(ctx)
     finally:
         ctx.conn.close()
+
+
+def _run_realm_doctor():
+    ctx = _action_context()
+    try:
+        lines = realm_commands.doctor_lines(ctx)
+    finally:
+        ctx.conn.close()
+    return {
+        "ok": all(passed for passed, _ in lines),
+        "lines": [{"passed": passed, "text": text} for passed, text in lines],
+    }
 
 
 def _run_realm_inbox_refresh():
@@ -497,6 +510,8 @@ class BoardRequestHandler(http_server.BaseHTTPRequestHandler):
             return self._post_action("compact", lambda payload: _run_compact())
         if path == _REALM_REFRESH_PATH:
             return self._post_payload("realm-refresh", lambda payload: dict(_run_realm_refresh(), ok=True))
+        if path == _REALM_DOCTOR_PATH:
+            return self._post_payload("realm-doctor", lambda payload: _run_realm_doctor())
         if path == _REALM_INBOX_REFRESH_PATH:
             return self._post_payload("realm-inbox-refresh", lambda payload: dict(_run_realm_inbox_refresh(), ok=True))
         realm_inbox_match = _REALM_INBOX_ACTION_RE.match(path)

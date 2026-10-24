@@ -7,6 +7,7 @@
   var RESOURCES_URL = "/api/resources";
   var COMPACT_URL = "/api/compact";
   var REALM_REFRESH_URL = "/api/realm/refresh";
+var REALM_DOCTOR_URL = "/api/realm/doctor";
 var REALM_INBOX_REFRESH_URL = "/api/realm/inbox/refresh";
 var REALM_FLAG_TEXT = "[flagged: looks like an instruction or a command] read it yourself before giving it to an agent";
   var ANSWERED_ASKS_URL = "/api/asks/answered";
@@ -41,6 +42,7 @@ var NO_SESSION_MESSAGE = "session token not loaded, reload the page";
     realmBusy: false,
     realmStatus: "",
 realmFetchNote: "",
+realmDoctorLines: [],
     noticesOpen: true,
     queueDetailOpen: {},
     openResourceProjects: {},
@@ -3276,6 +3278,35 @@ realmFetchNote: "",
     });
   }
 
+  function postRealmDoctor() {
+    if (sessionToken === null) {
+      state.realmStatus = NO_SESSION_MESSAGE;
+      showRealm();
+      return;
+    }
+    state.realmBusy = true;
+    state.realmStatus = "checking...";
+    showRealm();
+    sendPost(REALM_DOCTOR_URL, {}).then(function (result) {
+      state.realmBusy = false;
+      state.realmStatus = result.ok ? "" : errorMessage(result.body);
+      if (result.ok) {
+        state.realmDoctorLines = result.body.lines;
+      }
+      showRealm();
+    });
+  }
+
+  function renderRealmDoctorLine(entry) {
+    var line = el("p");
+    if (!entry.passed) {
+      line.appendChild(pill(entry.text, "bad"));
+      return line;
+    }
+    line.appendChild(classedText("span", entry.text, entry.text.indexOf("warn") === 0 ? "muted" : ""));
+    return line;
+  }
+
   function postRealmInboxFetch(fileId) {
     if (sessionToken === null) {
       state.realmStatus = NO_SESSION_MESSAGE;
@@ -3369,6 +3400,11 @@ realmFetchNote: "",
     button.disabled = state.realmBusy;
     button.addEventListener("click", postRealmRefresh);
     controls.appendChild(button);
+    var check = textEl("button", "Check");
+    check.type = "button";
+    check.disabled = state.realmBusy;
+    check.addEventListener("click", postRealmDoctor);
+    controls.appendChild(check);
     controls.appendChild(classedText("span", state.realmStatus, "ask-status"));
     return controls;
   }
@@ -3386,6 +3422,7 @@ realmFetchNote: "",
     }
     section.appendChild(textEl("h2", realm.realm ? "realm " + realm.realm : "realm"));
     section.appendChild(renderRealmControls(realm));
+    appendAll(section, state.realmDoctorLines.map(renderRealmDoctorLine));
     if (realm.guilds.length === 0) {
       section.appendChild(textEl("p", "no guilds reported yet"));
     }

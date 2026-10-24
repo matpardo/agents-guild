@@ -68,7 +68,7 @@ def _read_json(response):
     return payload
 
 
-def request(config, method, path, body):
+def exchange(config, method, path, body):
     connection = _connect_pinned(config)
     headers = {"Authorization": "Bearer " + config["token"]}
     data = None
@@ -79,13 +79,21 @@ def request(config, method, path, body):
         connection.request(method, path, body=data, headers=headers)
         response = connection.getresponse()
         payload = _read_json(response)
-        status_code = response.status
+        return response.status, payload, response.getheader("Date")
     except (OSError, http.client.HTTPException) as error:
         raise GuildError("realm hub request failed: {}".format(type(error).__name__), 1)
     finally:
         connection.close()
+
+
+def refusal(status_code, payload):
+    message = payload.get("error")
+    reason = _CONTROL_RE.sub("", message)[:_MAX_ERROR_LENGTH] if isinstance(message, str) else "no reason"
+    return "realm hub refused ({}): {}".format(status_code, reason)
+
+
+def request(config, method, path, body):
+    status_code, payload, _ = exchange(config, method, path, body)
     if not 200 <= status_code < 300:
-        message = payload.get("error")
-        reason = _CONTROL_RE.sub("", message)[:_MAX_ERROR_LENGTH] if isinstance(message, str) else "no reason"
-        raise GuildError("realm hub refused ({}): {}".format(status_code, reason), 1)
+        raise GuildError(refusal(status_code, payload), 1)
     return payload

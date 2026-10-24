@@ -14,7 +14,7 @@ from guild.commands import doctor as doctor_commands
 from guild.commands import realm as realm_commands
 from guild.context import RunContext
 from guild.errors import GuildError
-from guild.realm import client, clientconfig, hubconfig, pin, snapshot, status
+from guild.realm import checks as realm_checks, client, clientconfig, hubconfig, pin, snapshot, status
 from tests import realm_hub_fixture
 from tests.testutil import GuildTestCase
 
@@ -131,6 +131,9 @@ class RealmClientTests(GuildTestCase):
         class Reply:
             status = 400
 
+            def getheader(self, name):
+                return None
+
             def read(self, limit):
                 return json.dumps({"error": hostile}).encode("utf-8")
 
@@ -205,27 +208,7 @@ class RealmClientTests(GuildTestCase):
         self.assertIn("fingerprint mismatch: expected {}, got {}".format(wrong, self.fingerprint), raised.exception.message)
 
     def _serve(self, wrap):
-        listener = socket.socket()
-        listener.bind(("127.0.0.1", 0))
-        listener.listen(1)
-        self.addCleanup(listener.close)
-
-        def accept():
-            try:
-                peer, _ = listener.accept()
-            except OSError:
-                return
-            try:
-                wrap(peer)
-            except OSError:
-                pass
-            finally:
-                peer.close()
-
-        thread = threading.Thread(target=accept, daemon=True)
-        thread.start()
-        self.addCleanup(thread.join)
-        return "https://127.0.0.1:{}".format(listener.getsockname()[1])
+        return realm_hub_fixture.serve_once(self, wrap)
 
     def _assert_tls_refused(self, url):
         config = {"url": url, "fingerprint": self.fingerprint, "guild": "alpha", "realm": "test-realm", "token": self.tokens["alpha"]}
@@ -314,7 +297,7 @@ class RealmClientTests(GuildTestCase):
         code, out, err = self.run_cli(["realm", "status"], None, self.root)
         self.assertNotEqual(code, 0)
         self.assertIn("join --force", err)
-        self.assertIn("join --force", doctor_commands._realm_lines()[-1][1])
+        self.assertIn("join --force", realm_checks.config_lines()[-1][1])
 
     def test_invalid_entries_are_dropped_and_reported(self):
         self._join("alpha", [])
@@ -364,17 +347,17 @@ class RealmClientTests(GuildTestCase):
             clientconfig.load()
 
     def test_doctor_reports_bad_mode_and_shape(self):
-        self.assertEqual(doctor_commands._realm_lines(), [])
+        self.assertEqual(realm_checks.config_lines(), [])
         self._join("alpha", [])
-        self.assertEqual(doctor_commands._realm_lines(), [(True, "ok      realm config")])
+        self.assertEqual(realm_checks.config_lines(), [(True, "ok      realm config")])
         paths.realm_config_path().chmod(0o644)
-        lines = doctor_commands._realm_lines()
+        lines = realm_checks.config_lines()
         self.assertFalse(lines[0][0])
         self.assertIn("mode must be 0600", lines[0][1])
         paths.realm_config_path().write_text('{"url": 1}')
-        self.assertFalse(doctor_commands._realm_lines()[-1][0])
+        self.assertFalse(realm_checks.config_lines()[-1][0])
         paths.realm_config_path().write_text("{nope")
-        self.assertIn("not valid JSON", doctor_commands._realm_lines()[-1][1])
+        self.assertIn("not valid JSON", realm_checks.config_lines()[-1][1])
 
     def test_snapshot_is_valid_status(self):
         self._seed()

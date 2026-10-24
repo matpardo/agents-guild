@@ -1576,7 +1576,7 @@ class PreAnswerHookTests(GuildTestCase):
         self.assertEqual(code, 0)
         decision = json.loads(out)["hookSpecificOutput"]
         self.assertEqual(decision["permissionDecision"], "deny")
-        self.assertIn("realm commands other than status", decision["permissionDecisionReason"])
+        self.assertIn("realm commands other than status and doctor", decision["permissionDecisionReason"])
 
     def test_realm_commands_other_than_status_are_denied(self):
         self._assert_realm_denied("guild realm send beta req.md")
@@ -1618,6 +1618,12 @@ class PreAnswerHookTests(GuildTestCase):
         self._assert_silent("sess-1", "python3 -u -m guild realm status")
         self._assert_silent("sess-1", "nohup guild realm status")
         self._assert_silent("sess-1", "bash -lc 'guild realm status'")
+
+    def test_realm_doctor_is_silent_and_other_subcommands_stay_denied(self):
+        self._assert_silent("sess-1", "guild realm doctor")
+        self._assert_silent("sess-1", "python3 -m guild realm doctor")
+        self._assert_realm_denied("guild realm doctor2")
+        self._assert_realm_denied("guild realm push")
 
     def test_realm_status_is_silent(self):
         self._assert_silent("sess-1", "guild realm status")
