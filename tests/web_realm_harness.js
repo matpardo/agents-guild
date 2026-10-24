@@ -28,7 +28,7 @@ function hasClass(node, name) {
   return node.children.some((child) => hasClass(child, name));
 }
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
-async function run({ src, realm, refresh, clicks, replies }) {
+async function run({ src, realm, refresh, clicks, replies, guild_name }) {
   const posts = [];
   const byId = {};
   const doc = {
@@ -39,7 +39,7 @@ async function run({ src, realm, refresh, clicks, replies }) {
   };
   const board = { generated_at: "now", parties: [], raids: [], asks: [], blocked: [], notices: [], projects: [],
     memory: [], merge_queues: [], drift: [], ready_for_you: [], ideas: [], adventurers: [], health_jobs: [],
-    project_names: [], quest_boards: [], new_notice_count: 0, realm };
+    project_names: [], quest_boards: [], new_notice_count: 0, realm, guild_name };
   function respond(body, ok) {
     return Promise.resolve({ ok, json: () => Promise.resolve(body) });
   }
@@ -67,7 +67,7 @@ async function run({ src, realm, refresh, clicks, replies }) {
     findButtons(section, click.label)[click.index].h.click();
     await wait(30);
   }
-  return { posts, text: section.textContent, red: hasClass(section, "res-bad"), hasButton: findButton(section) !== null };
+  return { posts, title: doc.getElementById("board-title").textContent, text: section.textContent, red: hasClass(section, "res-bad"), hasButton: findButton(section) !== null };
 }
 readline.createInterface({ input: process.stdin }).on("line", async (line) => {
   console.log(JSON.stringify(await run(JSON.parse(line))));

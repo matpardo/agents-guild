@@ -2014,8 +2014,12 @@ against path traversal, not an identity boundary.
 optional, written by hand:
 
 ```json
-{"handoff_margin": 10, "resource_retention_days": 90}
+{"name": "forge", "handoff_margin": 10, "resource_retention_days": 90}
 ```
+
+- `name` (slug, optional): the name of this guild. It is the name a realm hub knows
+  the guild by, so `guild realm join` needs it, and the web board shows it in the
+  header. `guild doctor` warns while it is missing and suggests the host name.
 
 - `handoff_margin` (integer 0-100): when set and an automatic compaction has
   been recorded, the handoff threshold of every project is the last compaction
@@ -2682,14 +2686,14 @@ Any unexpected exception inside a hook is swallowed to a single line
 A realm connects guilds on one network. Any machine can run the hub, including one that runs a guild; the hub is a file store with no database, and it never reads or writes `guild.db`.
 
 ```
-guild realm init --bind <addr> --port <n>   # config + self-signed certificate; prints the SHA-256 fingerprint
+guild realm init --name <realm> --bind <addr> --port <n>   # config + self-signed certificate; prints the SHA-256 fingerprint
 guild realm serve                           # serve the hub over https
-guild realm member add <name>               # prints the member token once
+guild realm member add <name>               # prints the member token once and the join line
 guild realm member list                     # member names only
 guild realm member remove <name>            # drops the member and its stored status
 ```
 
-`init` writes `realm-hub.json` (0600) under the guild config dir and a
+`init` names the realm and writes `realm-hub.json` (0600) under the guild config dir and a
 certificate and key (0600) in `realm-hub/` beside it. Give each member the
 fingerprint and its token over a channel you trust; the token is shown once and
 only its SHA-256 hash is stored on the hub.
@@ -2697,7 +2701,7 @@ only its SHA-256 hash is stored on the hub.
 The hub stores, under `realm-hub/` in the guild data dir (0700), one
 `status/<guild>.json` per guild and an `inbox/<guild>/` folder of md files
 with their metadata. Routes (all need `Authorization: Bearer <token>`):
-`PUT /status`, `GET /status`, `POST /inbox/<guild>`, `GET /inbox`,
+`PUT /status`, `GET /status` (with the realm name), `GET /whoami` (the token's member and the realm name), `POST /inbox/<guild>`, `GET /inbox`,
 `GET /inbox/<id>` and `DELETE /inbox/<id>`. The sender is always the member of
 the token, never a field of the body. A status body is capped at 16 KB, a file
 at 256 KB, an inbox at 100 files.
@@ -2705,8 +2709,8 @@ at 256 KB, an inbox at 100 files.
 Joining a realm:
 
 ```
-guild realm member add <name>                                  # on the hub: prints the token once
-guild realm join <url> --fingerprint <F> --guild <name>        # on the guild: asks for the token at a prompt
+guild realm member add <name>                                  # on the hub: prints the token once and the join line
+guild realm join <url> --fingerprint <F>                       # on the guild: asks for the token at a prompt
 guild realm push                                               # send this guild's counts to the hub
 guild realm status                                             # every guild's counts; refreshes the cache
 guild realm status --cached                                    # last fetched status, no network
@@ -2716,8 +2720,15 @@ guild realm fetch <id> [--out <dir>]                           # save one file f
 guild realm drop <id>                                          # delete one file from the hub
 ```
 
-`join` reads the token with a hidden prompt (never argv), checks the hub with the
-pinned fingerprint and only then writes `realm.json` (0600) under the guild
+Name the guild first: put `"name"` in `guild.json` (see Global config). The
+member name on the hub must be that name. `member add` ends with the line to run
+on the guild, `guild realm join https://<addr>:<port> --fingerprint <F>`
+(`<hub-address>` when the hub binds to every address); it never repeats the token.
+`join` reads the token with a hidden prompt (never argv), asks the hub who the
+token belongs to (`/whoami`), refuses when that member is not this guild's name,
+and only then writes `realm.json` with the realm name; a `realm.json` from before
+names needs `join --force`. It checks the hub with the
+pinned fingerprint and writes `realm.json` (0600) under the guild
 config dir; `--force` replaces an existing one. The client compares the
 certificate fingerprint before it sends anything, so the token never reaches a
 wrong server. `status` keeps the last reply in `realm-cache.json` (0600) in the

@@ -6,6 +6,7 @@ from pathlib import Path
 
 from guild import claude_settings, config, ctx_pressure, identity, localbase, paths, tmux_windows
 from guild.adapters import github
+from guild.commands import realm as realm_commands
 from guild.commands import statusline as statusline_commands
 from guild.commands import timer as timer_commands
 from guild.errors import GuildError
@@ -104,6 +105,15 @@ def _global_config_lines(global_config_path):
         return config.load_global(global_config_path), []
     except GuildError as error:
         return None, [(False, "invalid {}".format(error.message))]
+
+
+def _guild_name_lines(global_config):
+    if global_config is None:
+        return []
+    name = global_config.get("name")
+    if name is not None:
+        return [(True, "ok      guild name {}".format(name))]
+    return [(True, "warn    guild has no name: {}".format(realm_commands.missing_name_hint()))]
 
 
 def _handoff_line(state_dir, global_config):
@@ -228,6 +238,7 @@ def run(ctx, scan_prs):
     checks.extend(global_lines)
     if global_config is not None:
         checks.extend(_handoff_line(ctx.state_dir, global_config))
+    checks.extend(_guild_name_lines(global_config))
     checks.extend(_realm_lines())
     checks.extend(_undated_lines(ctx.conn))
     checks.extend(_project_lines(ctx.projects_dir, ctx.state_dir, global_config))

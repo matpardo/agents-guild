@@ -3378,7 +3378,7 @@ realmFetchNote: "",
     if (realm === null) {
       return;
     }
-    section.appendChild(textEl("h2", "realm"));
+    section.appendChild(textEl("h2", realm.realm ? "realm " + realm.realm : "realm"));
     section.appendChild(renderRealmControls(realm));
     if (realm.guilds.length === 0) {
       section.appendChild(textEl("p", "no guilds reported yet"));
@@ -3637,6 +3637,7 @@ realmFetchNote: "",
   function render(data, onlyIfChanged) {
     rememberFocus();
     document.getElementById("generated-at").textContent = "generated at " + data.generated_at;
+    document.getElementById("board-title").textContent = data.guild_name ? "guild board · " + data.guild_name : "guild board";
     var view = currentView();
     applyView(view);
     state.partyFilter = view.kind === "party" ? view.name : "all";

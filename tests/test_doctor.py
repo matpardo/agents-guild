@@ -333,6 +333,19 @@ class DoctorTests(GuildTestCase):
         self._write_global({"handoff_margin": 10})
         self.assertNotIn("handoff at", self._doctor_out_for_clean_setup())
 
+    def test_named_guild_prints_an_ok_line(self):
+        self._write_global({"name": "forge"})
+        self.assertIn("ok      guild name forge", self._doctor_out_for_clean_setup())
+
+    def test_unnamed_guild_warns_without_failing(self):
+        self._write_settings(_ALL_HOOKS)
+        self._link_rules()
+        code, out, err = self.run_cli(["doctor"], None, None)
+        self.assertIn(
+            'warn    guild has no name: set "name" in {} (suggested: '.format(self.config_home / "guild" / "guild.json"), out
+        )
+        self.assertNotIn("see README", out)
+
     def test_invalid_global_config_fails(self):
         self._write_global({"handoff_margin": "ten"})
         self._write_settings(_ALL_HOOKS)

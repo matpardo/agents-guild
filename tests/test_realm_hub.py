@@ -72,7 +72,12 @@ class RealmHubTests(GuildTestCase):
         code, payload = self._as("beta", "GET", "/status")
         self.assertEqual(code, 200)
         self.assertEqual([entry["guild"] for entry in payload["guilds"]], ["alpha", "beta"])
+        self.assertEqual(payload["realm"], "test-realm")
         status.validate(payload["guilds"][0], True)
+
+    def test_whoami_names_the_member_and_the_realm(self):
+        self.assertEqual(self._as("beta", "GET", "/whoami"), (200, {"member": "beta", "realm": "test-realm"}))
+        self.assertEqual(self._request("GET", "/whoami", "nope", None)[0], 401)
 
     def test_status_for_other_guild_is_403(self):
         self.assertEqual(self._as("alpha", "PUT", "/status", _status_body("beta"))[0], 403)
@@ -147,7 +152,7 @@ class RealmHubTests(GuildTestCase):
     def _add_senders(self, count):
         for index in range(count):
             name = "sender{}".format(index)
-            self.tokens[name] = realm_commands.member_add(name, _HUMAN).rsplit(": ", 1)[1]
+            self.tokens[name] = realm_hub_fixture.token_of(realm_commands.member_add(name, _HUMAN))
 
     def test_inbox_total_cap_is_507(self):
         self._add_senders(6)
@@ -172,7 +177,7 @@ class RealmHubTests(GuildTestCase):
         self._as("beta", "POST", "/inbox/alpha", {"name": "a", "content": "x"})
         realm_commands.member_remove("alpha", _HUMAN)
         self.assertFalse((paths.realm_hub_store_dir() / "inbox" / "alpha").exists())
-        self.tokens["alpha"] = realm_commands.member_add("alpha", _HUMAN).rsplit(": ", 1)[1]
+        self.tokens["alpha"] = realm_hub_fixture.token_of(realm_commands.member_add("alpha", _HUMAN))
         self.assertEqual(self._as("alpha", "GET", "/inbox")[1]["files"], [])
 
     def test_connection_gate_drops_when_full(self):
@@ -236,26 +241,86 @@ class RealmHubTests(GuildTestCase):
             self.assertNotIn(token, config_text)
 
 
+@unittest.skipUnless(shutil.which("openssl"), "openssl not on PATH")
 class RealmCommandTests(GuildTestCase):
-    @unittest.skipUnless(shutil.which("openssl"), "openssl not on PATH")
     def test_init_refuses_twice_and_prints_fingerprint(self):
-        output = realm_commands.init("127.0.0.1", 8443, _HUMAN)
+        output = realm_commands.init("test-realm", "127.0.0.1", 8443, _HUMAN)
         self.assertRegex(output, r"(?:[0-9A-F]{2}:){31}[0-9A-F]{2}")
         with self.assertRaises(GuildError):
-            realm_commands.init("127.0.0.1", 8443, _HUMAN)
+            realm_commands.init("test-realm", "127.0.0.1", 8443, _HUMAN)
         self.assertIn(pin.cert_fingerprint(hubconfig.load()["cert"]), output)
 
     def test_init_without_openssl_fails_clearly(self):
         with unittest.mock.patch("shutil.which", return_value=None):
             with self.assertRaises(GuildError) as raised:
-                realm_commands.init("127.0.0.1", 8443, _HUMAN)
+                realm_commands.init("test-realm", "127.0.0.1", 8443, _HUMAN)
         self.assertIn("openssl", raised.exception.message)
         self.assertFalse(hubconfig.exists())
+
+    def test_init_requires_a_valid_realm_name(self):
+        with self.assertRaises(GuildError):
+            realm_commands.init("../x", "127.0.0.1", 8443, _HUMAN)
+        self.assertFalse(hubconfig.exists())
+        code, out, err = self.run_cli(["realm", "init", "--bind", "127.0.0.1", "--port", "8443"], None, self.root)
+        self.assertNotEqual(code, 0)
+        self.assertFalse(hubconfig.exists())
+
+    def test_init_stores_the_realm_name(self):
+        realm_commands.init("test-realm", "127.0.0.1", 8443, _HUMAN)
+        self.assertEqual(hubconfig.load()["name"], "test-realm")
+
+    def test_hub_config_with_a_bad_name_says_how_to_fix_it(self):
+        paths.realm_hub_config_path().parent.mkdir(parents=True, exist_ok=True)
+        for text in ('{"members": {}}', '{"members": {}, "name": "../x"}', '{"members": {}, "name": 3}'):
+            paths.realm_hub_config_path().write_text(text)
+            with self.assertRaises(GuildError) as raised:
+                hubconfig.load()
+            self.assertEqual(
+                raised.exception.message,
+                'realm hub config {} needs a valid "name": add it by hand (init refuses to run twice)'.format(
+                    paths.realm_hub_config_path()
+                ),
+            )
+
+    def test_hub_config_without_name_is_malformed(self):
+        paths.realm_hub_config_path().parent.mkdir(parents=True, exist_ok=True)
+        paths.realm_hub_config_path().write_text('{"members": {}}')
+        with self.assertRaises(GuildError):
+            hubconfig.load()
+
+    def _join_line(self, bind):
+        config = hubconfig.load()
+        config["bind"] = bind
+        hubconfig.save(config)
+        return realm_commands.member_add("alpha", _HUMAN).splitlines()[-1]
+
+    def test_member_add_prints_the_join_line_without_the_token(self):
+        realm_commands.init("test-realm", "10.1.2.3", 8443, _HUMAN)
+        output = realm_commands.member_add("alpha", _HUMAN)
+        token = realm_hub_fixture.token_of(output)
+        line = output.splitlines()[-1]
+        self.assertEqual(
+            line,
+            "join on the guild with: guild realm join https://10.1.2.3:8443 --fingerprint {}".format(
+                pin.cert_fingerprint(hubconfig.load()["cert"])
+            ),
+        )
+        self.assertNotIn(token, line)
+
+    def test_member_add_join_line_uses_placeholder_for_wildcard_binds(self):
+        realm_commands.init("test-realm", "0.0.0.0", 8443, _HUMAN)
+        self.assertIn("https://<hub-address>:8443 ", self._join_line("0.0.0.0"))
+        realm_commands.member_remove("alpha", _HUMAN)
+        self.assertIn("https://<hub-address>:8443 ", self._join_line("::"))
+
+    def test_member_add_join_line_brackets_ipv6(self):
+        realm_commands.init("test-realm", "::1", 8443, _HUMAN)
+        self.assertIn("https://[::1]:8443 ", realm_commands.member_add("alpha", _HUMAN).splitlines()[-1])
 
     def test_init_rejects_bad_port_and_bind(self):
         for bind, port in (("127.0.0.1", 0), ("127.0.0.1", 70000), ("", 8443)):
             with self.assertRaises(GuildError):
-                realm_commands.init(bind, port, _HUMAN)
+                realm_commands.init("test-realm", bind, port, _HUMAN)
 
     def test_fingerprint_format(self):
         self.assertEqual(
@@ -264,9 +329,9 @@ class RealmCommandTests(GuildTestCase):
         )
 
     def test_member_commands(self):
-        hubconfig.save({"bind": "127.0.0.1", "port": 1, "cert": "c", "key": "k", "members": {}})
+        realm_commands.init("test-realm", "127.0.0.1", 8443, _HUMAN)
         output = realm_commands.member_add("alpha", _HUMAN)
-        token = output.rsplit(": ", 1)[1]
+        token = realm_hub_fixture.token_of(output)
         self.assertGreaterEqual(len(token), 43)
         self.assertEqual(hubconfig.load()["members"]["alpha"], hub.token_hash(token))
         with self.assertRaises(GuildError):
@@ -281,12 +346,12 @@ class RealmCommandTests(GuildTestCase):
             realm_commands.member_remove("alpha", _HUMAN)
 
     def test_agent_environment_refuses_every_realm_command(self):
-        hubconfig.save({"bind": "127.0.0.1", "port": 1, "cert": "c", "key": "k", "members": {}})
+        realm_commands.init("test-realm", "127.0.0.1", 8443, _HUMAN)
         for args in (
             ["realm", "member", "add", "alpha"],
             ["realm", "member", "list"],
             ["realm", "member", "remove", "alpha"],
-            ["realm", "init", "--bind", "127.0.0.1", "--port", "9"],
+            ["realm", "init", "--name", "test-realm", "--bind", "127.0.0.1", "--port", "9"],
             ["realm", "serve"],
         ):
             with mock.patch.dict(os.environ, {"CLAUDECODE": "1"}):
@@ -306,7 +371,7 @@ class RealmCommandTests(GuildTestCase):
         patcher.start()
         self.addCleanup(patcher.stop)
         os.environ.pop("CLAUDECODE", None)
-        hubconfig.save({"bind": "127.0.0.1", "port": 1, "cert": "c", "key": "k", "members": {}})
+        realm_commands.init("test-realm", "127.0.0.1", 8443, _HUMAN)
         code, out, err = self.run_cli(["realm", "member", "add", "alpha"], None, self.root)
         self.assertEqual(code, 0)
         code, out, err = self.run_cli(["realm", "member", "list"], None, self.root)
