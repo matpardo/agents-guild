@@ -182,6 +182,17 @@ main {
   padding-left: 0.75rem;
 }
 
+#sidebar .sidebar-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+}
+
+#sidebar .ask-count {
+  background: var(--danger);
+  color: var(--bg);
+}
+
 #sidebar h3 {
   margin: 0.75rem 0 0.25rem 0;
   font-size: 0.9rem;
@@ -692,6 +703,11 @@ main.history-main {
 .status-working {
   background: var(--lifecycle-ready-bg);
   color: var(--lifecycle-ready-fg);
+}
+
+.status-queued {
+  background: var(--role-member-bg);
+  color: var(--role-member-fg);
 }
 
 .status-stopped-with-work {

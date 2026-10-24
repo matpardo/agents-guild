@@ -3034,22 +3034,67 @@ var NO_SESSION_MESSAGE = "session token not loaded, reload the page";
     });
   }
 
+  var ATTENTION_ORDER = ["waiting-permission", "waiting-ask", "ctx-high", "waiting-input", "stopped-with-work", "working", "queued"];
+
+  function attentionRank(row) {
+    var key = row.ctxHigh && row.status.name !== "waiting-permission" && row.status.name !== "waiting-ask" ? "ctx-high" : row.status.name;
+    var index = ATTENTION_ORDER.indexOf(key);
+    return index === -1 ? ATTENTION_ORDER.length : index;
+  }
+
+  function byAttention(left, right) {
+    var diff = attentionRank(left) - attentionRank(right);
+    if (diff !== 0) {
+      return diff;
+    }
+    return left.name < right.name ? -1 : left.name > right.name ? 1 : 0;
+  }
+
+  function sidebarRow(party, asks) {
+    return {
+      name: party.name,
+      status: party.status,
+      remaining: party.remaining,
+      asks: asks.filter(function (ask) {
+        return ask.party === party.name;
+      }).length,
+      ctxHigh: Boolean(party.ctx && party.ctx.high),
+      stoppedWithoutReport: Boolean(party.stopped_without_report),
+    };
+  }
+
   function sidebarModel(data) {
+    var rows = {};
+    data.parties.forEach(function (party) {
+      rows[party.name] = sidebarRow(party, data.asks);
+    });
     return {
       asks: data.asks.length,
       ready: data.ready_for_you.length,
       blocked: data.blocked.length,
       ctxHigh: ctxHighCount(data.parties),
       raids: data.raids.map(function (raid) {
-        return { name: raid.name, paused: raid.paused, members: raid.members };
+        return {
+          name: raid.name,
+          paused: raid.paused,
+          members: raid.members
+            .filter(function (name) {
+              return Object.prototype.hasOwnProperty.call(rows, name);
+            })
+            .map(function (name) {
+              return rows[name];
+            })
+            .sort(byAttention),
+        };
       }),
       solo: data.parties
         .filter(function (party) {
           return party.raids.length === 0;
         })
         .map(function (party) {
-          return party.name;
-        }),
+          return rows[party.name];
+        })
+        .sort(byAttention),
       adventurers: data.adventurers.filter(function (adventurer) {
         return adventurer.state === "active";
       }).length,
@@ -3076,12 +3121,28 @@ var NO_SESSION_MESSAGE = "session token not loaded, reload the page";
     return item;
   }
 
-  function sidebarPartyList(names, currentHash) {
+  function sidebarPartyItem(row, currentHash) {
+    var item = sidebarItem(sidebarLink("party/" + row.name, row.name, currentHash));
+    var badges = el("div");
+    badges.className = "sidebar-badges";
+    badges.appendChild(renderStatusBadge(row.status));
+    if (row.asks > 0) {
+      badges.appendChild(classedText("span", row.asks + " asks", "pill ask-count"));
+    }
+    badges.appendChild(renderRemainingBadge(row.remaining));
+    if (row.stoppedWithoutReport) {
+      badges.appendChild(classedText("span", STOPPED_WITHOUT_REPORT_TEXT, "pill stopped-without-report"));
+    }
+    item.appendChild(badges);
+    return item;
+  }
+
+  function sidebarPartyList(rows, currentHash) {
     var list = el("ul");
     appendAll(
       list,
-      names.map(function (name) {
-        return sidebarItem(sidebarLink("party/" + name, name, currentHash));
+      rows.map(function (row) {
+        return sidebarPartyItem(row, currentHash);
       })
     );
     return list;
@@ -3094,6 +3155,9 @@ var NO_SESSION_MESSAGE = "session token not loaded, reload the page";
     head.appendChild(sidebarLink("raid/" + raid.name, "raid " + raid.name, currentHash));
     if (raid.paused) {
       head.appendChild(classedText("span", " paused", "muted"));
+    }
+    if (raid.members.length > 0) {
+      head.appendChild(renderStatusBadge(raid.members[0].status));
     }
     group.appendChild(head);
     group.appendChild(sidebarPartyList(raid.members, currentHash));
