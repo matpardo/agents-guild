@@ -870,9 +870,9 @@ def _add_party_parser(subparsers):
     resume.add_argument("--session", help="session name; from a human terminal only")
     resume.set_defaults(handler=_handle_party_resume)
 
-    close = actions.add_parser("close", help="close a party; refuses while its quests are unfinished unless --force")
+    close = actions.add_parser("close", help="close a party; refuses while quests are unfinished or asks or PRs are open unless --force")
     close.add_argument("name", nargs="?")
-    close.add_argument("--force", action="store_true", help="override the quest done gate")
+    close.add_argument("--force", action="store_true", help="close despite unfinished quests, open asks or open PRs")
     close.add_argument("--pending", required=True, help="what is left pending; 'none' if nothing")
     close.set_defaults(handler=_handle_party_close)
 
