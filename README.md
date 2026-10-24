@@ -2718,6 +2718,7 @@ guild realm send <guild> <file.md>                             # put an md file 
 guild realm inbox                                              # files waiting for this guild; refreshes the inbox cache
 guild realm fetch <id> [--out <dir>]                           # save one file for you to read
 guild realm drop <id>                                          # delete one file from the hub
+guild realm doctor                                             # check the link to the hub and the hub itself
 ```
 
 Name the guild first: put `"name"` in `guild.json` (see Global config). The
@@ -2768,6 +2769,42 @@ age) with Refresh inbox, Fetch and Drop buttons; Drop asks for confirmation,
 Fetch saves into the default `realm-files/` dir and shows the saved path and the
 flag when the text looks like an instruction, and Refresh also reloads the
 inbox.
+Its Check button runs the same checks as `guild realm doctor` and lists the
+lines, failures marked in red and warnings muted.
+
+`guild realm doctor` only reads: it prints `ok      ...`, `warn    ...` and
+`fail    ...` lines like `guild doctor` and exits 1 when any check fails (warnings
+do not fail); agents may run it. On a guild with `realm.json` it checks, in
+order, and a failure stops the checks that depend on it: the file mode (0600) and
+shape of `realm.json`; that the hub is reachable, answers a TLS 1.3 handshake and
+shows the pinned fingerprint; that the hub accepts the token (`/whoami`), that
+the token belongs to this guild and that the hub still calls the realm by the
+name this guild joined; that the clock differs from the hub's `Date` header by at
+most 2 minutes (`warn`); and that this guild pushed (`warn` when it never did, or
+when the last push is over 15 minutes old: is the push timer running?). Without
+`realm.json` it prints `ok      no realm joined`. On the machine that runs the hub
+(`realm-hub.json` exists) it also checks the modes of the config and the key
+(0600) and of the pki and store dirs (0700); the certificate end date with
+`openssl x509 -enddate` (`warn` under 30 days or without `openssl`, `fail` once
+expired); and, per member, the age of its stored status (`warn` when it never
+pushed or pushed over 1 hour ago).
+
+To keep the hub running, a systemd user unit,
+`~/.config/systemd/user/guild-realm.service`:
+
+```
+[Unit]
+Description=Guild realm hub
+
+[Service]
+ExecStart=%h/.local/bin/guild realm serve
+Restart=on-failure
+
+[Install]
+WantedBy=default.target
+```
+
+then `systemctl --user daemon-reload` and `systemctl --user enable --now guild-realm`.
 
 Security:
 

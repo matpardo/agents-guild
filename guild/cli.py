@@ -617,6 +617,14 @@ def _handle_realm_status(ctx, args):
     return 0
 
 
+def _handle_realm_doctor(ctx, args):
+    from guild.commands import realm as realm_commands
+
+    lines = realm_commands.doctor_lines(ctx)
+    _print_lines([line for _, line in lines])
+    return 0 if all(passed for passed, _ in lines) else 1
+
+
 def _handle_realm_send(ctx, args):
     from guild.commands import realm as realm_commands
 
@@ -1257,6 +1265,9 @@ def _add_realm_parser(subparsers):
     realm_status = actions.add_parser("status", help="show every guild's counts")
     realm_status.add_argument("--cached", action="store_true", help="print the last fetched status without network")
     realm_status.set_defaults(handler=_handle_realm_status)
+
+    realm_doctor = actions.add_parser("doctor", help="check the link to the realm hub and the hub itself")
+    realm_doctor.set_defaults(handler=_handle_realm_doctor)
 
     member = actions.add_parser("member", help="add, list or remove hub members")
     member_actions = member.add_subparsers(dest="member_action", required=True, metavar="<subcommand>")

@@ -913,7 +913,7 @@ _ANSWER_DENY_REASON = (
     "guild: agents cannot answer or dismiss an ask; only a human may run this outside a session"
 )
 _REALM_DENY_REASON = (
-    "guild: agents cannot run realm commands other than status; only a human may run this outside a session"
+    "guild: agents cannot run realm commands other than status and doctor; only a human may run this outside a session"
 )
 _PYTHON_RE = re.compile(r"python(3(\.\d+)?)?")
 _GUILD_MODULES = ("guild", "guild.cli")
@@ -993,7 +993,7 @@ def _segment_deny_reason(tokens):
     words = _guild_words(tokens)
     if words[:1] and words[0] in _DENIED_ANSWER_SUBCOMMANDS:
         return _ANSWER_DENY_REASON
-    if words[:1] == ["realm"] and words[1:2] != ["status"]:
+    if words[:1] == ["realm"] and words[1:2] not in (["status"], ["doctor"]):
         return _REALM_DENY_REASON
     return None
 

@@ -56,3 +56,17 @@ updated: 2026-10-24
 **Status:** [x] done
 
 **What:** a guild names itself in `guild.json`, a hub names its realm at `init`; `join` checks the token belongs to this guild and `member add` prints the join line.
+
+## T08 — Realm doctor
+
+**Depends on:** T07
+**Status:** [x] done
+
+**What:** `guild realm doctor` checks the link from a guild to its hub and the hub itself, in the CLI and the web.
+
+## T08 — Realm doctor
+
+**Depends on:** T07
+**Status:** [x] done
+
+**What:** `guild realm doctor` checks the link from a guild to its hub and the hub itself, in the CLI and the web.

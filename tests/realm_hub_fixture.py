@@ -1,3 +1,4 @@
+import socket
 import threading
 
 from guild.commands import realm as realm_commands
@@ -25,3 +26,26 @@ def start_hub(testcase):
     testcase.addCleanup(server.server_close)
     testcase.addCleanup(server.shutdown)
     return server, config["cert"], tokens
+
+
+def serve_once(testcase, wrap):
+    listener = socket.socket()
+    listener.bind(("127.0.0.1", 0))
+    listener.listen(1)
+    testcase.addCleanup(listener.close)
+
+    def accept():
+        try:
+            peer, _ = listener.accept()
+        except OSError:
+            return
+        try:
+            wrap(peer)
+        except OSError:
+            pass
+        finally:
+            peer.close()
+
+    thread = threading.Thread(target=accept, daemon=True)
+    thread.start()
+    return "https://127.0.0.1:{}".format(listener.getsockname()[1])

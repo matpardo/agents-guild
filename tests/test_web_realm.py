@@ -187,6 +187,53 @@ class RealmRefreshRouteTests(WebWriteTestCase):
         self.assertIn("realm", self._error(payload))
 
 
+class RealmDoctorRouteTests(WebWriteTestCase):
+    _LINES = [(True, "ok      token accepted"), (True, "warn    this guild never pushed"), (False, "fail    realm hub unreachable: OSError")]
+
+    def test_returns_the_lines_and_overall_result(self):
+        with mock.patch("guild.webserver.realm_commands.doctor_lines", return_value=self._LINES) as command:
+            response, payload = self._post_json("/api/realm/doctor", self._good_headers(), {})
+        self.assertEqual(response.status, 200, payload)
+        self.assertEqual(
+            json.loads(payload),
+            {
+                "ok": False,
+                "lines": [
+                    {"passed": True, "text": "ok      token accepted"},
+                    {"passed": True, "text": "warn    this guild never pushed"},
+                    {"passed": False, "text": "fail    realm hub unreachable: OSError"},
+                ],
+            },
+        )
+        command.assert_called_once()
+
+    def test_all_passing_is_ok(self):
+        with mock.patch("guild.webserver.realm_commands.doctor_lines", return_value=self._LINES[:2]):
+            response, payload = self._post_json("/api/realm/doctor", self._good_headers(), {})
+        self.assertTrue(json.loads(payload)["ok"])
+
+    def test_without_a_realm_it_still_answers(self):
+        response, payload = self._post_json("/api/realm/doctor", self._good_headers(), {})
+        self.assertEqual(response.status, 200, payload)
+        self.assertEqual(json.loads(payload), {"ok": True, "lines": [{"passed": True, "text": "ok      no realm joined"}]})
+
+    def test_guild_error_is_422_with_the_message(self):
+        error = GuildError("boom", 1)
+        with mock.patch("guild.webserver.realm_commands.doctor_lines", side_effect=error):
+            response, payload = self._post_json("/api/realm/doctor", self._good_headers(), {})
+        self.assertEqual(response.status, 422)
+        self.assertEqual(self._error(payload), "boom")
+
+    def test_token_and_origin_are_enforced(self):
+        missing_token = self._good_headers()
+        del missing_token["X-Guild-Token"]
+        foreign = dict(self._good_headers(), Origin="http://evil.example")
+        with mock.patch("guild.webserver.realm_commands.doctor_lines") as command:
+            for headers in (missing_token, foreign):
+                self.assertEqual(self._post_json("/api/realm/doctor", headers, {})[0].status, 403)
+        command.assert_not_called()
+
+
 @unittest.skipIf(shutil.which("node") is None, "node not installed")
 class RealmPanelBehaviorTests(unittest.TestCase):
     def _panel(self, realm, refresh, clicks=None, replies=None, guild_name=None):
@@ -298,3 +345,26 @@ class RealmPanelBehaviorTests(unittest.TestCase):
         out = self._panel(self._with_inbox(), None, [{"label": "Refresh inbox", "index": 0}], replies)
         self.assertIn("realm hub request failed: URLError", out["text"])
         self.assertIn("req.md", out["text"])
+
+    def test_check_renders_lines_with_failures_marked(self):
+        lines = [
+            {"passed": True, "text": "ok      token accepted"},
+            {"passed": True, "text": "warn    this guild never pushed"},
+            {"passed": False, "text": "fail    realm hub unreachable: OSError"},
+        ]
+        replies = {"/api/realm/doctor": {"ok": True, "body": {"ok": False, "lines": lines}}}
+        out = self._panel(_MODEL, None, [{"label": "Check", "index": 0}], replies)
+        for line in lines:
+            self.assertIn(line["text"], out["text"])
+        self.assertTrue(out["red"])
+
+    def test_check_with_only_passing_lines_has_no_bad_marker(self):
+        replies = {"/api/realm/doctor": {"ok": True, "body": {"ok": True, "lines": [{"passed": True, "text": "ok      token accepted"}]}}}
+        out = self._panel(dict(_MODEL, guilds=[_GUILD]), None, [{"label": "Check", "index": 0}], replies)
+        self.assertIn("ok      token accepted", out["text"])
+        self.assertFalse(out["red"])
+
+    def test_check_error_text_is_shown(self):
+        replies = {"/api/realm/doctor": {"ok": False, "body": {"error": "boom"}}}
+        out = self._panel(_MODEL, None, [{"label": "Check", "index": 0}], replies)
+        self.assertIn("boom", out["text"])

@@ -10,13 +10,13 @@ from pathlib import Path
 
 from guild import config, names, paths, pii, timeutil
 from guild.errors import GuildError
-from guild.realm import client, clientconfig, hub, hubconfig, pin, snapshot, status
+from guild.realm import checks, client, clientconfig, hub, hubconfig, pin, snapshot, status
 
 
 def _require_human(claudecode):
     if claudecode:
         raise GuildError(
-            "realm commands other than status are for the human; run them from your own terminal", 1
+            "realm commands other than status and doctor are for the human; run them from your own terminal", 1
         )
 
 
@@ -67,6 +67,10 @@ def init(name, bind, port, claudecode):
 def serve(claudecode):
     _require_human(claudecode)
     return hub.serve_forever(hubconfig.load())
+
+
+def doctor_lines(ctx):
+    return checks.all_lines(ctx.now)
 
 
 def _join_url(hub_config):
