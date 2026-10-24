@@ -1258,7 +1258,10 @@ message, a wrong type `400`. The project select lists every registered
 project, and the deadline is typed as `YYYY-MM-DD`. Each idea shows its linked
 parties with `Unlink`, and a select of active parties with `Link`; the party
 card lists its ideas. `POST /api/ideas/<id>/link` and `/unlink` (body
-`{"party"}`) run the same functions as the CLI.
+`{"party"}`) run the same functions as the CLI. The description is a
+multi-line text box and its line breaks are kept when the idea is shown. Each
+idea shows its creation date and, after an edit, its update date; an idea with
+no linked party shows `not linked yet` (in the web and in `guild ideas`).
 
 ### Adventurers
 

@@ -3,7 +3,7 @@ epic: ideas
 type: tasks
 title: Ideas backlog
 status: done
-updated: 2026-10-23
+updated: 2026-10-24
 ---
 
 # Tasks: Ideas backlog
@@ -59,3 +59,15 @@ updated: 2026-10-23
 - [x] A session links and unlinks its own party; the human terminal passes `--party`; unknown or closed parties, unknown ideas and double links are refused.
 - [x] `guild ideas` shows `worked by:` and the party block in `guild board` lists its ideas, and the links survive `guild rebuild` and vanish with the idea.
 - [x] The web links and unlinks through the same functions as the CLI.
+
+## T06 — Idea description box, dates and link status
+
+**Depends on:** T05
+**Status:** [x] done
+
+**What:** The web description is a multi-line text box whose line breaks are kept on view; each idea shows its created date and, after an edit, its updated date; an idea with no linked party says `not linked yet` in the CLI and the web.
+
+**Acceptance:**
+- [x] The web description field is a textarea and the view keeps its line breaks.
+- [x] `guild ideas <id>` and the web show `created` and, after an edit, `updated` in local time.
+- [x] An unlinked idea shows `not linked yet` in `guild ideas`, `guild ideas <id>` and the web.

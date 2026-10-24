@@ -921,6 +921,10 @@ li.finding-guard {
   display: inline;
 }
 
+.idea-description {
+  white-space: pre-wrap;
+}
+
 .idea-fields {
   flex-wrap: wrap;
 }

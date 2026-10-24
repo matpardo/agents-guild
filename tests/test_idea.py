@@ -1,3 +1,6 @@
+from datetime import datetime, timedelta, timezone
+from unittest import mock
+
 from guild import context, db, origin, paths, timeutil
 from guild.commands import board as board_commands
 from tests.testutil import GuildTestCase
@@ -57,6 +60,20 @@ class IdeaTests(GuildTestCase):
         self.assertIn("new", out)
         self.assertIn("ana", out)
         self.assertNotIn("2099", out)
+
+    def test_show_prints_created_and_updated_after_edit(self):
+        created = datetime(2026, 10, 1, 10, 0, tzinfo=timezone.utc)
+        later = created + timedelta(hours=2)
+        with mock.patch("guild.timeutil.utcnow", return_value=created):
+            self._add("t")
+        out = self.run_cli(["ideas", "1"], None, None)[1]
+        self.assertIn("created " + timeutil.issued_label(created.isoformat()), out)
+        self.assertNotIn("+00:00", out)
+        self.assertNotIn("updated", out)
+        with mock.patch("guild.timeutil.utcnow", return_value=later):
+            self.run_cli(["idea", "edit", "1", "--title", "new"], None, None)
+        out = self.run_cli(["ideas", "1"], None, None)[1]
+        self.assertIn("updated " + timeutil.issued_label(later.isoformat()), out)
 
     def test_edit_errors(self):
         self._add("t")
@@ -147,6 +164,13 @@ class IdeaLinkTests(GuildTestCase):
         for argv in (["ideas"], ["ideas", "1"]):
             out = self.run_cli(argv, None, None)[1]
             self.assertIn("worked by: alpha, beta (closed)", out)
+
+    def test_unlinked_idea_says_not_linked_yet_until_linked(self):
+        for argv in (["ideas"], ["ideas", "1"]):
+            self.assertIn("not linked yet", self.run_cli(argv, None, None)[1])
+        self.run_cli(["idea", "link", "1"], "sess-1", self.repo_dir)
+        for argv in (["ideas"], ["ideas", "1"]):
+            self.assertNotIn("not linked yet", self.run_cli(argv, None, None)[1])
 
     def test_board_lists_ideas_per_party(self):
         self.run_cli(["idea", "link", "1"], "sess-1", self.repo_dir)

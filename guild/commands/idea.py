@@ -1,6 +1,6 @@
 import datetime
 
-from guild import config, db, events, identity, pii
+from guild import config, db, events, identity, pii, timeutil
 from guild.errors import GuildError
 from guild.ids import next_id
 
@@ -159,7 +159,7 @@ def linked_ideas(ctx, party):
 def _worked_by(ctx, idea_id):
     parties = linked_parties(ctx, idea_id)
     if not parties:
-        return []
+        return ["not linked yet"]
     labels = [row["name"] + (" (closed)" if row["state"] == "closed" else "") for row in parties]
     return ["worked by: " + ", ".join(labels)]
 
@@ -200,5 +200,5 @@ def show(ctx, idea_id):
     if is_overdue(ctx.now, row["deadline"]):
         lines.append("overdue")
     lines.extend(_worked_by(ctx, idea_id))
-    lines.append("created: {}".format(row["created_at"]))
+    lines.append(timeutil.dates_label(row["created_at"], row["updated_at"]))
     return lines
