@@ -3,7 +3,7 @@ epic: core-cli
 type: tasks
 title: Core CLI for coordinating parallel sessions
 status: done
-updated: 2026-09-28
+updated: 2026-10-24
 ---
 
 # Tasks: Core CLI for coordinating parallel sessions
@@ -84,3 +84,10 @@ updated: 2026-09-28
 **Status:** [x] done
 
 **What:** when the shell's working directory was deleted (for example a merged branch's worktree removed), commands and hooks resolve the project from the nearest existing parent of the shell's `PWD` or of the hook's `cwd` instead of crashing; without `PWD` the command fails with a clear message.
+
+## T12 — Party close refuses open asks and open pull requests
+
+**Depends on:** T11
+**Status:** [x] done
+
+**What:** `guild party close` also refuses while the party has an open ask or an open tracked PR, listing each ask and each PR (with its unseen review comment count) together with any quest problems in one message; `--force` keeps closing anyway, dismissing the asks. The web board has no party close action.

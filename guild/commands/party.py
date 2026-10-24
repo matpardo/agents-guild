@@ -209,6 +209,23 @@ def _open_pr_refs(conn, party):
     return ["{}#{}".format(row["repo"], row["number"]) for row in rows]
 
 
+def _open_work_problems(conn, party):
+    asks = conn.execute(
+        "SELECT id FROM asks WHERE party = ? AND state = 'open' ORDER BY id ASC", (party,)
+    ).fetchall()
+    prs = conn.execute(
+        "SELECT repo, number, review_comment_count, last_notified_comment_count FROM prs"
+        " WHERE party = ? AND lifecycle NOT IN ('merged', 'closed') ORDER BY repo ASC, number ASC",
+        (party,),
+    ).fetchall()
+    problems = ["open ask #{}".format(row["id"]) for row in asks]
+    for row in prs:
+        unseen = max(0, (row["review_comment_count"] or 0) - (row["last_notified_comment_count"] or 0))
+        suffix = " ({} unseen review comments)".format(unseen) if unseen else ""
+        problems.append("open PR {}#{}{}".format(row["repo"], row["number"], suffix))
+    return problems
+
+
 def _quests_unfinished_work(ctx, party):
     rows = ctx.conn.execute(
         "SELECT slug, project, epic FROM quests WHERE party = ? AND state = 'active' ORDER BY slug", (party,)
@@ -252,10 +269,11 @@ def close(ctx, name, force, pending):
         pending, "--pending", pii.HANDOFF_FIELD_MAX_LENGTH, pii.project_patterns(ctx.projects_dir, row["project"])
     )
     unfinished = _quests_unfinished_work(ctx, party)
-    if unfinished and not force:
+    open_work = _open_work_problems(ctx.conn, party)
+    if (unfinished or open_work) and not force:
         raise GuildError(
-            "party '{}' has quests with unfinished work, finish them or pass --force:\n{}".format(
-                party, "\n".join(unfinished)
+            "party '{}' still has work, finish it or pass --force:\n{}".format(
+                party, "\n".join(unfinished + open_work)
             ),
             1,
         )

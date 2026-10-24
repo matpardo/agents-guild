@@ -26,7 +26,7 @@ class PartyCloseTests(GuildTestCase):
         return row
 
     def test_human_closes_party_by_name_and_cleans_up(self):
-        code, out, err = self.run_cli(["party", "close", "alpha", "--pending", "none"], None, None)
+        code, out, err = self.run_cli(["party", "close", "alpha", "--force", "--pending", "none"], None, None)
         self.assertEqual(code, 0, err)
         self.assertIn("party 'alpha' closed: 1 quest done, 1 ask dismissed, 1 claim released", out)
         self.assertEqual(self._row("SELECT state FROM parties WHERE name = ?", ("alpha",))["state"], "closed")
@@ -41,7 +41,7 @@ class PartyCloseTests(GuildTestCase):
 
     def test_close_reports_pruned_handoff_count_when_files_deleted(self):
         self._expired_handoff_setup()
-        code, out, err = self.run_cli(["party", "close", "alpha", "--pending", "none"], None, None)
+        code, out, err = self.run_cli(["party", "close", "alpha", "--force", "--pending", "none"], None, None)
         self.assertEqual(code, 0, err)
         self.assertIn("pruned 1 handoff file(s)", out)
         self.assertFalse((self.data_home / "guild" / "handoffs" / "alpha-g1.md").exists())
@@ -49,23 +49,23 @@ class PartyCloseTests(GuildTestCase):
     def test_close_skips_prune_silently_when_locked(self):
         self._expired_handoff_setup()
         with locking.try_lock(paths.state_dir() / "handoff-prune", "prune.lock"):
-            code, out, err = self.run_cli(["party", "close", "alpha", "--pending", "none"], None, None)
+            code, out, err = self.run_cli(["party", "close", "alpha", "--force", "--pending", "none"], None, None)
         self.assertEqual(code, 0, err)
         self.assertNotIn("pruned", out)
         self.assertTrue((self.data_home / "guild" / "handoffs" / "alpha-g1.md").exists())
 
     def test_close_omits_pruned_line_when_nothing_deleted(self):
-        code, out, err = self.run_cli(["party", "close", "alpha", "--pending", "none"], None, None)
+        code, out, err = self.run_cli(["party", "close", "alpha", "--force", "--pending", "none"], None, None)
         self.assertNotIn("pruned", out)
 
     def test_bound_session_closes_own_party_without_name(self):
-        code, out, err = self.run_cli(["party", "close", "--pending", "none"], "sess-1", self.repo_dir)
+        code, out, err = self.run_cli(["party", "close", "--force", "--pending", "none"], "sess-1", self.repo_dir)
         self.assertEqual(code, 0, err)
         self.assertIn("party 'alpha' closed", out)
 
     def test_session_cannot_close_another_party(self):
         self.run_cli(["party", "start", "beta", "--reason", "test reason"], "sess-2", self.repo_dir)
-        code, out, err = self.run_cli(["party", "close", "alpha", "--pending", "none"], "sess-2", self.repo_dir)
+        code, out, err = self.run_cli(["party", "close", "alpha", "--force", "--pending", "none"], "sess-2", self.repo_dir)
         self.assertEqual(code, 1)
         self.assertIn("cannot close another party", err)
 
@@ -78,7 +78,7 @@ class PartyCloseTests(GuildTestCase):
             ["pr", "track", "acme/app#1", "--task", "demo/T01", "--what", "x", "--waits", "y"],
             "sess-1", self.repo_dir,
         )
-        code, out, err = self.run_cli(["party", "close", "alpha", "--pending", "none"], None, None)
+        code, out, err = self.run_cli(["party", "close", "alpha", "--force", "--pending", "none"], None, None)
         self.assertEqual(code, 0, err)
         self.assertIn("tracked PRs still open: acme/app#1", out)
 
@@ -99,7 +99,7 @@ class PartyCloseTests(GuildTestCase):
         conn.close()
         self.run_cli(["idea", "add", "Better thing", "--description", "d"], "sess-1", self.repo_dir)
         self.run_cli(["idea", "link", "1", "--party", "alpha"], "sess-1", self.repo_dir)
-        code, out, err = self.run_cli(["party", "close", "alpha", "--pending", "check the docs"], None, None)
+        code, out, err = self.run_cli(["party", "close", "alpha", "--force", "--pending", "check the docs"], None, None)
         self.assertEqual(code, 0, err)
         self.assertIn("final report for party 'alpha'", out)
         self.assertIn("acme/app#1 | does 1 | merged", out)
@@ -112,21 +112,72 @@ class PartyCloseTests(GuildTestCase):
         code, out, err = self.run_cli(["party", "close", "ghost", "--pending", "none"], None, None)
         self.assertEqual(code, 1)
         self.assertIn("unknown party 'ghost'", err)
-        self.run_cli(["party", "close", "alpha", "--pending", "none"], None, None)
-        code, out, err = self.run_cli(["party", "close", "alpha", "--pending", "none"], None, None)
+        self.run_cli(["party", "close", "alpha", "--force", "--pending", "none"], None, None)
+        code, out, err = self.run_cli(["party", "close", "alpha", "--force", "--pending", "none"], None, None)
         self.assertEqual(code, 1)
         self.assertIn("already closed", err)
 
     def test_closed_party_leaves_board(self):
-        self.run_cli(["party", "close", "alpha", "--pending", "none"], None, None)
+        self.run_cli(["party", "close", "alpha", "--force", "--pending", "none"], None, None)
         code, out, err = self.run_cli(["board"], None, None)
         self.assertNotIn("━━ alpha", out)
 
     def test_rebuild_reproduces_cascade(self):
-        self.run_cli(["party", "close", "alpha", "--pending", "none"], None, None)
+        self.run_cli(["party", "close", "alpha", "--force", "--pending", "none"], None, None)
         self.run_cli(["rebuild"], None, None)
         self.assertEqual(self._row("SELECT state FROM quests WHERE slug = ?", ("demo",))["state"], "done")
         self.assertEqual(self._row("SELECT state FROM asks WHERE id = 1", ())["state"], "dismissed")
+
+
+    def _track_open_pr(self):
+        self.write_gh_fixture(
+            "view_acme-app_1",
+            {"state": "OPEN", "isDraft": True, "headRefName": "feature/x", "title": "t"},
+        )
+        self.run_cli(
+            ["pr", "track", "acme/app#1", "--task", "demo/T01", "--what", "x", "--waits", "y"],
+            "sess-1", self.repo_dir,
+        )
+
+    def test_close_without_force_succeeds_when_no_open_work(self):
+        self.run_cli(["dismiss", "1"], None, None)
+        code, out, err = self.run_cli(["party", "close", "alpha", "--pending", "none"], None, None)
+        self.assertEqual(code, 0, err)
+        self.assertEqual(self._row("SELECT state FROM parties WHERE name = ?", ("alpha",))["state"], "closed")
+
+    def test_close_refuses_with_open_ask(self):
+        code, out, err = self.run_cli(["party", "close", "alpha", "--pending", "none"], None, None)
+        self.assertEqual(code, 1)
+        self.assertIn("open ask #1", err)
+        self.assertEqual(self._row("SELECT state FROM parties WHERE name = ?", ("alpha",))["state"], "active")
+        self.assertEqual(self._row("SELECT state FROM asks WHERE id = 1", ())["state"], "open")
+
+    def test_close_refuses_with_open_pr_and_unseen_comments(self):
+        self._track_open_pr()
+        conn = sqlite3.connect(str(self.data_home / "guild" / "guild.db"))
+        conn.execute("UPDATE prs SET review_comment_count = 5, last_notified_comment_count = 2")
+        conn.execute("UPDATE asks SET state = 'dismissed'")
+        conn.commit()
+        conn.close()
+        code, out, err = self.run_cli(["party", "close", "alpha", "--pending", "none"], None, None)
+        self.assertEqual(code, 1)
+        self.assertIn("open PR acme/app#1 (3 unseen review comments)", err)
+        self.assertNotIn("open ask", err)
+
+    def test_close_lists_asks_and_prs_together(self):
+        self._track_open_pr()
+        code, out, err = self.run_cli(["party", "close", "alpha", "--pending", "none"], None, None)
+        self.assertEqual(code, 1)
+        self.assertIn("open ask #1", err)
+        self.assertIn("open PR acme/app#1", err)
+        self.assertNotIn("unseen", err)
+
+    def test_close_force_dismisses_asks_despite_open_work(self):
+        self._track_open_pr()
+        code, out, err = self.run_cli(["party", "close", "alpha", "--force", "--pending", "none"], None, None)
+        self.assertEqual(code, 0, err)
+        self.assertEqual(self._row("SELECT state FROM asks WHERE id = 1", ())["state"], "dismissed")
+        self.assertIn("tracked PRs still open: acme/app#1", out)
 
 
 class QuestDoneTests(GuildTestCase):

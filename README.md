@@ -124,7 +124,7 @@ guild wire-settings   # merge guild hooks and permission rules into ~/.claude/se
 
 guild party start <name> --reason "<why>"       # no permission prompt; refused while this session leads another active party
 guild party resume <party> [--session <name>]   # --session: from a human terminal only
-guild party close [<party>] --pending "<text>" [--force]  # <party>: from a terminal, or your own party; --pending none when nothing is left; --force overrides the quest done gate
+guild party close [<party>] --pending "<text>" [--force]  # <party>: from a terminal, or your own party; --pending none when nothing is left; --force overrides the quest done gate and the open ask and PR check
 
 guild quest add <slug> --title "..." --epic <slug> [--tasks T09,T07b] [--reason "<why>"]   # without --tasks: an empty epic quest; --reason is optional on every quest add
 guild quest add <slug> --title "..." --no-epic [--tasks A,B [--titles "First,Second"]]
@@ -366,6 +366,11 @@ closes any party from a terminal (a session may only name its own party).
 Close applies the `guild quest done` gate to each active quest of the party: it
 refuses, listing every quest with tasks not done or epic drift, and `--force`
 closes anyway, reporting each such quest as `closed with unfinished work`.
+Close also refuses while the party has an open ask or an open tracked PR (with
+its unseen review comment count), listed together with the quest problems in one
+message; `--force` dismisses the asks and lists the PRs as still open. Closing
+unbinds the session and a closed party cannot be resumed, so answer the asks and
+merge or close the PRs first.
 Before judging drift, close refreshes the SDD snapshot once per project with an
 `sdd` block, as `guild sync --source sdd` would.
 
