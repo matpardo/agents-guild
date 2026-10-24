@@ -2156,6 +2156,12 @@ var NO_SESSION_MESSAGE = "session token not loaded, reload the page";
     return details;
   }
 
+  function renderAckButton(entry) {
+    return prButton("queue", entry.ref, "Mark " + entry.unseen_comments + (entry.unseen_comments === 1 ? " comment" : " comments") + " read", function () {
+      postPrAction("queue", entry.ref, "ack", {});
+    });
+  }
+
   function renderQueueSummary(entry) {
     var summary = el("p");
     summary.className = "queue-reason";
@@ -2175,6 +2181,9 @@ var NO_SESSION_MESSAGE = "session token not loaded, reload the page";
     item.appendChild(renderQueueEntryHead(entry));
     item.appendChild(renderQueueSummary(entry));
     item.appendChild(renderPrBlockControls(entry.ref, entry.blocked_external, "queue"));
+    if (entry.unseen_comments > 0) {
+      item.appendChild(renderAckButton(entry));
+    }
     if (entry.why) {
       item.appendChild(classedText("p", entry.why, "queue-reason"));
     }

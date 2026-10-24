@@ -3,7 +3,7 @@ epic: human-ready-prs
 type: tasks
 title: PRs that are really ready for the person
 status: done
-updated: 2026-10-20
+updated: 2026-10-24
 ---
 
 # Tasks: PRs that are really ready for the person
@@ -100,3 +100,14 @@ updated: 2026-10-20
 - [x] `pr wait` exits on a new comment or review by another author, on checks going from pending to done, and on close or merge; a notice-only bot comment does not end it.
 - [x] GUILD.md tells sessions to start them in the background after `guild ask` and after marking a PR Ready.
 
+## T10 — Ready check refreshes the PR and gates on unread comments
+
+**Depends on:** T03
+**Status:** [x] done
+
+**What:** `guild pr ready-check` refreshes the one PR from GitHub before it computes the queue, and fails while the PR has review comments nobody has read. `guild pr ack <ref>` (CLI and web) marks them read. A review bot that comments between the last sync and a merge no longer slips through.
+
+**Acceptance:**
+- [x] ready-check picks up comments posted after the last sync; on a `gh` failure it prints `note: state as of last sync` and keeps the stored state.
+- [x] Unread comments are a gate: ready-check exits 1 and the web detail lists it; `pr ack` clears it.
+- [x] The web never calls `gh` and shows the ack button only when comments are unread.

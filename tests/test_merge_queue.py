@@ -41,6 +41,7 @@ def _pr(number, **overrides):
         "fixes_flaky": False,
         "blocked_external": None,
         "comments_after_head": None,
+        "unseen_comments": 0,
         "ci_label": None,
         "trace_valid": None,
         "trace_reason": None,

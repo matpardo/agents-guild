@@ -87,7 +87,7 @@ class MergeQueueModelTests(MergeQueueModelTestCase):
                 "position", "ref", "repo", "number", "party", "task", "lifecycle", "branch",
                 "checks_failing", "checks_passing", "checks_pending", "labels", "blocked_external", "unblocks", "state", "next_action",
                 "action", "why", "reasons", "blockers", "waits", "gates", "url",
-                "human_state", "human_missing", "notes",
+                "human_state", "human_missing", "notes", "unseen_comments",
             },
         )
         self.assertEqual([entry["position"] for entry in queue], [1, 2, 3])

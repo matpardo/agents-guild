@@ -88,6 +88,7 @@ def _pr_record(conn, row):
         "review_decision": row["review_decision"],
         "unresolved_threads": row["unresolved_threads"],
         "comments_after_head": row["comments_after_head"],
+        "unseen_comments": max(0, (row["review_comment_count"] or 0) - (row["last_notified_comment_count"] or 0)),
         "ci_label": row["ci_label"],
         "trace_valid": row["trace_valid"],
         "trace_reason": row["trace_reason"],
@@ -500,6 +501,7 @@ def _entry_model(projects_dir, now, entry):
         "checks_passing": entry["checks_passing"],
         "checks_pending": entry["checks_pending"],
         "labels": entry["labels"],
+        "unseen_comments": entry["unseen_comments"],
         "url": "https://github.com/{}/pull/{}".format(entry["repo"], entry["number"]),
     }
 
@@ -510,6 +512,9 @@ def gates(entry, red_rows):
         found.append("draft (gh pr ready {})".format(entry["number"]))
     if "needs-human-pr-review" in entry["labels"]:
         found.append("needs human review")
+    if entry["unseen_comments"] > 0:
+        noun = "comment" if entry["unseen_comments"] == 1 else "comments"
+        found.append("{} review {} since last read (guild pr ack {})".format(entry["unseen_comments"], noun, entry["ref"]))
     found.extend(
         "main red {}".format(main_label(row))
         for row in red_rows

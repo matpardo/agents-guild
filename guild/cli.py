@@ -232,10 +232,21 @@ def _handle_pr_untrack(ctx, args):
     return 0
 
 
-def _handle_pr_ready_check(ctx, args):
+def _handle_pr_ack(ctx, args):
     from guild.commands import pr as pr_commands
 
-    lines, exit_code = pr_commands.ready_check(ctx, args.ref)
+    _print(pr_commands.ack_comments(ctx, args.ref))
+    return 0
+
+
+def _handle_pr_ready_check(ctx, args):
+    from guild import lifecycle, refs
+    from guild.commands import pr as pr_commands
+    from guild.commands import sync as sync_commands
+
+    repo, number = refs.parse_pr_ref(args.ref)
+    failures = sync_commands.refresh_pr(ctx, repo, number, lifecycle.run_process)
+    lines, exit_code = pr_commands.ready_check(ctx, args.ref, bool(failures))
     _print_lines(lines)
     return exit_code
 
@@ -1015,7 +1026,11 @@ def _add_pr_parser(subparsers):
     untrack.add_argument("ref")
     untrack.set_defaults(handler=_handle_pr_untrack)
 
-    ready_check = actions.add_parser("ready-check", help="read-only: list everything between a PR and a merge")
+    ack = actions.add_parser("ack", help="mark the review comments of a PR as read")
+    ack.add_argument("ref")
+    ack.set_defaults(handler=_handle_pr_ack)
+
+    ready_check = actions.add_parser("ready-check", help="refresh a PR and list everything between it and a merge")
     ready_check.add_argument("ref")
     ready_check.set_defaults(handler=_handle_pr_ready_check)
 

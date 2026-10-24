@@ -129,6 +129,7 @@ def _entry(pr):
         "checks_billing": pr["checks_billing"],
         "ci_label": pr["ci_label"],
         "labels": _labels(pr),
+        "unseen_comments": pr["unseen_comments"],
     }
 
 

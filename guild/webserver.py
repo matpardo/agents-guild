@@ -39,7 +39,7 @@ _PAGE_FILES = ("index.html", "history.html", "progress.html")
 _MAX_BODY_BYTES = 16384
 _ASK_ACTION_RE = re.compile(r"^/api/asks/([^/]+)/(answer|dismiss)$")
 _NOTICE_ACTION_RE = re.compile(r"^/api/notices/([^/]+)/(seen|unseen)$")
-_PR_ACTION_RE = re.compile(r"^/api/prs/([^/]+/[^/]+)/(\d+)/(block|unblock|relink|untrack)$")
+_PR_ACTION_RE = re.compile(r"^/api/prs/([^/]+/[^/]+)/(\d+)/(block|unblock|relink|untrack|ack)$")
 _RAID_ACTION_RE = re.compile(r"^/api/raids/([^/]+)/(pause|resume)$")
 _MEMORY_ACTION_RE = re.compile(r"^/api/memory/([^/]+)/([1-9][0-9]*)/rm$")
 _TASK_MOVE_RE = re.compile(r"^/api/quests/([^/]+)/tasks/([^/]+)/move$")
@@ -277,6 +277,8 @@ def _run_pr_action(action, ref, payload):
             return pr_commands.relink_as_human(ctx, ref, payload.get("task"), payload.get("card"))
         if action == "untrack":
             return pr_commands.untrack_as_human(ctx, ref)
+        if action == "ack":
+            return pr_commands.ack_comments(ctx, ref)
         return pr_commands.unblock_external(ctx, ref)
     finally:
         ctx.conn.close()

@@ -53,6 +53,22 @@ class WebPrBlockTests(WebWriteTestCase):
         self.assertIn("fixes-main", out)
         self.assertIn("blocked-external", out)
 
+    def _unseen(self):
+        return self._query("SELECT review_comment_count - COALESCE(last_notified_comment_count, 0) AS n FROM prs")[0]["n"]
+
+    def test_ack_marks_the_review_comments_as_read(self):
+        view = dict(OPEN_VIEW, comments=[{"author": {"login": "bot"}, "createdAt": "2026-10-20T11:00:00Z"}])
+        self.write_gh_fixture("view_acme-app_1", view)
+        self.run_cli(["sync", "--source", "gh"], "sess-1", self.repo_dir)
+        self.assertGreater(self._unseen(), 0)
+        response, payload = self._post_json("/api/prs/acme/app/1/ack", self._good_headers(), {})
+        self.assertEqual(response.status, 200, payload)
+        self.assertEqual(self._unseen(), 0)
+
+    def test_ack_of_an_unknown_pr_is_422(self):
+        response, payload = self._post_json("/api/prs/acme/app/9/ack", self._good_headers(), {})
+        self.assertEqual(response.status, 422)
+
     def test_empty_reason_is_422(self):
         response, payload = self._post_json(_BLOCK, self._good_headers(), {"reason": "   "})
         self.assertEqual(response.status, 422)

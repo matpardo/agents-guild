@@ -171,6 +171,17 @@ class WebQueueBlockBehaviorTests(unittest.TestCase):
         queue = {"head": None, "scope": "party:a", "synced_at": "now", "synced_label": "synced now", "main": [], "queue": [entry]}
         return _render(dict(_BOARD, merge_queues=[queue]), "all", "all", "merge-queues", "text")
 
+    def test_unseen_comments_offer_the_ack_button(self):
+        text = self._human_text(unseen_comments=2, gates=["2 review comments since last read (guild pr ack o/r#1)"])
+        self.assertIn("Mark 2 comments read", text)
+        self.assertIn("gate: 2 review comments since last read", text)
+
+    def test_single_unseen_comment_is_singular(self):
+        self.assertIn("Mark 1 comment read", self._human_text(unseen_comments=1))
+
+    def test_no_unseen_comments_hide_the_ack_button(self):
+        self.assertNotIn("comments read", self._human_text(unseen_comments=0))
+
     def test_ci_pending_entry_shows_pill_and_note(self):
         text = self._human_text(human_state="ready (CI pending)", notes=["CI label run-ci not on the PR"])
         self.assertIn("b ready (CI pending) no checks", text)

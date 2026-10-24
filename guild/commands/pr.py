@@ -126,6 +126,12 @@ def acknowledge_comments(ctx, repo, number):
         )
 
 
+def ack_comments(ctx, ref):
+    repo, number = refs.parse_pr_ref(ref)
+    acknowledge_comments(ctx, repo, number)
+    return "PR '{}#{}' review comments marked as read".format(repo, number)
+
+
 def _flag_value(requested, current):
     if requested is None:
         return int(current or 0)
@@ -289,7 +295,7 @@ def set_(
     return message
 
 
-def ready_check(ctx, ref):
+def ready_check(ctx, ref, refresh_failed):
     repo, number = refs.parse_pr_ref(ref)
     row = _load_pr(ctx.conn, repo, number)
     if row["lifecycle"] in _CLOSED_LIFECYCLES:
@@ -306,6 +312,8 @@ def ready_check(ctx, ref):
     lines.extend("- wait: {}".format(wait) for wait in entry["waits"])
     lines.extend("- gate: {}".format(gate) for gate in gates)
     lines.extend("- note: {}".format(note) for note in merge_queue_commands.notes(ctx.projects_dir, entry, red_rows))
+    if refresh_failed:
+        lines.append("- note: state as of last sync")
     ready = entry["action"] == "merge" and entry["human_state"] in merge_queue.HUMAN_READY_STATES
     exit_code = 0 if ready and not gates else 1
     return [sanitize.strip_control_sequences(line) for line in lines], exit_code
