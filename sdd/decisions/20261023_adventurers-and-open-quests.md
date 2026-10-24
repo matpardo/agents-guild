@@ -25,6 +25,7 @@ Decisión del dev, 2026-10-23:
 | health job | a recurring adventurer job a project declares; the board shows when it is due |
 | epic, task | planning units owned by SDD and the tracker; guild only observes them |
 | raid | named channel several parties join |
+| realm | the guilds that share one hub: a status view and inboxes for files, never actions |
 | brief | what a fresh session reads: handoff, task, PR and asks |
 | keeper, raid lead, dispatcher, officer | retired |
 

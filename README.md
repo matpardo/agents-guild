@@ -2729,6 +2729,6 @@ working, waiting on a permission prompt or stopped with work), `cost-metering`,
 `ask-context`, `session-lifecycle` (handoff retention, respawn in guild-launched windows), `ephemeral-brief` (the task brief, `idle`/`queued` party
 status, shorter sessions), `merge-queue`, `web-board`, `lifecycle-commands`,
 `resource-footprint`, `security-hardening` and `derived-state`. Open:
-`install-and-update` and `raids-in-practice`. Drafts: `conflict-hotspots`,
+`install-and-update`, `raids-in-practice` and `realms`. Drafts: `conflict-hotspots`,
 `execution-profiles`, `budgets`, `officers`, `federation` and
 `skill-integration`.
