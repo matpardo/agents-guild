@@ -89,7 +89,7 @@ def _render(board, party_filter, raid_filter, out_id, mode):
 _MISSING = object()
 _BOARD = {
     "generated_at": "now", "asks": [], "notices": [], "ideas": [], "adventurers": [], "health_jobs": [], "project_names": [], "memory": [], "blocked": [], "merge_queues": [], "ready_for_you": [],
-    "projects": [], "quest_boards": [], "new_notice_count": 0, "raids": [{"name": "r", "members": ["c"]}],
+    "projects": [], "quest_boards": [], "realm": None, "new_notice_count": 0, "raids": [{"name": "r", "members": ["c"]}],
     "parties": [
         {
             "name": name, "raids": [], "quests": [], "prs": [], "claims": [], "state": "active", "generation": 1,

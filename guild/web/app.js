@@ -6,6 +6,7 @@
   var SESSION_URL = "/api/session";
   var RESOURCES_URL = "/api/resources";
   var COMPACT_URL = "/api/compact";
+  var REALM_REFRESH_URL = "/api/realm/refresh";
   var ANSWERED_ASKS_URL = "/api/asks/answered";
   var RESOURCE_ITEMS_PER_CATEGORY = 10;
   var NO_RESOURCES_MESSAGE = "no samples yet; run guild resources collect";
@@ -34,6 +35,9 @@ var NO_SESSION_MESSAGE = "session token not loaded, reload the page";
     openParties: {},
     resourcesOpen: false,
     resourcesModel: null,
+    realmModel: null,
+    realmBusy: false,
+    realmStatus: "",
     noticesOpen: true,
     queueDetailOpen: {},
     openResourceProjects: {},
@@ -3159,6 +3163,102 @@ var NO_SESSION_MESSAGE = "session token not loaded, reload the page";
       });
   }
 
+  function ageSince(iso) {
+    var seconds = Math.max(0, Math.floor((Date.now() - Date.parse(iso)) / 1000));
+    if (isNaN(seconds)) {
+      return iso;
+    }
+    if (seconds < 60) {
+      return seconds + "s";
+    }
+    if (seconds < 3600) {
+      return Math.floor(seconds / 60) + "m";
+    }
+    if (seconds < 86400) {
+      return Math.floor(seconds / 3600) + "h";
+    }
+    return Math.floor(seconds / 86400) + "d";
+  }
+
+  function realmProjectLine(project) {
+    var line = el("p");
+    line.appendChild(
+      textEl(
+        "span",
+        project.name + ": parties " + project.parties + ", quests " + project.open_quests +
+          ", PRs " + project.open_prs + " (" + project.ready_prs + " ready), asks " + project.open_asks + " "
+      )
+    );
+    if (project.main_red) {
+      line.appendChild(pill("main red", "bad"));
+    }
+    return line;
+  }
+
+  function renderRealmGuild(entry) {
+    var article = el("article");
+    article.className = "card realm-guild";
+    var head = el("div");
+    head.className = "card-head";
+    head.appendChild(textEl("strong", entry.guild));
+    head.appendChild(classedText("span", "last seen " + ageSince(entry.received_at) + " ago", "muted"));
+    article.appendChild(head);
+    appendAll(article, entry.projects.map(realmProjectLine));
+    return article;
+  }
+
+  function postRealmRefresh() {
+    if (sessionToken === null) {
+      state.realmStatus = NO_SESSION_MESSAGE;
+      showRealm();
+      return;
+    }
+    state.realmBusy = true;
+    state.realmStatus = "refreshing...";
+    showRealm();
+    sendPost(REALM_REFRESH_URL, {}).then(function (result) {
+      state.realmBusy = false;
+      state.realmStatus = result.ok ? "" : errorMessage(result.body);
+      if (result.ok) {
+        state.realmModel = result.body;
+      }
+      showRealm();
+    });
+  }
+
+  function renderRealmControls(realm) {
+    var controls = el("p");
+    var fetched = realm.fetched_at === null ? "never fetched" : "fetched " + ageSince(realm.fetched_at) + " ago";
+    controls.appendChild(classedText("span", fetched + " ", "muted"));
+    var button = textEl("button", "Refresh");
+    button.type = "button";
+    button.disabled = state.realmBusy;
+    button.addEventListener("click", postRealmRefresh);
+    controls.appendChild(button);
+    controls.appendChild(classedText("span", state.realmStatus, "ask-status"));
+    return controls;
+  }
+
+  function showRealm() {
+    renderRealm(state.realmModel);
+  }
+
+  function renderRealm(realm) {
+    state.realmModel = realm;
+    var section = document.getElementById("realm");
+    clear(section);
+    if (realm === null) {
+      return;
+    }
+    section.appendChild(textEl("h2", "realm"));
+    section.appendChild(renderRealmControls(realm));
+    if (realm.guilds.length === 0) {
+      section.appendChild(textEl("p", "no guilds reported yet"));
+      return;
+    }
+    appendAll(section, realm.guilds.map(renderRealmGuild));
+  }
+
   function renderSection(id, args, renderFn, onlyIfChanged) {
     var key = JSON.stringify(args);
     if (onlyIfChanged && state.sectionKeys[id] === key) {
@@ -3185,11 +3285,11 @@ var NO_SESSION_MESSAGE = "session token not loaded, reload the page";
     adventurers: ["adventurers", "health-jobs"],
     ideas: ["ideas"],
     quests: ["quest-board"],
-    overview: ["notices", "raids", "drift", "projects"],
+    overview: ["notices", "raids", "drift", "projects", "realm"],
   };
   var ALL_SECTION_IDS = [
     "asks", "ready-for-you", "answered-asks", "notices", "ideas", "adventurers", "health-jobs",
-    "memory", "raids", "drift", "projects", "quest-board", "merge-queues", "parties",
+    "memory", "raids", "drift", "projects", "quest-board", "merge-queues", "parties", "realm",
   ];
   var DEFAULT_VIEW = { kind: "needs-you", name: "", hash: "needs-you" };
 
@@ -3431,6 +3531,7 @@ var NO_SESSION_MESSAGE = "session token not loaded, reload the page";
     renderSection("projects", [filtered.projects], renderProjects, onlyIfChanged);
     renderSection("quest-board", [data.quest_boards], renderQuestBoard, onlyIfChanged);
     renderSection("parties", [filtered.parties], renderParties, onlyIfChanged);
+    renderSection("realm", [data.realm], renderRealm, onlyIfChanged);
     restoreFocus();
   }
 

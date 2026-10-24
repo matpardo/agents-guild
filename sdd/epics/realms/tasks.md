@@ -32,7 +32,7 @@ updated: 2026-10-24
 ## T04 — Realm panel on the web
 
 **Depends on:** T03
-**Status:** [ ] pending
+**Status:** [x] done
 
 **What:** the board shows the cached realm status and refreshes it through the same command function.
 
