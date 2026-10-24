@@ -32,7 +32,7 @@ are updated in the same PR as the code.
 - **party** — a durable work lineage that survives session handoffs. Session
   names change; the party does not. Owns quests, PRs and claims.
 - **adventurer** — one session doing one job on one project: a synced SDD
-  task or a one-off change. No generations, no handoff; it ends with `guild
+  task or a one-off repo change. No generations, no handoff; it ends with `guild
   adventurer done --pending`. Never owns a quest.
 - **leader** — the live session of a party: zero or one. An attribute of
   `party`, not a command of its own.
@@ -2355,8 +2355,9 @@ or create a raid. `guild quest add` and `guild task add` need no approval.
 
 **Opt-in binding.** A session never needs a party. The unbound hint says to
 resume a party when the work continues one, and otherwise to ask the human
-whether the work is a party or an adventurer before working on a registered
-project. The `permissions.ask` rules make Claude Code ask the human before every
+whether the work is a party or an adventurer only when the work will change a
+repo. Sessions that answer questions, investigate or run commands stay unbound.
+The `permissions.ask` rules make Claude Code ask the human before every
 `guild party start`, `guild party resume`, `guild raid join` and
 `guild adventurer start`, whatever the model decides.
 

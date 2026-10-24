@@ -14,6 +14,11 @@ class BriefTests(GuildTestCase):
         self.assertEqual(code, 0)
         self.assertIn("session not bound", out)
 
+    def test_unbound_hint_binds_only_for_repo_changes(self):
+        code, out, err = self.run_cli(["brief"], "sess-1", None)
+        self.assertIn("only when the work will change a repo", out)
+        self.assertIn("questions and commands stay unbound", out)
+
     def test_human_terminal_points_to_board(self):
         code, out, err = self.run_cli(["brief"], None, None)
         self.assertEqual(code, 0)
