@@ -231,7 +231,7 @@ class BoardModelShapeTests(BoardModelTestCase):
         self.assertEqual(
             set(party),
             {
-                "name", "state", "generation", "reason", "from_adventurer", "started", "status", "ctx", "caps", "resume_command",
+                "name", "state", "generation", "reason", "from_adventurer", "dates", "status", "ctx", "caps", "resume_command",
                 "leader_session_name", "has_live_leader", "stopped_without_report", "quests", "prs", "raids", "claims", "ideas", "remaining", "drift", "waits",
             },
         )
@@ -259,7 +259,7 @@ class BoardModelShapeTests(BoardModelTestCase):
             set(pr),
             {
                 "repo", "number", "lifecycle", "needs_ask_answer", "needs_human_pr_review", "checks_failing",
-                "checks_passing", "checks_pending", "what", "waits", "url", "card", "card_url",
+                "checks_passing", "checks_pending", "what", "waits", "url", "dates", "card", "card_url",
                 "branch", "fixes_main", "fixes_flaky", "blocked_external", "base_branch", "review_reasons", "ask_id", "party",
             },
         )

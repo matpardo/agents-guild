@@ -1962,6 +1962,13 @@ and in the web (`dates` in the quest and task models, `null` when unknown). A
 quest changes when it is taken, released, done or closed with its party, or when a
 task is added or moved; a task changes when it starts, blocks, finishes or moves.
 
+The same label appears on tracked PRs (tracked, then last activity: a change of
+lifecycle, waits, flags or synced state, not a sync with nothing new), on claims
+in `guild claims` and the claims line of a party (claimed, then last renewal)
+and on each party (first leader start, then last handoff, resume or close). The
+web model carries it as `dates` in the PR, claim and party entries (`null` when
+unknown); the party `started` key is replaced by `dates`.
+
 The web board has a `quest board` section for every registered project with
 synced epics or open quests, even with no party (`quest_boards` in
 `/api/board`: `name`, `open_quests`, `free_tasks` per epic and the active
@@ -2201,7 +2208,10 @@ replay cleanly.
 the event timestamps by the same column migration. Rows that exist before the
 migration stay empty and show no date until the log is replayed: run `guild
 compact`, then `guild rebuild`, with no session working. `guild doctor` warns
-`N rows predate stored dates` while any such row remains.
+`N rows predate stored dates` while any such row remains. The same holds for
+`prs.tracked_at`, `claims.created_at` and `claims.updated_at` and
+`parties.updated_at`. A claim keeps `created_at` while the same party renews it
+and resets it when another party takes the area.
 
 `guild sync --source gh` also stores, per tracked PR, `prs.review_decision`
 (`reviewDecision`), `prs.merge_state` (`mergeStateStatus`) and

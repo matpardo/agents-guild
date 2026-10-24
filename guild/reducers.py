@@ -4,14 +4,15 @@ import json
 def _party_started(conn, event):
     payload = event["payload"]
     conn.execute(
-        "INSERT INTO parties (name, project, leader_session_id, generation, state, reason, from_adventurer)"
-        " VALUES (?, ?, ?, 1, 'active', ?, ?)",
+        "INSERT INTO parties (name, project, leader_session_id, generation, state, reason, from_adventurer,"
+        " updated_at) VALUES (?, ?, ?, 1, 'active', ?, ?, ?)",
         (
             payload["party"],
             event["project"],
             event["session_id"],
             payload.get("reason"),
             payload.get("from_adventurer"),
+            event["ts"],
         ),
     )
     conn.execute(
@@ -37,8 +38,8 @@ def _party_resumed(conn, event):
         (payload["party"], payload["generation"]),
     )
     conn.execute(
-        "UPDATE parties SET leader_session_id = ?, generation = ?, state = 'active' WHERE name = ?",
-        (event["session_id"], payload["generation"], payload["party"]),
+        "UPDATE parties SET leader_session_id = ?, generation = ?, state = 'active', updated_at = ? WHERE name = ?",
+        (event["session_id"], payload["generation"], event["ts"], payload["party"]),
     )
     conn.execute(
         "INSERT INTO leaders (party, generation, session_id, session_name, started_at, ended_at)"
@@ -55,7 +56,9 @@ def _party_resumed(conn, event):
 
 def _party_closed(conn, event):
     payload = event["payload"]
-    conn.execute("UPDATE parties SET state = 'closed' WHERE name = ?", (payload["party"],))
+    conn.execute(
+        "UPDATE parties SET state = 'closed', updated_at = ? WHERE name = ?", (event["ts"], payload["party"])
+    )
     conn.execute(
         "UPDATE quests SET state = 'done', updated_at = ? WHERE party = ? AND state = 'active'",
         (event["ts"], payload["party"]),
@@ -72,7 +75,9 @@ def _party_closed(conn, event):
 
 def _party_handed_off(conn, event):
     payload = event["payload"]
-    conn.execute("UPDATE parties SET state = 'awaiting-leader' WHERE name = ?", (payload["party"],))
+    conn.execute(
+        "UPDATE parties SET state = 'awaiting-leader', updated_at = ? WHERE name = ?", (event["ts"], payload["party"])
+    )
     conn.execute(
         "UPDATE leaders SET handoff_path = ? WHERE party = ? AND generation = ?",
         (payload["handoff_path"], payload["party"], payload["generation"]),
@@ -272,8 +277,8 @@ def _pr_tracked(conn, event):
         "INSERT INTO prs (repo, number, party, task_quest, task_tid, card, what, waits, lifecycle,"
         " branch, title, gh_state, gh_draft, checks_failing, checks_passing, seeded, synced_at,"
         " mergeable, review_comment_count, last_notified_comment_count, last_activity_at,"
-        " needs_ask_answer, needs_human_pr_review, fixes_main, fixes_flaky, adventurer)"
-        " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, ?, NULL, NULL, 0, 0, ?, ?, ?, ?, ?, ?)",
+        " needs_ask_answer, needs_human_pr_review, fixes_main, fixes_flaky, adventurer, tracked_at)"
+        " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, ?, NULL, NULL, 0, 0, ?, ?, ?, ?, ?, ?, ?)",
         (
             payload["repo"],
             payload["number"],
@@ -295,6 +300,7 @@ def _pr_tracked(conn, event):
             values["fixes_main"],
             values["fixes_flaky"],
             payload.get("adventurer"),
+            event["ts"],
         ),
     )
 
@@ -566,8 +572,11 @@ def _idea_unlinked(conn, event):
 def _claim_created(conn, event):
     payload = event["payload"]
     conn.execute(
-        "INSERT OR REPLACE INTO claims (project, area, party, expires_at) VALUES (?, ?, ?, ?)",
-        (payload["project"], payload["area"], payload["party"], payload["expires_at"]),
+        "INSERT INTO claims (project, area, party, expires_at, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)"
+        " ON CONFLICT(project, area) DO UPDATE SET"
+        " created_at = CASE WHEN claims.party = excluded.party THEN claims.created_at ELSE excluded.created_at END,"
+        " party = excluded.party, expires_at = excluded.expires_at, updated_at = excluded.updated_at",
+        (payload["project"], payload["area"], payload["party"], payload["expires_at"], event["ts"], event["ts"]),
     )
 
 

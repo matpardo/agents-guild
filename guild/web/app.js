@@ -2409,6 +2409,9 @@ realmFetchNote: "",
       row.appendChild(textEl("span", pr.card));
     }
     row.appendChild(textEl("span", pr.what));
+    if (pr.dates) {
+      row.appendChild(classedText("span", pr.dates, "muted"));
+    }
     if (pr.waits) {
       row.appendChild(textEl("span", "waits: " + pr.waits));
     }
@@ -2630,8 +2633,8 @@ realmFetchNote: "",
 
   function partyOrigin(party) {
     var parts = [];
-    if (party.started !== null) {
-      parts.push("started " + party.started);
+    if (party.dates !== null) {
+      parts.push(party.dates);
     }
     if (party.from_adventurer !== null) {
       parts.push("from adventurer " + party.from_adventurer);
@@ -2726,7 +2729,7 @@ realmFetchNote: "",
     if (party.claims.length > 0) {
       var claimsText = party.claims
         .map(function (claim) {
-          return claim.area;
+          return claim.dates ? claim.area + " (" + claim.dates + ")" : claim.area;
         })
         .join(", ");
       details.appendChild(explain(textEl("p", "claims: " + claimsText), "ui", "claims"));

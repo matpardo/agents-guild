@@ -93,7 +93,7 @@ _BOARD = {
     "parties": [
         {
             "name": name, "raids": [], "quests": [], "prs": [], "claims": [], "state": "active", "generation": 1,
-            "reason": None, "from_adventurer": None, "started": "2026-10-24 10:00",
+            "reason": None, "from_adventurer": None, "dates": "created 2026-10-24 10:00",
             "status": {"name": "idle", "label": "idle"}, "remaining": {"all_done": True}, "ctx": None,
             "resume_command": None, "caps": None, "drift": {"findings": [], "more": 0}, "leader_session_name": None, "waits": [], "ideas": [],
         }
@@ -293,7 +293,7 @@ class WebAdventurerBehaviorTests(unittest.TestCase):
     def test_party_card_shows_origin(self):
         party = dict(_BOARD["parties"][0], reason="grew to several PRs", from_adventurer=4)
         out = _render(dict(_BOARD, parties=[party]), "all", "all", "parties", "text")
-        self.assertIn("started 2026-10-24 10:00", out)
+        self.assertIn("created 2026-10-24 10:00", out)
         self.assertIn("from adventurer 4", out)
         self.assertIn("reason: grew to several PRs", out)
         plain = _render(_BOARD, "all", "all", "parties", "text")
@@ -776,6 +776,27 @@ class WebQuestBoardBehaviorTests(unittest.TestCase):
         hidden = rendered(None, None)
         self.assertNotIn("QUESTDATE", hidden)
         self.assertNotIn("TASKDATE", hidden)
+
+    def test_party_pr_and_claim_show_dates_only_when_known(self):
+        def rendered(party_dates, pr_dates, claim_dates):
+            pr = {
+                "repo": "o/r", "number": 1, "lifecycle": "ready", "needs_ask_answer": False, "ask_id": None,
+                "needs_human_pr_review": False, "fixes_main": False, "fixes_flaky": False, "blocked_external": None,
+                "party": "a", "checks_failing": 0, "checks_passing": 0, "checks_pending": 0, "what": "w",
+                "waits": None, "branch": None, "base_branch": None, "review_reasons": [], "card": None,
+                "card_url": None, "dates": pr_dates, "url": "https://example.com/pr",
+            }
+            claim = {"area": "src/x", "expires_at": "2026-10-24T11:00:00+00:00", "dates": claim_dates}
+            party = dict(_BOARD["parties"][0], dates=party_dates, prs=[pr], claims=[claim])
+            return _render(dict(_BOARD, parties=[party]), "all", "all", "parties", "text")
+
+        shown = rendered("created PARTYDATE", "created PRDATE", "created CLAIMDATE")
+        for expected in ("PARTYDATE", "PRDATE", "src/x (created CLAIMDATE)"):
+            self.assertIn(expected, shown)
+        hidden = rendered(None, None, None)
+        for unexpected in ("PARTYDATE", "PRDATE", "CLAIMDATE"):
+            self.assertNotIn(unexpected, hidden)
+        self.assertIn("claims: src/x", hidden)
 
     def test_writes_go_through_send_post(self):
         for expected in ('"/api/quests/create-open"', '"/api/quests/" + quest.slug + "/take"', '"/api/quests/" + quest.slug + "/release"'):
