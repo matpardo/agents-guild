@@ -522,12 +522,20 @@ def _handle_release(ctx, args):
     return 0
 
 
+def _claim_line(row):
+    line = "{} — {} until {}".format(row["area"], row["party"], row["expires_at"])
+    dates = timeutil.dates_label(row["created_at"], row["updated_at"])
+    if dates is None:
+        return line
+    return "{} ({})".format(line, dates)
+
+
 def _handle_claims(ctx, args):
     from guild.commands import claim as claim_commands
 
     rows = claim_commands.list_claims(ctx.conn, ctx.now)
     _print_lines(
-        ["{} — {} until {}".format(row["area"], row["party"], row["expires_at"]) for row in rows]
+        [_claim_line(row) for row in rows]
     )
     return 0
 

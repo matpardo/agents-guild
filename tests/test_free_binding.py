@@ -90,7 +90,7 @@ class PromoteTests(AdventurerTestCase):
         self.assertEqual(model["adventurers"], [])
         party = model["parties"][0]
         self.assertEqual((party["reason"], party["from_adventurer"]), ("grew", 1))
-        self.assertRegex(party["started"], r"^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$")
+        self.assertRegex(party["dates"], r"^created \d{4}-\d{2}-\d{2} \d{2}:\d{2}$")
         code, out, err = self.cli(["board"], None)
         self.assertIn("reason: grew", out)
 

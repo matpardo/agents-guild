@@ -14,7 +14,13 @@ from guild.realm import clientconfig
 _TRACE_RE = re.compile(r"guild|ask #[0-9]|notice #[0-9]", re.IGNORECASE)
 _RETIRED_UNIT_NAMES = ("guild-dispatch.timer", "guild-dispatch.service")
 _PR_SCAN_FIELDS = ("number", "title", "body", "comments", "commits")
-_DATED_COLUMNS = (("quests", "created_at"), ("quest_tasks", "created_at"))
+_DATED_COLUMNS = (
+    ("quests", "created_at"),
+    ("quest_tasks", "created_at"),
+    ("prs", "tracked_at"),
+    ("claims", "created_at"),
+    ("parties", "updated_at"),
+)
 
 
 def _claude_dir():

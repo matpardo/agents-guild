@@ -166,9 +166,12 @@ def _pr_lines(ctx, painter, pr_row, indent):
         branch_lines = painter.wrap("branch: {}".format(branch), indent + "  ")
         head_lines = head_lines + [painter.paint(line, "dim") for line in branch_lines]
     waits = _visible_waits(pr_row)
-    if not waits:
+    if waits:
+        head_lines = head_lines + painter.wrap("waits: {}".format(waits), indent + "  ")
+    dates = timeutil.dates_label(pr_row["tracked_at"], pr_row["last_activity_at"])
+    if dates is None:
         return head_lines
-    return head_lines + painter.wrap("waits: {}".format(waits), indent + "  ")
+    return head_lines + [painter.paint(indent + "  " + dates, "dim")]
 
 
 def _pr_ref_blocked(conn, ref):
@@ -582,13 +585,13 @@ def _leader_session_name(conn, party_name):
     return leader["session_name"]
 
 
-def _party_started_label(conn, party_name):
+def _party_dates(conn, party_row):
     row = conn.execute(
-        "SELECT started_at FROM leaders WHERE party = ? AND generation = 1", (party_name,)
+        "SELECT started_at FROM leaders WHERE party = ? AND generation = 1", (party_row["name"],)
     ).fetchone()
     if row is None:
         return None
-    return timeutil.issued_label(row["started_at"])
+    return timeutil.dates_label(row["started_at"], party_row["updated_at"])
 
 
 def _leader_label(ctx, party_row):
@@ -736,6 +739,12 @@ def _quest_board_lines(ctx, painter, projects_by_name):
     return lines
 
 
+def _claim_text(ctx, row):
+    dates = _row_dates(row)
+    suffix = "" if dates is None else ", {}".format(dates)
+    return "{} ({}{})".format(row["area"], timeutil.time_left_label(ctx.now, row["expires_at"]), suffix)
+
+
 def _party_section(ctx, painter, party_row, project_config):
     lines = [
         "{} {}  {}".format(
@@ -744,6 +753,9 @@ def _party_section(ctx, painter, party_row, project_config):
             painter.paint(_leader_label(ctx, party_row), "dim"),
         )
     ]
+    dates = _party_dates(ctx.conn, party_row)
+    if dates is not None:
+        lines.append(painter.paint("  " + dates, "dim"))
     if party_row["reason"]:
         lines.extend(painter.wrap("reason: {}".format(sanitize.strip_control_sequences(party_row["reason"])), "  "))
     status = party_status.derive(ctx, party_row)
@@ -781,7 +793,7 @@ def _party_section(ctx, painter, party_row, project_config):
     claims = _party_claims(ctx, party_row["name"])
     if claims:
         claim_text = ", ".join(
-            "{} ({})".format(row["area"], timeutil.time_left_label(ctx.now, row["expires_at"])) for row in claims
+            _claim_text(ctx, row) for row in claims
         )
         lines.append(painter.paint("  claims: {}".format(claim_text), "dim"))
     for idea in idea_commands.linked_ideas(ctx, party_row["name"]):
@@ -975,6 +987,7 @@ def _pr_model(ctx, pr_row, project_config):
         ),
         "card": card,
         "card_url": links.card_url(project_config, card),
+        "dates": timeutil.dates_label(pr_row["tracked_at"], pr_row["last_activity_at"]),
         "url": links.pr_url(pr_row["repo"], pr_row["number"]),
     }
 
@@ -1162,7 +1175,7 @@ def _party_model(ctx, party_row, project_config):
         "generation": party_row["generation"],
         "reason": _optional_text(party_row["reason"]),
         "from_adventurer": party_row["from_adventurer"],
-        "started": _party_started_label(ctx.conn, party_row["name"]),
+        "dates": _party_dates(ctx.conn, party_row),
         "status": _status_model(ctx, party_row),
         "remaining": party_progress.remaining(ctx.conn, party_row["name"]),
         "waits": party_waits.for_party(ctx, party_row),
@@ -1187,7 +1200,9 @@ def _party_model(ctx, party_row, project_config):
             }
             for row in raids
         ],
-        "claims": [{"area": row["area"], "expires_at": row["expires_at"]} for row in claims],
+        "claims": [
+            {"area": row["area"], "expires_at": row["expires_at"], "dates": _row_dates(row)} for row in claims
+        ],
     }
 
 
