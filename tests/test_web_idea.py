@@ -79,11 +79,27 @@ class WebIdeaLinkTests(WebWriteTestCase):
         response, payload = self._link("link", party="alpha")
         self.assertEqual(response.status, 200, payload)
         board = self._board()
-        self.assertEqual(board["ideas"][0]["parties"], [{"name": "alpha", "state": "active"}])
+        self.assertEqual(board["ideas"][0]["parties"], [{"name": "alpha", "state": "active", "has_prs": False}])
         self.assertEqual(board["parties"][0]["ideas"], [{"id": 1, "title": "Dark mode"}])
         response, payload = self._link("unlink", party="alpha")
         self.assertEqual(response.status, 200, payload)
         self.assertEqual(self._board()["ideas"][0]["parties"], [])
+
+    def test_unlink_is_422_once_the_party_tracks_a_pr(self):
+        self._link("link", party="alpha")
+        self.write_gh_fixture(
+            "view_acme-app_7",
+            {"state": "OPEN", "isDraft": True, "headRefName": "feature/7", "title": "t"},
+        )
+        code, out, err = self.run_cli(
+            ["pr", "track", "acme/app#7", "--task", "demo/T01", "--what", "x", "--waits", "y"],
+            "sess-1", self.repo_dir,
+        )
+        self.assertEqual(code, 0, err)
+        response, payload = self._link("unlink", party="alpha")
+        self.assertEqual(response.status, 422, payload)
+        self.assertIn(b"the party already tracks a PR", payload)
+        self.assertEqual(self._board()["ideas"][0]["parties"][0]["has_prs"], True)
 
     def test_refusals_are_422_and_bad_types_400(self):
         self.assertEqual(self._link("link", party="ghost")[0].status, 422)

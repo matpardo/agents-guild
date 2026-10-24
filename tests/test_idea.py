@@ -180,10 +180,47 @@ class IdeaLinkTests(GuildTestCase):
     def test_board_model_carries_links(self):
         self.run_cli(["idea", "link", "1"], "sess-1", self.repo_dir)
         model = board_commands.board_model(self._ctx())
-        self.assertEqual(model["ideas"][0]["parties"], [{"name": "alpha", "state": "active"}])
+        self.assertEqual(model["ideas"][0]["parties"], [{"name": "alpha", "state": "active", "has_prs": False}])
         by_name = {party["name"]: party for party in model["parties"]}
         self.assertEqual(by_name["alpha"]["ideas"], [{"id": 1, "title": "Dark mode"}])
         self.assertEqual(by_name["beta"]["ideas"], [])
+
+    def _track_pr(self, number):
+        self.write_gh_fixture(
+            "view_acme-app_{}".format(number),
+            {"state": "OPEN", "isDraft": True, "headRefName": "feature/{}".format(number), "title": "t"},
+        )
+        self.run_cli(["quest", "add", "demo", "--title", "Demo", "--no-epic"], "sess-1", self.repo_dir)
+        self.run_cli(["task", "add", "demo/T01", "--title", "First"], "sess-1", self.repo_dir)
+        code, out, err = self.run_cli(
+            ["pr", "track", "acme/app#{}".format(number), "--task", "demo/T01", "--what", "x", "--waits", "y"],
+            "sess-1", self.repo_dir,
+        )
+        self.assertEqual(code, 0, err)
+
+    def test_unlink_is_refused_once_the_party_tracks_a_pr(self):
+        self.run_cli(["idea", "link", "1"], "sess-1", self.repo_dir)
+        self.run_cli(["idea", "link", "1", "--party", "beta"], None, None)
+        self._track_pr(7)
+        code, out, err = self.run_cli(["idea", "unlink", "1"], "sess-1", self.repo_dir)
+        self.assertEqual(code, 1)
+        self.assertIn("stays linked to party 'alpha': the party already tracks a PR", err)
+        self.assertEqual(self.run_cli(["idea", "unlink", "1", "--party", "alpha"], None, None)[0], 1)
+        self.assertEqual(self._links(), ["alpha", "beta"])
+        model = board_commands.board_model(self._ctx())
+        self.assertEqual(
+            model["ideas"][0]["parties"],
+            [{"name": "alpha", "state": "active", "has_prs": True}, {"name": "beta", "state": "active", "has_prs": False}],
+        )
+        self.assertEqual(self.run_cli(["idea", "unlink", "1", "--party", "beta"], None, None)[0], 0)
+
+    def test_link_stays_allowed_and_untrack_releases_the_lock(self):
+        self._track_pr(7)
+        self.assertEqual(self.run_cli(["idea", "link", "1"], "sess-1", self.repo_dir)[0], 0)
+        self.assertEqual(self.run_cli(["idea", "unlink", "1"], "sess-1", self.repo_dir)[0], 1)
+        self.assertEqual(self.run_cli(["pr", "untrack", "acme/app#7"], "sess-1", self.repo_dir)[0], 0)
+        self.assertEqual(self.run_cli(["idea", "unlink", "1"], "sess-1", self.repo_dir)[0], 0)
+        self.assertEqual(self._links(), [])
 
     def _ctx(self):
         return context.RunContext(
