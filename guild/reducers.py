@@ -56,7 +56,10 @@ def _party_resumed(conn, event):
 def _party_closed(conn, event):
     payload = event["payload"]
     conn.execute("UPDATE parties SET state = 'closed' WHERE name = ?", (payload["party"],))
-    conn.execute("UPDATE quests SET state = 'done' WHERE party = ? AND state = 'active'", (payload["party"],))
+    conn.execute(
+        "UPDATE quests SET state = 'done', updated_at = ? WHERE party = ? AND state = 'active'",
+        (event["ts"], payload["party"]),
+    )
     conn.execute("UPDATE asks SET state = 'dismissed' WHERE party = ? AND state = 'open'", (payload["party"],))
     conn.execute("DELETE FROM claims WHERE party = ?", (payload["party"],))
     conn.execute("DELETE FROM raid_members WHERE party = ?", (payload["party"],))
@@ -101,7 +104,9 @@ def _leader_located(conn, event):
 
 
 def _quest_done(conn, event):
-    conn.execute("UPDATE quests SET state = 'done' WHERE slug = ?", (event["payload"]["slug"],))
+    conn.execute(
+        "UPDATE quests SET state = 'done', updated_at = ? WHERE slug = ?", (event["ts"], event["payload"]["slug"])
+    )
 
 
 def _quest_marked_incomplete(conn, event):
@@ -111,65 +116,82 @@ def _quest_marked_incomplete(conn, event):
 def _quest_added(conn, event):
     payload = event["payload"]
     conn.execute(
-        "INSERT INTO quests (slug, project, party, epic, title, state)"
-        " VALUES (?, ?, ?, ?, ?, 'active')",
-        (payload["slug"], payload["project"], payload["party"], payload["epic"], payload["title"]),
+        "INSERT INTO quests (slug, project, party, epic, title, state, created_at, updated_at)"
+        " VALUES (?, ?, ?, ?, ?, 'active', ?, ?)",
+        (
+            payload["slug"],
+            payload["project"],
+            payload["party"],
+            payload["epic"],
+            payload["title"],
+            event["ts"],
+            event["ts"],
+        ),
     )
     for task in payload["tasks"]:
         conn.execute(
-            "INSERT INTO quest_tasks (quest, tid, title, state, summary, blocked_reason)"
-            " VALUES (?, ?, ?, 'queued', NULL, NULL)",
-            (payload["slug"], task["tid"], task["title"]),
+            "INSERT INTO quest_tasks (quest, tid, title, state, summary, blocked_reason, created_at, updated_at)"
+            " VALUES (?, ?, ?, 'queued', NULL, NULL, ?, ?)",
+            (payload["slug"], task["tid"], task["title"], event["ts"], event["ts"]),
         )
 
 
 def _quest_taken(conn, event):
     payload = event["payload"]
-    conn.execute("UPDATE quests SET party = ? WHERE slug = ?", (payload["party"], payload["slug"]))
+    conn.execute(
+        "UPDATE quests SET party = ?, updated_at = ? WHERE slug = ?", (payload["party"], event["ts"], payload["slug"])
+    )
 
 
 def _quest_released(conn, event):
-    conn.execute("UPDATE quests SET party = NULL WHERE slug = ?", (event["payload"]["slug"],))
+    conn.execute(
+        "UPDATE quests SET party = NULL, updated_at = ? WHERE slug = ?", (event["ts"], event["payload"]["slug"])
+    )
 
 
 def _task_added(conn, event):
     payload = event["payload"]
     conn.execute(
-        "INSERT INTO quest_tasks (quest, tid, title, state, summary, blocked_reason)"
-        " VALUES (?, ?, ?, 'queued', NULL, NULL)",
-        (payload["quest"], payload["tid"], payload["title"]),
+        "INSERT INTO quest_tasks (quest, tid, title, state, summary, blocked_reason, created_at, updated_at)"
+        " VALUES (?, ?, ?, 'queued', NULL, NULL, ?, ?)",
+        (payload["quest"], payload["tid"], payload["title"], event["ts"], event["ts"]),
     )
+    conn.execute("UPDATE quests SET updated_at = ? WHERE slug = ?", (event["ts"], payload["quest"]))
 
 
 def _task_started(conn, event):
     payload = event["payload"]
     conn.execute(
-        "UPDATE quest_tasks SET state = 'active', summary = ? WHERE quest = ? AND tid = ?",
-        (payload["summary"], payload["quest"], payload["tid"]),
+        "UPDATE quest_tasks SET state = 'active', summary = ?, updated_at = ? WHERE quest = ? AND tid = ?",
+        (payload["summary"], event["ts"], payload["quest"], payload["tid"]),
     )
 
 
 def _task_blocked(conn, event):
     payload = event["payload"]
     conn.execute(
-        "UPDATE quest_tasks SET state = 'blocked', blocked_reason = ? WHERE quest = ? AND tid = ?",
-        (payload["reason"], payload["quest"], payload["tid"]),
+        "UPDATE quest_tasks SET state = 'blocked', blocked_reason = ?, updated_at = ? WHERE quest = ? AND tid = ?",
+        (payload["reason"], event["ts"], payload["quest"], payload["tid"]),
     )
 
 
 def _task_done(conn, event):
     payload = event["payload"]
     conn.execute(
-        "UPDATE quest_tasks SET state = 'done', summary = ? WHERE quest = ? AND tid = ?",
-        (payload["summary"], payload["quest"], payload["tid"]),
+        "UPDATE quest_tasks SET state = 'done', summary = ?, updated_at = ? WHERE quest = ? AND tid = ?",
+        (payload["summary"], event["ts"], payload["quest"], payload["tid"]),
     )
 
 
 def _task_moved(conn, event):
     payload = event["payload"]
     conn.execute(
-        "UPDATE quest_tasks SET quest = ? WHERE quest = ? AND tid = ?",
-        (payload["to_quest"], payload["from_quest"], payload["tid"]),
+        "UPDATE quest_tasks SET quest = ?, updated_at = ? WHERE quest = ? AND tid = ?",
+        (payload["to_quest"], event["ts"], payload["from_quest"], payload["tid"]),
+    )
+    conn.execute(
+        "UPDATE quests SET updated_at = ? WHERE slug IN (?, ?)",
+        (event["ts"], payload["from_quest"], payload["to_quest"]),
     )
     conn.execute(
         "UPDATE prs SET task_quest = ? WHERE task_quest = ? AND task_tid = ?",

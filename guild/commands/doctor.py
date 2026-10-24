@@ -14,6 +14,7 @@ from guild.realm import clientconfig
 _TRACE_RE = re.compile(r"guild|ask #[0-9]|notice #[0-9]", re.IGNORECASE)
 _RETIRED_UNIT_NAMES = ("guild-dispatch.timer", "guild-dispatch.service")
 _PR_SCAN_FIELDS = ("number", "title", "body", "comments", "commits")
+_DATED_COLUMNS = (("quests", "created_at"), ("quest_tasks", "created_at"))
 
 
 def _claude_dir():
@@ -203,6 +204,17 @@ def _scan_lines(ctx):
     return lines
 
 
+def _undated_lines(conn):
+    total = sum(
+        conn.execute("SELECT COUNT(*) FROM {} WHERE {} IS NULL".format(table, column)).fetchone()[0]
+        for table, column in _DATED_COLUMNS
+    )
+    if total == 0:
+        return []
+    message = "warn    {} rows predate stored dates: run guild compact, then guild rebuild, with no session working"
+    return [(True, message.format(total))]
+
+
 def run(ctx, scan_prs):
     settings = claude_settings.load_settings(_claude_dir() / "settings.json")
     checks = _hook_lines(settings)
@@ -217,6 +229,7 @@ def run(ctx, scan_prs):
     if global_config is not None:
         checks.extend(_handoff_line(ctx.state_dir, global_config))
     checks.extend(_realm_lines())
+    checks.extend(_undated_lines(ctx.conn))
     checks.extend(_project_lines(ctx.projects_dir, ctx.state_dir, global_config))
     checks.extend((True, "warn    {}".format(finding)) for finding in identity.double_bindings(ctx.conn, None))
     if scan_prs:

@@ -13,7 +13,7 @@ def _resolve_project(ctx, project):
 
 def _open_quest_models(conn, project):
     quests = conn.execute(
-        "SELECT slug, epic, title FROM quests WHERE project = ? AND party IS NULL AND state = 'active'"
+        "SELECT slug, epic, title, created_at, updated_at FROM quests WHERE project = ? AND party IS NULL AND state = 'active'"
         " ORDER BY rowid ASC",
         (project,),
     ).fetchall()
@@ -26,6 +26,7 @@ def _open_quest_models(conn, project):
             "slug": quest_row["slug"],
             "epic": quest_row["epic"],
             "title": quest_row["title"],
+            "dates": timeutil.dates_label(quest_row["created_at"], quest_row["updated_at"]),
             "tasks": [
                 {
                     "tid": task_row["tid"],
@@ -133,13 +134,19 @@ def _task_line(task):
     return "{} (held by adventurer {})".format(line, task["adventurer"])
 
 
+def _dates_suffix(quest):
+    if quest["dates"] is None:
+        return ""
+    return " · {}".format(quest["dates"])
+
+
 def _open_quest_lines(quests):
     if not quests:
         return ["  none"]
     lines = []
     for quest in quests:
         scope = "epic {}".format(quest["epic"]) if quest["epic"] else "no epic"
-        lines.append("  {} ({}): {}".format(quest["slug"], scope, quest["title"]))
+        lines.append("  {} ({}{}): {}".format(quest["slug"], scope, _dates_suffix(quest), quest["title"]))
         lines.extend(_task_line(task) for task in quest["tasks"])
     return lines
 
@@ -155,7 +162,9 @@ def _free_task_lines(epics):
 def summary_lines(model):
     lines = ["{} QUEST BOARD".format(model["name"])]
     for quest in model["open_quests"]:
-        lines.append("  open quest {} ({} tasks)".format(quest["slug"], len(quest["tasks"])))
+        lines.append(
+            "  open quest {} ({} tasks{})".format(quest["slug"], len(quest["tasks"]), _dates_suffix(quest))
+        )
     for entry in model["free_tasks"]:
         lines.append("  free tasks {}: {}".format(entry["epic"], len(entry["tasks"])))
     if len(lines) == 1:

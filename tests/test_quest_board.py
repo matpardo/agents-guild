@@ -68,7 +68,7 @@ class OpenQuestSchemaTests(GuildTestCase):
         self.assertEqual(party_column["notnull"], 0)
         self.assertEqual(conn.execute("SELECT party FROM quests WHERE slug = 'old'").fetchone()["party"], "alpha")
         schema.create_all(conn)
-        conn.execute("INSERT INTO quests VALUES ('open', 'acme', NULL, NULL, 'Open', 'active')")
+        conn.execute("INSERT INTO quests (slug, project, party, epic, title, state) VALUES ('open', 'acme', NULL, NULL, 'Open', 'active')")
 
 
 class OpenQuestAddTests(QuestBoardTestCase):

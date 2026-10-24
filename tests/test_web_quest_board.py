@@ -76,7 +76,7 @@ class WebQuestBoardTests(WebWriteTestCase):
         code, out, err = self.run_cli(["board"], "sess-1", self.repo_dir)
         self.assertEqual(code, 0, err)
         self.assertIn("QUEST BOARD", out)
-        self.assertIn("open quest pre (2 tasks)", out)
+        self.assertIn("open quest pre (2 tasks", out)
         self.assertIn("free tasks demo-epic:", out)
 
 

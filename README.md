@@ -1952,7 +1952,15 @@ and claim.
   <epic>/<tid>` (or `<quest>/<tid>` for a no-epic open quest).
 
 `guild board` prints a `QUEST BOARD` block per such project: each open quest with
-its task count and the number of free tasks per epic.
+its task count and dates and the number of free tasks per epic.
+
+Quests and quest tasks show when they were created and, if they changed later,
+when they last changed, as `created 2026-10-24 09:15 · updated 2026-10-24 11:02`
+(local time, minute precision; just `created …` while nothing changed). The
+label appears on open quests, on the quests and tasks of a party in `guild board`
+and in the web (`dates` in the quest and task models, `null` when unknown). A
+quest changes when it is taken, released, done or closed with its party, or when a
+task is added or moved; a task changes when it starts, blocks, finishes or moves.
 
 The web board has a `quest board` section for every registered project with
 synced epics or open quests, even with no party (`quest_boards` in
@@ -2184,6 +2192,12 @@ no data loss. Old events recorded before `mergeable`/`review_comment_count`
 existed lack those payload keys; `guild rebuild` tolerates that (carries the
 current stored value forward instead of raising) so historic databases
 replay cleanly.
+
+`quests` and `quest_tasks` also carry `created_at` and `updated_at`, set from
+the event timestamps by the same column migration. Rows that exist before the
+migration stay empty and show no date until the log is replayed: run `guild
+compact`, then `guild rebuild`, with no session working. `guild doctor` warns
+`N rows predate stored dates` while any such row remains.
 
 `guild sync --source gh` also stores, per tracked PR, `prs.review_decision`
 (`reviewDecision`), `prs.merge_state` (`mergeStateStatus`) and

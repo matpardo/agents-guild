@@ -44,8 +44,8 @@ class RealmClientTests(GuildTestCase):
         try:
             _insert(conn, "INSERT INTO parties (name, project, generation, state) VALUES ('p1', 'acme', 1, 'active')", ())
             _insert(conn, "INSERT INTO parties (name, project, generation, state) VALUES ('p2', 'acme', 1, 'closed')", ())
-            _insert(conn, "INSERT INTO quests VALUES ('q1', 'acme', 'p1', NULL, 't', 'active')", ())
-            _insert(conn, "INSERT INTO quests VALUES ('q2', 'acme', 'p1', NULL, 't', 'done')", ())
+            _insert(conn, "INSERT INTO quests (slug, project, party, epic, title, state) VALUES ('q1', 'acme', 'p1', NULL, 't', 'active')", ())
+            _insert(conn, "INSERT INTO quests (slug, project, party, epic, title, state) VALUES ('q2', 'acme', 'p1', NULL, 't', 'done')", ())
             for repo, number, lifecycle in (
                 ("acme/app", 1, "ready"), ("acme/lib", 2, "draft"), ("acme/app", 3, "merged"), ("acme/idle", 4, "closed"),
             ):

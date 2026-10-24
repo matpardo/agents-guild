@@ -463,15 +463,30 @@ def _notices_section(ctx, painter, rows):
     return lines
 
 
+def _row_dates(row):
+    return timeutil.dates_label(row["created_at"], row["updated_at"])
+
+
+def _dated(painter, text, dates):
+    if dates is None:
+        return text
+    return "{}  {}".format(text, painter.paint(dates, "dim"))
+
+
 def _task_lines(ctx, painter, task_row, task_prs):
+    dates = _row_dates(task_row)
     if task_row["state"] == "blocked":
         return [
-            painter.paint(
-                "    ■ blocked: {} — {}".format(task_row["tid"], task_row["blocked_reason"]), "red"
+            _dated(
+                painter,
+                painter.paint(
+                    "    ■ blocked: {} — {}".format(task_row["tid"], task_row["blocked_reason"]), "red"
+                ),
+                dates,
             )
         ]
     title = sanitize.strip_control_sequences(task_row["title"])
-    lines = ["    ▶ {}  {}".format(painter.paint(task_row["tid"], "bold"), title)]
+    lines = [_dated(painter, "    ▶ {}  {}".format(painter.paint(task_row["tid"], "bold"), title), dates)]
     if task_row["summary"]:
         lines.extend(painter.paint(line, "dim") for line in painter.wrap(task_row["summary"], "        "))
     for pr_row in task_prs:
@@ -519,7 +534,7 @@ def _close_blocker_lines(painter, blockers):
 
 def _quest_lines(ctx, painter, quest_row, prs_by_task):
     title = sanitize.strip_control_sequences(quest_row["title"])
-    lines = ["  {} — {}".format(painter.paint(quest_row["slug"], "bold"), title)]
+    lines = [_dated(painter, "  {} — {}".format(painter.paint(quest_row["slug"], "bold"), title), _row_dates(quest_row))]
     task_rows = _open_task_rows(ctx.conn, quest_row["slug"])
     queued = []
     for task_row in task_rows:
@@ -1059,6 +1074,7 @@ def _task_model(ctx, project, epic, task_row, task_prs, project_config):
         "tid": task_row["tid"],
         "title": sanitize.strip_control_sequences(task_row["title"]),
         "state": task_row["state"],
+        "dates": _row_dates(task_row),
         "summary": _optional_text(task_row["summary"]),
         "blocked_reason": _optional_text(task_row["blocked_reason"]),
         "card_url": links.card_url(project_config, key),
@@ -1091,6 +1107,7 @@ def _quest_model(ctx, project, quest_row, prs_by_task, project_config):
     return {
         "slug": quest_row["slug"],
         "title": sanitize.strip_control_sequences(quest_row["title"]),
+        "dates": _row_dates(quest_row),
         "move_targets": _move_targets(ctx.conn, quest_row),
         "close_blockers": _close_blockers(ctx, quest_row),
         "releasable": not quest_commands.release_blockers(ctx, quest_row),
