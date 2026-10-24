@@ -24,10 +24,6 @@ class RaidFilterTests(unittest.TestCase):
     def setUp(self):
         self.source = (_WEB_DIR / "app.js").read_text()
 
-    def test_raid_filter_select_is_populated_from_raids(self):
-        self.assertIn("raid-filter", self.source)
-        self.assertIn("function refreshRaidFilterOptions(raids) {", self.source)
-
     def test_raid_filter_narrows_parties_asks_and_notices(self):
         self.assertIn("function applyRaidFilter(data) {", self.source)
         self.assertIn("members.indexOf(ask.party)", self.source)

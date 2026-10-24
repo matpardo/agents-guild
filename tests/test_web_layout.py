@@ -5,8 +5,8 @@ from pathlib import Path
 _WEB_DIR = Path(__file__).resolve().parent.parent / "guild" / "web"
 
 
-def _column(html, name):
-    match = re.search(r'<div class="column column-{}">(.*?)</div>'.format(name), html, re.DOTALL)
+def _pane_sections(html):
+    match = re.search(r'<div class="pane">(.*?)</div>', html, re.DOTALL)
     return re.findall(r'<section id="([a-z-]+)"', match.group(1))
 
 
@@ -16,21 +16,29 @@ class BoardLayoutTests(unittest.TestCase):
         self.css = (_WEB_DIR / "app.css").read_text()
         self.js = (_WEB_DIR / "app.js").read_text()
 
-    def test_left_column_holds_asks_notices_drift_and_projects(self):
-        self.assertEqual(_column(self.html, "left"), ["asks", "ready-for-you", "answered-asks", "notices", "ideas", "adventurers", "health-jobs", "memory", "raids", "drift", "projects", "quest-board"])
+    def test_pane_holds_every_section_in_view_order(self):
+        self.assertEqual(
+            _pane_sections(self.html),
+            ["asks", "ready-for-you", "answered-asks", "merge-queues", "parties", "memory", "adventurers", "health-jobs", "ideas", "quest-board", "notices", "raids", "drift", "projects"],
+        )
 
-    def test_header_row_holds_resources_beside_the_filters(self):
+    def test_sidebar_sits_beside_the_pane(self):
+        main = re.search(r"<main>(.*?)</main>", self.html, re.DOTALL).group(1)
+        self.assertLess(main.index('<nav id="sidebar"'), main.index('<div class="pane">'))
+
+    def test_header_keeps_the_state_filter_and_resources_without_party_or_raid_selects(self):
         header = re.search(r"<header>(.*?)</header>", self.html, re.DOTALL).group(1)
-        self.assertIn('id="filters"', header)
+        self.assertIn('id="state-filter"', header)
         self.assertIn('<section id="resources"', header)
+        self.assertNotIn('id="party-filter"', self.html)
+        self.assertNotIn('id="raid-filter"', self.html)
         self.assertIn(".header-row", self.css)
 
-    def test_right_column_holds_merge_queue_then_parties(self):
-        self.assertEqual(_column(self.html, "right"), ["merge-queues", "parties"])
-
-    def test_columns_sit_side_by_side_on_wide_screens(self):
-        self.assertIn(".column-right", self.css)
-        self.assertNotIn("grid-row: 1 / span 4", self.css)
+    def test_page_uses_the_full_width_and_stacks_on_narrow_screens(self):
+        self.assertIn("max-width: none;", self.css)
+        self.assertNotIn("max-width: 60rem", self.css)
+        self.assertIn("grid-template-columns: 16rem minmax(0, 1fr);", self.css)
+        self.assertIn("@media (min-width: 481px)", self.css)
 
     def test_notices_collapse_and_keep_their_state_across_refreshes(self):
         self.assertIn("noticesOpen: true", self.js)

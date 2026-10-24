@@ -54,7 +54,7 @@ async function run({ src, scenario }) {
     if (resourcesCalls <= 2) return respond({ machine, since: "1d", projects: [], unattributed: null }, true);
     return respond({ error: "database is locked" }, false);
   }
-  const ctx = { document: doc, window: {}, console, setInterval() {}, setTimeout() {}, fetch: fetchStub };
+  const ctx = { document: doc, window: {}, location: { hash: "" }, addEventListener() {}, console, setInterval() {}, setTimeout() {}, fetch: fetchStub };
   ctx.window = ctx;
   vm.createContext(ctx);
   vm.runInContext(fs.readFileSync(src, "utf8"), ctx);
