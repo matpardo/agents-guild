@@ -38,6 +38,14 @@ def realm_hub_config_path():
     return config_dir() / "realm-hub.json"
 
 
+def realm_config_path():
+    return config_dir() / "realm.json"
+
+
+def realm_cache_path():
+    return data_dir() / "realm-cache.json"
+
+
 def realm_hub_pki_dir():
     return config_dir() / "realm-hub"
 

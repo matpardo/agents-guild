@@ -1,3 +1,4 @@
+import json
 import re
 import shutil
 import sys
@@ -8,6 +9,7 @@ from guild.adapters import github
 from guild.commands import statusline as statusline_commands
 from guild.commands import timer as timer_commands
 from guild.errors import GuildError
+from guild.realm import clientconfig
 
 _TRACE_RE = re.compile(r"guild|ask #[0-9]|notice #[0-9]", re.IGNORECASE)
 _RETIRED_UNIT_NAMES = ("guild-dispatch.timer", "guild-dispatch.service")
@@ -149,6 +151,22 @@ def _project_lines(projects_dir, state_dir, global_config):
     return lines
 
 
+def _realm_lines():
+    path = paths.realm_config_path()
+    if not path.exists():
+        return []
+    lines = []
+    if path.stat().st_mode & 0o077:
+        lines.append((False, "invalid realm config {}: mode must be 0600".format(path)))
+    try:
+        found = clientconfig.problems(json.loads(path.read_text(encoding="utf-8")))
+    except ValueError:
+        found = ["not valid JSON"]
+    if found:
+        return lines + [(False, "invalid realm config {}: {}".format(path, "; ".join(found)))]
+    return lines + [(True, "ok      realm config")]
+
+
 def _has_trace(text):
     return text is not None and _TRACE_RE.search(text) is not None
 
@@ -198,6 +216,7 @@ def run(ctx, scan_prs):
     checks.extend(global_lines)
     if global_config is not None:
         checks.extend(_handoff_line(ctx.state_dir, global_config))
+    checks.extend(_realm_lines())
     checks.extend(_project_lines(ctx.projects_dir, ctx.state_dir, global_config))
     checks.extend((True, "warn    {}".format(finding)) for finding in identity.double_bindings(ctx.conn, None))
     if scan_prs:

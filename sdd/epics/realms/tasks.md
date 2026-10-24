@@ -25,7 +25,7 @@ updated: 2026-10-24
 ## T03 — Realm client and status
 
 **Depends on:** T02
-**Status:** [ ] pending
+**Status:** [x] done
 
 **What:** `guild realm join|push|status`: pinned client, counts-only status, local cache, doctor check.
 
