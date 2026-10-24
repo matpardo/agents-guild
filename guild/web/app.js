@@ -42,6 +42,8 @@ var NO_SESSION_MESSAGE = "session token not loaded, reload the page";
     statuses: {},
     busy: {},
     prBlockOpen: {},
+    prRelinkOpen: {},
+    prRelinkDrafts: {},
     prDrafts: {},
     prStatuses: {},
     prBusy: {},
@@ -581,6 +583,8 @@ var NO_SESSION_MESSAGE = "session token not loaded, reload the page";
       delete state.prBusy[key];
       if (result.ok) {
         delete state.prBlockOpen[key];
+        delete state.prRelinkOpen[key];
+        delete state.prRelinkDrafts[key];
         delete state.prDrafts[key];
         delete state.prStatuses[key];
       } else {
@@ -624,6 +628,76 @@ var NO_SESSION_MESSAGE = "session token not loaded, reload the page";
     return input;
   }
 
+  function relinkPayload(key) {
+    var draft = state.prRelinkDrafts[key] || {};
+    var payload = {};
+    if ((draft.task || "").trim() !== "") {
+      payload.task = draft.task.trim();
+    }
+    if ((draft.card || "").trim() !== "") {
+      payload.card = draft.card.trim();
+    }
+    return payload;
+  }
+
+  function submitRelink(location, ref) {
+    var key = location + "|" + ref;
+    var payload = relinkPayload(key);
+    if (payload.task === undefined && payload.card === undefined) {
+      state.prStatuses[key] = "enter a task or a card";
+      fetchBoard();
+      return;
+    }
+    postPrAction(location, ref, "relink", payload);
+  }
+
+  function renderRelinkInput(location, ref, field, placeholder) {
+    var key = location + "|" + ref;
+    var input = el("input");
+    input.type = "text";
+    input.className = "block-reason";
+    input.placeholder = placeholder;
+    input.value = (state.prRelinkDrafts[key] || {})[field] || "";
+    input.disabled = state.prBusy[key] === true;
+    input.dataset.focusKey = key + "|" + field;
+    input.addEventListener("input", function () {
+      var draft = state.prRelinkDrafts[key] || {};
+      draft[field] = input.value;
+      state.prRelinkDrafts[key] = draft;
+    });
+    return input;
+  }
+
+  function renderPrLinkControls(ref, location) {
+    var key = location + "|" + ref;
+    var controls = el("span");
+    controls.className = "pr-block-controls";
+    if (state.prRelinkOpen[key]) {
+      controls.appendChild(renderRelinkInput(location, ref, "task", "quest/tid"));
+      controls.appendChild(renderRelinkInput(location, ref, "card", "card key"));
+      controls.appendChild(
+        prButton(location, ref, "Confirm relink", function () {
+          submitRelink(location, ref);
+        })
+      );
+    } else {
+      controls.appendChild(
+        prButton(location, ref, "Relink", function () {
+          state.prRelinkOpen[key] = true;
+          fetchBoard();
+        })
+      );
+    }
+    controls.appendChild(
+      prButton(location, ref, "Untrack", function () {
+        if (window.confirm("Stop tracking " + ref + "?")) {
+          postPrAction(location, ref, "untrack", {});
+        }
+      })
+    );
+    return controls;
+  }
+
   function renderPrBlockControls(ref, blockedExternal, location) {
     var key = location + "|" + ref;
     var controls = el("span");
@@ -649,6 +723,7 @@ var NO_SESSION_MESSAGE = "session token not loaded, reload the page";
         })
       );
     }
+    controls.appendChild(renderPrLinkControls(ref, location));
     var status = textEl("span", state.prStatuses[key] || "");
     status.className = "ask-status";
     controls.appendChild(status);

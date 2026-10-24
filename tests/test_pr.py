@@ -320,3 +320,88 @@ if __name__ == "__main__":
     import unittest
 
     unittest.main()
+
+
+class PrRelinkTests(GuildTestCase):
+    def setUp(self):
+        super().setUp()
+        self.repo_dir = self.register_project("acme", ["acme/app"])
+        self.run_cli(["party", "start", "alpha", "--reason", "test reason"], "sess-1", self.repo_dir)
+        self.run_cli(["quest", "add", "demo", "--title", "Demo", "--no-epic"], "sess-1", self.repo_dir)
+        self.run_cli(["task", "add", "demo/T01", "--title", "First"], "sess-1", self.repo_dir)
+        self.run_cli(["task", "add", "demo/T02", "--title", "Second"], "sess-1", self.repo_dir)
+        self.write_gh_fixture(
+            "view_acme-app_1",
+            {"state": "OPEN", "isDraft": True, "headRefName": "feature/x", "title": "t"},
+        )
+        code, out, err = self.run_cli(
+            ["pr", "track", "acme/app#1", "--task", "demo/T01", "--what", "x", "--waits", "y"],
+            "sess-1", self.repo_dir,
+        )
+        self.assertEqual(code, 0, err)
+
+    def _rows(self):
+        conn = sqlite3.connect(str(self.data_home / "guild" / "guild.db"))
+        conn.row_factory = sqlite3.Row
+        try:
+            return conn.execute("SELECT task_quest, task_tid, card, lifecycle FROM prs").fetchall()
+        finally:
+            conn.close()
+
+    def test_set_task_relinks_the_pr(self):
+        code, out, err = self.run_cli(["pr", "set", "acme/app#1", "--task", "demo/T02"], "sess-1", self.repo_dir)
+        self.assertEqual(code, 0, err)
+        row = self._rows()[0]
+        self.assertEqual((row["task_quest"], row["task_tid"], row["lifecycle"]), ("demo", "T02", "draft"))
+
+    def test_set_card_relinks_the_card_and_keeps_the_task(self):
+        code, out, err = self.run_cli(["pr", "set", "acme/app#1", "--card", "DEMO-7"], "sess-1", self.repo_dir)
+        self.assertEqual(code, 0, err)
+        row = self._rows()[0]
+        self.assertEqual((row["task_quest"], row["task_tid"], row["card"]), ("demo", "T01", "DEMO-7"))
+
+    def test_set_unknown_task_is_refused(self):
+        code, out, err = self.run_cli(["pr", "set", "acme/app#1", "--task", "demo/T99"], "sess-1", self.repo_dir)
+        self.assertEqual(code, 1)
+        self.assertIn("unknown task", err)
+
+    def test_set_task_of_another_party_is_refused(self):
+        self.write_session(2, "sess-2", "beta-session")
+        self.run_cli(["party", "start", "beta", "--reason", "test reason"], "sess-2", self.repo_dir)
+        self.run_cli(["quest", "add", "other", "--title", "Other", "--no-epic"], "sess-2", self.repo_dir)
+        self.run_cli(["task", "add", "other/T01", "--title", "Theirs"], "sess-2", self.repo_dir)
+        code, out, err = self.run_cli(["pr", "set", "acme/app#1", "--task", "other/T01"], "sess-1", self.repo_dir)
+        self.assertEqual(code, 1)
+        self.assertIn("does not belong", err)
+
+    def test_foreign_party_cannot_relink_or_untrack(self):
+        self.write_session(2, "sess-2", "beta-session")
+        self.run_cli(["party", "start", "beta", "--reason", "test reason"], "sess-2", self.repo_dir)
+        code, out, err = self.run_cli(["pr", "set", "acme/app#1", "--card", "DEMO-7"], "sess-2", self.repo_dir)
+        self.assertEqual(code, 1)
+        self.assertIn("belongs to another session", err)
+        code, out, err = self.run_cli(["pr", "untrack", "acme/app#1"], "sess-2", self.repo_dir)
+        self.assertEqual(code, 1)
+        self.assertEqual(len(self._rows()), 1)
+
+    def test_untrack_removes_the_row_and_ready_check_says_not_tracked(self):
+        code, out, err = self.run_cli(["pr", "untrack", "acme/app#1"], "sess-1", self.repo_dir)
+        self.assertEqual(code, 0, err)
+        self.assertEqual(self._rows(), [])
+        code, out, err = self.run_cli(["pr", "ready-check", "acme/app#1"], "sess-1", self.repo_dir)
+        self.assertEqual(code, 1)
+        self.assertIn("not tracked", err)
+
+    def test_untrack_unknown_pr_is_refused(self):
+        code, out, err = self.run_cli(["pr", "untrack", "acme/app#9"], "sess-1", self.repo_dir)
+        self.assertEqual(code, 1)
+        self.assertIn("not tracked", err)
+
+    def test_rebuild_replays_relink_and_untrack(self):
+        self.run_cli(["pr", "set", "acme/app#1", "--task", "demo/T02"], "sess-1", self.repo_dir)
+        self.run_cli(["rebuild"], None, None)
+        self.assertEqual(self._rows()[0]["task_tid"], "T02")
+        self.run_cli(["pr", "untrack", "acme/app#1"], "sess-1", self.repo_dir)
+        code, out, err = self.run_cli(["rebuild"], None, None)
+        self.assertEqual(code, 0, err)
+        self.assertEqual(self._rows(), [])

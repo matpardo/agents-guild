@@ -151,6 +151,8 @@ guild pr set   <owner/repo>#<n> [--lifecycle draft|converging|ready] [--waits ".
                                [--fixes-main | --no-fixes-main]
                                [--fixes-flaky | --no-fixes-flaky]
                                [--blocked-external "<reason>" | --no-blocked-external]
+                               [--task <quest>/<tid>] [--card <KEY>]   # relink: the PR's own party or adventurer only; a party's task must be one of its own
+guild pr untrack <owner/repo>#<n>   # stop tracking: drops the PR row and its drift findings; own PR only
 guild pr ready-check <owner/repo>#<n>   # read-only: everything standing between the PR and a merge
 guild pr wait <owner/repo>#<n> [--timeout <dur>]   # block until a comment or review by another author, checks finished, merge or close; exit 0 on a change, 3 on timeout, 4 when no sync ran for 30m
 
@@ -947,6 +949,8 @@ Merged and closed PRs become `merged` and `closed`. Agents mark a PR ready
 with `gh pr ready <n>`; `guild pr set --lifecycle` remains for the
 `converging` nuance. `pr set --lifecycle ready` on a PR that
 is still draft on GitHub prints a hint, and the next sync reverts it.
+
+**Relink and untrack.** `guild pr set <ref> --task <quest>/<tid>` and/or `--card <KEY>` change the task or card a tracked PR is linked to (an adventurer's PR takes `--card` only); `guild pr untrack <ref>` drops the PR (event `pr.untracked`). Use them when a merged PR only refined a spec and its card should not be reported as not done. Only the owning party or adventurer may run them; the web board offers Relink and Untrack on each PR row, as the human.
 
 **Human flags.** Two independent booleans set with `guild pr set` and never
 touched by sync: `--needs-ask-answer` (the PR is stopped until the human

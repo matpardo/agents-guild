@@ -192,6 +192,11 @@ class WebQueueBlockBehaviorTests(unittest.TestCase):
         self.assertIn("Block manually", text)
         self.assertNotIn("Unblock", text)
 
+    def test_queue_entry_offers_relink_and_untrack(self):
+        text = self._queue_text(None)
+        self.assertIn("Relink", text)
+        self.assertIn("Untrack", text)
+
     def test_blocked_queue_entry_offers_unblock_and_shows_the_reason(self):
         text = self._queue_text("waiting on legal")
         self.assertIn("Unblock", text)

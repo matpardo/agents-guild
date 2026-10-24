@@ -3,7 +3,7 @@ epic: quest-bound-work
 type: tasks
 title: A party's work always belongs to a quest
 status: done
-updated: 2026-10-23
+updated: 2026-10-24
 ---
 
 # Tasks: A party's work always belongs to a quest
@@ -37,3 +37,13 @@ updated: 2026-10-23
 
 **Acceptance:**
 - [x] No `GUILD.md` rule tells a party to use `--card` alone.
+
+## T04 — Relink or untrack a PR
+
+**Depends on:** T01
+**Status:** [x] done
+
+**What:** `pr set --task|--card` relinks a tracked PR and `pr untrack` drops it, in the CLI and the web board, so a merged PR that only refined a spec stops raising a card-not-done finding.
+
+**Acceptance:**
+- [x] After `pr untrack` or a relink to a task without a card, a merged PR no longer raises "card not done".

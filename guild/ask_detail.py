@@ -14,6 +14,7 @@ _EVENT_KINDS = (
     "task.done",
     "pr.tracked",
     "pr.set",
+    "pr.untracked",
     "ask.created",
     "ask.answered",
     "party.handed_off",
