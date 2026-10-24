@@ -32,7 +32,7 @@ class WireSettingsTests(GuildTestCase):
         self.assertEqual(code, 0, err)
         settings = self._settings()
         self.assertIn("added hook PreToolUse: guild hook pre-edit", out)
-        self.assertIn("added ask rule Bash(guild party start:*)", out)
+        self.assertIn("added ask rule Bash(guild party resume:*)", out)
         self.assertIn("added allow rule Bash(guild sync:*)", out)
         self.assertEqual(settings["permissions"]["ask"], list(claude_settings.EXPECTED_ASK_RULES))
         self.assertEqual(settings["permissions"]["allow"], list(claude_settings.EXPECTED_ALLOW_RULES))
@@ -104,16 +104,27 @@ class WireSettingsTests(GuildTestCase):
         self.assertNotIn("Bash(guild quest add:*)", ask)
         self.assertEqual(ask[0], "Bash(other:*)")
 
+    def test_retired_start_ask_rules_are_removed(self):
+        self._write({"permissions": {"ask": ["Bash(guild party start:*)", "Bash(guild adventurer start:*)"]}})
+        code, out, err = self._wire()
+        self.assertEqual(code, 0, err)
+        self.assertIn("removed ask rule Bash(guild party start:*)", out)
+        self.assertIn("removed ask rule Bash(guild adventurer start:*)", out)
+        ask = self._settings()["permissions"]["ask"]
+        self.assertNotIn("Bash(guild party start:*)", ask)
+        self.assertNotIn("Bash(guild adventurer start:*)", ask)
+
     def test_binding_commands_ask_and_quest_add_is_allowed(self):
         self._wire()
         permissions = self._settings()["permissions"]
         for rule in (
-            "Bash(guild party start:*)",
             "Bash(guild party resume:*)",
             "Bash(guild raid join:*)",
-            "Bash(guild adventurer start:*)",
         ):
             self.assertIn(rule, permissions["ask"])
+        for rule in ("Bash(guild party start:*)", "Bash(guild adventurer start:*)"):
+            self.assertNotIn(rule, permissions["ask"])
+        self.assertIn("Bash(guild party:*)", permissions["allow"])
         self.assertIn("Bash(guild quest:*)", permissions["allow"])
         self.assertNotIn("Bash(guild quest add:*)", permissions["ask"])
 

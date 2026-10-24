@@ -48,7 +48,7 @@ class BoardModelShapeTests(BoardModelTestCase):
         super().setUp()
         self.repo_dir = self.register_project("acme", ["acme/app"])
         self._add_tracker_browse_url("acme", "https://tracker.example/browse/")
-        self.run_cli(["party", "start", "alpha"], "sess-1", self.repo_dir)
+        self.run_cli(["party", "start", "alpha", "--reason", "test reason"], "sess-1", self.repo_dir)
         code, out, err = self.sync_sdd(self.repo_dir, "sess-1", "acme", "demo-epic", _TASKS_MD)
         self.assertEqual(code, 0, err)
         self.run_cli(
@@ -231,7 +231,7 @@ class BoardModelShapeTests(BoardModelTestCase):
         self.assertEqual(
             set(party),
             {
-                "name", "state", "generation", "status", "ctx", "caps", "resume_command",
+                "name", "state", "generation", "reason", "from_adventurer", "started", "status", "ctx", "caps", "resume_command",
                 "leader_session_name", "has_live_leader", "stopped_without_report", "quests", "prs", "raids", "claims", "ideas", "remaining", "drift", "waits",
             },
         )
@@ -300,7 +300,7 @@ class BoardModelNoticeFlaggedTests(BoardModelTestCase):
     def setUp(self):
         super().setUp()
         self.repo_dir = self.register_project("acme", ["acme/app"])
-        self.run_cli(["party", "start", "alpha"], "sess-1", self.repo_dir)
+        self.run_cli(["party", "start", "alpha", "--reason", "test reason"], "sess-1", self.repo_dir)
 
     def test_notice_from_bound_party_with_instruction_like_text_is_flagged(self):
         self.run_cli(
@@ -326,8 +326,8 @@ class BoardModelNoticeFlaggedTests(BoardModelTestCase):
 class BoardModelRaidsTests(BoardModelTestCase):
     def test_raids_model_lists_name_and_members(self):
         self.repo_dir = self.register_project("acme", ["acme/app"])
-        self.run_cli(["party", "start", "alpha"], "sess-1", self.repo_dir)
-        self.run_cli(["party", "start", "beta"], "sess-2", self.repo_dir)
+        self.run_cli(["party", "start", "alpha", "--reason", "test reason"], "sess-1", self.repo_dir)
+        self.run_cli(["party", "start", "beta", "--reason", "test reason"], "sess-2", self.repo_dir)
         self.run_cli(["raid", "join", "ci", "--ttl", "1h"], "sess-1", self.repo_dir)
         self.run_cli(["raid", "join", "ci", "--ttl", "1h"], "sess-2", self.repo_dir)
 
@@ -343,7 +343,7 @@ class BoardModelRaidsTests(BoardModelTestCase):
 
     def test_raids_model_empty_when_no_raids(self):
         self.repo_dir = self.register_project("acme", ["acme/app"])
-        self.run_cli(["party", "start", "alpha"], "sess-1", self.repo_dir)
+        self.run_cli(["party", "start", "alpha", "--reason", "test reason"], "sess-1", self.repo_dir)
 
         ctx = self._ctx()
         model = board_commands.board_model(ctx)
@@ -355,8 +355,8 @@ class BoardModelRaidsTests(BoardModelTestCase):
 class BoardModelPartyWithoutProjectTests(BoardModelTestCase):
     def test_party_without_project_is_skipped_from_drift(self):
         self.repo_dir = self.register_project("acme", ["acme/app"])
-        self.run_cli(["party", "start", "alpha"], "sess-1", self.repo_dir)
-        self.run_cli(["party", "start", "gamma"], "sess-2", None)
+        self.run_cli(["party", "start", "alpha", "--reason", "test reason"], "sess-1", self.repo_dir)
+        self.run_cli(["party", "start", "gamma", "--reason", "test reason"], "sess-2", None)
 
         ctx = self._ctx()
         model = board_commands.board_model(ctx)
@@ -405,7 +405,7 @@ class BoardModelCtxPressureTests(BoardModelTestCase):
     def setUp(self):
         super().setUp()
         self.repo_dir = self.register_project("acme", ["acme/app"])
-        self.run_cli(["party", "start", "alpha"], "sess-1", self.repo_dir)
+        self.run_cli(["party", "start", "alpha", "--reason", "test reason"], "sess-1", self.repo_dir)
         self.write_session(os.getpid(), "sess-1", "alpha-g1")
 
     def _party(self):
@@ -459,7 +459,7 @@ class BoardModelSessionStatusTests(BoardModelTestCase):
     def setUp(self):
         super().setUp()
         self.repo_dir = self.register_project("acme", ["acme/app"])
-        self.run_cli(["party", "start", "alpha"], "sess-1", self.repo_dir)
+        self.run_cli(["party", "start", "alpha", "--reason", "test reason"], "sess-1", self.repo_dir)
         self.write_session(os.getpid(), "sess-1", "alpha-g1")
 
     def _model(self):

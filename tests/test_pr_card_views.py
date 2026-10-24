@@ -15,7 +15,7 @@ class CardPrViewsTestCase(GuildTestCase):
         data = json.loads(config_file.read_text())
         data["tracker"] = {"kind": "jira-acli", "browse_url": "https://tracker.example/browse/"}
         config_file.write_text(json.dumps(data))
-        self.run_cli(["party", "start", "alpha"], "sess-1", self.repo_dir)
+        self.run_cli(["party", "start", "alpha", "--reason", "test reason"], "sess-1", self.repo_dir)
         self.write_gh_fixture("view_acme-app_1", _OPEN_VIEW)
         self.track_legacy_card_pr("alpha", "acme/app", 1, "ABC-123", "fix ci", "review", "feature/x")
 
@@ -46,7 +46,7 @@ class CardPrBoardTests(CardPrViewsTestCase):
 
     def test_adventurer_pr_is_not_listed_under_the_party(self):
         self.write_gh_fixture("view_acme-app_3", _OPEN_VIEW)
-        self.run_cli(["adventurer", "start", "fix typo"], "adv-1", self.repo_dir)
+        self.run_cli(["adventurer", "start", "fix typo", "--reason", "test reason"], "adv-1", self.repo_dir)
         code, out, err = self.run_cli(
             ["pr", "track", "acme/app#3", "--card", "ABC-9", "--what", "typo fix", "--waits", "review"],
             "adv-1", self.repo_dir,

@@ -14,8 +14,8 @@ class TaskMoveTestCase(GuildTestCase):
         super().setUp()
         self.repo_dir = self.register_project("acme", ["acme/app"])
         self.sync_sdd(self.repo_dir, "sess-1", "acme", "wave", _TASKS_MD)
-        self.run_cli(["party", "start", "alpha"], "sess-1", self.repo_dir)
-        self.run_cli(["party", "start", "beta"], "sess-2", self.repo_dir)
+        self.run_cli(["party", "start", "alpha", "--reason", "test reason"], "sess-1", self.repo_dir)
+        self.run_cli(["party", "start", "beta", "--reason", "test reason"], "sess-2", self.repo_dir)
         self._cli(
             "sess-1", ["quest", "add", "src", "--title", "Src", "--epic", "wave", "--tasks", "T01,T02,T03"]
         )
@@ -120,7 +120,7 @@ class TaskMoveRefusalTests(TaskMoveTestCase):
 
     def test_project_mismatch(self):
         other_repo = self.register_project("other", ["other/app"])
-        self.run_cli(["party", "start", "gamma"], "sess-3", other_repo)
+        self.run_cli(["party", "start", "gamma", "--reason", "test reason"], "sess-3", other_repo)
         self.run_cli(["quest", "add", "far", "--title", "Far", "--no-epic"], "sess-3", other_repo)
         self._cli("sess-1", ["quest", "add", "near", "--title", "Near", "--no-epic"])
         self._cli("sess-1", ["task", "add", "near/N1", "--title", "N"])

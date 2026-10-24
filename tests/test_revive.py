@@ -132,8 +132,8 @@ class ReviveBase(GuildTestCase):
         self.work_a.mkdir()
         self.work_b = self.repo_dir.parent / "work-b"
         self.work_b.mkdir()
-        self.run_cli(["party", "start", "alpha"], "sess-a", self.work_a)
-        self.run_cli(["party", "start", "beta"], "sess-b", self.work_b)
+        self.run_cli(["party", "start", "alpha", "--reason", "test reason"], "sess-a", self.work_a)
+        self.run_cli(["party", "start", "beta", "--reason", "test reason"], "sess-b", self.work_b)
         self.run_cli(["quest", "add", "demo", "--title", "Demo", "--no-epic"], "sess-a", self.work_a)
         self.run_cli(["task", "add", "demo/T01", "--title", "First"], "sess-a", self.work_a)
         self.run_cli(["task", "add", "demo/T02", "--title", "Second"], "sess-a", self.work_a)

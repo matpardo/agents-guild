@@ -3,6 +3,7 @@ import os
 from pathlib import Path
 
 from guild import config, db, events, final_report, health_jobs, identity, pii, refs, resume, tmux_windows
+from guild.commands import party as party_commands
 from guild.commands import quest as quest_commands
 from guild.errors import GuildError
 from guild.ids import next_id
@@ -74,7 +75,7 @@ def _resolve_start_job(job, task, health_job):
     return health_job
 
 
-def start(ctx, job, task, health_job):
+def start(ctx, job, task, health_job, reason):
     if ctx.session_id is None:
         raise GuildError("adventurer start requires a Claude Code session", 1)
     job = _resolve_start_job(job, task, health_job)
@@ -83,6 +84,7 @@ def start(ctx, job, task, health_job):
     if health_job is not None:
         health_jobs.require_job(config.load_project(ctx.projects_dir, project), health_job)
     _validate_text(ctx, project, "adventurer job", job, pii.ADVENTURER_JOB_MAX_LENGTH)
+    pii.validate_reason(reason, ctx.projects_dir, project)
     _validate_task(ctx, project, task)
     adventurer_id = next_id(ctx.conn, "adventurers")
     with db.writing(ctx.conn):
@@ -95,7 +97,7 @@ def start(ctx, job, task, health_job):
             project,
             "adventurer.started",
             "local",
-            {"id": adventurer_id, "job": job, "task": task, "health_job": health_job},
+            {"id": adventurer_id, "job": job, "task": task, "health_job": health_job, "reason": reason},
         )
     return "adventurer {} started".format(adventurer_id)
 
@@ -154,6 +156,33 @@ def done(ctx, pending):
     return "adventurer {} done\n{}".format(adventurer["id"], final_report.adventurer_report(ctx, adventurer, pending))
 
 
+def promote(ctx, name, reason):
+    adventurer = identity.resolve_adventurer(ctx.conn, ctx.session_id)
+    if adventurer is None:
+        raise GuildError("session is not an active adventurer", 1)
+    party_commands.require_new_name(ctx.conn, name)
+    pii.validate_reason(reason, ctx.projects_dir, adventurer["project"])
+    with db.writing(ctx.conn):
+        events.record(
+            ctx.conn,
+            ctx.now,
+            ctx.origin,
+            None,
+            ctx.session_id,
+            adventurer["project"],
+            "adventurer.promoted",
+            "local",
+            {"id": adventurer["id"], "party": name},
+        )
+        party_commands.record_started(ctx, name, adventurer["project"], reason, adventurer["id"])
+    message = "adventurer {} promoted to party '{}', generation 1".format(adventurer["id"], name)
+    if adventurer["task"] is None:
+        return message
+    return "{}\nadd task {} to a quest: `guild quest add <slug> --epic <epic> --tasks <tid> --reason \"<text>\"`".format(
+        message, adventurer["task"]
+    )
+
+
 def dismiss(ctx, adventurer_id):
     row = ctx.conn.execute("SELECT project, state FROM adventurers WHERE id = ?", (adventurer_id,)).fetchone()
     if row is None:
@@ -205,6 +234,8 @@ def show(ctx, adventurer_id):
     if row["task"] is not None:
         lines.append("task: {}".format(row["task"]))
     lines.append("started: {}".format(row["started_at"]))
+    if row["reason"] is not None:
+        lines.append("reason: {}".format(row["reason"]))
     if row["state"] == "done":
         lines.append("done: {}".format(row["done_at"]))
         lines.append("pending: {}".format(row["pending"]))

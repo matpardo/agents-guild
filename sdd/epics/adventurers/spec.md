@@ -5,7 +5,7 @@ title: Adventurers do one job and report what is pending
 status: done
 owner: matpardo
 created: 2026-10-23
-updated: 2026-10-23
+updated: 2026-10-24
 ---
 
 # Spec: Adventurers do one job and report what is pending
@@ -30,14 +30,14 @@ Sessions outside a party leave no trace in guild: the human cannot see what they
 - The board and the web list adventurers with job, live or stopped, PRs and pending report, and flag one that stopped without reporting. A done adventurer stays listed until `guild adventurer dismiss <id>` (web: Dismiss button). A party whose leader is gone without a handoff gets the same flag.
 - `guild party close` and `guild adventurer done` print a final report block (PRs with state, quests with done/total tasks, linked ideas, pending) read from existing state; the session ends with a report to the human built from it (decisión del dev, 2026-10-23).
 - `guild party close` requires `--pending`, validated like `--learned` and stored on the `party.closed` event.
-- The unbound hint tells the session to ask the human, before any work on a registered project, whether it is a party or an adventurer.
+- The unbound hint tells the session to choose party or adventurer itself, with a reason, before any work that changes a repo of a registered project; it asks the human only when unsure (T10).
 - `README.md` and `GUILD.md` change with the code.
 
 ## Out of scope
 
 - A Stop hook that blocks until the session reports (dropped in `20261012_dispatcher-suggests-human-launches`).
 - Inferring pending work from transcripts.
-- Turning an adventurer into a party: it reports and a new party session starts.
+- Turning an adventurer into a party was out of scope here; `adventurer promote` covers it (T10).
 
 ## Success criteria
 

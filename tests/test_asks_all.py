@@ -11,7 +11,7 @@ class AsksAllTests(GuildTestCase):
     def setUp(self):
         super().setUp()
         self.repo_dir = self.register_project("acme", ["acme/app"])
-        self.run_cli(["party", "start", "alpha"], "sess-1", self.repo_dir)
+        self.run_cli(["party", "start", "alpha", "--reason", "test reason"], "sess-1", self.repo_dir)
         self.run_cli(["quest", "add", "demo", "--title", "Demo", "--no-epic"], "sess-1", self.repo_dir)
         self.run_cli(["task", "add", "demo/T01", "--title", "First"], "sess-1", self.repo_dir)
         self.conn = db.connect(paths.db_path())
@@ -41,7 +41,7 @@ class AsksAllTests(GuildTestCase):
             )
 
     def _seed_three(self):
-        self.run_cli(["party", "start", "beta"], "sess-2", self.repo_dir)
+        self.run_cli(["party", "start", "beta", "--reason", "test reason"], "sess-2", self.repo_dir)
         self._create(4, "beta", "Rename flag?", _NOW - timedelta(days=5))
         self._create(5, "alpha", "Which base branch?", _NOW - timedelta(days=2))
         self._create(7, "alpha", "Should the retry cap be 3 or 5?", _NOW)

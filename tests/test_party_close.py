@@ -9,7 +9,7 @@ class PartyCloseTests(GuildTestCase):
     def setUp(self):
         super().setUp()
         self.repo_dir = self.register_project("acme", ["acme/app"])
-        self.run_cli(["party", "start", "alpha"], "sess-1", self.repo_dir)
+        self.run_cli(["party", "start", "alpha", "--reason", "test reason"], "sess-1", self.repo_dir)
         self.run_cli(["quest", "add", "demo", "--title", "Demo", "--no-epic"], "sess-1", self.repo_dir)
         self.run_cli(["task", "add", "demo/T01", "--title", "First"], "sess-1", self.repo_dir)
         self.run_cli(["task", "done", "demo/T01", "--summary", "shipped"], "sess-1", self.repo_dir)
@@ -64,7 +64,7 @@ class PartyCloseTests(GuildTestCase):
         self.assertIn("party 'alpha' closed", out)
 
     def test_session_cannot_close_another_party(self):
-        self.run_cli(["party", "start", "beta"], "sess-2", self.repo_dir)
+        self.run_cli(["party", "start", "beta", "--reason", "test reason"], "sess-2", self.repo_dir)
         code, out, err = self.run_cli(["party", "close", "alpha", "--pending", "none"], "sess-2", self.repo_dir)
         self.assertEqual(code, 1)
         self.assertIn("cannot close another party", err)
@@ -133,7 +133,7 @@ class QuestDoneTests(GuildTestCase):
     def setUp(self):
         super().setUp()
         self.repo_dir = self.register_project("acme", ["acme/app"])
-        self.run_cli(["party", "start", "alpha"], "sess-1", self.repo_dir)
+        self.run_cli(["party", "start", "alpha", "--reason", "test reason"], "sess-1", self.repo_dir)
         self.run_cli(["quest", "add", "demo", "--title", "Demo", "--no-epic"], "sess-1", self.repo_dir)
 
     def test_owner_marks_quest_done(self):
@@ -144,7 +144,7 @@ class QuestDoneTests(GuildTestCase):
         self.assertNotIn("Demo", out)
 
     def test_other_party_cannot_mark_quest_done(self):
-        self.run_cli(["party", "start", "beta"], "sess-2", self.repo_dir)
+        self.run_cli(["party", "start", "beta", "--reason", "test reason"], "sess-2", self.repo_dir)
         code, out, err = self.run_cli(["quest", "done", "demo"], "sess-2", self.repo_dir)
         self.assertEqual(code, 1)
         self.assertIn("not owned by party 'beta'", err)
@@ -159,8 +159,8 @@ class RaidMemberCloseTests(GuildTestCase):
     def setUp(self):
         super().setUp()
         self.repo_dir = self.register_project("acme", ["acme/app"])
-        self.run_cli(["party", "start", "alpha"], "sess-1", self.repo_dir)
-        self.run_cli(["party", "start", "beta"], "sess-2", self.repo_dir)
+        self.run_cli(["party", "start", "alpha", "--reason", "test reason"], "sess-1", self.repo_dir)
+        self.run_cli(["party", "start", "beta", "--reason", "test reason"], "sess-2", self.repo_dir)
         self.run_cli(["raid", "join", "ci", "--until-leave"], "sess-1", self.repo_dir)
 
     def test_close_succeeds_while_other_member_active(self):

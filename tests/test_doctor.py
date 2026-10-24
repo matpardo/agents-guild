@@ -56,7 +56,7 @@ class DoctorTests(GuildTestCase):
         self.assertEqual(code, 0, out + err)
         self.assertIn("ok      hook SessionStart: guild hook session-start", out)
         self.assertIn("ok      project acme", out)
-        self.assertIn("ok      ask rule Bash(guild party start:*)", out)
+        self.assertIn("ok      ask rule Bash(guild party resume:*)", out)
         self.assertNotIn("missing", out)
 
     def test_missing_ask_rule_fails_and_names_it(self):
@@ -64,7 +64,7 @@ class DoctorTests(GuildTestCase):
         self._link_rules()
         code, out, err = self.run_cli(["doctor"], None, None)
         self.assertEqual(code, 1)
-        self.assertIn("missing ask rule Bash(guild party start:*)", out)
+        self.assertIn("missing ask rule Bash(guild party resume:*)", out)
         self.assertIn("ok      ask rule Bash(guild raid join:*)", out)
 
     def test_retired_ask_rule_warns(self):

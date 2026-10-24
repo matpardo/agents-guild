@@ -15,7 +15,7 @@ class ProjectStatusTestCase(BoardModelTestCase):
     def setUp(self):
         super().setUp()
         self.repo_dir = self.register_project("acme", ["acme/app"])
-        self.run_cli(["party", "start", "alpha"], "sess-1", self.repo_dir)
+        self.run_cli(["party", "start", "alpha", "--reason", "test reason"], "sess-1", self.repo_dir)
 
     def _configure(self, **values):
         config_file = self.config_home / "guild" / "projects" / "acme.json"

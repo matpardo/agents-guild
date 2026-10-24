@@ -4,9 +4,15 @@ import json
 def _party_started(conn, event):
     payload = event["payload"]
     conn.execute(
-        "INSERT INTO parties (name, project, leader_session_id, generation, state)"
-        " VALUES (?, ?, ?, 1, 'active')",
-        (payload["party"], event["project"], event["session_id"]),
+        "INSERT INTO parties (name, project, leader_session_id, generation, state, reason, from_adventurer)"
+        " VALUES (?, ?, ?, 1, 'active', ?, ?)",
+        (
+            payload["party"],
+            event["project"],
+            event["session_id"],
+            payload.get("reason"),
+            payload.get("from_adventurer"),
+        ),
     )
     conn.execute(
         "INSERT INTO leaders (party, generation, session_id, session_name, started_at, ended_at)"
@@ -621,8 +627,8 @@ _WAIT_STATUS = {
 def _adventurer_started(conn, event):
     payload = event["payload"]
     conn.execute(
-        "INSERT INTO adventurers (id, session_id, project, job, task, health_job, state, pending, started_at, done_at)"
-        " VALUES (?, ?, ?, ?, ?, ?, 'active', NULL, ?, NULL)",
+        "INSERT INTO adventurers (id, session_id, project, job, task, health_job, state, pending, started_at, done_at, reason)"
+        " VALUES (?, ?, ?, ?, ?, ?, 'active', NULL, ?, NULL, ?)",
         (
             payload["id"],
             event["session_id"],
@@ -631,7 +637,20 @@ def _adventurer_started(conn, event):
             payload["task"],
             payload.get("health_job"),
             event["ts"],
+            payload.get("reason"),
         ),
+    )
+
+
+def _adventurer_promoted(conn, event):
+    payload = event["payload"]
+    conn.execute(
+        "UPDATE adventurers SET state = 'promoted', pending = ?, done_at = ? WHERE id = ?",
+        ("promoted to party {}".format(payload["party"]), event["ts"], payload["id"]),
+    )
+    conn.execute(
+        "UPDATE prs SET party = ? WHERE adventurer = ? AND party = ''",
+        (payload["party"], payload["id"]),
     )
 
 
@@ -784,6 +803,7 @@ _REDUCERS = {
     "idea.unlinked": _idea_unlinked,
     "adventurer.started": _adventurer_started,
     "adventurer.done": _adventurer_done,
+    "adventurer.promoted": _adventurer_promoted,
     "adventurer.dismissed": _adventurer_dismissed,
     "claim.created": _claim_created,
     "claim.released": _claim_released,

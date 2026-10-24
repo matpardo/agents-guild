@@ -93,6 +93,7 @@ _BOARD = {
     "parties": [
         {
             "name": name, "raids": [], "quests": [], "prs": [], "claims": [], "state": "active", "generation": 1,
+            "reason": None, "from_adventurer": None, "started": "2026-10-24 10:00",
             "status": {"name": "idle", "label": "idle"}, "remaining": {"all_done": True}, "ctx": None,
             "resume_command": None, "caps": None, "drift": {"findings": [], "more": 0}, "leader_session_name": None, "waits": [], "ideas": [],
         }
@@ -251,7 +252,7 @@ class WebHealthJobBehaviorTests(unittest.TestCase):
 def _adventurer(**overrides):
     entry = {
         "id": 1, "project": "acme", "job": "fix typo", "task": "demo/T02", "state": "active", "pending": None,
-        "live": False, "stopped_without_report": True, "prs": [],
+        "live": False, "stopped_without_report": True, "prs": [], "reason": None, "started": "2026-10-24 10:00",
     }
     return dict(entry, **overrides)
 
@@ -266,6 +267,22 @@ class WebAdventurerBehaviorTests(unittest.TestCase):
         for expected in ("adventurer 1 fix typo", "acme", "task demo/T02", "stopped", "stopped without report"):
             self.assertIn(expected, out)
         self.assertNotIn("Dismiss", out)
+
+    def test_reason_and_start_time_show_only_when_present(self):
+        out = self._text([_adventurer(reason="one PR job")])
+        self.assertIn("reason: one PR job", out)
+        self.assertIn("started 2026-10-24 10:00", out)
+        self.assertNotIn("reason:", self._text([_adventurer()]))
+
+    def test_party_card_shows_origin(self):
+        party = dict(_BOARD["parties"][0], reason="grew to several PRs", from_adventurer=4)
+        out = _render(dict(_BOARD, parties=[party]), "all", "all", "parties", "text")
+        self.assertIn("started 2026-10-24 10:00", out)
+        self.assertIn("from adventurer 4", out)
+        self.assertIn("reason: grew to several PRs", out)
+        plain = _render(_BOARD, "all", "all", "parties", "text")
+        self.assertNotIn("from adventurer", plain)
+        self.assertNotIn("reason:", plain)
 
     def test_live_adventurer_has_no_flag(self):
         out = self._text([_adventurer(live=True, stopped_without_report=False)])

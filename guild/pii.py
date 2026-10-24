@@ -7,6 +7,7 @@ NOTICE_TEXT_MAX_LENGTH = 500
 ASK_QUESTION_MAX_LENGTH = 300
 IDEA_TITLE_MAX_LENGTH = 200
 ADVENTURER_JOB_MAX_LENGTH = 200
+REASON_MAX_LENGTH = 300
 IDEA_DESCRIPTION_MAX_LENGTH = 2000
 IDEA_REQUESTER_MAX_LENGTH = 100
 ASK_CONTEXT_MAX_LENGTH = 2000
@@ -88,6 +89,12 @@ def validate_field(value, field_name, max_length, patterns):
     _enforce_no_email(value, field_name)
     _enforce_no_secret(value, field_name)
     _enforce_project_patterns(value, field_name, patterns)
+
+
+def validate_reason(reason, projects_dir, project):
+    if reason.strip() == "":
+        raise GuildError("--reason must not be empty", 1)
+    validate_field(reason, "--reason", REASON_MAX_LENGTH, project_patterns(projects_dir, project))
 
 
 def project_patterns(projects_dir, project_name):

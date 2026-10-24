@@ -13,7 +13,7 @@ class CloseBlockersTestCase(DriftTestCase):
     def setUp(self):
         super().setUp()
         self.write_session(2, "sess-2", "beta-session")
-        self.run_cli(["party", "start", "beta"], "sess-2", self.repo_dir)
+        self.run_cli(["party", "start", "beta", "--reason", "test reason"], "sess-2", self.repo_dir)
         self._write_epic("wave8", "status: active\n", _EPIC)
         self._sync_sdd()
         self._add_quest("sess-1", "alpha-q", "T01")

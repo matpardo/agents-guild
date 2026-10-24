@@ -81,32 +81,42 @@ def _refuse_other_party(conn, session_id, name):
     )
 
 
-def start(ctx, name):
+def require_new_name(conn, name):
     names.validate_name(name, "party name")
-    if ctx.session_id is None:
-        raise GuildError("party start requires a Claude Code session", 1)
-    _refuse_other_party(ctx.conn, ctx.session_id, name)
-    existing = ctx.conn.execute("SELECT name FROM parties WHERE name = ?", (name,)).fetchone()
+    existing = conn.execute("SELECT name FROM parties WHERE name = ?", (name,)).fetchone()
     if existing is not None:
         raise GuildError(
             "party '{}' already exists: use `guild party resume {}`".format(name, name), 1
         )
+
+
+def record_started(ctx, name, project, reason, from_adventurer):
+    session_name = session_info.read_session_name(ctx.sessions_dir, ctx.session_id)
+    events.record(
+        ctx.conn,
+        ctx.now,
+        ctx.origin,
+        name,
+        ctx.session_id,
+        project,
+        "party.started",
+        "local",
+        {"party": name, "session_name": session_name, "reason": reason, "from_adventurer": from_adventurer},
+    )
+    record_location(ctx, name, project, 1, ctx.session_id, None)
+
+
+def start(ctx, name, reason):
+    names.validate_name(name, "party name")
+    if ctx.session_id is None:
+        raise GuildError("party start requires a Claude Code session", 1)
+    _refuse_other_party(ctx.conn, ctx.session_id, name)
+    require_new_name(ctx.conn, name)
     projects = config.load_all_projects(ctx.projects_dir)
     project = config.resolve_project(ctx.cwd, projects)
-    session_name = session_info.read_session_name(ctx.sessions_dir, ctx.session_id)
+    pii.validate_reason(reason, ctx.projects_dir, project)
     with db.writing(ctx.conn):
-        events.record(
-            ctx.conn,
-            ctx.now,
-            ctx.origin,
-            name,
-            ctx.session_id,
-            project,
-            "party.started",
-            "local",
-            {"party": name, "session_name": session_name},
-        )
-        record_location(ctx, name, project, 1, ctx.session_id, None)
+        record_started(ctx, name, project, reason, None)
     return "party '{}' started, generation 1".format(name)
 
 

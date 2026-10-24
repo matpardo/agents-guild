@@ -45,7 +45,7 @@ class CostCollectTests(GuildTestCase):
         return event
 
     def _bind(self, session_id="sess-1"):
-        self.run_cli(["party", "start", "alpha"], session_id, self.repo_dir)
+        self.run_cli(["party", "start", "alpha", "--reason", "test reason"], session_id, self.repo_dir)
 
     def test_main_and_subagent_count_under_parent_session(self):
         write_transcript(self.main_path, [_line("m1", _OLD, 1, 2)])

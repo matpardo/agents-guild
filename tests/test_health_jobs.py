@@ -93,24 +93,24 @@ class HealthJobsTestCase(GuildTestCase):
 
 class HealthJobStartTests(HealthJobsTestCase):
     def test_start_job_uses_the_job_name_as_text(self):
-        code, out, err = self.cli(["adventurer", "start", "--job", "red-main"], "adv-1")
+        code, out, err = self.cli(["adventurer", "start", "--job", "red-main", "--reason", "test reason"], "adv-1")
         self.assertEqual(code, 0, err)
         row = self.rows("SELECT job, health_job, task FROM adventurers")[0]
         self.assertEqual((row["job"], row["health_job"], row["task"]), ("red-main", "red-main", None))
 
     def test_start_job_refusals(self):
         for argv in (
-            ["adventurer", "start", "--job", "nope"],
-            ["adventurer", "start", "text", "--job", "red-main"],
-            ["adventurer", "start", "--job", "red-main", "--task", "e/T01"],
-            ["adventurer", "start"],
+            ["adventurer", "start", "--job", "nope", "--reason", "test reason"],
+            ["adventurer", "start", "text", "--job", "red-main", "--reason", "test reason"],
+            ["adventurer", "start", "--job", "red-main", "--task", "e/T01", "--reason", "test reason"],
+            ["adventurer", "start", "--reason", "test reason"],
         ):
             code, out, err = self.cli(argv, "adv-1")
             self.assertEqual(code, 1, argv)
         self.assertEqual(self.rows("SELECT * FROM adventurers"), [])
 
     def test_plain_start_has_no_health_job(self):
-        self.cli(["adventurer", "start", "fix typo"], "adv-1")
+        self.cli(["adventurer", "start", "fix typo", "--reason", "test reason"], "adv-1")
         self.assertIsNone(self.rows("SELECT health_job FROM adventurers")[0]["health_job"])
 
 
@@ -123,7 +123,7 @@ class HealthJobDueTests(HealthJobsTestCase):
         self.assertEqual(jobs["red-main"]["project"], "acme")
 
     def test_active_job_is_running_then_ok_after_done(self):
-        self.cli(["adventurer", "start", "--job", "red-main"], "adv-1")
+        self.cli(["adventurer", "start", "--job", "red-main", "--reason", "test reason"], "adv-1")
         self.assertEqual(self.board_jobs()["red-main"]["state"], "running")
         self.cli(["adventurer", "done", "--pending", "none"], "adv-1")
         job = self.board_jobs()["red-main"]
@@ -131,7 +131,7 @@ class HealthJobDueTests(HealthJobsTestCase):
         self.assertIsNotNone(job["last_done"])
 
     def test_job_is_due_again_after_every(self):
-        self.cli(["adventurer", "start", "--job", "red-main"], "adv-1")
+        self.cli(["adventurer", "start", "--job", "red-main", "--reason", "test reason"], "adv-1")
         self.cli(["adventurer", "done", "--pending", "none"], "adv-1")
         old = timeutil.to_iso(timeutil.utcnow() - timedelta(days=2))
         conn = sqlite3.connect(str(paths.db_path()))
@@ -141,13 +141,13 @@ class HealthJobDueTests(HealthJobsTestCase):
         self.assertEqual(self.board_jobs()["red-main"]["state"], "due")
 
     def test_dismissed_done_still_counts(self):
-        self.cli(["adventurer", "start", "--job", "red-main"], "adv-1")
+        self.cli(["adventurer", "start", "--job", "red-main", "--reason", "test reason"], "adv-1")
         self.cli(["adventurer", "done", "--pending", "none"], "adv-1")
         self.cli(["adventurer", "dismiss", "1"], None)
         self.assertEqual(self.board_jobs()["red-main"]["state"], "ok")
 
     def test_text_board_lists_due_and_running_not_ok(self):
-        self.cli(["adventurer", "start", "--job", "red-main"], "adv-1")
+        self.cli(["adventurer", "start", "--job", "red-main", "--reason", "test reason"], "adv-1")
         self.cli(["adventurer", "done", "--pending", "none"], "adv-1")
         self.cli(["adventurer", "dismiss", "1"], None)
         code, out, err = self.cli(["board"], None)
@@ -211,6 +211,9 @@ class HealthJobHookTests(HealthJobsTestCase):
         self.assertEqual(code, 0, err)
         self.assertIn("adventurer 1 started", out)
         self.assertEqual(self.rows("SELECT health_job FROM adventurers")[0]["health_job"], "red-main")
+        self.assertEqual(
+            self.rows("SELECT reason FROM adventurers")[0]["reason"], "health job red-main launched by the human"
+        )
 
     def test_unknown_job_reports_why(self):
         code, out, err = self.session_start("adv-1", "nope", "startup")
@@ -218,7 +221,7 @@ class HealthJobHookTests(HealthJobsTestCase):
         self.assertEqual(self.rows("SELECT * FROM adventurers"), [])
 
     def test_bound_or_already_adventurer_session_is_left_alone(self):
-        self.cli(["party", "start", "alpha"], "sess-1")
+        self.cli(["party", "start", "alpha", "--reason", "test reason"], "sess-1")
         self.session_start("sess-1", "red-main", "startup")
         self.session_start("adv-1", "red-main", "startup")
         self.session_start("adv-1", "red-main", "compact")

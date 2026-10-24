@@ -20,19 +20,19 @@ class SessionStartHookTests(GuildTestCase):
         code, out, err = self.run_hook("session-start", {"session_id": "sess-1", "cwd": str(self.root)})
         self.assertEqual(code, 0)
         self.assertIn("session not bound", out)
-        self.assertIn("ask the human whether the work is a party", out)
+        self.assertIn("ask the human only when unsure", out)
         self.assertIn("`guild adventurer start", out)
 
     def test_bound_prints_brief_and_spawns_sync(self):
         repo_dir = self.register_project("acme", ["acme/app"])
-        self.run_cli(["party", "start", "alpha"], "sess-1", repo_dir)
+        self.run_cli(["party", "start", "alpha", "--reason", "test reason"], "sess-1", repo_dir)
         code, out, err = self.run_hook("session-start", {"session_id": "sess-1", "cwd": str(repo_dir)})
         self.assertEqual(code, 0)
         self.assertIn("party: alpha", out)
 
     def test_resumed_generation_shows_handoff_once(self):
         repo_dir = self.register_project("acme", ["acme/app"])
-        self.run_cli(["party", "start", "alpha"], "sess-1", repo_dir)
+        self.run_cli(["party", "start", "alpha", "--reason", "test reason"], "sess-1", repo_dir)
         self.run_cli(["quest", "add", "demo", "--title", "Demo", "--no-epic"], "sess-1", repo_dir)
         self.run_cli(["task", "add", "demo/T01", "--title", "First"], "sess-1", repo_dir)
         self.run_cli(
@@ -50,7 +50,7 @@ class SessionStartHookTests(GuildTestCase):
         self.assertNotIn("shipping T01", out)
 
     def _hand_off_to_generation_two(self, repo_dir, with_task):
-        self.run_cli(["party", "start", "alpha"], "sess-1", repo_dir)
+        self.run_cli(["party", "start", "alpha", "--reason", "test reason"], "sess-1", repo_dir)
         if with_task:
             self.run_cli(["quest", "add", "demo", "--title", "Demo", "--no-epic"], "sess-1", repo_dir)
             self.run_cli(["task", "add", "demo/T01", "--title", "First"], "sess-1", repo_dir)
@@ -110,7 +110,7 @@ class SessionStartHookTests(GuildTestCase):
 
     def test_broken_task_brief_falls_back_to_handoff_with_notice(self):
         repo_dir = self.register_project("acme", ["acme/app"])
-        self.run_cli(["party", "start", "alpha"], "sess-1", repo_dir)
+        self.run_cli(["party", "start", "alpha", "--reason", "test reason"], "sess-1", repo_dir)
         self.run_cli(["quest", "add", "demo", "--title", "Demo", "--no-epic"], "sess-1", repo_dir)
         self.run_cli(["task", "add", "demo/T01", "--title", "First"], "sess-1", repo_dir)
         self.run_cli(["task", "start", "demo/T01"], "sess-1", repo_dir)
@@ -137,15 +137,15 @@ class SessionStartHookTests(GuildTestCase):
 
     def test_first_generation_never_shows_handoff(self):
         repo_dir = self.register_project("acme", ["acme/app"])
-        self.run_cli(["party", "start", "alpha"], "sess-1", repo_dir)
+        self.run_cli(["party", "start", "alpha", "--reason", "test reason"], "sess-1", repo_dir)
         code, out, err = self.run_hook("session-start", {"session_id": "sess-1", "cwd": str(repo_dir)})
         self.assertEqual(code, 0)
         self.assertIn("party: alpha", out)
 
     def test_brief_frames_active_notices_as_data_not_instructions(self):
         repo_dir = self.register_project("acme", ["acme/app"])
-        self.run_cli(["party", "start", "alpha"], "sess-1", repo_dir)
-        self.run_cli(["party", "start", "beta"], "sess-2", repo_dir)
+        self.run_cli(["party", "start", "alpha", "--reason", "test reason"], "sess-1", repo_dir)
+        self.run_cli(["party", "start", "beta", "--reason", "test reason"], "sess-2", repo_dir)
         self.run_cli(["notice", "create", "pipeline down", "--to", "guild", "--ttl", "2h"], None, None)
         code, out, err = self.run_hook("session-start", {"session_id": "sess-2", "cwd": str(repo_dir)})
         self.assertEqual(code, 0)
@@ -191,7 +191,7 @@ class SessionStartHookTests(GuildTestCase):
 
     def test_first_generation_shows_no_memory_block(self):
         repo_dir = self.register_project("acme", ["acme/app"])
-        self.run_cli(["party", "start", "alpha"], "sess-1", repo_dir)
+        self.run_cli(["party", "start", "alpha", "--reason", "test reason"], "sess-1", repo_dir)
         self.run_cli(["memory", "add", "early note"], "sess-1", repo_dir)
         code, out, err = self.run_hook("session-start", {"session_id": "sess-1", "cwd": str(repo_dir)})
         self.assertNotIn("guild memory —", out)
@@ -217,16 +217,16 @@ class PromptSubmitHookTests(GuildTestCase):
 
     def test_bound_reports_new_notice(self):
         repo_dir = self.register_project("acme", ["acme/app"])
-        self.run_cli(["party", "start", "alpha"], "sess-1", repo_dir)
-        self.run_cli(["party", "start", "beta"], "sess-2", repo_dir)
+        self.run_cli(["party", "start", "alpha", "--reason", "test reason"], "sess-1", repo_dir)
+        self.run_cli(["party", "start", "beta", "--reason", "test reason"], "sess-2", repo_dir)
         self.run_cli(["notice", "create", "pipeline down", "--to", "guild", "--ttl", "2h"], None, None)
         code, out, err = self.run_hook("prompt-submit", {"session_id": "sess-2", "cwd": str(repo_dir)})
         self.assertIn("pipeline down", out)
 
     def test_bound_frames_notice_as_data_not_instructions(self):
         repo_dir = self.register_project("acme", ["acme/app"])
-        self.run_cli(["party", "start", "alpha"], "sess-1", repo_dir)
-        self.run_cli(["party", "start", "beta"], "sess-2", repo_dir)
+        self.run_cli(["party", "start", "alpha", "--reason", "test reason"], "sess-1", repo_dir)
+        self.run_cli(["party", "start", "beta", "--reason", "test reason"], "sess-2", repo_dir)
         self.run_cli(["notice", "create", "pipeline down", "--to", "guild", "--ttl", "2h"], None, None)
         code, out, err = self.run_hook("prompt-submit", {"session_id": "sess-2", "cwd": str(repo_dir)})
         self.assertIn(
@@ -245,7 +245,7 @@ class CtxNudgeTests(GuildTestCase):
 
     def test_nudge_fires_once_when_over_threshold(self):
         repo_dir = self.register_project("acme", ["acme/app"])
-        self.run_cli(["party", "start", "alpha"], "sess-1", repo_dir)
+        self.run_cli(["party", "start", "alpha", "--reason", "test reason"], "sess-1", repo_dir)
         self._set_handoff_threshold(80)
         statusline_commands.record_ctx(paths.state_dir(), "sess-1", 81)
         payload = {"session_id": "sess-1", "cwd": str(repo_dir)}
@@ -258,7 +258,7 @@ class CtxNudgeTests(GuildTestCase):
 
     def test_no_nudge_below_threshold(self):
         repo_dir = self.register_project("acme", ["acme/app"])
-        self.run_cli(["party", "start", "alpha"], "sess-1", repo_dir)
+        self.run_cli(["party", "start", "alpha", "--reason", "test reason"], "sess-1", repo_dir)
         self._set_handoff_threshold(80)
         statusline_commands.record_ctx(paths.state_dir(), "sess-1", 50)
         code, out, err = self.run_hook(
@@ -268,7 +268,7 @@ class CtxNudgeTests(GuildTestCase):
 
     def test_nudge_falls_back_to_the_default_threshold(self):
         repo_dir = self.register_project("acme", ["acme/app"])
-        self.run_cli(["party", "start", "alpha"], "sess-1", repo_dir)
+        self.run_cli(["party", "start", "alpha", "--reason", "test reason"], "sess-1", repo_dir)
         statusline_commands.record_ctx(paths.state_dir(), "sess-1", ctx_pressure.DEFAULT_HANDOFF_THRESHOLD)
         code, out, err = self.run_hook(
             "prompt-submit", {"session_id": "sess-1", "cwd": str(repo_dir)}
@@ -277,7 +277,7 @@ class CtxNudgeTests(GuildTestCase):
 
     def test_no_nudge_below_the_default_threshold(self):
         repo_dir = self.register_project("acme", ["acme/app"])
-        self.run_cli(["party", "start", "alpha"], "sess-1", repo_dir)
+        self.run_cli(["party", "start", "alpha", "--reason", "test reason"], "sess-1", repo_dir)
         statusline_commands.record_ctx(
             paths.state_dir(), "sess-1", ctx_pressure.DEFAULT_HANDOFF_THRESHOLD - 1
         )
@@ -300,7 +300,7 @@ class CompactNudgeTests(GuildTestCase):
 
     def _bound(self):
         repo_dir = self.register_project("acme", ["acme/app"])
-        self.run_cli(["party", "start", "alpha"], "sess-1", repo_dir)
+        self.run_cli(["party", "start", "alpha", "--reason", "test reason"], "sess-1", repo_dir)
         return repo_dir
 
     def _record_window(self, generation):
@@ -409,7 +409,7 @@ class CompactNudgeTests(GuildTestCase):
 class PostToolUseHookTests(GuildTestCase):
     def test_silent_when_nothing_new(self):
         repo_dir = self.register_project("acme", ["acme/app"])
-        self.run_cli(["party", "start", "alpha"], "sess-1", repo_dir)
+        self.run_cli(["party", "start", "alpha", "--reason", "test reason"], "sess-1", repo_dir)
         code, out, err = self.run_hook(
             "post-tool-use", {"session_id": "sess-1", "cwd": str(repo_dir)}
         )
@@ -418,8 +418,8 @@ class PostToolUseHookTests(GuildTestCase):
 
     def test_reports_new_notice_as_hook_specific_output(self):
         repo_dir = self.register_project("acme", ["acme/app"])
-        self.run_cli(["party", "start", "alpha"], "sess-1", repo_dir)
-        self.run_cli(["party", "start", "beta"], "sess-2", repo_dir)
+        self.run_cli(["party", "start", "alpha", "--reason", "test reason"], "sess-1", repo_dir)
+        self.run_cli(["party", "start", "beta", "--reason", "test reason"], "sess-2", repo_dir)
         self.run_cli(["notice", "create", "pipeline down", "--to", "guild", "--ttl", "2h"], None, None)
         code, out, err = self.run_hook(
             "post-tool-use", {"session_id": "sess-2", "cwd": str(repo_dir)}
@@ -431,8 +431,8 @@ class PostToolUseHookTests(GuildTestCase):
 
     def test_frames_notice_as_data_not_instructions(self):
         repo_dir = self.register_project("acme", ["acme/app"])
-        self.run_cli(["party", "start", "alpha"], "sess-1", repo_dir)
-        self.run_cli(["party", "start", "beta"], "sess-2", repo_dir)
+        self.run_cli(["party", "start", "alpha", "--reason", "test reason"], "sess-1", repo_dir)
+        self.run_cli(["party", "start", "beta", "--reason", "test reason"], "sess-2", repo_dir)
         self.run_cli(["notice", "create", "pipeline down", "--to", "guild", "--ttl", "2h"], None, None)
         code, out, err = self.run_hook(
             "post-tool-use", {"session_id": "sess-2", "cwd": str(repo_dir)}
@@ -447,8 +447,8 @@ class PostToolUseHookTests(GuildTestCase):
 
     def test_shares_cursor_with_prompt_submit(self):
         repo_dir = self.register_project("acme", ["acme/app"])
-        self.run_cli(["party", "start", "alpha"], "sess-1", repo_dir)
-        self.run_cli(["party", "start", "beta"], "sess-2", repo_dir)
+        self.run_cli(["party", "start", "alpha", "--reason", "test reason"], "sess-1", repo_dir)
+        self.run_cli(["party", "start", "beta", "--reason", "test reason"], "sess-2", repo_dir)
         self.run_cli(["notice", "create", "pipeline down", "--to", "guild", "--ttl", "2h"], None, None)
         payload = {"session_id": "sess-2", "cwd": str(repo_dir)}
 
@@ -624,8 +624,8 @@ class PrePushSharedAreasTests(GuildTestCase):
         data["shared_areas"] = ["config/routes.rb", "db/migrate/*"]
         data["shared_area_claim_ttl"] = "2h"
         config_file.write_text(json.dumps(data))
-        self.run_cli(["party", "start", "alpha"], "sess-1", self.repo_dir)
-        self.run_cli(["party", "start", "beta"], "sess-2", self.repo_dir)
+        self.run_cli(["party", "start", "alpha", "--reason", "test reason"], "sess-1", self.repo_dir)
+        self.run_cli(["party", "start", "beta", "--reason", "test reason"], "sess-2", self.repo_dir)
         self.write_gh_fixture("list_feature-shared", [])
 
     def _commit_file(self, relative_path):
@@ -843,7 +843,7 @@ class PreEditHookTests(GuildTestCase):
 
     def test_allow_when_no_project(self):
         repo_dir = self.register_project("acme", ["acme/app"])
-        self.run_cli(["party", "start", "alpha"], "sess-1", repo_dir)
+        self.run_cli(["party", "start", "alpha", "--reason", "test reason"], "sess-1", repo_dir)
         unrelated_dir = self.root / "unrelated"
         unrelated_dir.mkdir()
         file_path = unrelated_dir / "somewhere.txt"
@@ -857,7 +857,7 @@ class PreEditHookTests(GuildTestCase):
     def test_allow_when_no_shared_areas_configured(self):
         repo_dir = self.register_project("acme", ["acme/app"])
         self._git_init(repo_dir)
-        self.run_cli(["party", "start", "alpha"], "sess-1", repo_dir)
+        self.run_cli(["party", "start", "alpha", "--reason", "test reason"], "sess-1", repo_dir)
         (repo_dir / "config").mkdir()
         file_path = repo_dir / "config" / "routes.rb"
         file_path.write_text("x")
@@ -869,7 +869,7 @@ class PreEditHookTests(GuildTestCase):
         repo_dir = self.register_project("acme", ["acme/app"])
         self._git_init(repo_dir)
         self._set_shared_areas("acme", ["config/routes.rb"], "2h")
-        self.run_cli(["party", "start", "alpha"], "sess-1", repo_dir)
+        self.run_cli(["party", "start", "alpha", "--reason", "test reason"], "sess-1", repo_dir)
         file_path = repo_dir / "app.rb"
         file_path.write_text("x")
         code, out, err = self.run_hook("pre-edit", self._edit_payload("sess-1", repo_dir, file_path))
@@ -879,7 +879,7 @@ class PreEditHookTests(GuildTestCase):
     def test_allow_outside_git(self):
         repo_dir = self.register_project("acme", ["acme/app"])
         self._set_shared_areas("acme", ["config/routes.rb"], "2h")
-        self.run_cli(["party", "start", "alpha"], "sess-1", repo_dir)
+        self.run_cli(["party", "start", "alpha", "--reason", "test reason"], "sess-1", repo_dir)
         (repo_dir / "config").mkdir()
         file_path = repo_dir / "config" / "routes.rb"
         file_path.write_text("x")
@@ -891,7 +891,7 @@ class PreEditHookTests(GuildTestCase):
         repo_dir = self.register_project("acme", ["acme/app"])
         self._git_init(repo_dir)
         self._set_shared_areas("acme", ["config/routes.rb"], "2h")
-        self.run_cli(["party", "start", "alpha"], "sess-1", repo_dir)
+        self.run_cli(["party", "start", "alpha", "--reason", "test reason"], "sess-1", repo_dir)
         payload = {
             "session_id": "sess-1",
             "cwd": str(repo_dir),
@@ -906,7 +906,7 @@ class PreEditHookTests(GuildTestCase):
         repo_dir = self.register_project("acme", ["acme/app"])
         self._git_init(repo_dir)
         self._set_shared_areas("acme", ["config/routes.rb"], "2h")
-        self.run_cli(["party", "start", "alpha"], "sess-1", repo_dir)
+        self.run_cli(["party", "start", "alpha", "--reason", "test reason"], "sess-1", repo_dir)
         payload = {"session_id": "sess-1", "cwd": str(repo_dir), "tool_name": "Edit", "tool_input": {}}
         code, out, err = self.run_hook("pre-edit", payload)
         self.assertEqual(code, 0)
@@ -916,7 +916,7 @@ class PreEditHookTests(GuildTestCase):
         repo_dir = self.register_project("acme", ["acme/app"])
         self._git_init(repo_dir)
         self._set_shared_areas("acme", ["config/routes.rb"], "2h")
-        self.run_cli(["party", "start", "alpha"], "sess-1", repo_dir)
+        self.run_cli(["party", "start", "alpha", "--reason", "test reason"], "sess-1", repo_dir)
         (repo_dir / "config").mkdir()
         file_path = repo_dir / "config" / "routes.rb"
         file_path.write_text("x")
@@ -936,8 +936,8 @@ class PreEditHookTests(GuildTestCase):
         repo_dir = self.register_project("acme", ["acme/app"])
         self._git_init(repo_dir)
         self._set_shared_areas("acme", ["config/routes.rb"], "2h")
-        self.run_cli(["party", "start", "alpha"], "sess-1", repo_dir)
-        self.run_cli(["party", "start", "beta"], "sess-2", repo_dir)
+        self.run_cli(["party", "start", "alpha", "--reason", "test reason"], "sess-1", repo_dir)
+        self.run_cli(["party", "start", "beta", "--reason", "test reason"], "sess-2", repo_dir)
         (repo_dir / "config").mkdir()
         file_path = repo_dir / "config" / "routes.rb"
         file_path.write_text("x")
@@ -960,8 +960,8 @@ class PreEditHookTests(GuildTestCase):
         repo_dir = self.register_project("acme", ["acme/app"])
         self._git_init(repo_dir)
         self._set_shared_areas("acme", ["config/routes.rb"], "2h")
-        self.run_cli(["party", "start", "alpha"], "sess-1", repo_dir)
-        self.run_cli(["party", "start", "beta"], "sess-2", repo_dir)
+        self.run_cli(["party", "start", "alpha", "--reason", "test reason"], "sess-1", repo_dir)
+        self.run_cli(["party", "start", "beta", "--reason", "test reason"], "sess-2", repo_dir)
         self.run_cli(["raid", "join", "epic-alpha", "--ttl", "2h"], "sess-1", repo_dir)
         self.run_cli(["raid", "join", "epic-alpha", "--ttl", "2h"], "sess-2", repo_dir)
         (repo_dir / "config").mkdir()
@@ -978,8 +978,8 @@ class PreEditHookTests(GuildTestCase):
         repo_dir = self.register_project("acme", ["acme/app"])
         self._git_init(repo_dir)
         self._set_shared_areas("acme", ["config/routes.rb"], "2h")
-        self.run_cli(["party", "start", "alpha"], "sess-1", repo_dir)
-        self.run_cli(["party", "start", "beta"], "sess-2", repo_dir)
+        self.run_cli(["party", "start", "alpha", "--reason", "test reason"], "sess-1", repo_dir)
+        self.run_cli(["party", "start", "beta", "--reason", "test reason"], "sess-2", repo_dir)
         self.run_cli(["raid", "join", "zeta", "--ttl", "2h"], "sess-1", repo_dir)
         self.run_cli(["raid", "join", "aaa", "--ttl", "2h"], "sess-2", repo_dir)
         self.run_cli(["raid", "join", "zeta", "--ttl", "2h"], "sess-2", repo_dir)
@@ -996,8 +996,8 @@ class PreEditHookTests(GuildTestCase):
         repo_dir = self.register_project("acme", ["acme/app"])
         self._git_init(repo_dir)
         self._set_shared_areas("acme", ["config/routes.rb"], "2h")
-        self.run_cli(["party", "start", "alpha"], "sess-1", repo_dir)
-        self.run_cli(["party", "start", "beta"], "sess-2", repo_dir)
+        self.run_cli(["party", "start", "alpha", "--reason", "test reason"], "sess-1", repo_dir)
+        self.run_cli(["party", "start", "beta", "--reason", "test reason"], "sess-2", repo_dir)
         self.run_cli(["raid", "join", "epic-alpha", "--ttl", "2h"], "sess-2", repo_dir)
         (repo_dir / "config").mkdir()
         file_path = repo_dir / "config" / "routes.rb"
@@ -1012,8 +1012,8 @@ class PreEditHookTests(GuildTestCase):
         repo_dir = self.register_project("acme", ["acme/app"])
         self._git_init(repo_dir)
         self._set_shared_areas("acme", ["config/routes.rb"], "2h")
-        self.run_cli(["party", "start", "alpha"], "sess-1", repo_dir)
-        self.run_cli(["party", "start", "beta"], "sess-2", repo_dir)
+        self.run_cli(["party", "start", "alpha", "--reason", "test reason"], "sess-1", repo_dir)
+        self.run_cli(["party", "start", "beta", "--reason", "test reason"], "sess-2", repo_dir)
 
         worktree_dir = repo_dir.parent / "worktree"
         subprocess.run(
@@ -1040,7 +1040,7 @@ class PreEditHookTests(GuildTestCase):
         repo_dir = self.register_project("acme", ["acme/app"])
         self._git_init(repo_dir)
         self._set_shared_areas("acme", ["notebooks/*.ipynb"], "2h")
-        self.run_cli(["party", "start", "alpha"], "sess-1", repo_dir)
+        self.run_cli(["party", "start", "alpha", "--reason", "test reason"], "sess-1", repo_dir)
         (repo_dir / "notebooks").mkdir()
         notebook_path = repo_dir / "notebooks" / "explore.ipynb"
         notebook_path.write_text("{}")
@@ -1060,7 +1060,7 @@ class PreEditHookTests(GuildTestCase):
         repo_dir = self.register_project("acme", ["acme/app"])
         self._git_init(repo_dir)
         self._set_shared_areas("acme", ["db/migrate/*"], "2h")
-        self.run_cli(["party", "start", "alpha"], "sess-1", repo_dir)
+        self.run_cli(["party", "start", "alpha", "--reason", "test reason"], "sess-1", repo_dir)
         new_file = repo_dir / "db" / "migrate" / "003_new.rb"
         payload = {
             "session_id": "sess-1",
@@ -1078,7 +1078,7 @@ class PreEditHookTests(GuildTestCase):
         repo_dir = self.register_project("acme", ["acme/app"])
         self._git_init(repo_dir)
         self._set_shared_areas("acme", ["config/routes.rb"], "2h")
-        self.run_cli(["party", "start", "alpha"], "sess-1", repo_dir)
+        self.run_cli(["party", "start", "alpha", "--reason", "test reason"], "sess-1", repo_dir)
         (repo_dir / "config").mkdir()
         file_path = repo_dir / "config" / "routes.rb"
         file_path.write_text("x")
@@ -1109,7 +1109,7 @@ class RaidMembershipWarningTests(GuildTestCase):
     def setUp(self):
         super().setUp()
         self.repo_dir = self.register_project("acme", ["acme/app"])
-        self.run_cli(["party", "start", "alpha"], "sess-1", self.repo_dir)
+        self.run_cli(["party", "start", "alpha", "--reason", "test reason"], "sess-1", self.repo_dir)
 
     def test_warning_fires_once_within_window_on_prompt_submit(self):
         self.run_cli(["raid", "join", "ci", "--ttl", "10h"], "sess-1", self.repo_dir)
@@ -1175,7 +1175,7 @@ if __name__ == "__main__":
 class SessionLivenessHookTests(GuildTestCase):
     def _bound(self):
         repo_dir = self.register_project("acme", ["acme/app"])
-        self.run_cli(["party", "start", "alpha"], "sess-1", repo_dir)
+        self.run_cli(["party", "start", "alpha", "--reason", "test reason"], "sess-1", repo_dir)
         return repo_dir
 
     def _payload(self, repo_dir, **extra):
@@ -1309,7 +1309,7 @@ class NotificationPushTests(GuildTestCase):
     def setUp(self):
         super().setUp()
         self.repo_dir = self.register_project("acme", ["acme/app"])
-        self.run_cli(["party", "start", "alpha"], "sess-1", self.repo_dir)
+        self.run_cli(["party", "start", "alpha", "--reason", "test reason"], "sess-1", self.repo_dir)
         self.runner = mock.Mock()
         patcher = mock.patch("guild.notify.spawn_detached", self.runner)
         patcher.start()
@@ -1392,7 +1392,7 @@ class PrePrOwnerHookTests(GuildTestCase):
         self._git(["init", "-q"])
         self._git(["checkout", "-q", "-b", "feature/x"])
         self._git(["remote", "add", "origin", "https://github.com/acme/app.git"])
-        self.run_cli(["party", "start", "alpha"], "sess-1", self.repo_dir)
+        self.run_cli(["party", "start", "alpha", "--reason", "test reason"], "sess-1", self.repo_dir)
         self.run_cli(["quest", "add", "demo", "--title", "Demo", "--no-epic"], "sess-1", self.repo_dir)
         self.run_cli(["task", "add", "demo/T01", "--title", "First"], "sess-1", self.repo_dir)
         self.write_gh_fixture(
@@ -1403,7 +1403,7 @@ class PrePrOwnerHookTests(GuildTestCase):
             ["pr", "track", "acme/app#1", "--task", "demo/T01", "--what", "x", "--waits", "y"],
             "sess-1", self.repo_dir,
         )
-        self.run_cli(["party", "start", "beta"], "sess-2", self.repo_dir)
+        self.run_cli(["party", "start", "beta", "--reason", "test reason"], "sess-2", self.repo_dir)
 
     def _git(self, args):
         subprocess.run(["git"] + args, cwd=str(self.repo_dir), check=True)

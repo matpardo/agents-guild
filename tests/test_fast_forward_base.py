@@ -40,7 +40,7 @@ class _CloneFixture(GuildTestCase):
         _git(self.root, "clone", str(self.remote), str(self.repo_dir))
         self._set_flag(True)
         self.write_gh_fixture("branch_checks_acme-app_main", {"check_runs": []})
-        self.run_cli(["party", "start", "alpha"], "sess-1", self.repo_dir)
+        self.run_cli(["party", "start", "alpha", "--reason", "test reason"], "sess-1", self.repo_dir)
         self.run_cli(["quest", "add", "demo", "--title", "Demo", "--no-epic"], "sess-1", self.repo_dir)
         self.run_cli(["task", "add", "demo/T01", "--title", "First"], "sess-1", self.repo_dir)
         self._track(1)

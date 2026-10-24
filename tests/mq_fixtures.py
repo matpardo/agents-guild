@@ -66,7 +66,7 @@ class MergeQueueTestCase(GuildTestCase):
         config_file.write_text(json.dumps(data))
 
     def start_party(self, name, session_id):
-        self.run_cli(["party", "start", name], session_id, self.repo_dir)
+        self.run_cli(["party", "start", name, "--reason", "test reason"], session_id, self.repo_dir)
 
     def add_quest(self, session_id, slug, epic, tasks):
         code, out, err = self.run_cli(

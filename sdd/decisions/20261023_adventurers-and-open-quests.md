@@ -1,7 +1,7 @@
 # ADR: Adventurers, open quests and one identity per session
 
 - **Date:** 2026-10-23
-- **Status:** accepted
+- **Status:** accepted, amended by 20261024_sessions-bind-themselves
 - **Supersedes:** 20261004_vocabulary-short-sessions
 
 ## Context

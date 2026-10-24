@@ -21,7 +21,7 @@ class SyncTrackerTests(GuildTestCase):
         self.repo_dir.mkdir(parents=True)
         self.sdd_root = self.project_root / "sdd-docs"
         self._write_project_config()
-        self.run_cli(["party", "start", "alpha"], "sess-1", self.repo_dir)
+        self.run_cli(["party", "start", "alpha", "--reason", "test reason"], "sess-1", self.repo_dir)
 
     def _write_project_config(self, tracker_config=None, sdd_config=None):
         projects_dir = self.config_home / "guild" / "projects"

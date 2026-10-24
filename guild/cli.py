@@ -81,7 +81,7 @@ def _handle_init_project(ctx, args):
 def _handle_party_start(ctx, args):
     from guild.commands import party as party_commands
 
-    _print(party_commands.start(ctx, args.name))
+    _print(party_commands.start(ctx, args.name, args.reason))
     return 0
 
 
@@ -118,7 +118,7 @@ def _handle_quest_add(ctx, args):
 
     _print(quest_commands.add(
         ctx, args.slug, args.title, args.epic, args.tasks, args.titles, args.no_epic, args.followups_of,
-        args.open
+        args.open, args.reason
     ))
     return 0
 
@@ -148,7 +148,7 @@ def _handle_task_add(ctx, args):
     from guild.commands import task as task_commands
 
     quest, tid = args.ref.split("/", 1)
-    _print(task_commands.add(ctx, quest, tid, args.title))
+    _print(task_commands.add(ctx, quest, tid, args.title, args.reason))
     return 0
 
 
@@ -431,7 +431,14 @@ def _handle_ideas(ctx, args):
 def _handle_adventurer_start(ctx, args):
     from guild.commands import adventurer as adventurer_commands
 
-    _print(adventurer_commands.start(ctx, args.job, args.task, args.health_job))
+    _print(adventurer_commands.start(ctx, args.job, args.task, args.health_job, args.reason))
+    return 0
+
+
+def _handle_adventurer_promote(ctx, args):
+    from guild.commands import adventurer as adventurer_commands
+
+    _print(adventurer_commands.promote(ctx, args.party, args.reason))
     return 0
 
 
@@ -846,6 +853,7 @@ def _add_party_parser(subparsers):
 
     start = actions.add_parser("start", help="start a party and bind this session to it")
     start.add_argument("name")
+    start.add_argument("--reason", required=True, help="why this work is a party")
     start.set_defaults(handler=_handle_party_start)
 
     resume = actions.add_parser("resume", help="resume a party in this session")
@@ -873,6 +881,7 @@ def _add_quest_parser(subparsers):
     add.add_argument("--no-epic", action="store_true", help="create a quest outside any epic")
     add.add_argument("--followups-of", help="quest this one follows up")
     add.add_argument("--open", action="store_true", help="create an open quest no party owns yet")
+    add.add_argument("--reason", help="why the quest was added")
     add.set_defaults(handler=_handle_quest_add)
 
     take = actions.add_parser("take", help="take an open quest of your project for your party")
@@ -906,6 +915,7 @@ def _add_task_parser(subparsers):
     add = actions.add_parser("add", help="add a task to an open quest of your party")
     add.add_argument("ref")
     add.add_argument("--title", required=True)
+    add.add_argument("--reason", help="why the task was added")
     add.set_defaults(handler=_handle_task_add)
 
     start = actions.add_parser("start", help="mark a task in progress")
@@ -1068,7 +1078,13 @@ def _add_adventurer_parser(subparsers):
     start.add_argument("job", nargs="?", help="what this session does; omit with --job")
     start.add_argument("--task", help="synced SDD task as <epic>/<tid>")
     start.add_argument("--job", dest="health_job", help="health job of the project config, instead of a job text")
+    start.add_argument("--reason", required=True, help="why this work is an adventurer")
     start.set_defaults(handler=_handle_adventurer_start)
+
+    promote = actions.add_parser("promote", help="turn this adventurer into a party led by this session")
+    promote.add_argument("party")
+    promote.add_argument("--reason", required=True, help="why the work outgrew one job")
+    promote.set_defaults(handler=_handle_adventurer_promote)
 
     launch = actions.add_parser("launch", help="open a tmux window running a health job (human terminal only)")
     launch.add_argument("name", help="health job name")

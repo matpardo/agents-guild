@@ -24,7 +24,7 @@ class RaidJoinLeaveTests(GuildTestCase):
     def setUp(self):
         super().setUp()
         self.repo_dir = self.register_project("acme", ["acme/app"])
-        self.run_cli(["party", "start", "alpha"], "sess-1", self.repo_dir)
+        self.run_cli(["party", "start", "alpha", "--reason", "test reason"], "sess-1", self.repo_dir)
 
     def test_join_requires_binding(self):
         code, out, err = self.run_cli(["raid", "join", "ci", "--ttl", "1h"], None, None)
@@ -156,8 +156,8 @@ class RaidNoticeTests(GuildTestCase):
     def setUp(self):
         super().setUp()
         self.repo_dir = self.register_project("acme", ["acme/app"])
-        self.run_cli(["party", "start", "alpha"], "sess-1", self.repo_dir)
-        self.run_cli(["party", "start", "beta"], "sess-2", self.repo_dir)
+        self.run_cli(["party", "start", "alpha", "--reason", "test reason"], "sess-1", self.repo_dir)
+        self.run_cli(["party", "start", "beta", "--reason", "test reason"], "sess-2", self.repo_dir)
 
     def test_notice_to_empty_raid_fails(self):
         code, out, err = self.run_cli(
@@ -258,7 +258,7 @@ class RaidNoticeTests(GuildTestCase):
 class RaidBoardTests(GuildTestCase):
     def test_board_shows_raid_scope_and_party_membership(self):
         repo_dir = self.register_project("acme", ["acme/app"])
-        self.run_cli(["party", "start", "alpha"], "sess-1", repo_dir)
+        self.run_cli(["party", "start", "alpha", "--reason", "test reason"], "sess-1", repo_dir)
         self.run_cli(["raid", "join", "ci", "--ttl", "5h"], "sess-1", repo_dir)
         self.run_cli(
             ["notice", "create", "ci flaky", "--to", "raid:ci", "--ttl", "1h"], "sess-1", repo_dir
@@ -271,7 +271,7 @@ class RaidBoardTests(GuildTestCase):
 
     def test_board_shows_until_leave_membership(self):
         repo_dir = self.register_project("acme", ["acme/app"])
-        self.run_cli(["party", "start", "alpha"], "sess-1", repo_dir)
+        self.run_cli(["party", "start", "alpha", "--reason", "test reason"], "sess-1", repo_dir)
         self.run_cli(["raid", "join", "ci", "--until-leave"], "sess-1", repo_dir)
         code, out, err = self.run_cli(["board"], None, None)
         self.assertEqual(code, 0, err)
@@ -282,8 +282,8 @@ class BoardRaidFilterTests(GuildTestCase):
     def setUp(self):
         super().setUp()
         self.repo_dir = self.register_project("acme", ["acme/app"])
-        self.run_cli(["party", "start", "alpha"], "sess-1", self.repo_dir)
-        self.run_cli(["party", "start", "beta"], "sess-2", self.repo_dir)
+        self.run_cli(["party", "start", "alpha", "--reason", "test reason"], "sess-1", self.repo_dir)
+        self.run_cli(["party", "start", "beta", "--reason", "test reason"], "sess-2", self.repo_dir)
         self.run_cli(["raid", "join", "ci", "--ttl", "1h"], "sess-1", self.repo_dir)
 
     def test_shows_only_raid_member_parties(self):
@@ -350,7 +350,7 @@ class RaidPartyCloseTests(GuildTestCase):
     def setUp(self):
         super().setUp()
         self.repo_dir = self.register_project("acme", ["acme/app"])
-        self.run_cli(["party", "start", "alpha"], "sess-1", self.repo_dir)
+        self.run_cli(["party", "start", "alpha", "--reason", "test reason"], "sess-1", self.repo_dir)
         self.run_cli(["raid", "join", "ci", "--ttl", "5h"], "sess-1", self.repo_dir)
         self.run_cli(["raid", "join", "ci-ul", "--until-leave"], "sess-1", self.repo_dir)
 
@@ -394,8 +394,8 @@ class RaidWithoutLeadTests(GuildTestCase):
     def setUp(self):
         super().setUp()
         self.repo_dir = self.register_project("acme", ["acme/app"])
-        self.run_cli(["party", "start", "alpha"], "sess-1", self.repo_dir)
-        self.run_cli(["party", "start", "beta"], "sess-2", self.repo_dir)
+        self.run_cli(["party", "start", "alpha", "--reason", "test reason"], "sess-1", self.repo_dir)
+        self.run_cli(["party", "start", "beta", "--reason", "test reason"], "sess-2", self.repo_dir)
         self.run_cli(["raid", "join", "ci", "--ttl", "1h"], "sess-1", self.repo_dir)
         self.run_cli(["raid", "join", "ci", "--ttl", "1h"], "sess-2", self.repo_dir)
 

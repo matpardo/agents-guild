@@ -11,7 +11,7 @@ class LeaderWindowsBase(GuildTestCase):
     def setUp(self):
         super().setUp()
         self.repo_dir = self.register_project("acme", ["acme/app"])
-        self.run_cli(["party", "start", "alpha"], "sess-1", self.repo_dir)
+        self.run_cli(["party", "start", "alpha", "--reason", "test reason"], "sess-1", self.repo_dir)
         self.conn = db.connect(paths.db_path())
 
     def tearDown(self):
@@ -67,7 +67,7 @@ class ReviveRecordsWindowsTests(LeaderWindowsBase):
         super().setUp()
         self.work = self.repo_dir.parent / "work"
         self.work.mkdir()
-        self.run_cli(["party", "start", "beta"], "sess-b", self.work)
+        self.run_cli(["party", "start", "beta", "--reason", "test reason"], "sess-b", self.work)
 
     def _transcript(self, session_id):
         directory = self.claude_projects_dir / "-w"

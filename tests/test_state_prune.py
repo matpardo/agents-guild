@@ -18,7 +18,7 @@ class StatePruneTests(GuildTestCase):
     def setUp(self):
         super().setUp()
         self.repo_dir = self.register_project("acme", ["acme/app"])
-        self.run_cli(["party", "start", "alpha"], _LEADER, self.repo_dir)
+        self.run_cli(["party", "start", "alpha", "--reason", "test reason"], _LEADER, self.repo_dir)
         (self.sessions_dir / "live.json").write_text(json.dumps({"sessionId": _LIVE, "name": "x"}))
         self.ctx = _build_context(_LEADER, self.repo_dir)
         self.ctx_dir = self.ctx.state_dir / "ctx"

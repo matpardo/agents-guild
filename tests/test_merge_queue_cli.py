@@ -169,7 +169,7 @@ class OutputTests(QueueCliTestCase):
         self.assertIn("qc/T01 [draft] [needs-ask-answer]", out)
 
     def test_party_with_no_open_prs_says_so(self):
-        self.run_cli(["party", "start", "epsilon"], "sess-5", self.repo_dir)
+        self.run_cli(["party", "start", "epsilon", "--reason", "test reason"], "sess-5", self.repo_dir)
         code, out, err = self.queue(["--party", "epsilon"], None)
         self.assertEqual(code, 0, err)
         self.assertIn("no open tracked PRs", out)
