@@ -1571,6 +1571,58 @@ class PreAnswerHookTests(GuildTestCase):
     def test_ask_creation_is_silent(self):
         self._assert_silent("sess-1", 'guild ask "question" --ref task:demo/T01')
 
+    def _assert_realm_denied(self, command):
+        code, out, err = self._bash("sess-1", command)
+        self.assertEqual(code, 0)
+        decision = json.loads(out)["hookSpecificOutput"]
+        self.assertEqual(decision["permissionDecision"], "deny")
+        self.assertIn("realm commands other than status", decision["permissionDecisionReason"])
+
+    def test_realm_commands_other_than_status_are_denied(self):
+        self._assert_realm_denied("guild realm send beta req.md")
+        self._assert_realm_denied("guild realm member add beta")
+        self._assert_realm_denied("python3 -m guild realm serve")
+        self._assert_realm_denied("cd /foo && guild realm init --bind 0.0.0.0 --port 1")
+
+    def test_realm_bypass_forms_are_denied(self):
+        for command in (
+            "python3 -u -m guild realm send b x",
+            "python3.12 -m guild realm member add b",
+            "python -m guild.cli realm serve",
+            "nohup guild realm serve",
+            "time guild realm serve",
+            "exec guild realm serve",
+            "echo x | xargs guild realm serve",
+            "xargs -n 1 guild realm serve",
+            "env FOO=1 guild realm serve",
+            "command guild realm serve",
+            "bash -lc 'guild realm serve'",
+            "sh -c \"python3 -m guild realm serve\"",
+            "(guild realm serve)",
+            "{ guild realm serve; }",
+            "echo hi | guild realm serve",
+            "true & guild realm serve",
+            "$(guild realm serve)",
+            "guild realm",
+        ):
+            self._assert_realm_denied(command)
+
+    def test_unparseable_realm_or_answer_is_denied(self):
+        code, out, err = self._bash("sess-1", "guild realm send 'oops")
+        self.assertEqual(json.loads(out)["hookSpecificOutput"]["permissionDecision"], "deny")
+        code, out, err = self._bash("sess-1", "guild answer 1 --answer 'oops")
+        self.assertEqual(json.loads(out)["hookSpecificOutput"]["permissionDecision"], "deny")
+        self._assert_silent("sess-1", "echo 'unterminated")
+
+    def test_realm_status_forms_are_silent(self):
+        self._assert_silent("sess-1", "python3 -u -m guild realm status")
+        self._assert_silent("sess-1", "nohup guild realm status")
+        self._assert_silent("sess-1", "bash -lc 'guild realm status'")
+
+    def test_realm_status_is_silent(self):
+        self._assert_silent("sess-1", "guild realm status")
+        self._assert_silent("sess-1", "echo guild realm send")
+
     def test_swallows_exceptions_as_system_message(self):
         with mock.patch("guild.commands.hook.pre_answer", side_effect=RuntimeError("boom")):
             code, out, err = self._bash("sess-1", "guild answer 1 --answer x")

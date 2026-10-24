@@ -562,6 +562,40 @@ def _handle_memory_rm(ctx, args):
     return 0
 
 
+def _handle_realm_init(ctx, args):
+    from guild.commands import realm as realm_commands
+
+    _print(realm_commands.init(args.bind, args.port, os.environ.get("CLAUDECODE")))
+    return 0
+
+
+def _handle_realm_serve(ctx, args):
+    from guild.commands import realm as realm_commands
+
+    return realm_commands.serve(os.environ.get("CLAUDECODE"))
+
+
+def _handle_realm_member_add(ctx, args):
+    from guild.commands import realm as realm_commands
+
+    _print(realm_commands.member_add(args.name, os.environ.get("CLAUDECODE")))
+    return 0
+
+
+def _handle_realm_member_list(ctx, args):
+    from guild.commands import realm as realm_commands
+
+    _print_lines(realm_commands.member_list(os.environ.get("CLAUDECODE")))
+    return 0
+
+
+def _handle_realm_member_remove(ctx, args):
+    from guild.commands import realm as realm_commands
+
+    _print(realm_commands.member_remove(args.name, os.environ.get("CLAUDECODE")))
+    return 0
+
+
 def _handle_raid_join(ctx, args):
     from guild.commands import raid as raid_commands
 
@@ -1131,6 +1165,33 @@ def _add_adventurer_parser(subparsers):
     dismiss.set_defaults(handler=_handle_adventurer_dismiss)
 
 
+def _add_realm_parser(subparsers):
+    parser = subparsers.add_parser("realm", help="run a realm hub and manage its members")
+    actions = parser.add_subparsers(dest="realm_action", required=True, metavar="<subcommand>")
+
+    init = actions.add_parser("init", help="create the hub config and a pinned self-signed certificate")
+    init.add_argument("--bind", required=True)
+    init.add_argument("--port", type=int, required=True)
+    init.set_defaults(handler=_handle_realm_init)
+
+    serve = actions.add_parser("serve", help="serve the realm hub over https")
+    serve.set_defaults(handler=_handle_realm_serve)
+
+    member = actions.add_parser("member", help="add, list or remove hub members")
+    member_actions = member.add_subparsers(dest="member_action", required=True, metavar="<subcommand>")
+
+    member_add = member_actions.add_parser("add", help="add a member and print its token once")
+    member_add.add_argument("name")
+    member_add.set_defaults(handler=_handle_realm_member_add)
+
+    member_list = member_actions.add_parser("list", help="list member names")
+    member_list.set_defaults(handler=_handle_realm_member_list)
+
+    member_remove = member_actions.add_parser("remove", help="remove a member and its status")
+    member_remove.add_argument("name")
+    member_remove.set_defaults(handler=_handle_realm_member_remove)
+
+
 def _add_memory_parser(subparsers):
     parser = subparsers.add_parser("memory", help="add, list or remove items in a party's memory")
     actions = parser.add_subparsers(dest="memory_action", required=True, metavar="<subcommand>")
@@ -1313,6 +1374,8 @@ def build_parser():
     claims.set_defaults(handler=_handle_claims)
 
     _add_memory_parser(subparsers)
+
+    _add_realm_parser(subparsers)
 
     _add_raid_parser(subparsers)
 

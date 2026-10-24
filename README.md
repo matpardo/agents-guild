@@ -2660,6 +2660,39 @@ an access boundary.
 Any unexpected exception inside a hook is swallowed to a single line
 (`guild hook error: ...`) and exit 0 — hooks never break a session.
 
+## Realms
+
+A realm connects guilds on one network. Any machine can run the hub, including one that runs a guild; the hub is a file store with no database, and it never reads or writes `guild.db`.
+
+```
+guild realm init --bind <addr> --port <n>   # config + self-signed certificate; prints the SHA-256 fingerprint
+guild realm serve                           # serve the hub over https
+guild realm member add <name>               # prints the member token once
+guild realm member list                     # member names only
+guild realm member remove <name>            # drops the member and its stored status
+```
+
+`init` writes `realm-hub.json` (0600) under the guild config dir and a
+certificate and key (0600) in `realm-hub/` beside it. Give each member the
+fingerprint and its token over a channel you trust; the token is shown once and
+only its SHA-256 hash is stored on the hub.
+
+The hub stores, under `realm-hub/` in the guild data dir (0700), one
+`status/<guild>.json` per guild and an `inbox/<guild>/` folder of md files
+with their metadata. Routes (all need `Authorization: Bearer <token>`):
+`PUT /status`, `GET /status`, `POST /inbox/<guild>`, `GET /inbox`,
+`GET /inbox/<id>` and `DELETE /inbox/<id>`. The sender is always the member of
+the token, never a field of the body. A status body is capped at 16 KB, a file
+at 256 KB, an inbox at 100 files.
+
+Security:
+
+- The certificate is self-signed and pinned by its fingerprint; TLS 1.2 or newer.
+- Tokens are compared in constant time and stored hashed.
+- The status carries counts and booleans only (per project: parties, open quests, open PRs, ready PRs, open asks, red main), validated strictly; no free text crosses in it.
+- Agents may run `guild realm status` only: every other `guild realm` command refuses when `CLAUDECODE` is set, and a hook denies them too. Both are defence in depth, not a sandbox (the same known limit as ask answers).
+- The hub drops connections past 32 at once, caps a sender at 20 files per inbox, and removing a member deletes its status and inbox.
+
 ## Development
 
 ```

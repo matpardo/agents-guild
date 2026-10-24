@@ -6,7 +6,7 @@ _NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
 
 
 def validate_name(value, field_name):
-    if _NAME_RE.match(value) is None or ".." in value:
+    if _NAME_RE.fullmatch(value) is None or ".." in value:
         raise GuildError(
             "invalid {} '{}': must match {} and must not contain '..'".format(
                 field_name, value, _NAME_RE.pattern
