@@ -3,7 +3,7 @@ epic: install-and-update
 type: tasks
 title: Versioned install and self-update
 status: active
-updated: 2026-10-21
+updated: 2026-10-24
 ---
 
 # Tasks: Versioned install and self-update
@@ -84,3 +84,10 @@ updated: 2026-10-21
 **Status:** [x] done — #196
 
 **What:** The SDD task of a PR lands already `[x] done — #<pr>` in the same single commit as the change: the PR is opened first, then the commit is amended with its number and force-pushed. No second commit, no follow-up PR.
+
+## T12 — Run the test suite in CI
+
+**Depends on:** —
+**Status:** [x] done — #212
+
+**What:** A GitHub Actions workflow runs `TMPDIR=/dev/shm python3 tests/run_parallel.py` on Python 3.10 for every pull request and every push to `main`, with node present so the web harness tests run. Tests carry their own git identity, so the suite passes on a runner with no global git config. A PR merges only once its checks are green and the local suite passed (the repository plan has no branch protection, so this is a rule, not a setting).
