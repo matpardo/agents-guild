@@ -45,7 +45,7 @@ _VIEWS_BOARD = dict(
 
 _PANE_IDS = {
     "asks", "ready-for-you", "answered-asks", "notices", "ideas", "adventurers", "health-jobs",
-    "memory", "raids", "drift", "projects", "quest-board", "merge-queues", "parties",
+    "memory", "raids", "drift", "projects", "quest-board", "merge-queues", "parties", "realm",
 }
 
 
@@ -133,7 +133,7 @@ class WebViewBehaviorTests(unittest.TestCase):
             "#adventurers": {"adventurers", "health-jobs"},
             "#ideas": {"ideas"},
             "#quests": {"quest-board"},
-            "#overview": {"notices", "raids", "drift", "projects"},
+            "#overview": {"notices", "raids", "drift", "projects", "realm"},
             "#raid/r": {"asks", "merge-queues", "parties", "memory"},
         }
         for hash_value, ids in shown.items():

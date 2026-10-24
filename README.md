@@ -2716,6 +2716,13 @@ asks and whether main is red (a main blocked only by billing does not count).
 
 or a systemd user timer with `OnUnitActiveSec=5min` running `guild realm push`.
 
+The web board shows a Realm panel in the overview view once `realm.json`
+exists: per guild, how long ago it was last seen and, per project, the counts
+with a red marker when main is red. It reads the cached status, never the
+network; its Refresh button runs the same call as `guild realm status` and
+redraws the panel, showing the error text when the hub is unreachable or its
+fingerprint changed.
+
 Security:
 
 - The certificate is self-signed and pinned by its fingerprint; TLS 1.2 or newer.

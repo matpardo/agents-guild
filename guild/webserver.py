@@ -21,6 +21,7 @@ from guild.commands import memory as memory_commands
 from guild.commands import notice as notice_commands
 from guild.commands import pr as pr_commands
 from guild.commands import raid_pause as raid_pause_commands
+from guild.commands import realm as realm_commands
 from guild.commands import task as task_commands
 from guild.errors import GuildError
 from guild.resources import report as resources_report
@@ -50,6 +51,7 @@ _QUEST_ACTION_RE = re.compile(r"^/api/quests/([^/]+)/(take|release)$")
 _QUEST_CREATE_PATH = "/api/quests/create-open"
 _ADVENTURER_DISMISS_RE = re.compile(r"^/api/adventurers/([^/]+)/dismiss$")
 _COMPACT_PATH = "/api/compact"
+_REALM_REFRESH_PATH = "/api/realm/refresh"
 _SEEN_ALL_PATH = "/api/notices/seen-all"
 _NOTICE_CREATE_PATH = "/api/notices/create"
 _ANSWERED_ASKS_PATH = "/api/asks/answered"
@@ -260,6 +262,14 @@ def _run_compact():
         ctx.conn.close()
 
 
+def _run_realm_refresh():
+    ctx = _action_context()
+    try:
+        return realm_commands.realm_status_model(ctx)
+    finally:
+        ctx.conn.close()
+
+
 def _run_task_move_action(quest, tid, payload):
     ctx = _action_context()
     try:
@@ -408,18 +418,21 @@ class BoardRequestHandler(http_server.BaseHTTPRequestHandler):
         return payload
 
     def _post_action(self, action, run):
+        return self._post_payload(action, lambda payload: {"ok": True, "message": run(payload)})
+
+    def _post_payload(self, action, build):
         try:
             self._check_write_headers()
             payload = self._read_action_payload(action)
         except _RequestRejected as rejected:
             return self._write_json(rejected.status, {"error": rejected.message})
         try:
-            message = run(payload)
+            body = build(payload)
         except GuildError as error:
             return self._write_json(422, {"error": error.message})
         except sqlite3.Error as error:
             return self._write_json(500, {"error": str(error)})
-        return self._write_json(200, {"ok": True, "message": message})
+        return self._write_json(200, body)
 
     def _route_post(self):
         path = urlsplit(self.path).path
@@ -465,6 +478,8 @@ class BoardRequestHandler(http_server.BaseHTTPRequestHandler):
             )
         if path == _COMPACT_PATH:
             return self._post_action("compact", lambda payload: _run_compact())
+        if path == _REALM_REFRESH_PATH:
+            return self._post_payload("realm-refresh", lambda payload: dict(_run_realm_refresh(), ok=True))
         if path == _SEEN_ALL_PATH:
             return self._post_action("seen-all", lambda payload: _run_seen_all())
         memory_match = _MEMORY_ACTION_RE.match(path)

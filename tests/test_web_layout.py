@@ -19,7 +19,7 @@ class BoardLayoutTests(unittest.TestCase):
     def test_pane_holds_every_section_in_view_order(self):
         self.assertEqual(
             _pane_sections(self.html),
-            ["asks", "ready-for-you", "answered-asks", "merge-queues", "parties", "memory", "adventurers", "health-jobs", "ideas", "quest-board", "notices", "raids", "drift", "projects"],
+            ["asks", "ready-for-you", "answered-asks", "merge-queues", "parties", "memory", "adventurers", "health-jobs", "ideas", "quest-board", "notices", "raids", "drift", "projects", "realm"],
         )
 
     def test_sidebar_sits_beside_the_pane(self):

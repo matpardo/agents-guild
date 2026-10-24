@@ -16,7 +16,9 @@ from guild.commands import next as next_commands
 from guild.commands import notice as notice_commands
 from guild.commands import project_status
 from guild.commands import raid as raid_commands
+from guild.commands import realm as realm_commands
 from guild.errors import GuildError
+from guild.realm import clientconfig
 
 _ANSWERED_PAGE_SIZE = 10
 
@@ -1185,6 +1187,15 @@ def _raid_models(conn, now):
     return [_raid_model(conn, raid_name, grouped[raid_name]) for raid_name in sorted(grouped)]
 
 
+def _realm_model():
+    if not clientconfig.exists():
+        return None
+    try:
+        return realm_commands.cached_status_model()
+    except GuildError:
+        return {"fetched_at": None, "guilds": [], "dropped": 0}
+
+
 def board_model(ctx):
     party_rows = ctx.conn.execute(
         "SELECT * FROM parties WHERE state != 'closed' ORDER BY name ASC"
@@ -1223,5 +1234,6 @@ def board_model(ctx):
         "projects": _project_models(ctx, party_rows, projects_by_name),
         "project_names": sorted(projects_by_name),
         "quest_boards": quest_board.models(ctx, projects_by_name),
+        "realm": _realm_model(),
     }
 
