@@ -227,6 +227,26 @@ main {
   color: var(--bg);
 }
 
+#sidebar .needs-asks {
+  background: var(--lifecycle-needs-ask-answer-bg);
+  color: var(--lifecycle-needs-ask-answer-fg);
+}
+
+#sidebar .needs-ready {
+  background: var(--lifecycle-ready-bg);
+  color: var(--lifecycle-ready-fg);
+}
+
+#sidebar .needs-blocked {
+  background: var(--lifecycle-blocked-external-bg);
+  color: var(--lifecycle-blocked-external-fg);
+}
+
+#sidebar .needs-ctx-high {
+  background: var(--lifecycle-converging-bg);
+  color: var(--lifecycle-converging-fg);
+}
+
 #sidebar h3 {
   margin: 0.75rem 0 0.25rem 0;
   font-size: 0.9rem;

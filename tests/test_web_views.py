@@ -111,6 +111,14 @@ class WebViewBehaviorTests(unittest.TestCase):
         self.assertIn("adventurers (1)", text)
         self.assertIn("overview (3 new)", text)
 
+    def test_needs_you_counts_above_zero_are_pills_by_type(self):
+        board = dict(_VIEWS_BOARD, asks=[{"party": "a"}], ready_for_you=[], blocked=[{}, {}])
+        nodes = _walk(json.loads(_render(board, "", "sidebar", "tree")), [])
+        pairs = [(node["text"], node["className"]) for node in nodes]
+        for pair in (("1 asks", "pill needs-asks"), ("2 blocked", "pill needs-blocked"), ("0 ready", "muted"), ("0 context high", "muted")):
+            with self.subTest(pair=pair):
+                self.assertIn(pair, pairs)
+
     def test_needs_you_is_the_default_for_empty_and_unknown_hashes(self):
         expected = _PANE_IDS - {"asks", "ready-for-you", "answered-asks"}
         for hash_value in ("", "#nonsense", "#party", "#party/"):

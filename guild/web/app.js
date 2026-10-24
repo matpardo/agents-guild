@@ -1,7 +1,7 @@
 (function () {
   "use strict";
 
-  var REFRESH_INTERVAL_MS = 15000;
+  var REFRESH_INTERVAL_MS = 10000;
   var BOARD_URL = "/api/board";
   var SESSION_URL = "/api/session";
   var RESOURCES_URL = "/api/resources";
@@ -3231,13 +3231,21 @@ var NO_SESSION_MESSAGE = "session token not loaded, reload the page";
     return group;
   }
 
-  function sidebarNeedsText(model) {
-    return [
-      model.asks + " asks",
-      model.ready + " ready",
-      model.blocked + " blocked",
-      model.ctxHigh + " context high",
-    ].join(" · ");
+  function needsCount(count, label, type) {
+    var text = count + " " + label;
+    return count > 0 ? classedText("span", text, "pill needs-" + type) : classedText("span", text, "muted");
+  }
+
+  function sidebarNeedsCounts(model) {
+    var counts = el("div");
+    counts.className = "sidebar-badges";
+    appendAll(counts, [
+      needsCount(model.asks, "asks", "asks"),
+      needsCount(model.ready, "ready", "ready"),
+      needsCount(model.blocked, "blocked", "blocked"),
+      needsCount(model.ctxHigh, "context high", "ctx-high"),
+    ]);
+    return counts;
   }
 
   function renderSidebar(model, currentHash) {
@@ -3245,7 +3253,7 @@ var NO_SESSION_MESSAGE = "session token not loaded, reload the page";
     clear(nav);
     var top = el("ul");
     var needs = sidebarItem(sidebarLink("needs-you", "needs you", currentHash));
-    needs.appendChild(classedText("p", sidebarNeedsText(model), "muted"));
+    needs.appendChild(sidebarNeedsCounts(model));
     top.appendChild(needs);
     appendAll(
       top,
