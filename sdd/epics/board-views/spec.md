@@ -2,7 +2,7 @@
 epic: board-views
 type: spec
 title: Sidebar and views on the web board
-status: active
+status: done
 owner: matpardo
 created: 2026-10-23
 updated: 2026-10-23
