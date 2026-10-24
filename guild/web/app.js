@@ -2782,44 +2782,88 @@ var NO_SESSION_MESSAGE = "session token not loaded, reload the page";
     return (value < 0 ? "-" : "+") + formatBytes(Math.abs(value));
   }
 
-  function resourceDelta(entry, hasBaseline) {
+  var DISK_WARN_PERCENT = 70;
+  var DISK_BAD_PERCENT = 85;
+  var RAM_BAD_RATIO = 0.1;
+  var RAM_WARN_RATIO = 0.25;
+
+  function pill(text, tone) {
+    return classedText("span", text, "pill res-" + tone);
+  }
+
+  function deltaPill(text, value) {
+    if (value === null) {
+      return pill(text, "dim");
+    }
+    return pill(text, value > 0 ? "warn" : "ok");
+  }
+
+  function diskTone(percent) {
+    if (percent >= DISK_BAD_PERCENT) {
+      return "bad";
+    }
+    return percent >= DISK_WARN_PERCENT ? "warn" : "ok";
+  }
+
+  function ramTone(machine) {
+    if (machine.mem_available < machine.mem_total * RAM_BAD_RATIO) {
+      return "bad";
+    }
+    return machine.mem_available < machine.mem_total * RAM_WARN_RATIO ? "warn" : "ok";
+  }
+
+  function diskText(machine) {
+    return "disk " + machine.disk_percent + "% used (" + formatBytes(machine.disk_used) + " of " + formatBytes(machine.disk_total) + ")";
+  }
+
+  function resourceDeltaPill(entry, hasBaseline) {
     if (!hasBaseline) {
-      return "";
+      return null;
     }
     if (entry.new) {
-      return "new";
+      return pill("new", "warn");
     }
-    return signedBytes(entry.delta_bytes);
+    return deltaPill(signedBytes(entry.delta_bytes), entry.delta_bytes);
   }
 
   function renderResourceItem(entry, hasBaseline) {
     var row = el("li");
     row.appendChild(textEl("code", entry.item));
-    row.appendChild(textEl("span", " " + formatBytes(entry.bytes)));
-    var delta = resourceDelta(entry, hasBaseline);
+    row.appendChild(textEl("span", " " + formatBytes(entry.bytes) + " "));
+    var delta = resourceDeltaPill(entry, hasBaseline);
     if (delta) {
-      row.appendChild(textEl("span", " " + delta));
+      row.appendChild(delta);
+    }
+    if (entry.state !== "ok") {
+      row.appendChild(pill(entry.state, "dim"));
     }
     if (entry.flag) {
-      row.appendChild(explain(textEl("span", " " + (RESOURCE_FLAG_LABELS[entry.flag] || entry.flag)), "resourceFlag", entry.flag));
+      row.appendChild(explain(pill(RESOURCE_FLAG_LABELS[entry.flag] || entry.flag, "warn"), "resourceFlag", entry.flag));
     }
     return row;
   }
 
-  function resourceCategoryText(category, hasBaseline) {
+  function renderResourceCategoryHeading(category, hasBaseline) {
+    var heading = el("h4");
     if (category.category === "docker") {
-      return category.category + " " + category.state + " (" + category.detail + ")";
+      heading.appendChild(textEl("span", "docker "));
+      heading.appendChild(pill(category.state, "dim"));
+      heading.appendChild(textEl("span", " (" + category.detail + ")"));
+      return heading;
     }
-    var text = category.category + " " + formatBytes(category.bytes);
+    heading.appendChild(textEl("span", category.category + " " + formatBytes(category.bytes) + " "));
     if (hasBaseline && category.delta_bytes !== null) {
-      text += " (" + signedBytes(category.delta_bytes) + ")";
+      heading.appendChild(deltaPill(signedBytes(category.delta_bytes), category.delta_bytes));
     }
-    return text;
+    if (category.state !== "ok") {
+      heading.appendChild(pill(category.state, "dim"));
+    }
+    return heading;
   }
 
   function renderResourceCategory(project, category, hasBaseline) {
     var wrapper = el("div");
-    wrapper.appendChild(explain(textEl("h4", resourceCategoryText(category, hasBaseline)), "resourceCategory", category.category));
+    wrapper.appendChild(explain(renderResourceCategoryHeading(category, hasBaseline), "resourceCategory", category.category));
     var items = project.items.filter(function (entry) {
       return entry.category === category.category;
     });
@@ -2837,16 +2881,17 @@ var NO_SESSION_MESSAGE = "session token not loaded, reload the page";
     return wrapper;
   }
 
-  function resourceHeadline(label, project) {
+  function renderResourceHeadline(label, project) {
     var hasBaseline = project.baseline_at !== null;
-    var text = label + " total " + formatBytes(project.total_bytes);
+    var summary = el("summary");
+    summary.appendChild(textEl("span", label + " total " + formatBytes(project.total_bytes) + " "));
     if (hasBaseline && project.delta_bytes !== null) {
-      text += " (" + signedBytes(project.delta_bytes) + ")";
+      summary.appendChild(deltaPill(signedBytes(project.delta_bytes), project.delta_bytes));
     }
     if (!hasBaseline) {
-      text += " no earlier sample";
+      summary.appendChild(textEl("span", "no earlier sample"));
     }
-    return text;
+    return summary;
   }
 
   function renderResourceProject(label, project) {
@@ -2856,7 +2901,7 @@ var NO_SESSION_MESSAGE = "session token not loaded, reload the page";
     details.addEventListener("toggle", function () {
       state.openResourceProjects[label] = details.open;
     });
-    details.appendChild(textEl("summary", resourceHeadline(label, project)));
+    details.appendChild(renderResourceHeadline(label, project));
     var hasBaseline = project.baseline_at !== null;
     project.categories.forEach(function (category) {
       details.appendChild(renderResourceCategory(project, category, hasBaseline));
@@ -2870,30 +2915,49 @@ var NO_SESSION_MESSAGE = "session token not loaded, reload the page";
     return details;
   }
 
-  function resourceMachineLines(machine, since) {
-    var lines = [];
-    var disk = "disk n/a";
-    if (machine.disk_percent !== null) {
-      disk = "disk " + machine.disk_percent + "% used (" + formatBytes(machine.disk_used) + " of " + formatBytes(machine.disk_total);
-      if (machine.disk_delta !== null) {
-        disk += ", " + signedBytes(machine.disk_delta) + " in " + since;
-      }
-      disk += ")";
+  function diskPill(machine) {
+    if (machine.disk_percent === null) {
+      return pill("disk n/a", "dim");
     }
-    var ram = "ram n/a";
-    if (machine.mem_available !== null) {
-      ram = "ram " + formatBytes(machine.mem_available) + " available of " + formatBytes(machine.mem_total);
+    return pill(diskText(machine), diskTone(machine.disk_percent));
+  }
+
+  function ramPill(machine) {
+    if (machine.mem_available === null) {
+      return pill("ram n/a", "dim");
     }
-    var docker = "docker n/a";
-    if (machine.docker !== null) {
-      docker = "docker " + formatBytes(machine.docker.total) + " (reclaimable " + formatBytes(machine.docker.images_reclaimable) + ")";
+    return pill("ram " + formatBytes(machine.mem_available) + " available of " + formatBytes(machine.mem_total), ramTone(machine));
+  }
+
+  function dockerPill(machine) {
+    if (machine.docker === null) {
+      return pill("docker n/a", "dim");
     }
-    lines.push(disk + " \u00b7 " + ram);
-    lines.push(docker + " \u00b7 guild.db " + formatBytes(machine.guild_db_bytes));
+    var text = "docker " + formatBytes(machine.docker.total) + " (reclaimable " + formatBytes(machine.docker.images_reclaimable) + ")";
+    return pill(text, machine.docker.images_reclaimable > 0 ? "warn" : "ok");
+  }
+
+  function resourceMachinePills(machine, since) {
+    var pills = [diskPill(machine)];
+    if (machine.disk_delta !== null) {
+      pills.push(deltaPill(signedBytes(machine.disk_delta) + " in " + since, machine.disk_delta));
+    }
+    pills.push(ramPill(machine));
+    pills.push(dockerPill(machine));
+    pills.push(pill("guild.db " + formatBytes(machine.guild_db_bytes), "dim"));
     if (machine.untracked_growth !== null) {
-      lines.push("untracked growth: " + signedBytes(machine.untracked_growth));
+      pills.push(deltaPill("untracked growth: " + signedBytes(machine.untracked_growth), machine.untracked_growth));
     }
-    return lines;
+    return pills;
+  }
+
+  function renderSidebarResources(model) {
+    var target = document.getElementById("sidebar-resources");
+    clear(target);
+    if (model.machine === null || model.machine.disk_percent === null) {
+      return;
+    }
+    target.appendChild(pill("disk " + model.machine.disk_percent + "%", diskTone(model.machine.disk_percent)));
   }
 
   function renderResourceProjects(model) {
@@ -2933,14 +2997,17 @@ var NO_SESSION_MESSAGE = "session token not loaded, reload the page";
     state.resourcesModel = model;
     var section = document.getElementById("resources");
     clear(section);
+    renderSidebarResources(model);
     section.appendChild(textEl("h2", "resources"));
     if (model.machine === null) {
       section.appendChild(textEl("p", NO_RESOURCES_MESSAGE));
       return;
     }
-    resourceMachineLines(model.machine, model.since).forEach(function (line) {
-      section.appendChild(textEl("p", line));
+    var pills = classedText("div", "", "res-pills");
+    resourceMachinePills(model.machine, model.since).forEach(function (machinePill) {
+      pills.appendChild(machinePill);
     });
+    section.appendChild(pills);
     section.appendChild(classedText("p", "sampled at " + model.machine.sampled_at, "muted"));
     section.appendChild(renderCompactControls());
     section.appendChild(renderResourceProjects(model));

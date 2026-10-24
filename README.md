@@ -644,6 +644,11 @@ the sync timer (same rules as `guild sync-timer`; `print` only prints them).
 The service runs at `Nice=19` and `IOSchedulingClass=idle`. Every 2 hours is
 the recommended cadence.
 
+The web board shows the same values as coloured pills (disk green under 70%,
+amber under 85%, red above; RAM red under 10% available; growth amber, shrink or
+no change green; unmeasured values grey) and a disk pill in the sidebar. The
+report itself still has no thresholds.
+
 What is measured:
 
 | Category | Source | Attributed to |

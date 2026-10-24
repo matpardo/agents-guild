@@ -161,6 +161,40 @@ main {
   max-width: none;
 }
 
+.res-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+}
+
+.header-resources h2 {
+  margin: 0.25rem 0;
+}
+
+.header-resources p {
+  margin: 0.25rem 0;
+}
+
+.res-ok {
+  background: var(--lifecycle-ready-bg);
+  color: var(--lifecycle-ready-fg);
+}
+
+.res-warn {
+  background: var(--lifecycle-converging-bg);
+  color: var(--lifecycle-converging-fg);
+}
+
+.res-bad {
+  background: var(--lifecycle-fixes-main-bg);
+  color: var(--lifecycle-fixes-main-fg);
+}
+
+.res-dim {
+  background: var(--lifecycle-draft-bg);
+  color: var(--lifecycle-draft-fg);
+}
+
 .pane {
   display: flex;
   flex-direction: column;
@@ -219,7 +253,7 @@ main {
     gap: 1.5rem;
   }
 
-  #sidebar {
+  .sidebar-column {
     position: sticky;
     top: 0.5rem;
   }

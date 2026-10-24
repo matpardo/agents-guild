@@ -2,7 +2,7 @@
 epic: board-views
 type: tasks
 title: Sidebar and views on the web board
-status: active
+status: done
 updated: 2026-10-23
 ---
 
@@ -21,3 +21,10 @@ updated: 2026-10-23
 **Status:** [x] done — #210
 
 **What:** `guild/web/app.js`, `app.css`: each sidebar party row shows its state badge, an open-ask count, the work left and `stopped without report`; parties sort by attention inside each group; a raid header shows its worst member state; `.status-queued` gets a blue colour.
+
+## T03 — Colour resource values
+
+**Depends on:** T01
+**Status:** [x] done — #211
+
+**What:** `guild/web/app.js`, `app.css`, `index.html`: resource values on the web board are coloured pills (disk percent, RAM available, deltas, `new`, flags, unmeasured states) from named thresholds; the header machine summary is one wrapped line of pills; the sidebar shows a compact disk pill.
