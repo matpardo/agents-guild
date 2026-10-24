@@ -153,7 +153,8 @@ guild pr set   <owner/repo>#<n> [--lifecycle draft|converging|ready] [--waits ".
                                [--blocked-external "<reason>" | --no-blocked-external]
                                [--task <quest>/<tid>] [--card <KEY>]   # relink: the PR's own party or adventurer only; a party's task must be one of its own
 guild pr untrack <owner/repo>#<n>   # stop tracking: drops the PR row and its drift findings; own PR only
-guild pr ready-check <owner/repo>#<n>   # read-only: everything standing between the PR and a merge
+guild pr ready-check <owner/repo>#<n>   # refreshes the PR from gh, then lists everything standing between it and a merge; fails while review comments are unread
+guild pr ack <owner/repo>#<n>   # mark the PR's review comments as read
 guild pr wait <owner/repo>#<n> [--timeout <dur>]   # block until a comment or review by another author, checks finished, merge or close; exit 0 on a change, 3 on timeout, 4 when no sync ran for 30m
 
 guild finding list                              # finding classes of the project with PR counts
@@ -925,12 +926,16 @@ flag, a bound session uses its raid when its party is in exactly one, errors
 listing them when it is in several, and uses its own party when it is in
 none; a human terminal (or an unbound session) must pass a flag.
 
-**Ready check.** `guild pr ready-check <owner/repo>#<n>` computes the queue
+**Ready check.** `guild pr ready-check <owner/repo>#<n>` first refreshes that
+one PR from GitHub (the same refresh as `guild sync --source gh`, merge side
+effects included); when `gh` fails it adds `- note: state as of last sync` and
+keeps the stored state. It then computes the queue
 over every open tracked PR (cross-party stacks, pins and task dependencies
 count) and prints `<ref> <human state>` (`ready`, `ready (CI pending)`,
 `waiting` or `blocked`), then one `- <blocker>` line per blocker, one
 `- <missing>` line per missing item, `- wait: <x>` per wait, `- gate: ...` per
-gate (draft with the `gh pr ready <n>` hint, needs human review, main red) and
+gate (draft with the `gh pr ready <n>` hint, needs human review, `N review
+comments since last read`, main red) and
 `- note: <x>` per note. A PR is human-ready when it is not draft, has no
 unresolved thread, no comment or review by another author after the head
 commit (unknown counts as none), a valid review trace when the project
@@ -939,7 +944,10 @@ configures a validator and green CI on the head. `- review trace invalid:
 it `waiting`. Without any check on
 the head it is `ready (CI pending)` when the project's CI label is absent from
 the PR or main is blocked by billing, otherwise `waiting` with `- no checks on
-head`. It exits 0 only when the action is `merge`, the state is `ready` or
+head`. Unread comments are the PR's comments and reviews that no `guild next`
+or `guild pr ack <owner/repo>#<n>` has marked as read; read them, then ack. The
+web queue detail shows the same gate and a `Mark N comments read` button (it
+never calls `gh`). It exits 0 only when the action is `merge`, the state is `ready` or
 `ready (CI pending)` and there is no gate, else 1. The merge queue order does
 not include human-ready: it only decides the sequence, and `guild
 merge-queue` with `--head` still order and name PRs by the queue state and

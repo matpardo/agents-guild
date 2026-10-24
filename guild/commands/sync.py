@@ -553,6 +553,35 @@ def _prune_handoffs(ctx, failures):
         failures.append("handoff prune failed: {}".format(error))
 
 
+def _refresh_row(ctx, projects, row, failures, lifecycle_runner):
+    try:
+        lifecycle = _sync_pr(ctx, projects, row, failures, lifecycle_runner)
+    except github.GhCommandError as error:
+        failures.append("{}#{}: {}".format(row["repo"], row["number"], error))
+        return False, None
+    merged = _became_merged(row, lifecycle)
+    if merged:
+        _handle_merge(ctx, projects, row, failures)
+    return merged, _lifecycle_trigger(row, lifecycle)
+
+
+def refresh_pr(ctx, repo, number, lifecycle_runner):
+    row = ctx.conn.execute(
+        "SELECT * FROM prs WHERE repo = ? AND number = ? AND lifecycle NOT IN ('merged', 'closed')",
+        (repo, number),
+    ).fetchone()
+    if row is None:
+        return []
+    failures = []
+    projects = config.load_all_projects(ctx.projects_dir)
+    merged, trigger = _refresh_row(ctx, projects, row, failures, lifecycle_runner)
+    if merged:
+        _fast_forward_merged_bases_mutating_git(ctx, projects, {repo})
+    triggers = [] if trigger is None else [trigger]
+    lifecycle_commands.run_sync_triggers(ctx, projects, triggers, lifecycle_runner)
+    return failures
+
+
 def _sync_gh(ctx, lifecycle_runner):
     rows = ctx.conn.execute(
         "SELECT * FROM prs WHERE lifecycle NOT IN ('merged', 'closed')"
@@ -562,15 +591,9 @@ def _sync_gh(ctx, lifecycle_runner):
     merged_repos = set()
     triggers = []
     for row in rows:
-        try:
-            lifecycle = _sync_pr(ctx, projects, row, failures, lifecycle_runner)
-        except github.GhCommandError as error:
-            failures.append("{}#{}: {}".format(row["repo"], row["number"], error))
-            continue
-        if _became_merged(row, lifecycle):
-            _handle_merge(ctx, projects, row, failures)
+        merged, trigger = _refresh_row(ctx, projects, row, failures, lifecycle_runner)
+        if merged:
             merged_repos.add(row["repo"])
-        trigger = _lifecycle_trigger(row, lifecycle)
         if trigger is not None:
             triggers.append(trigger)
     _fast_forward_merged_bases_mutating_git(ctx, projects, merged_repos)

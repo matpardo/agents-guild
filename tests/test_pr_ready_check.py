@@ -88,7 +88,46 @@ class ReadyCheckTests(MergeQueueTestCase):
         self.sync_gh("sess-1")
         code, out, err = self.check(3)
         self.assertEqual(code, 1)
-        self.assertEqual(out.splitlines(), ["acme/app#3 blocked", "- 1 comment after head"])
+        self.assertEqual(
+            out.splitlines(),
+            ["acme/app#3 blocked", "- 1 comment after head",
+             "- gate: 1 review comment since last read (guild pr ack acme/app#3)"],
+        )
+
+    def _comment_view(self, count):
+        comments = [{"author": {"login": "bot"}, "createdAt": "2026-10-20T11:00:00Z"} for _ in range(count)]
+        return dict(OPEN_VIEW, author={"login": "me"}, comments=comments)
+
+    def test_unseen_comments_gate_then_ack_clears(self):
+        self.track("sess-1", 3, "qa/T03", "ready")
+        self.write_gh_fixture("view_acme-app_3", dict(OPEN_VIEW, commits=[{"committedDate": "2026-10-20T10:00:00Z"}]))
+        self.sync_gh("sess-1")
+        self.assertEqual(self.check(3)[:2], (0, "acme/app#3 ready\n"))
+        view = dict(self._comment_view(2), commits=[{"committedDate": "2026-10-21T10:00:00Z"}])
+        self.write_gh_fixture("view_acme-app_3", view)
+        code, out, err = self.check(3)
+        self.assertEqual(code, 1)
+        self.assertIn("- gate: 2 review comments since last read (guild pr ack acme/app#3)", out.splitlines())
+        code, out, err = self.run_cli(["pr", "ack", "acme/app#3"], "sess-1", self.repo_dir)
+        self.assertEqual((code, out), (0, "PR 'acme/app#3' review comments marked as read\n"))
+        self.assertEqual(self.check(3)[:2], (0, "acme/app#3 ready\n"))
+
+    def test_new_comments_after_last_sync_are_found_by_the_refresh(self):
+        self.track("sess-1", 3, "qa/T03", "ready")
+        self.write_gh_fixture("view_acme-app_3", self._comment_view(0))
+        self.sync_gh("sess-1")
+        self.assertEqual(self.query("SELECT review_comment_count AS n FROM prs")[0]["n"], 0)
+        self.write_gh_fixture("view_acme-app_3", self._comment_view(1))
+        code, out, err = self.check(3)
+        self.assertEqual(code, 1)
+        self.assertIn("- gate: 1 review comment since last read (guild pr ack acme/app#3)", out.splitlines())
+
+    def test_gh_failure_keeps_the_synced_state_with_a_note(self):
+        self.track("sess-1", 3, "qa/T03", "ready")
+        self.sync_gh("sess-1")
+        self.write_gh_error("view_acme-app_3", "boom")
+        code, out, err = self.check(3)
+        self.assertEqual((code, out), (0, "acme/app#3 ready\n- note: state as of last sync\n"))
 
     def _configure_validator(self, code):
         init_clone(self.repo_dir, "acme/app")
@@ -187,6 +226,7 @@ def _entry(lifecycle, labels):
     return {
         "lifecycle": lifecycle, "labels": labels, "number": 7, "repo": "acme/app",
         "checks_billing": 0, "checks_failing": 0, "checks_passing": 0, "checks_pending": 0, "ci_label": None, "human_state": "ready",
+        "unseen_comments": 0, "ref": "acme/app#7",
     }
 
 
@@ -200,6 +240,14 @@ class GatesTests(unittest.TestCase):
     def test_draft_and_converging_hint_the_promote_command(self):
         for lifecycle in ("draft", "converging"):
             self.assertEqual(merge_queue.gates(self.entry(lifecycle, []), []), ["draft (gh pr ready 7)"])
+
+    def test_unseen_comments_gate_with_the_ack_hint(self):
+        entry = dict(self.entry("ready", []), unseen_comments=2)
+        self.assertEqual(
+            merge_queue.gates(entry, []), ["2 review comments since last read (guild pr ack acme/app#7)"]
+        )
+        entry = dict(entry, unseen_comments=1)
+        self.assertEqual(merge_queue.gates(entry, []), ["1 review comment since last read (guild pr ack acme/app#7)"])
 
     def test_human_review_label_gates(self):
         self.assertEqual(
