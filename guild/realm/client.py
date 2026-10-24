@@ -1,6 +1,7 @@
 import hmac
 import http.client
 import json
+import re
 import ssl
 from urllib.parse import urlsplit
 
@@ -9,6 +10,8 @@ from guild.realm import pin
 
 MAX_RESPONSE_BYTES = 2 * 1024 * 1024
 _TIMEOUT_SECONDS = 10
+_MAX_ERROR_LENGTH = 200
+_CONTROL_RE = re.compile(r"[\x00-\x1f\x7f-\x9f]")
 
 
 def parse_url(url):
@@ -83,5 +86,6 @@ def request(config, method, path, body):
         connection.close()
     if not 200 <= status_code < 300:
         message = payload.get("error")
-        raise GuildError("realm hub refused ({}): {}".format(status_code, message if isinstance(message, str) else "no reason"), 1)
+        reason = _CONTROL_RE.sub("", message)[:_MAX_ERROR_LENGTH] if isinstance(message, str) else "no reason"
+        raise GuildError("realm hub refused ({}): {}".format(status_code, reason), 1)
     return payload

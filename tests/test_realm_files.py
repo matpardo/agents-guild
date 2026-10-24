@@ -34,7 +34,9 @@ class RealmFilesTests(GuildTestCase):
         self.out = Path(self.root) / "out"
 
     def _join(self, member):
-        argv = ["realm", "join", self.url, "--fingerprint", self.fingerprint, "--guild", member, "--force"]
+        paths.global_config_path().parent.mkdir(parents=True, exist_ok=True)
+        paths.global_config_path().write_text(json.dumps({"name": member}))
+        argv = ["realm", "join", self.url, "--fingerprint", self.fingerprint, "--force"]
         with mock.patch("getpass.getpass", return_value=self.tokens[member]):
             code, out, err = self.run_cli(argv, None, self.root)
         self.assertEqual(code, 0, err)

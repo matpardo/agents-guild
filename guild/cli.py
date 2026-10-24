@@ -565,7 +565,7 @@ def _handle_memory_rm(ctx, args):
 def _handle_realm_init(ctx, args):
     from guild.commands import realm as realm_commands
 
-    _print(realm_commands.init(args.bind, args.port, os.environ.get("CLAUDECODE")))
+    _print(realm_commands.init(args.name, args.bind, args.port, os.environ.get("CLAUDECODE")))
     return 0
 
 
@@ -599,7 +599,7 @@ def _handle_realm_member_remove(ctx, args):
 def _handle_realm_join(ctx, args):
     from guild.commands import realm as realm_commands
 
-    _print(realm_commands.join(args.url, args.fingerprint, args.guild, args.force, os.environ.get("CLAUDECODE")))
+    _print(realm_commands.join(args.url, args.fingerprint, args.force, os.environ.get("CLAUDECODE")))
     return 0
 
 
@@ -1220,6 +1220,7 @@ def _add_realm_parser(subparsers):
     actions = parser.add_subparsers(dest="realm_action", required=True, metavar="<subcommand>")
 
     init = actions.add_parser("init", help="create the hub config and a pinned self-signed certificate")
+    init.add_argument("--name", required=True)
     init.add_argument("--bind", required=True)
     init.add_argument("--port", type=int, required=True)
     init.set_defaults(handler=_handle_realm_init)
@@ -1230,7 +1231,6 @@ def _add_realm_parser(subparsers):
     join = actions.add_parser("join", help="join a realm hub (token is read from the prompt)")
     join.add_argument("url")
     join.add_argument("--fingerprint", required=True)
-    join.add_argument("--guild", required=True)
     join.add_argument("--force", action="store_true")
     join.set_defaults(handler=_handle_realm_join)
 

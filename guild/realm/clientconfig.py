@@ -5,7 +5,7 @@ from guild import names, paths
 from guild.errors import GuildError
 from guild.realm import client, hubconfig
 
-_KEYS = frozenset(("url", "fingerprint", "guild", "token"))
+_KEYS = frozenset(("url", "fingerprint", "guild", "realm", "token"))
 _FINGERPRINT_RE = re.compile(r"(?:[0-9A-F]{2}:){31}[0-9A-F]{2}")
 
 
@@ -22,7 +22,7 @@ def normalize_fingerprint(raw):
 
 def problems(config):
     if not isinstance(config, dict) or set(config) != _KEYS:
-        return ["keys must be exactly url, fingerprint, guild, token"]
+        return ["keys must be exactly url, fingerprint, guild, realm, token (re-run `guild realm join --force`)"]
     found = [
         "{} must be a non-empty string".format(key)
         for key in sorted(_KEYS)
@@ -34,6 +34,7 @@ def problems(config):
         client.parse_url(config["url"])
         normalize_fingerprint(config["fingerprint"])
         names.validate_name(config["guild"], "guild name")
+        names.validate_name(config["realm"], "realm name")
     except GuildError as error:
         return [error.message]
     return []

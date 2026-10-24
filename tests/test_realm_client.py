@@ -35,8 +35,13 @@ class RealmClientTests(GuildTestCase):
         self.url = "https://127.0.0.1:{}".format(self.server.server_address[1])
         self.fingerprint = pin.cert_fingerprint(self.cert)
 
+    def _name_guild(self, name):
+        paths.global_config_path().parent.mkdir(parents=True, exist_ok=True)
+        paths.global_config_path().write_text(json.dumps({"name": name}))
+
     def _join(self, member, extra):
-        argv = ["realm", "join", self.url, "--fingerprint", self.fingerprint, "--guild", member] + extra
+        self._name_guild(member)
+        argv = ["realm", "join", self.url, "--fingerprint", self.fingerprint] + extra
         with mock.patch("getpass.getpass", return_value=self.tokens[member]):
             return self.run_cli(argv, None, self.root)
 
@@ -79,13 +84,97 @@ class RealmClientTests(GuildTestCase):
         self.assertEqual(stat.S_IMODE(path.stat().st_mode), 0o600)
         saved = json.loads(path.read_text())
         self.assertEqual(saved["guild"], "alpha")
+        self.assertEqual(saved["realm"], realm_hub_fixture.REALM)
+        self.assertIn("joined realm test-realm", out)
         self.assertEqual(saved["token"], self.tokens["alpha"])
         self.assertEqual(saved["fingerprint"], self.fingerprint)
         self.assertNotEqual(self._join("alpha", [])[0], 0)
         self.assertEqual(self._join("alpha", ["--force"])[0], 0)
 
+    def test_join_without_a_guild_name_says_where_to_set_it(self):
+        with mock.patch("getpass.getpass", return_value=self.tokens["alpha"]):
+            code, out, err = self.run_cli(["realm", "join", self.url, "--fingerprint", self.fingerprint], None, self.root)
+        self.assertNotEqual(code, 0)
+        self.assertIn('set "name" in {}'.format(paths.global_config_path()), err)
+        self.assertIn("suggested: ", err)
+        self.assertFalse(paths.realm_config_path().exists())
+
+    def test_join_with_a_token_of_another_member_writes_nothing(self):
+        self._name_guild("alpha")
+        argv = ["realm", "join", self.url, "--fingerprint", self.fingerprint]
+        with mock.patch("getpass.getpass", return_value=self.tokens["beta"]):
+            code, out, err = self.run_cli(argv, None, self.root)
+        self.assertNotEqual(code, 0)
+        self.assertIn("the token belongs to beta, this guild is alpha", err)
+        self.assertFalse(paths.realm_config_path().exists())
+
+    def test_join_rejects_a_malformed_whoami(self):
+        self._name_guild("alpha")
+        for payload in ({"member": "alpha"}, {"member": "alpha", "realm": "../x"}, {"member": 1, "realm": "r"}):
+            with mock.patch("getpass.getpass", return_value="t"), mock.patch.object(client, "request", return_value=payload):
+                with self.assertRaises(GuildError):
+                    realm_commands.join(self.url, self.fingerprint, False, None)
+        self.assertFalse(paths.realm_config_path().exists())
+
+    def test_join_does_not_echo_an_invalid_member(self):
+        self._name_guild("alpha")
+        payload = {"member": "\x1b[31mevil\n", "realm": "hearth"}
+        with mock.patch("getpass.getpass", return_value="t"), mock.patch.object(client, "request", return_value=payload):
+            with self.assertRaises(GuildError) as raised:
+                realm_commands.join(self.url, self.fingerprint, False, None)
+        self.assertEqual(raised.exception.message, "realm hub sent an invalid response")
+
+    def test_hub_error_text_is_stripped_and_capped(self):
+        config = {"url": self.url, "fingerprint": self.fingerprint, "guild": "alpha", "realm": "test-realm", "token": "nope"}
+        hostile = "\x1b[31mred\nline\x7f\x85" + "x" * 500
+
+        class Reply:
+            status = 400
+
+            def read(self, limit):
+                return json.dumps({"error": hostile}).encode("utf-8")
+
+        with mock.patch.object(http.client.HTTPSConnection, "getresponse", return_value=Reply()):
+            with self.assertRaises(GuildError) as raised:
+                client.request(config, "GET", "/status", None)
+        message = raised.exception.message
+        self.assertNotRegex(message, r"[\x00-\x1f\x7f-\x9f]")
+        self.assertLessEqual(len(message), len("realm hub refused (400): ") + 200)
+
+    def test_status_with_an_invalid_realm_is_an_invalid_response(self):
+        self._join("alpha", [])
+        for realm in ("\x1b[31m", "../x", 3, None):
+            with mock.patch.object(client, "request", return_value={"realm": realm, "guilds": []}):
+                with self.assertRaises(GuildError) as raised:
+                    realm_commands.realm_status_model(self._ctx())
+            self.assertEqual(raised.exception.message, "realm hub sent an invalid response")
+        self.assertFalse(paths.realm_cache_path().exists())
+
+    def test_status_with_a_renamed_realm_asks_to_rejoin(self):
+        self._join("alpha", [])
+        with mock.patch.object(client, "request", return_value={"realm": "other", "guilds": []}):
+            with self.assertRaises(GuildError) as raised:
+                realm_commands.realm_status_model(self._ctx())
+        self.assertEqual(
+            raised.exception.message,
+            "the hub now calls its realm other, this guild joined test-realm: re-run join --force",
+        )
+        self.assertFalse(paths.realm_cache_path().exists())
+
+    def test_cache_with_an_invalid_realm_is_malformed(self):
+        paths.realm_cache_path().parent.mkdir(parents=True, exist_ok=True)
+        paths.realm_cache_path().write_text('{"fetched_at": "2026-10-24T10:00:00+00:00", "realm": "\\u001b[31m", "guilds": []}')
+        with self.assertRaises(GuildError) as raised:
+            realm_commands.cached_status_model()
+        self.assertIn("malformed", raised.exception.message)
+        self.assertNotIn("\x1b", raised.exception.message)
+
+    def _ctx(self):
+        return mock.Mock(now=timeutil.utcnow())
+
     def test_join_with_wrong_token_keeps_no_file(self):
-        argv = ["realm", "join", self.url, "--fingerprint", self.fingerprint, "--guild", "alpha"]
+        self._name_guild("alpha")
+        argv = ["realm", "join", self.url, "--fingerprint", self.fingerprint]
         with mock.patch("getpass.getpass", return_value="wrong"):
             code, out, err = self.run_cli(argv, None, self.root)
         self.assertNotEqual(code, 0)
@@ -94,21 +183,21 @@ class RealmClientTests(GuildTestCase):
 
     def test_join_rejects_bad_inputs(self):
         with mock.patch("getpass.getpass", return_value="t"):
-            for url, fingerprint, name in (
-                ("http://127.0.0.1:1", self.fingerprint, "alpha"),
-                (self.url + "/x", self.fingerprint, "alpha"),
-                (self.url, "AA:BB", "alpha"),
-                (self.url, self.fingerprint, "../x"),
+            self._name_guild("alpha")
+            for url, fingerprint in (
+                ("http://127.0.0.1:1", self.fingerprint),
+                (self.url + "/x", self.fingerprint),
+                (self.url, "AA:BB"),
             ):
                 with self.assertRaises(GuildError):
-                    realm_commands.join(url, fingerprint, name, False, None)
+                    realm_commands.join(url, fingerprint, False, None)
         with mock.patch("getpass.getpass", return_value="  "):
             with self.assertRaises(GuildError):
-                realm_commands.join(self.url, self.fingerprint, "alpha", False, None)
+                realm_commands.join(self.url, self.fingerprint, False, None)
 
     def test_fingerprint_mismatch_sends_nothing(self):
         wrong = ":".join(["00"] * 32)
-        config = {"url": self.url, "fingerprint": wrong, "guild": "alpha", "token": self.tokens["alpha"]}
+        config = {"url": self.url, "fingerprint": wrong, "guild": "alpha", "realm": "test-realm", "token": self.tokens["alpha"]}
         with mock.patch.object(http.client.HTTPSConnection, "request") as sent:
             with self.assertRaises(GuildError) as raised:
                 client.request(config, "GET", "/status", None)
@@ -139,7 +228,7 @@ class RealmClientTests(GuildTestCase):
         return "https://127.0.0.1:{}".format(listener.getsockname()[1])
 
     def _assert_tls_refused(self, url):
-        config = {"url": url, "fingerprint": self.fingerprint, "guild": "alpha", "token": self.tokens["alpha"]}
+        config = {"url": url, "fingerprint": self.fingerprint, "guild": "alpha", "realm": "test-realm", "token": self.tokens["alpha"]}
         with mock.patch.object(http.client.HTTPSConnection, "request") as sent:
             with self.assertRaises(GuildError) as raised:
                 client.request(config, "GET", "/status", None)
@@ -159,13 +248,13 @@ class RealmClientTests(GuildTestCase):
         self._assert_tls_refused(self._serve(lambda peer: peer.sendall(b"HTTP/1.0 400 Bad Request\r\n\r\n")))
 
     def test_unreachable_hub_is_a_guild_error(self):
-        config = {"url": "https://127.0.0.1:1", "fingerprint": self.fingerprint, "guild": "alpha", "token": "t"}
+        config = {"url": "https://127.0.0.1:1", "fingerprint": self.fingerprint, "guild": "alpha", "realm": "test-realm", "token": "t"}
         with self.assertRaises(GuildError) as raised:
             client.request(config, "GET", "/status", None)
         self.assertIn("realm hub unreachable: ", raised.exception.message)
 
     def test_oversize_response_is_refused(self):
-        config = {"url": self.url, "fingerprint": self.fingerprint, "guild": "alpha", "token": self.tokens["alpha"]}
+        config = {"url": self.url, "fingerprint": self.fingerprint, "guild": "alpha", "realm": "test-realm", "token": self.tokens["alpha"]}
         with mock.patch.object(client, "MAX_RESPONSE_BYTES", 5):
             with self.assertRaises(GuildError) as raised:
                 client.request(config, "GET", "/status", None)
@@ -179,6 +268,7 @@ class RealmClientTests(GuildTestCase):
         self.assertIn("2 project(s)", out)
         code, out, err = self.run_cli(["realm", "status"], None, self.root)
         self.assertEqual(code, 0, err)
+        self.assertIn("realm test-realm", out)
         self.assertIn("alpha (last seen", out)
         self.assertIn("acme: parties 1, quests 1, PRs 2 (1 ready), asks 1, main red", out)
         self.assertIn("idle: parties 0, quests 0, PRs 0 (0 ready), asks 0", out)
@@ -203,6 +293,28 @@ class RealmClientTests(GuildTestCase):
         paths.realm_cache_path().write_text('{"fetched_at": "x"}')
         with self.assertRaises(GuildError):
             realm_commands.cached_status_model()
+        paths.realm_cache_path().write_text('{"fetched_at": "2026-10-24T10:00:00+00:00", "guilds": []}')
+        with self.assertRaises(GuildError):
+            realm_commands.cached_status_model()
+        paths.realm_cache_path().write_text('{"fetched_at": "2026-10-24T10:00:00+00:00", "realm": 3, "guilds": []}')
+        with self.assertRaises(GuildError):
+            realm_commands.cached_status_model()
+
+    def test_cache_carries_the_realm(self):
+        self._join("alpha", [])
+        self.run_cli(["realm", "status"], None, self.root)
+        self.assertEqual(json.loads(paths.realm_cache_path().read_text())["realm"], "test-realm")
+        self.assertEqual(realm_commands.cached_status_model()["realm"], "test-realm")
+
+    def test_config_without_realm_asks_to_rejoin(self):
+        self._join("alpha", [])
+        saved = json.loads(paths.realm_config_path().read_text())
+        del saved["realm"]
+        paths.realm_config_path().write_text(json.dumps(saved))
+        code, out, err = self.run_cli(["realm", "status"], None, self.root)
+        self.assertNotEqual(code, 0)
+        self.assertIn("join --force", err)
+        self.assertIn("join --force", doctor_commands._realm_lines()[-1][1])
 
     def test_invalid_entries_are_dropped_and_reported(self):
         self._join("alpha", [])
@@ -210,14 +322,16 @@ class RealmClientTests(GuildTestCase):
             "guild": "beta", "generated_at": "2026-10-24T10:00:00+00:00", "received_at": "2026-10-24T10:00:00+00:00",
             "projects": [],
         }
-        payload = {"guilds": [good, {"guild": "evil", "projects": "x"}]}
+        payload = {"realm": "test-realm", "guilds": [good, {"guild": "evil", "projects": "x"}]}
         with mock.patch.object(client, "request", return_value=payload):
             code, out, err = self.run_cli(["realm", "status"], None, self.root)
         self.assertEqual(code, 0, err)
         self.assertIn("dropped 1 invalid entry", out)
         self.assertIn("beta", out)
         self.assertNotIn("evil", out)
-        with mock.patch.object(client, "request", return_value={"guilds": "nope"}):
+        with mock.patch.object(client, "request", return_value={"realm": "test-realm", "guilds": "nope"}):
+            self.assertNotEqual(self.run_cli(["realm", "status"], None, self.root)[0], 0)
+        with mock.patch.object(client, "request", return_value={"guilds": []}):
             self.assertNotEqual(self.run_cli(["realm", "status"], None, self.root)[0], 0)
 
     def test_claudecode_refuses_join_and_push_but_not_status(self):

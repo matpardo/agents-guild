@@ -140,6 +140,8 @@ class WireSettingsTests(GuildTestCase):
     def test_doctor_is_healthy_after_wiring(self):
         self._wire()
         (self.home / ".claude" / "GUILD.md").write_text("rules")
+        (self.config_home / "guild").mkdir(parents=True, exist_ok=True)
+        (self.config_home / "guild" / "guild.json").write_text('{"name": "forge"}')
         with mock.patch("guild.commands.doctor.shutil.which", return_value=None):
             code, out, err = self.run_cli(["doctor"], None, None)
         self.assertEqual(code, 0, out + err)

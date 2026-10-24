@@ -1,12 +1,14 @@
 import getpass
 import json
 import os
+import re
 import secrets
 import shutil
+import socket
 import subprocess
 from pathlib import Path
 
-from guild import names, paths, pii, timeutil
+from guild import config, names, paths, pii, timeutil
 from guild.errors import GuildError
 from guild.realm import client, clientconfig, hub, hubconfig, pin, snapshot, status
 
@@ -42,8 +44,9 @@ def _generate_cert(cert_path, key_path):
     os.chmod(cert_path, 0o600)
 
 
-def init(bind, port, claudecode):
+def init(name, bind, port, claudecode):
     _require_human(claudecode)
+    names.validate_name(name, "realm name")
     if not bind or bind != bind.strip():
         raise GuildError("invalid bind address", 1)
     _check_port(port)
@@ -54,16 +57,25 @@ def init(bind, port, claudecode):
     key_path = pki_dir / "key.pem"
     _generate_cert(cert_path, key_path)
     hubconfig.save(
-        {"bind": bind, "port": port, "cert": str(cert_path), "key": str(key_path), "members": {}}
+        {"name": name, "bind": bind, "port": port, "cert": str(cert_path), "key": str(key_path), "members": {}}
     )
-    return "realm hub initialized on {}:{}\ncertificate fingerprint (SHA-256): {}".format(
-        bind, port, pin.cert_fingerprint(cert_path)
+    return "realm {} initialized on {}:{}\ncertificate fingerprint (SHA-256): {}".format(
+        name, bind, port, pin.cert_fingerprint(cert_path)
     )
 
 
 def serve(claudecode):
     _require_human(claudecode)
     return hub.serve_forever(hubconfig.load())
+
+
+def _join_url(hub_config):
+    address = hub_config["bind"]
+    if address in ("", "0.0.0.0", "::"):
+        address = "<hub-address>"
+    elif ":" in address:
+        address = "[{}]".format(address)
+    return "https://{}:{}".format(address, hub_config["port"])
 
 
 def member_add(name, claudecode):
@@ -75,7 +87,9 @@ def member_add(name, claudecode):
     token = secrets.token_urlsafe(32)
     config["members"][name] = hub.token_hash(token)
     hubconfig.save(config)
-    return "member {} added\ntoken (shown once, store it now): {}".format(name, token)
+    return "member {} added\ntoken (shown once, store it now): {}\njoin on the guild with: guild realm join {} --fingerprint {}".format(
+        name, token, _join_url(config), pin.cert_fingerprint(Path(config["cert"]))
+    )
 
 
 def member_list(claudecode):
@@ -97,9 +111,30 @@ def member_remove(name, claudecode):
     return "member {} removed".format(name)
 
 
-def join(url, fingerprint, guild_name, force, claudecode):
+def _is_valid_name(value):
+    if not isinstance(value, str):
+        return False
+    try:
+        names.validate_name(value, "name")
+    except GuildError:
+        return False
+    return True
+
+
+def suggested_guild_name():
+    slug = re.sub(r"[^A-Za-z0-9._-]+", "-", socket.gethostname()).strip("-.")
+    return slug or "guild"
+
+
+def missing_name_hint():
+    return 'set "name" in {} (suggested: {})'.format(paths.global_config_path(), suggested_guild_name())
+
+
+def join(url, fingerprint, force, claudecode):
     _require_human(claudecode)
-    names.validate_name(guild_name, "guild name")
+    guild_name = config.load_global(paths.global_config_path()).get("name")
+    if guild_name is None:
+        raise GuildError("this guild has no name: " + missing_name_hint(), 1)
     client.parse_url(url)
     pinned = clientconfig.normalize_fingerprint(fingerprint)
     if clientconfig.exists() and not force:
@@ -108,9 +143,16 @@ def join(url, fingerprint, guild_name, force, claudecode):
     if not token:
         raise GuildError("empty token", 1)
     candidate = {"url": url, "fingerprint": pinned, "guild": guild_name, "token": token}
-    client.request(candidate, "GET", "/status", None)
+    identity = client.request(candidate, "GET", "/whoami", None)
+    member = identity.get("member")
+    realm = identity.get("realm")
+    if not _is_valid_name(member) or not _is_valid_name(realm):
+        raise GuildError("realm hub sent an invalid response", 1)
+    if member != guild_name:
+        raise GuildError("the token belongs to {}, this guild is {}".format(member, guild_name), 1)
+    candidate["realm"] = realm
     clientconfig.save(candidate)
-    return "joined realm {} as {}".format(url, guild_name)
+    return "joined realm {} at {} as {}".format(realm, url, guild_name)
 
 
 def push(ctx, claudecode):
@@ -138,12 +180,18 @@ def _write_cache(model):
 
 
 def realm_status_model(ctx):
-    payload = client.request(clientconfig.load(), "GET", "/status", None)
+    joined = clientconfig.load()
+    payload = client.request(joined, "GET", "/status", None)
     entries = payload.get("guilds")
-    if not isinstance(entries, list):
+    realm = payload.get("realm")
+    if not isinstance(entries, list) or not _is_valid_name(realm):
         raise GuildError("realm hub sent an invalid response", 1)
+    if realm != joined["realm"]:
+        raise GuildError(
+            "the hub now calls its realm {}, this guild joined {}: re-run join --force".format(realm, joined["realm"]), 1
+        )
     valid = _valid_entries(entries)
-    model = {"fetched_at": timeutil.to_iso(ctx.now), "guilds": valid}
+    model = {"fetched_at": timeutil.to_iso(ctx.now), "realm": realm, "guilds": valid}
     _write_cache(model)
     return dict(model, dropped=len(entries) - len(valid))
 
@@ -156,10 +204,13 @@ def cached_status_model():
         cached = json.loads(path.read_text(encoding="utf-8"))
         fetched_at = cached["fetched_at"]
         timeutil.from_iso(fetched_at)
+        realm = cached["realm"]
         guilds = _valid_entries(cached["guilds"])
     except (ValueError, KeyError, TypeError):
         raise GuildError("realm cache is malformed: {}".format(path), 1)
-    return {"fetched_at": fetched_at, "guilds": guilds, "dropped": 0}
+    if not _is_valid_name(realm):
+        raise GuildError("realm cache is malformed: {}".format(path), 1)
+    return {"fetched_at": fetched_at, "realm": realm, "guilds": guilds, "dropped": 0}
 
 
 def _project_line(project):
@@ -169,7 +220,10 @@ def _project_line(project):
 
 
 def render_status(model, now):
-    lines = ["realm status fetched {} ago".format(timeutil.age_label(now, model["fetched_at"]))]
+    lines = [
+        "realm {}".format(model["realm"]),
+        "realm status fetched {} ago".format(timeutil.age_label(now, model["fetched_at"])),
+    ]
     if model["dropped"]:
         lines.append("dropped {} invalid entr{}".format(model["dropped"], "y" if model["dropped"] == 1 else "ies"))
     for guild_entry in model["guilds"]:

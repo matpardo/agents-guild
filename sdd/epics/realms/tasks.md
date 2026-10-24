@@ -49,3 +49,10 @@ updated: 2026-10-24
 **Status:** [x] done
 
 **What:** hub and client require TLS 1.3; a handshake failure is reported apart from an unreachable hub.
+
+## T07 — Guild and realm names
+
+**Depends on:** T03
+**Status:** [x] done
+
+**What:** a guild names itself in `guild.json`, a hub names its realm at `init`; `join` checks the token belongs to this guild and `member add` prints the join line.

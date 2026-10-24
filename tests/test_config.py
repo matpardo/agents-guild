@@ -496,3 +496,22 @@ class RetiredDispatcherConfigTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class GlobalNameConfigTests(unittest.TestCase):
+    def _load(self, text):
+        with TemporaryDirectory() as tmp:
+            path = Path(tmp) / "guild.json"
+            path.write_text(text)
+            return config.load_global(path)
+
+    def test_valid_name_is_kept(self):
+        self.assertEqual(self._load('{"name": "forge-1"}')["name"], "forge-1")
+
+    def test_name_is_optional(self):
+        self.assertNotIn("name", self._load("{}"))
+
+    def test_invalid_names_are_rejected(self):
+        for text in ('{"name": "../x"}', '{"name": ""}', '{"name": 3}', '{"name": null}', '{"name": "a b"}'):
+            with self.assertRaises(GuildError, msg=text):
+                self._load(text)

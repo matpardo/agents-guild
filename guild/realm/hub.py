@@ -140,7 +140,10 @@ class HubRequestHandler(http_server.BaseHTTPRequestHandler):
             except (ValueError, GuildError):
                 continue
         entries.sort(key=lambda entry: entry["guild"])
-        self._reply(200, {"guilds": entries})
+        self._reply(200, {"realm": hubconfig.load()["name"], "guilds": entries})
+
+    def _whoami(self, member):
+        self._reply(200, {"member": member, "realm": hubconfig.load()["name"]})
 
     def _post_inbox(self, member, target):
         if target not in hubconfig.load()["members"]:
@@ -204,6 +207,7 @@ class HubRequestHandler(http_server.BaseHTTPRequestHandler):
         return (
             ("PUT", re.compile(r"^/status$"), self._put_status),
             ("GET", re.compile(r"^/status$"), self._get_status),
+            ("GET", re.compile(r"^/whoami$"), self._whoami),
             ("POST", re.compile(r"^/inbox/([^/]+)$"), self._post_inbox),
             ("GET", re.compile(r"^/inbox$"), self._list_inbox),
             ("GET", re.compile(r"^/inbox/([^/]+)$"), self._get_inbox_file),

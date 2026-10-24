@@ -304,6 +304,12 @@ def _validate_resource_retention_config(data):
         )
 
 
+def _validate_global_name(name):
+    if not isinstance(name, str):
+        raise GuildError("global config 'name' must be a string", 1)
+    names.validate_name(name, "global config 'name'")
+
+
 def load_global(config_file):
     if not config_file.is_file():
         return {}
@@ -317,6 +323,8 @@ def load_global(config_file):
     if margin is not None and (isinstance(margin, bool) or not isinstance(margin, int) or not 0 <= margin <= 100):
         raise GuildError("global config 'handoff_margin' must be an integer from 0 to 100", 1)
     _validate_resource_retention_config(data)
+    if "name" in data:
+        _validate_global_name(data["name"])
     return data
 
 

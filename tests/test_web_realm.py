@@ -17,7 +17,7 @@ _GUILD = {"guild": "alpha", "generated_at": "2026-10-24T09:59:00+00:00", "receiv
 _RED_GUILD = {"guild": "beta", "generated_at": "2026-10-24T09:59:00+00:00", "received_at": "2026-10-24T10:00:00+00:00", "projects": [dict(_PROJECT, name="api", main_red=True)]}
 _FILE = {"id": "0123456789abcdef", "from": "alpha", "name": "req.md", "size": 12, "sent_at": "2026-10-24T09:00:00+00:00"}
 _FILE_TWO = dict(_FILE, id="fedcba9876543210", name="other.md")
-_MODEL = {"fetched_at": "2026-10-24T10:00:00+00:00", "guilds": [_GUILD, _RED_GUILD], "dropped": 0, "inbox": []}
+_MODEL = {"fetched_at": "2026-10-24T10:00:00+00:00", "realm": "hearth", "guilds": [_GUILD, _RED_GUILD], "dropped": 0, "inbox": []}
 _FLAG_TEXT = "read it yourself before giving it to an agent"
 
 
@@ -43,17 +43,30 @@ class RealmBoardModelTests(_RealmFiles, WebWriteTestCase):
 
     def test_config_and_cache_give_the_cached_model(self):
         self._write_config()
-        self._write_cache(json.dumps({"fetched_at": _MODEL["fetched_at"], "guilds": [_GUILD, _RED_GUILD]}))
+        self._write_cache(json.dumps({"fetched_at": _MODEL["fetched_at"], "realm": "hearth", "guilds": [_GUILD, _RED_GUILD]}))
         self.assertEqual(self._realm(), _MODEL)
+
+    def test_cache_without_realm_is_empty(self):
+        self._write_config()
+        self._write_cache(json.dumps({"fetched_at": _MODEL["fetched_at"], "guilds": []}))
+        self.assertIsNone(self._realm()["realm"])
+
+    def test_guild_name_comes_from_the_global_config(self):
+        response, body = self._get("/api/board", self._host())
+        self.assertIsNone(json.loads(body)["guild_name"])
+        paths.global_config_path().parent.mkdir(parents=True, exist_ok=True)
+        paths.global_config_path().write_text(json.dumps({"name": "forge"}))
+        response, body = self._get("/api/board", self._host())
+        self.assertEqual(json.loads(body)["guild_name"], "forge")
 
     def test_missing_cache_is_empty(self):
         self._write_config()
-        self.assertEqual(self._realm(), {"fetched_at": None, "guilds": [], "dropped": 0, "inbox": []})
+        self.assertEqual(self._realm(), {"fetched_at": None, "realm": None, "guilds": [], "dropped": 0, "inbox": []})
 
     def test_bad_cache_is_empty(self):
         self._write_config()
         self._write_cache("{not json")
-        self.assertEqual(self._realm(), {"fetched_at": None, "guilds": [], "dropped": 0, "inbox": []})
+        self.assertEqual(self._realm(), {"fetched_at": None, "realm": None, "guilds": [], "dropped": 0, "inbox": []})
 
     def _write_inbox_cache(self, payload):
         path = paths.realm_inbox_cache_path()
@@ -67,7 +80,7 @@ class RealmBoardModelTests(_RealmFiles, WebWriteTestCase):
 
     def test_bad_inbox_cache_is_an_empty_inbox(self):
         self._write_config()
-        self._write_cache(json.dumps({"fetched_at": _MODEL["fetched_at"], "guilds": []}))
+        self._write_cache(json.dumps({"fetched_at": _MODEL["fetched_at"], "realm": "hearth", "guilds": []}))
         paths.realm_inbox_cache_path().write_text("{nope")
         self.assertEqual(self._realm()["inbox"], [])
 
@@ -176,10 +189,13 @@ class RealmRefreshRouteTests(WebWriteTestCase):
 
 @unittest.skipIf(shutil.which("node") is None, "node not installed")
 class RealmPanelBehaviorTests(unittest.TestCase):
-    def _panel(self, realm, refresh, clicks=None, replies=None):
+    def _panel(self, realm, refresh, clicks=None, replies=None, guild_name=None):
         return node_harness.request(
             _HARNESS_NAME,
-            {"src": str(_APP_JS), "realm": realm, "refresh": refresh, "clicks": clicks or [], "replies": replies or {}},
+            {
+                "src": str(_APP_JS), "realm": realm, "refresh": refresh, "clicks": clicks or [],
+                "replies": replies or {}, "guild_name": guild_name,
+            },
         )
 
     def test_guilds_show_counts_and_red_marker(self):
@@ -187,6 +203,14 @@ class RealmPanelBehaviorTests(unittest.TestCase):
         for expected in ("alpha", "beta", "app: parties 2, quests 3, PRs 4 (1 ready), asks 5", "api: parties", "main red"):
             self.assertIn(expected, out["text"])
         self.assertTrue(out["red"])
+
+    def test_heading_shows_the_realm_name_when_known(self):
+        self.assertIn("realm hearth", self._panel(_MODEL, None)["text"])
+        self.assertNotIn("realm hearth", self._panel(dict(_MODEL, realm=None), None)["text"])
+
+    def test_header_shows_the_guild_name_when_set(self):
+        self.assertEqual(self._panel(_MODEL, None, guild_name="forge")["title"], "guild board · forge")
+        self.assertEqual(self._panel(_MODEL, None)["title"], "guild board")
 
     def test_green_main_has_no_marker(self):
         out = self._panel(dict(_MODEL, guilds=[_GUILD]), None)

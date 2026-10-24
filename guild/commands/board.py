@@ -1211,7 +1211,7 @@ def _realm_model():
     try:
         return dict(realm_commands.cached_status_model(), inbox=inbox)
     except GuildError:
-        return {"fetched_at": None, "guilds": [], "dropped": 0, "inbox": inbox}
+        return {"fetched_at": None, "realm": None, "guilds": [], "dropped": 0, "inbox": inbox}
 
 
 def board_model(ctx):
@@ -1253,5 +1253,6 @@ def board_model(ctx):
         "project_names": sorted(projects_by_name),
         "quest_boards": quest_board.models(ctx, projects_by_name),
         "realm": _realm_model(),
+        "guild_name": config.load_global(paths.global_config_path()).get("name"),
     }
 

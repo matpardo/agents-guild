@@ -2,12 +2,23 @@ import json
 import os
 import tempfile
 
-from guild import paths
+from guild import names, paths
 from guild.errors import GuildError
 
 
 def exists():
     return paths.realm_hub_config_path().exists()
+
+
+def _has_valid_name(config):
+    name = config.get("name")
+    if not isinstance(name, str):
+        return False
+    try:
+        names.validate_name(name, "realm name")
+    except GuildError:
+        return False
+    return True
 
 
 def load():
@@ -20,6 +31,10 @@ def load():
         raise GuildError("realm hub config is not valid JSON: {}".format(path), 1)
     if not isinstance(config, dict) or not isinstance(config.get("members"), dict):
         raise GuildError("realm hub config is malformed: {}".format(path), 1)
+    if not _has_valid_name(config):
+        raise GuildError(
+            'realm hub config {} needs a valid "name": add it by hand (init refuses to run twice)'.format(path), 1
+        )
     return config
 
 
