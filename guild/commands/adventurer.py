@@ -2,7 +2,7 @@ import glob
 import os
 from pathlib import Path
 
-from guild import config, db, events, final_report, health_jobs, identity, pii, refs, resume, tmux_windows
+from guild import config, db, events, final_report, health_jobs, identity, pii, refs, resume, timeutil, tmux_windows
 from guild.commands import party as party_commands
 from guild.commands import quest as quest_commands
 from guild.commands import sync as sync_commands
@@ -243,10 +243,10 @@ def show(ctx, adventurer_id):
     lines.append("project: {}".format(row["project"]))
     if row["task"] is not None:
         lines.append("task: {}".format(row["task"]))
-    lines.append("started: {}".format(row["started_at"]))
+    lines.append("started: {}".format(timeutil.issued_label(row["started_at"])))
     if row["reason"] is not None:
         lines.append("reason: {}".format(row["reason"]))
     if row["state"] == "done":
-        lines.append("done: {}".format(row["done_at"]))
+        lines.append("done: {}".format(timeutil.issued_label(row["done_at"])))
         lines.append("pending: {}".format(row["pending"]))
     return lines

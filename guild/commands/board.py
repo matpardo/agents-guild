@@ -225,9 +225,14 @@ def _ask_detail_lines(painter, conn, row):
     else:
         blocks_text = "blocks: 0 of {} refs still open (may be stale)".format(len(ref_list))
     lines.append(painter.paint("     {}".format(blocks_text), "dim"))
+    lines.append(painter.paint("     " + _ask_dates(row), "dim"))
     lines.append(painter.paint('     → guild answer {} "..."'.format(row["id"]), "dim"))
     lines.append("")
     return lines
+
+
+def _ask_dates(row):
+    return timeutil.dates_label(row["created_at"], row["answered_at"])
 
 
 def _ask_summary_lines(painter, conn, row):
@@ -240,7 +245,7 @@ def _ask_summary_lines(painter, conn, row):
         "{} · {}{}{}".format(row["party"], row["question"], options_text, blocks_text), "      "
     )
     first = "  {} {}".format(painter.paint("#{}".format(row["id"]), "red"), wrapped[0].strip())
-    return [first] + wrapped[1:]
+    return [first] + wrapped[1:] + [painter.paint("      " + _ask_dates(row), "dim")]
 
 
 def _sorted_open_asks(conn, party_names):
@@ -331,12 +336,9 @@ def _all_ask_lines(painter, row):
             painter.paint(row["question"], "bold"),
         )
     ]
-    if row["state"] != "answered":
-        return lines
-    lines.extend(painter.wrap("answer: {}".format(row["answer"]), "     "))
-    if row["answered_at"] is not None:
-        lines.append("     answered: {}".format(timeutil.issued_label(row["answered_at"])))
-    return lines
+    if row["state"] == "answered":
+        lines.extend(painter.wrap("answer: {}".format(row["answer"]), "     "))
+    return lines + [painter.paint("     " + _ask_dates(row), "dim")]
 
 
 def render_all_asks(ctx, party, since_cutoff, color, width):
@@ -407,14 +409,8 @@ def _answered_ask_model(row):
         "question": sanitize.strip_control_sequences(row["question"]),
         "answer": _optional_text(row["answer"]),
         "answered_at": row["answered_at"],
-        "answered": _answered_label(row["answered_at"]),
+        "dates": _ask_dates(row),
     }
-
-
-def _answered_label(answered_at):
-    if answered_at is None:
-        return None
-    return timeutil.issued_label(answered_at)
 
 
 def _party_scoped_notices(ctx, party_filter):
@@ -855,6 +851,7 @@ def _adventurer_lines(ctx, painter):
         )
         if row["reason"]:
             lines.extend(painter.wrap("reason: {}".format(sanitize.strip_control_sequences(row["reason"])), "    "))
+        lines.append(painter.paint("    " + timeutil.dates_label(row["started_at"], row["done_at"]), "dim"))
         if _adventurer_stopped(row, live_ids):
             lines.append(painter.paint("    " + STOPPED_WITHOUT_REPORT, "red"))
         if row["state"] == "done":
@@ -1019,6 +1016,7 @@ def _ask_model(conn, row):
         "state": row["state"],
         "answer": _optional_text(row["answer"]),
         "answered_at": row["answered_at"],
+        "dates": _ask_dates(row),
     }
 
 
@@ -1065,7 +1063,7 @@ def _adventurer_model(ctx, row, live_ids, projects_by_name):
         "state": row["state"],
         "pending": _optional_text(row["pending"]),
         "reason": _optional_text(row["reason"]),
-        "started": timeutil.issued_label(row["started_at"]),
+        "dates": timeutil.dates_label(row["started_at"], row["done_at"]),
         "live": row["session_id"] in live_ids,
         "stopped_without_report": _adventurer_stopped(row, live_ids),
         "prs": [_pr_model(ctx, pr_row, project_config) for pr_row in _adventurer_pr_rows(ctx.conn, row["id"])],

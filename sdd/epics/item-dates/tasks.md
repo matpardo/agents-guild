@@ -2,7 +2,7 @@
 epic: item-dates
 type: tasks
 title: Dates on every item
-status: active
+status: done
 updated: 2026-10-24
 ---
 
@@ -25,6 +25,6 @@ updated: 2026-10-24
 ## T03 — Ask and adventurer dates
 
 **Depends on:** —
-**Status:** [ ] pending
+**Status:** [x] done
 
 **What:** Show created and answered for asks, started and done for adventurers.

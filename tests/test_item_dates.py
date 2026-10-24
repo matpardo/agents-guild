@@ -2,7 +2,7 @@ import sqlite3
 from datetime import datetime, timedelta, timezone
 from unittest import mock
 
-from guild import paths
+from guild import paths, timeutil
 from guild.commands import board as board_commands
 from tests.test_quest_board import QuestBoardTestCase
 
@@ -94,3 +94,29 @@ class ItemDatesTests(QuestBoardTestCase):
         raw.close()
         _, out, _ = self.run_cli(["doctor"], None, self.repo_dir)
         self.assertIn("3 rows predate stored dates", out)
+
+
+class AskAdventurerDatesTests(ItemDatesTests):
+    def ask_models(self):
+        return board_commands.board_model(self.ctx())["asks"]
+
+    def test_open_ask_shows_created_and_answered_adds_updated(self):
+        self.at(0, ["party", "start", "alpha", "--reason", "r"], "sess-1")
+        self.at(1, ["ask", "Ship it?", "--context", "x", "--ref", "card:ABC-1"], "sess-1")
+        created = timeutil.issued_label(_iso(1))
+        self.assertEqual(self.ask_models()[0]["dates"], "created " + created)
+        self.assertIn("created " + created, self.at(2, ["asks"], None))
+        self.at(30, ["answer", "1", "yes"], None)
+        out = self.at(31, ["asks", "--all"], None)
+        self.assertIn("created {} · updated {}".format(created, timeutil.issued_label(_iso(30))), out)
+        self.assertNotIn("answered:", out)
+
+    def test_adventurer_done_shows_started_and_done(self):
+        self.at(0, ["adventurer", "start", "fix typo", "--reason", "r"], "sess-1")
+        started = timeutil.issued_label(_iso(0))
+        self.assertEqual(board_commands.board_model(self.ctx())["adventurers"][0]["dates"], "created " + started)
+        self.at(40, ["adventurer", "done", "--pending", "none"], "sess-1")
+        expected = "created {} · updated {}".format(started, timeutil.issued_label(_iso(40)))
+        self.assertEqual(board_commands.board_model(self.ctx())["adventurers"][0]["dates"], expected)
+        self.assertIn(expected, self.at(41, ["board"], None))
+        self.assertIn("done: " + timeutil.issued_label(_iso(40)), self.at(41, ["adventurers", "1"], None))

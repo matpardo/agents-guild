@@ -5,6 +5,9 @@ from guild.commands import board
 from tests.testutil import GuildTestCase
 
 _NOW = timeutil.utcnow()
+_ANSWERED_DATES = timeutil.dates_label(
+    timeutil.to_iso(_NOW - timedelta(days=2)), "2026-10-03T09:12:40+00:00"
+)
 
 
 class AsksAllTests(GuildTestCase):
@@ -90,10 +93,12 @@ class AsksAllCliTests(AsksAllTests):
             [
                 "ASKS · 3 (1 open · 1 answered · 1 dismissed)",
                 "  #4 beta · dismissed · Rename flag?",
+                "     created {}".format(timeutil.issued_label(timeutil.to_iso(_NOW - timedelta(days=5)))),
                 "  #5 alpha · answered · Which base branch?",
                 "     answer: main",
-                "     answered: {}".format(timeutil.issued_label("2026-10-03T09:12:40+00:00")),
+                "     " + _ANSWERED_DATES,
                 "  #7 alpha · open · Should the retry cap be 3 or 5?",
+                "     created {}".format(timeutil.issued_label(timeutil.to_iso(_NOW))),
                 "",
             ],
         )
@@ -158,7 +163,7 @@ class AsksAnsweredCliTests(AsksAllTests):
                 "ANSWERED · 1 · page 1/1",
                 "  #5 alpha · answered · Which base branch?",
                 "     answer: main",
-                "     answered: {}".format(timeutil.issued_label("2026-10-03T09:12:40+00:00")),
+                "     " + _ANSWERED_DATES,
                 "",
             ],
         )

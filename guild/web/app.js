@@ -1046,6 +1046,9 @@ realmFetchNote: "",
       article.appendChild(textEl("p", "options: " + ask.options.join(" | ")));
     }
     article.appendChild(textEl("p", "refs: " + ask.refs.join(", ")));
+    if (ask.dates !== null) {
+      article.appendChild(classedText("p", ask.dates, "muted"));
+    }
     article.appendChild(explain(textEl("p", blocksText(ask)), "ui", "askBlocks"));
 
     var details = el("details");
@@ -1107,8 +1110,8 @@ realmFetchNote: "",
     head.appendChild(textEl("strong", ask.question));
     article.appendChild(head);
     article.appendChild(textEl("p", "answer: " + ask.answer));
-    if (ask.answered !== null) {
-      article.appendChild(textEl("p", "answered: " + ask.answered));
+    if (ask.dates !== null) {
+      article.appendChild(classedText("p", ask.dates, "muted"));
     }
     return article;
   }
@@ -1687,7 +1690,7 @@ realmFetchNote: "",
       parts.push("task " + adventurer.task);
     }
     parts.push(adventurer.live ? "live" : "stopped");
-    parts.push("started " + adventurer.started);
+    parts.push(adventurer.dates);
     return parts.join(" · ");
   }
 

@@ -106,7 +106,7 @@ class AdventurerBoardReasonTests(AdventurerTestCase):
         )
         entry = board_commands.board_model(ctx)["adventurers"][0]
         self.assertEqual(entry["reason"], "test reason")
-        self.assertRegex(entry["started"], r"^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$")
+        self.assertRegex(entry["dates"], r"^created \d{4}-\d{2}-\d{2} \d{2}:\d{2}$")
         code, out, err = self.cli(["board"], None)
         self.assertIn("reason: test reason", out)
 

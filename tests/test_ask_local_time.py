@@ -39,7 +39,8 @@ class AskLocalTimeTests(GuildTestCase):
     def test_all_listing_shows_local_answer_time(self):
         code, out, err = self.run_cli(["asks", "--all"], None, None)
         self.assertEqual(code, 0, err)
-        self.assertIn("     answered: 2026-10-04 14:30", out)
+        self.assertIn("     created 2026-10-04 09:15 · updated 2026-10-04 14:30", out)
+        self.assertNotIn("answered:", out)
         self.assertNotIn("+00:00", out)
 
     def test_web_model_carries_local_labels(self):

@@ -49,10 +49,11 @@ class AnsweredAsksEndpointTests(WebServerTestCase):
         self.assertEqual([ask["id"] for ask in model["asks"]], list(range(12, 2, -1)))
         first = model["asks"][0]
         self.assertEqual(
-            set(first), {"id", "party", "question", "answer", "answered_at", "answered"}
+            set(first), {"id", "party", "question", "answer", "answered_at", "dates"}
         )
         self.assertEqual((first["party"], first["answer"]), ("alpha", "a12"))
-        self.assertEqual(first["answered"], timeutil.issued_label(first["answered_at"]))
+        self.assertTrue(first["dates"].startswith("created "))
+        self.assertIn(" · updated ", first["dates"])
 
     def test_second_page_has_the_oldest(self):
         self._seed(12)

@@ -2,7 +2,7 @@
 epic: item-dates
 type: spec
 title: Dates on every item
-status: active
+status: done
 owner: matpardo
 created: 2026-10-24
 updated: 2026-10-24
@@ -43,9 +43,9 @@ Rows stored before a date column existed show no date until the log is replayed:
 
 ## Success criteria
 
-- [ ] Each entity in the table shows its dates in the CLI and the web.
-- [ ] Stored dates are equal before and after `guild rebuild`.
-- [ ] Output hides the label when a date is unknown.
+- [x] Each entity in the table shows its dates in the CLI and the web.
+- [x] Stored dates are equal before and after `guild rebuild`.
+- [x] Output hides the label when a date is unknown.
 
 ## Security and data
 
