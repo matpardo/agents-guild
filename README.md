@@ -1969,6 +1969,12 @@ and on each party (first leader start, then last handoff, resume or close). The
 web model carries it as `dates` in the PR, claim and party entries (`null` when
 unknown); the party `started` key is replaced by `dates`.
 
+Asks show it too (created, then answered) in `guild asks`, `guild asks --all`,
+`--answered` and the web, replacing the old `answered:` line; adventurers show
+started, then done, in `guild board` and the web (the `started` key of the
+adventurer model and the `answered` key of the answered-ask model are replaced by
+`dates`). `guild adventurers <id>` prints started and done in local time.
+
 The web board has a `quest board` section for every registered project with
 synced epics or open quests, even with no party (`quest_boards` in
 `/api/board`: `name`, `open_quests`, `free_tasks` per epic and the active

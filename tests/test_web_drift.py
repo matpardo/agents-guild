@@ -265,12 +265,33 @@ class WebHealthJobBehaviorTests(unittest.TestCase):
         self.assertNotIn("/api/health", _APP_JS)
 
 
+def _ask(**overrides):
+    entry = {
+        "id": 3, "party": "a", "question": "Ship it?", "context": "x", "options": [], "refs": ["card:ABC-1"],
+        "blocked": 0, "total_refs": 1, "created_at": "2026-10-24T10:00:00+00:00", "state": "open",
+        "answer": None, "answered_at": None, "dates": "created 2026-10-24 10:00",
+    }
+    return dict(entry, **overrides)
+
+
 def _adventurer(**overrides):
     entry = {
         "id": 1, "project": "acme", "job": "fix typo", "task": "demo/T02", "state": "active", "pending": None,
-        "live": False, "stopped_without_report": True, "prs": [], "reason": None, "started": "2026-10-24 10:00",
+        "live": False, "stopped_without_report": True, "prs": [], "reason": None, "dates": "created 2026-10-24 10:00",
     }
     return dict(entry, **overrides)
+
+
+@unittest.skipIf(shutil.which("node") is None, "node not installed")
+class WebAskDatesBehaviorTests(unittest.TestCase):
+    def _text(self, ask):
+        return _render(dict(_BOARD, asks=[ask]), "all", "all", "asks", "text")
+
+    def test_open_ask_shows_dates(self):
+        self.assertIn("created 2026-10-24 10:00", self._text(_ask()))
+
+    def test_null_dates_are_hidden(self):
+        self.assertNotIn("created", self._text(_ask(dates=None)))
 
 
 @unittest.skipIf(shutil.which("node") is None, "node not installed")
@@ -287,8 +308,12 @@ class WebAdventurerBehaviorTests(unittest.TestCase):
     def test_reason_and_start_time_show_only_when_present(self):
         out = self._text([_adventurer(reason="one PR job")])
         self.assertIn("reason: one PR job", out)
-        self.assertIn("started 2026-10-24 10:00", out)
+        self.assertIn("created 2026-10-24 10:00", out)
         self.assertNotIn("reason:", self._text([_adventurer()]))
+
+    def test_done_adventurer_shows_both_dates(self):
+        out = self._text([_adventurer(state="done", dates="created 2026-10-24 10:00 · updated 2026-10-24 11:00")])
+        self.assertIn("created 2026-10-24 10:00 · updated 2026-10-24 11:00", out)
 
     def test_party_card_shows_origin(self):
         party = dict(_BOARD["parties"][0], reason="grew to several PRs", from_adventurer=4)
