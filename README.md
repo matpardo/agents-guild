@@ -2688,6 +2688,34 @@ with their metadata. Routes (all need `Authorization: Bearer <token>`):
 the token, never a field of the body. A status body is capped at 16 KB, a file
 at 256 KB, an inbox at 100 files.
 
+Joining a realm:
+
+```
+guild realm member add <name>                                  # on the hub: prints the token once
+guild realm join <url> --fingerprint <F> --guild <name>        # on the guild: asks for the token at a prompt
+guild realm push                                               # send this guild's counts to the hub
+guild realm status                                             # every guild's counts; refreshes the cache
+guild realm status --cached                                    # last fetched status, no network
+```
+
+`join` reads the token with a hidden prompt (never argv), checks the hub with the
+pinned fingerprint and only then writes `realm.json` (0600) under the guild
+config dir; `--force` replaces an existing one. The client compares the
+certificate fingerprint before it sends anything, so the token never reaches a
+wrong server. `status` keeps the last reply in `realm-cache.json` (0600) in the
+data dir and drops entries that fail validation, saying how many. `guild doctor`
+checks the mode and shape of `realm.json`.
+
+The status holds, per project: parties, open quests, open PRs, ready PRs, open
+asks and whether main is red (a main blocked only by billing does not count).
+`push` is meant for a timer; every 5 minutes with cron:
+
+```
+*/5 * * * * guild realm push
+```
+
+or a systemd user timer with `OnUnitActiveSec=5min` running `guild realm push`.
+
 Security:
 
 - The certificate is self-signed and pinned by its fingerprint; TLS 1.2 or newer.

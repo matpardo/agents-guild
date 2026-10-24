@@ -596,6 +596,27 @@ def _handle_realm_member_remove(ctx, args):
     return 0
 
 
+def _handle_realm_join(ctx, args):
+    from guild.commands import realm as realm_commands
+
+    _print(realm_commands.join(args.url, args.fingerprint, args.guild, args.force, os.environ.get("CLAUDECODE")))
+    return 0
+
+
+def _handle_realm_push(ctx, args):
+    from guild.commands import realm as realm_commands
+
+    _print(realm_commands.push(ctx, os.environ.get("CLAUDECODE")))
+    return 0
+
+
+def _handle_realm_status(ctx, args):
+    from guild.commands import realm as realm_commands
+
+    _print(realm_commands.show_status(ctx, args.cached))
+    return 0
+
+
 def _handle_raid_join(ctx, args):
     from guild.commands import raid as raid_commands
 
@@ -1166,7 +1187,7 @@ def _add_adventurer_parser(subparsers):
 
 
 def _add_realm_parser(subparsers):
-    parser = subparsers.add_parser("realm", help="run a realm hub and manage its members")
+    parser = subparsers.add_parser("realm", help="run a realm hub, join one and see every guild's status")
     actions = parser.add_subparsers(dest="realm_action", required=True, metavar="<subcommand>")
 
     init = actions.add_parser("init", help="create the hub config and a pinned self-signed certificate")
@@ -1176,6 +1197,20 @@ def _add_realm_parser(subparsers):
 
     serve = actions.add_parser("serve", help="serve the realm hub over https")
     serve.set_defaults(handler=_handle_realm_serve)
+
+    join = actions.add_parser("join", help="join a realm hub (token is read from the prompt)")
+    join.add_argument("url")
+    join.add_argument("--fingerprint", required=True)
+    join.add_argument("--guild", required=True)
+    join.add_argument("--force", action="store_true")
+    join.set_defaults(handler=_handle_realm_join)
+
+    push = actions.add_parser("push", help="send this guild's counts to the realm hub")
+    push.set_defaults(handler=_handle_realm_push)
+
+    realm_status = actions.add_parser("status", help="show every guild's counts")
+    realm_status.add_argument("--cached", action="store_true", help="print the last fetched status without network")
+    realm_status.set_defaults(handler=_handle_realm_status)
 
     member = actions.add_parser("member", help="add, list or remove hub members")
     member_actions = member.add_subparsers(dest="member_action", required=True, metavar="<subcommand>")

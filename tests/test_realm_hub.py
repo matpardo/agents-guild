@@ -5,7 +5,6 @@ import json
 import os
 import shutil
 import ssl
-import threading
 import unittest
 import unittest.mock
 from unittest import mock
@@ -14,6 +13,7 @@ from guild import names, paths
 from guild.commands import realm as realm_commands
 from guild.errors import GuildError
 from guild.realm import hub, hubconfig, pin, status
+from tests import realm_hub_fixture
 from tests.testutil import GuildTestCase
 
 _NOW = "2026-10-24T10:00:00+00:00"
@@ -37,22 +37,8 @@ def _status_body(guild):
 class RealmHubTests(GuildTestCase):
     def setUp(self):
         super().setUp()
-        realm_commands.init("127.0.0.1", 8443, _HUMAN)
-        config = hubconfig.load()
-        self.tokens = {}
-        for name in ("alpha", "beta"):
-            output = realm_commands.member_add(name, _HUMAN)
-            self.tokens[name] = output.rsplit(": ", 1)[1]
-        config = hubconfig.load()
-        config["port"] = 0
-        self.server = hub.make_server(config)
+        self.server, self.cert, self.tokens = realm_hub_fixture.start_hub(self)
         self.port = self.server.server_address[1]
-        self.cert = config["cert"]
-        thread = threading.Thread(target=self.server.serve_forever, daemon=True)
-        thread.start()
-        self.addCleanup(thread.join)
-        self.addCleanup(self.server.server_close)
-        self.addCleanup(self.server.shutdown)
 
     def _request(self, method, path, token, body, content_type="application/json", raw=None):
         context = ssl.create_default_context(cafile=self.cert)
