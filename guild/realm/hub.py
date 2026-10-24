@@ -191,7 +191,7 @@ class HubRequestHandler(http_server.BaseHTTPRequestHandler):
     def _get_inbox_file(self, member, file_id):
         inbox, meta_path = self._own_file(member, file_id)
         meta = json.loads(meta_path.read_text(encoding="utf-8"))
-        meta["content"] = (inbox / (file_id + ".md")).read_text(encoding="utf-8")
+        meta["content"] = (inbox / (file_id + ".md")).read_bytes().decode("utf-8")
         self._reply(200, meta)
 
     def _delete_inbox_file(self, member, file_id):

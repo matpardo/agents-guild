@@ -2,7 +2,7 @@
 epic: realms
 type: discovery
 title: Realms connect guilds on one network
-status: active
+status: done
 updated: 2026-10-24
 ---
 

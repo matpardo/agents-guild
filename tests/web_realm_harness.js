@@ -16,20 +16,20 @@ function mk(tag) {
   Object.defineProperty(o, "firstChild", { get() { return o.children[0] || null; } });
   return o;
 }
+function findButtons(node, label) {
+  const found = node.tag === "button" && node._text === label ? [node] : [];
+  return found.concat(...node.children.map((child) => findButtons(child, label)));
+}
 function findButton(node) {
-  if (node.tag === "button" && node._text === "Refresh") return node;
-  for (const child of node.children) {
-    const found = findButton(child);
-    if (found) return found;
-  }
-  return null;
+  return findButtons(node, "Refresh")[0] || null;
 }
 function hasClass(node, name) {
   if ((node.className || "").split(" ").includes(name)) return true;
   return node.children.some((child) => hasClass(child, name));
 }
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
-async function run({ src, realm, refresh }) {
+async function run({ src, realm, refresh, clicks, replies }) {
+  const posts = [];
   const byId = {};
   const doc = {
     getElementById: (id) => (byId[id] = byId[id] || mk(id.endsWith("-filter") ? "select" : "div")),
@@ -47,9 +47,11 @@ async function run({ src, realm, refresh }) {
     if (url === "/api/board") return respond(board, true);
     if (url === "/api/session") return respond({ token: "t" }, true);
     if (url === "/api/realm/refresh") return respond(refresh.body, refresh.ok);
-    return respond({}, false);
+    if (url.startsWith("/api/realm/")) posts.push(url);
+    const reply = (replies || {})[url];
+    return reply ? respond(reply.body, reply.ok) : respond({}, false);
   }
-  const ctx = { document: doc, window: {}, location: { hash: "" }, addEventListener() {}, console, setInterval() {}, setTimeout() {}, fetch: fetchStub };
+  const ctx = { document: doc, window: {}, location: { hash: "" }, addEventListener() {}, console, setInterval() {}, setTimeout() {}, fetch: fetchStub, confirm: () => true };
   ctx.window = ctx;
   ctx.Date = Date;
   vm.createContext(ctx);
@@ -61,7 +63,11 @@ async function run({ src, realm, refresh }) {
     findButton(section).h.click();
     await wait(30);
   }
-  return { text: section.textContent, red: hasClass(section, "res-bad"), hasButton: findButton(section) !== null };
+  for (const click of clicks || []) {
+    findButtons(section, click.label)[click.index].h.click();
+    await wait(30);
+  }
+  return { posts, text: section.textContent, red: hasClass(section, "res-bad"), hasButton: findButton(section) !== null };
 }
 readline.createInterface({ input: process.stdin }).on("line", async (line) => {
   console.log(JSON.stringify(await run(JSON.parse(line))));

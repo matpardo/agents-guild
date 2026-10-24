@@ -4,8 +4,9 @@ import os
 import secrets
 import shutil
 import subprocess
+from pathlib import Path
 
-from guild import names, paths, timeutil
+from guild import names, paths, pii, timeutil
 from guild.errors import GuildError
 from guild.realm import client, clientconfig, hub, hubconfig, pin, snapshot, status
 
@@ -180,3 +181,185 @@ def render_status(model, now):
 def show_status(ctx, cached):
     model = cached_status_model() if cached else realm_status_model(ctx)
     return render_status(model, ctx.now)
+
+
+_MAX_FIELD_LENGTH = 64
+_MAX_ISO_LENGTH = 64
+_FILE_KEYS = frozenset(("id", "from", "name", "size", "sent_at"))
+
+
+def _is_bounded_text(value):
+    return isinstance(value, str) and 0 < len(value) <= _MAX_FIELD_LENGTH + len(".md")
+
+
+def _is_valid_sender(value):
+    if not isinstance(value, str) or len(value) > _MAX_FIELD_LENGTH:
+        return False
+    try:
+        names.validate_name(value, "guild name")
+    except GuildError:
+        return False
+    return True
+
+
+def _is_valid_iso(value):
+    if not isinstance(value, str) or len(value) > _MAX_ISO_LENGTH:
+        return False
+    try:
+        timeutil.from_iso(value)
+    except ValueError:
+        return False
+    return True
+
+
+def _is_valid_file(entry):
+    if not isinstance(entry, dict) or set(entry) != _FILE_KEYS:
+        return False
+    size = entry["size"]
+    return (
+        isinstance(entry["id"], str)
+        and hub.is_file_id(entry["id"])
+        and _is_valid_sender(entry["from"])
+        and _is_bounded_text(entry["name"])
+        and isinstance(size, int)
+        and not isinstance(size, bool)
+        and 0 <= size <= hub.CONTENT_MAX_BYTES
+        and _is_valid_iso(entry["sent_at"])
+    )
+
+
+def _valid_files(entries):
+    return [entry for entry in entries if _is_valid_file(entry)]
+
+
+def _read_local_markdown(file_path):
+    path = Path(file_path)
+    if path.suffix != ".md":
+        raise GuildError("only .md files can be sent: {}".format(file_path), 1)
+    if not path.is_file():
+        raise GuildError("not a regular file: {}".format(file_path), 1)
+    with path.open("rb") as handle:
+        data = handle.read(hub.CONTENT_MAX_BYTES + 1)
+    if len(data) > hub.CONTENT_MAX_BYTES:
+        raise GuildError("file too large: limit is {} bytes".format(hub.CONTENT_MAX_BYTES), 1)
+    try:
+        return path.name, data.decode("utf-8")
+    except UnicodeDecodeError:
+        raise GuildError("file is not valid UTF-8: {}".format(file_path), 1)
+
+
+def send(target_guild, file_path, claudecode):
+    _require_human(claudecode)
+    names.validate_name(target_guild, "guild name")
+    name, content = _read_local_markdown(file_path)
+    payload = client.request(
+        clientconfig.load(), "POST", "/inbox/" + target_guild, {"name": name, "content": content}
+    )
+    file_id = payload.get("id")
+    if not isinstance(file_id, str) or not hub.is_file_id(file_id):
+        raise GuildError("realm hub sent an invalid response", 1)
+    return "sent {} to {} as {}".format(name, target_guild, file_id)
+
+
+def _write_inbox_cache(model):
+    path = paths.realm_inbox_cache_path()
+    paths.ensure_private_dir(path.parent)
+    hubconfig.write_atomic(path, json.dumps(model).encode("utf-8"))
+
+
+def inbox_model(ctx, claudecode):
+    _require_human(claudecode)
+    payload = client.request(clientconfig.load(), "GET", "/inbox", None)
+    entries = payload.get("files")
+    if not isinstance(entries, list):
+        raise GuildError("realm hub sent an invalid response", 1)
+    model = {"fetched_at": timeutil.to_iso(ctx.now), "files": _valid_files(entries)}
+    _write_inbox_cache(model)
+    return model
+
+
+def cached_inbox():
+    path = paths.realm_inbox_cache_path()
+    try:
+        cached = json.loads(path.read_text(encoding="utf-8"))
+        timeutil.from_iso(cached["fetched_at"])
+        return _valid_files(cached["files"])
+    except (OSError, ValueError, KeyError, TypeError):
+        return []
+
+
+def render_inbox(model, now):
+    if not model["files"]:
+        return "inbox empty"
+    return "\n".join(
+        "{} from {} {} {} bytes {} ago".format(
+            entry["id"], entry["from"], entry["name"], entry["size"], timeutil.age_label(now, entry["sent_at"])
+        )
+        for entry in model["files"]
+    )
+
+
+def _checked_file(payload):
+    content = payload.get("content")
+    sender = payload.get("from")
+    name = payload.get("name")
+    if not (isinstance(content, str) and _is_valid_sender(sender) and isinstance(name, str)):
+        raise GuildError("realm hub sent an invalid response", 1)
+    try:
+        data = content.encode("utf-8")
+    except UnicodeEncodeError:
+        raise GuildError("realm file is not valid UTF-8", 1)
+    if payload.get("size") != len(data) or len(data) > hub.CONTENT_MAX_BYTES:
+        raise GuildError("realm file size does not match its content", 1)
+    return sender, hub.safe_name(name), data
+
+
+def _create_exclusive(directory, file_name, data):
+    target = directory / file_name
+    if target.name != file_name or target.parent != directory:
+        raise GuildError("realm file name escapes the output directory", 1)
+    descriptor = os.open(str(target), os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
+    with os.fdopen(descriptor, "wb") as handle:
+        handle.write(data)
+    return target
+
+
+def _save_file(directory, file_name, file_id, data):
+    try:
+        return _create_exclusive(directory, file_name, data)
+    except FileExistsError:
+        pass
+    alternate = "{}-{}.md".format(file_name[: -len(".md")], file_id)
+    try:
+        return _create_exclusive(directory, alternate, data)
+    except FileExistsError:
+        raise GuildError("realm file already saved: {}".format(directory / alternate), 1)
+
+
+def _check_file_id(file_id):
+    if not hub.is_file_id(file_id):
+        raise GuildError("invalid file id: expected 16 hex characters", 1)
+
+
+def fetch(file_id, out_dir, claudecode):
+    _require_human(claudecode)
+    _check_file_id(file_id)
+    payload = client.request(clientconfig.load(), "GET", "/inbox/" + file_id, None)
+    sender, file_name, data = _checked_file(payload)
+    directory = paths.ensure_private_dir(Path(out_dir)).resolve()
+    saved = _save_file(directory, file_name, file_id, data)
+    return {"path": str(saved), "from": sender, "flagged": pii.looks_instruction_like(data.decode("utf-8"))}
+
+
+def render_fetch(result):
+    lines = ["saved {} from {}".format(result["path"], result["from"])]
+    if result["flagged"]:
+        lines.append("{} read it yourself before giving it to an agent".format(pii.INSTRUCTION_LIKE_FLAG))
+    return "\n".join(lines)
+
+
+def drop(file_id, claudecode):
+    _require_human(claudecode)
+    _check_file_id(file_id)
+    client.request(clientconfig.load(), "DELETE", "/inbox/" + file_id, None)
+    return "dropped {} from the realm inbox".format(file_id)

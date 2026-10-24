@@ -24,6 +24,7 @@ from guild.commands import raid_pause as raid_pause_commands
 from guild.commands import realm as realm_commands
 from guild.commands import task as task_commands
 from guild.errors import GuildError
+from guild.realm import hub as realm_hub
 from guild.resources import report as resources_report
 
 _WEB_DIR = Path(__file__).resolve().parent / "web"
@@ -52,6 +53,8 @@ _QUEST_CREATE_PATH = "/api/quests/create-open"
 _ADVENTURER_DISMISS_RE = re.compile(r"^/api/adventurers/([^/]+)/dismiss$")
 _COMPACT_PATH = "/api/compact"
 _REALM_REFRESH_PATH = "/api/realm/refresh"
+_REALM_INBOX_REFRESH_PATH = "/api/realm/inbox/refresh"
+_REALM_INBOX_ACTION_RE = re.compile(r"^/api/realm/inbox/([^/]+)/(fetch|drop)$")
 _SEEN_ALL_PATH = "/api/notices/seen-all"
 _NOTICE_CREATE_PATH = "/api/notices/create"
 _ANSWERED_ASKS_PATH = "/api/asks/answered"
@@ -270,6 +273,20 @@ def _run_realm_refresh():
         ctx.conn.close()
 
 
+def _run_realm_inbox_refresh():
+    ctx = _action_context()
+    try:
+        return realm_commands.inbox_model(ctx, None)
+    finally:
+        ctx.conn.close()
+
+
+def _run_realm_inbox_action(action, file_id):
+    if action == "fetch":
+        return realm_commands.fetch(file_id, str(paths.realm_files_dir()), None)
+    return {"message": realm_commands.drop(file_id, None)}
+
+
 def _run_task_move_action(quest, tid, payload):
     ctx = _action_context()
     try:
@@ -480,6 +497,16 @@ class BoardRequestHandler(http_server.BaseHTTPRequestHandler):
             return self._post_action("compact", lambda payload: _run_compact())
         if path == _REALM_REFRESH_PATH:
             return self._post_payload("realm-refresh", lambda payload: dict(_run_realm_refresh(), ok=True))
+        if path == _REALM_INBOX_REFRESH_PATH:
+            return self._post_payload("realm-inbox-refresh", lambda payload: dict(_run_realm_inbox_refresh(), ok=True))
+        realm_inbox_match = _REALM_INBOX_ACTION_RE.match(path)
+        if realm_inbox_match is not None:
+            file_id, action = realm_inbox_match.groups()
+            if not realm_hub.is_file_id(file_id):
+                return self._not_found()
+            return self._post_payload(
+                "realm-inbox-" + action, lambda payload: dict(_run_realm_inbox_action(action, file_id), ok=True)
+            )
         if path == _SEEN_ALL_PATH:
             return self._post_action("seen-all", lambda payload: _run_seen_all())
         memory_match = _MEMORY_ACTION_RE.match(path)

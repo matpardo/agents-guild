@@ -2,7 +2,7 @@
 epic: realms
 type: tasks
 title: Realms connect guilds on one network
-status: active
+status: done
 updated: 2026-10-24
 ---
 
@@ -39,6 +39,6 @@ updated: 2026-10-24
 ## T05 — Realm file transport
 
 **Depends on:** T03
-**Status:** [ ] pending
+**Status:** [x] done
 
 **What:** `guild realm send|inbox|fetch|drop` in the CLI and the web; agents are denied every realm command but `status`.

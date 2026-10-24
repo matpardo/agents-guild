@@ -617,6 +617,35 @@ def _handle_realm_status(ctx, args):
     return 0
 
 
+def _handle_realm_send(ctx, args):
+    from guild.commands import realm as realm_commands
+
+    _print(realm_commands.send(args.guild, args.file, os.environ.get("CLAUDECODE")))
+    return 0
+
+
+def _handle_realm_inbox(ctx, args):
+    from guild.commands import realm as realm_commands
+
+    model = realm_commands.inbox_model(ctx, os.environ.get("CLAUDECODE"))
+    _print(realm_commands.render_inbox(model, ctx.now))
+    return 0
+
+
+def _handle_realm_fetch(ctx, args):
+    from guild.commands import realm as realm_commands
+
+    _print(realm_commands.render_fetch(realm_commands.fetch(args.id, args.out, os.environ.get("CLAUDECODE"))))
+    return 0
+
+
+def _handle_realm_drop(ctx, args):
+    from guild.commands import realm as realm_commands
+
+    _print(realm_commands.drop(args.id, os.environ.get("CLAUDECODE")))
+    return 0
+
+
 def _handle_raid_join(ctx, args):
     from guild.commands import raid as raid_commands
 
@@ -1207,6 +1236,23 @@ def _add_realm_parser(subparsers):
 
     push = actions.add_parser("push", help="send this guild's counts to the realm hub")
     push.set_defaults(handler=_handle_realm_push)
+
+    send = actions.add_parser("send", help="send an md file to another guild's inbox")
+    send.add_argument("guild")
+    send.add_argument("file")
+    send.set_defaults(handler=_handle_realm_send)
+
+    inbox = actions.add_parser("inbox", help="list the files waiting in this guild's realm inbox")
+    inbox.set_defaults(handler=_handle_realm_inbox)
+
+    fetch = actions.add_parser("fetch", help="save an inbox file to disk for you to read first")
+    fetch.add_argument("id")
+    fetch.add_argument("--out", default=str(paths.realm_files_dir()), help="directory to save into")
+    fetch.set_defaults(handler=_handle_realm_fetch)
+
+    drop = actions.add_parser("drop", help="delete a file from the realm inbox")
+    drop.add_argument("id")
+    drop.set_defaults(handler=_handle_realm_drop)
 
     realm_status = actions.add_parser("status", help="show every guild's counts")
     realm_status.add_argument("--cached", action="store_true", help="print the last fetched status without network")
