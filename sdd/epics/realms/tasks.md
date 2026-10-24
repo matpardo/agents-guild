@@ -42,3 +42,10 @@ updated: 2026-10-24
 **Status:** [x] done
 
 **What:** `guild realm send|inbox|fetch|drop` in the CLI and the web; agents are denied every realm command but `status`.
+
+## T06 — TLS 1.3 only
+
+**Depends on:** T02
+**Status:** [x] done
+
+**What:** hub and client require TLS 1.3; a handshake failure is reported apart from an unreachable hub.

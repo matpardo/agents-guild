@@ -26,7 +26,7 @@ def parse_url(url):
 
 def _context():
     context = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
-    context.minimum_version = ssl.TLSVersion.TLSv1_2
+    context.minimum_version = ssl.TLSVersion.TLSv1_3
     context.check_hostname = False
     context.verify_mode = ssl.CERT_NONE
     return context
@@ -38,6 +38,9 @@ def _connect_pinned(config):
     try:
         connection.connect()
         got = pin.fingerprint(connection.sock.getpeercert(binary_form=True))
+    except ssl.SSLError:
+        connection.close()
+        raise GuildError("realm hub refused the TLS 1.3 handshake (downgrade or not a realm hub)", 1)
     except (OSError, http.client.HTTPException) as error:
         connection.close()
         raise GuildError("realm hub unreachable: {}".format(type(error).__name__), 1)
