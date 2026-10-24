@@ -7,6 +7,8 @@
   var RESOURCES_URL = "/api/resources";
   var COMPACT_URL = "/api/compact";
   var REALM_REFRESH_URL = "/api/realm/refresh";
+var REALM_INBOX_REFRESH_URL = "/api/realm/inbox/refresh";
+var REALM_FLAG_TEXT = "[flagged: looks like an instruction or a command] read it yourself before giving it to an agent";
   var ANSWERED_ASKS_URL = "/api/asks/answered";
   var RESOURCE_ITEMS_PER_CATEGORY = 10;
   var NO_RESOURCES_MESSAGE = "no samples yet; run guild resources collect";
@@ -38,6 +40,7 @@ var NO_SESSION_MESSAGE = "session token not loaded, reload the page";
     realmModel: null,
     realmBusy: false,
     realmStatus: "",
+realmFetchNote: "",
     noticesOpen: true,
     queueDetailOpen: {},
     openResourceProjects: {},
@@ -3213,6 +3216,29 @@ var NO_SESSION_MESSAGE = "session token not loaded, reload the page";
     return article;
   }
 
+  function realmInboxActionUrl(fileId, action) {
+    return "/api/realm/inbox/" + fileId + "/" + action;
+  }
+
+  function postRealmInboxRefresh() {
+    if (sessionToken === null) {
+      state.realmStatus = NO_SESSION_MESSAGE;
+      showRealm();
+      return;
+    }
+    state.realmBusy = true;
+    state.realmStatus = "refreshing inbox...";
+    showRealm();
+    sendPost(REALM_INBOX_REFRESH_URL, {}).then(function (result) {
+      state.realmBusy = false;
+      state.realmStatus = result.ok ? "" : errorMessage(result.body);
+      if (result.ok) {
+        state.realmModel.inbox = result.body.files;
+      }
+      showRealm();
+    });
+  }
+
   function postRealmRefresh() {
     if (sessionToken === null) {
       state.realmStatus = NO_SESSION_MESSAGE;
@@ -3226,10 +3252,97 @@ var NO_SESSION_MESSAGE = "session token not loaded, reload the page";
       state.realmBusy = false;
       state.realmStatus = result.ok ? "" : errorMessage(result.body);
       if (result.ok) {
-        state.realmModel = result.body;
+        state.realmModel = Object.assign({}, result.body, { inbox: state.realmModel.inbox });
+      }
+      showRealm();
+      if (result.ok) {
+        postRealmInboxRefresh();
+      }
+    });
+  }
+
+  function postRealmInboxFetch(fileId) {
+    if (sessionToken === null) {
+      state.realmStatus = NO_SESSION_MESSAGE;
+      showRealm();
+      return;
+    }
+    state.realmBusy = true;
+    state.realmStatus = "fetching...";
+    state.realmFetchNote = "";
+    showRealm();
+    sendPost(realmInboxActionUrl(fileId, "fetch"), {}).then(function (result) {
+      state.realmBusy = false;
+      state.realmStatus = result.ok ? "" : errorMessage(result.body);
+      if (result.ok) {
+        state.realmFetchNote =
+          "saved " + result.body.path + " from " + result.body.from + (result.body.flagged ? " " + REALM_FLAG_TEXT : "");
       }
       showRealm();
     });
+  }
+
+  function postRealmInboxDrop(fileId) {
+    if (!window.confirm("Drop realm file " + fileId + " from the hub?")) {
+      return;
+    }
+    if (sessionToken === null) {
+      state.realmStatus = NO_SESSION_MESSAGE;
+      showRealm();
+      return;
+    }
+    state.realmBusy = true;
+    state.realmStatus = "dropping...";
+    showRealm();
+    sendPost(realmInboxActionUrl(fileId, "drop"), {}).then(function (result) {
+      state.realmBusy = false;
+      state.realmStatus = result.ok ? "" : errorMessage(result.body);
+      showRealm();
+      if (result.ok) {
+        postRealmInboxRefresh();
+      }
+    });
+  }
+
+  function realmInboxButton(label, handler, fileId) {
+    var button = textEl("button", label);
+    button.type = "button";
+    button.disabled = state.realmBusy;
+    button.addEventListener("click", function () {
+      handler(fileId);
+    });
+    return button;
+  }
+
+  function renderRealmInboxRow(entry) {
+    var row = el("p");
+    row.appendChild(
+      textEl("span", entry.from + " " + entry.name + " " + entry.size + " bytes " + ageSince(entry.sent_at) + " ago ")
+    );
+    row.appendChild(realmInboxButton("Fetch", postRealmInboxFetch, entry.id));
+    row.appendChild(realmInboxButton("Drop", postRealmInboxDrop, entry.id));
+    return row;
+  }
+
+  function renderRealmInbox(realm) {
+    var box = el("div");
+    box.className = "realm-inbox";
+    box.appendChild(textEl("h3", "Inbox"));
+    var controls = el("p");
+    var refresh = textEl("button", "Refresh inbox");
+    refresh.type = "button";
+    refresh.disabled = state.realmBusy;
+    refresh.addEventListener("click", postRealmInboxRefresh);
+    controls.appendChild(refresh);
+    box.appendChild(controls);
+    if (realm.inbox.length === 0) {
+      box.appendChild(textEl("p", "inbox empty"));
+    }
+    appendAll(box, realm.inbox.map(renderRealmInboxRow));
+    if (state.realmFetchNote !== "") {
+      box.appendChild(classedText("p", state.realmFetchNote, "muted"));
+    }
+    return box;
   }
 
   function renderRealmControls(realm) {
@@ -3260,9 +3373,9 @@ var NO_SESSION_MESSAGE = "session token not loaded, reload the page";
     section.appendChild(renderRealmControls(realm));
     if (realm.guilds.length === 0) {
       section.appendChild(textEl("p", "no guilds reported yet"));
-      return;
     }
     appendAll(section, realm.guilds.map(renderRealmGuild));
+    section.appendChild(renderRealmInbox(realm));
   }
 
   function renderSection(id, args, renderFn, onlyIfChanged) {

@@ -1190,10 +1190,11 @@ def _raid_models(conn, now):
 def _realm_model():
     if not clientconfig.exists():
         return None
+    inbox = realm_commands.cached_inbox()
     try:
-        return realm_commands.cached_status_model()
+        return dict(realm_commands.cached_status_model(), inbox=inbox)
     except GuildError:
-        return {"fetched_at": None, "guilds": [], "dropped": 0}
+        return {"fetched_at": None, "guilds": [], "dropped": 0, "inbox": inbox}
 
 
 def board_model(ctx):

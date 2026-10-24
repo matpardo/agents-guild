@@ -46,6 +46,14 @@ def realm_cache_path():
     return data_dir() / "realm-cache.json"
 
 
+def realm_inbox_cache_path():
+    return data_dir() / "realm-inbox-cache.json"
+
+
+def realm_files_dir():
+    return data_dir() / "realm-files"
+
+
 def realm_hub_pki_dir():
     return config_dir() / "realm-hub"
 

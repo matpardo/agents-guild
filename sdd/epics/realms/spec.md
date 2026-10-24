@@ -2,7 +2,7 @@
 epic: realms
 type: spec
 title: Realms connect guilds on one network
-status: active
+status: done
 owner: matpardo
 created: 2026-10-24
 updated: 2026-10-24
@@ -35,10 +35,10 @@ Each guild lives on one machine. Requests between teams arrive as md files copie
 
 ## Success criteria
 
-- [ ] Two guilds pushed to one hub both show in `guild realm status` and on the web board.
-- [ ] An md file sent from one guild is fetched byte for byte on the other.
-- [ ] A client that sees another certificate fingerprint refuses to connect.
-- [ ] An agent's `guild realm send` is denied.
+- [x] Two guilds pushed to one hub both show in `guild realm status` and on the web board.
+- [x] An md file sent from one guild is fetched byte for byte on the other.
+- [x] A client that sees another certificate fingerprint refuses to connect.
+- [x] An agent's `guild realm send` is denied.
 
 ## Depends on
 

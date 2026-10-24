@@ -2696,6 +2696,10 @@ guild realm join <url> --fingerprint <F> --guild <name>        # on the guild: a
 guild realm push                                               # send this guild's counts to the hub
 guild realm status                                             # every guild's counts; refreshes the cache
 guild realm status --cached                                    # last fetched status, no network
+guild realm send <guild> <file.md>                             # put an md file in another guild's inbox
+guild realm inbox                                              # files waiting for this guild; refreshes the inbox cache
+guild realm fetch <id> [--out <dir>]                           # save one file for you to read
+guild realm drop <id>                                          # delete one file from the hub
 ```
 
 `join` reads the token with a hidden prompt (never argv), checks the hub with the
@@ -2716,12 +2720,29 @@ asks and whether main is red (a main blocked only by billing does not count).
 
 or a systemd user timer with `OnUnitActiveSec=5min` running `guild realm push`.
 
+Sending and receiving files: `send` takes a regular `.md` file of at most 256 KB,
+valid UTF-8, and prints the id the hub gave it; the hub names the file and the
+receiver sees the sending guild from the token, never from the file. `inbox`
+lists id, sender, name, size and age, and keeps the list in
+`realm-inbox-cache.json` (0600) in the guild data dir for the board. `fetch`
+writes the file as `<name>` (or `<name-stem>-<id>.md` when that name exists) with
+mode 0600 into `--out`, which defaults to `realm-files/` in the guild data dir
+(0700); it prints the path and the sender, and the file stays on the hub until
+`drop`. When the text looks like an instruction or a command, `fetch` adds the
+flag line and tells you to read it yourself before giving it to an agent. The
+rule is: a human reads a realm file first; nothing injects a realm file or the
+inbox into a session, and agents are denied `send`, `inbox`, `fetch` and `drop`.
+
 The web board shows a Realm panel in the overview view once `realm.json`
 exists: per guild, how long ago it was last seen and, per project, the counts
 with a red marker when main is red. It reads the cached status, never the
 network; its Refresh button runs the same call as `guild realm status` and
 redraws the panel, showing the error text when the hub is unreachable or its
-fingerprint changed.
+fingerprint changed. The panel also has an Inbox list (sender, name, size,
+age) with Refresh inbox, Fetch and Drop buttons; Drop asks for confirmation,
+Fetch saves into the default `realm-files/` dir and shows the saved path and the
+flag when the text looks like an instruction, and Refresh also reloads the
+inbox.
 
 Security:
 
@@ -2799,7 +2820,7 @@ contract appears.
 working, waiting on a permission prompt or stopped with work), `cost-metering`,
 `ask-context`, `session-lifecycle` (handoff retention, respawn in guild-launched windows), `ephemeral-brief` (the task brief, `idle`/`queued` party
 status, shorter sessions), `merge-queue`, `web-board`, `lifecycle-commands`,
-`resource-footprint`, `security-hardening` and `derived-state`. Open:
-`install-and-update`, `raids-in-practice` and `realms`. Drafts: `conflict-hotspots`,
+`resource-footprint`, `security-hardening`, `derived-state` and `realms`. Open:
+`install-and-update` and `raids-in-practice`. Drafts: `conflict-hotspots`,
 `execution-profiles`, `budgets`, `officers`, `federation` and
 `skill-integration`.
