@@ -360,6 +360,10 @@ _CREATE_STATEMENTS = (
 
 _COLUMN_MIGRATIONS = (
     ("leaders", "handoff_path", "TEXT"),
+    ("quests", "created_at", "TEXT"),
+    ("quests", "updated_at", "TEXT"),
+    ("quest_tasks", "created_at", "TEXT"),
+    ("quest_tasks", "updated_at", "TEXT"),
     ("leaders", "cwd", "TEXT"),
     ("leaders", "permission_mode", "TEXT"),
     ("prs", "mergeable", "TEXT"),

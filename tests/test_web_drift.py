@@ -694,7 +694,7 @@ class WebReadyForYouBehaviorTests(unittest.TestCase):
 
 _QUEST_BOARD = {
     "open_quests": [{
-        "slug": "pre", "epic": "demo", "title": "Pre work",
+        "slug": "pre", "epic": "demo", "title": "Pre work", "dates": "created 2026-10-24 09:00",
         "tasks": [{"tid": "T01", "title": "First", "adventurer": None}, {"tid": "T02", "title": "Second", "adventurer": 7}],
     }],
     "free_tasks": [{"epic": "demo", "tasks": [{"tid": "T03", "title": "Third"}, {"tid": "T04", "title": "Fourth"}]}],
@@ -751,6 +751,31 @@ class WebQuestBoardBehaviorTests(unittest.TestCase):
         hidden = _render(dict(_BOARD, parties=parties(False)), "all", "all", "parties", "text")
         self.assertIn("Release", shown)
         self.assertNotIn("Release", hidden)
+
+    def test_open_quest_shows_dates_only_when_known(self):
+        self.assertIn("created 2026-10-24 09:00", self._text(_QUEST_BOARD))
+        undated = dict(_QUEST_BOARD, open_quests=[dict(_QUEST_BOARD["open_quests"][0], dates=None)])
+        self.assertNotIn("created", self._text(undated))
+
+    def test_party_quest_and_task_show_dates_only_when_known(self):
+        def rendered(quest_dates, task_dates):
+            task = {
+                "tid": "T01", "title": "First", "state": "active", "dates": task_dates, "summary": None,
+                "blocked_reason": None, "card_url": None, "prs": [],
+            }
+            quest = {
+                "slug": "q", "title": "Q", "dates": quest_dates, "tasks": [task], "close_blockers": None,
+                "move_targets": [], "releasable": False,
+            }
+            parties = [dict(_BOARD["parties"][0], quests=[quest])]
+            return _render(dict(_BOARD, parties=parties), "all", "all", "parties", "text")
+
+        shown = rendered("created QUESTDATE", "created TASKDATE")
+        self.assertIn("QUESTDATE", shown)
+        self.assertIn("TASKDATE", shown)
+        hidden = rendered(None, None)
+        self.assertNotIn("QUESTDATE", hidden)
+        self.assertNotIn("TASKDATE", hidden)
 
     def test_writes_go_through_send_post(self):
         for expected in ('"/api/quests/create-open"', '"/api/quests/" + quest.slug + "/take"', '"/api/quests/" + quest.slug + "/release"'):

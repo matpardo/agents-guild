@@ -1930,6 +1930,9 @@ realmFetchNote: "",
     article.className = "card open-quest";
     article.appendChild(textEl("h4", quest.slug + " \u2014 " + quest.title));
     article.appendChild(classedText("p", quest.epic === null ? "no epic" : "epic " + quest.epic, "muted"));
+    if (quest.dates) {
+      article.appendChild(classedText("p", quest.dates, "muted"));
+    }
     var list = el("ul");
     list.className = "task-list";
     appendAll(
@@ -2462,6 +2465,9 @@ realmFetchNote: "",
       head.appendChild(link(task.card_url, task.tid + " card"));
     }
     item.appendChild(head);
+    if (task.dates) {
+      item.appendChild(classedText("p", task.dates, "muted"));
+    }
     var movable = task.state === "queued" || task.state === "blocked";
     if (movable && quest.move_targets.length > 0) {
       item.appendChild(renderTaskMoveControls(quest, task));
@@ -2532,6 +2538,9 @@ realmFetchNote: "",
     var article = el("div");
     article.className = "quest";
     article.appendChild(textEl("h4", quest.slug + " — " + quest.title));
+    if (quest.dates) {
+      article.appendChild(classedText("p", quest.dates, "muted"));
+    }
     if (quest.close_blockers) {
       article.appendChild(renderCloseBlockers(quest.close_blockers));
     }
