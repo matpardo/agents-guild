@@ -132,6 +132,30 @@ def _flag_value(requested, current):
     return int(requested)
 
 
+def _require_owner(ctx, row):
+    adventurer = identity.resolve_adventurer(ctx.conn, ctx.session_id)
+    if adventurer is not None:
+        owned = row["adventurer"] == adventurer["id"]
+    else:
+        owned = identity.require_binding(ctx.conn, ctx.session_id)["party"] == row["party"]
+    if not owned:
+        raise GuildError("PR '{}#{}' belongs to another session".format(row["repo"], row["number"]), 1)
+
+
+def _link_fields(ctx, row, task_ref, card):
+    if row["adventurer"] is not None:
+        if task_ref is not None:
+            raise GuildError("an adventurer's PR is linked with --card only", 1)
+        return {"task_quest": None, "task_tid": None, "card": card}
+    if task_ref is None:
+        return {"task_quest": row["task_quest"], "task_tid": row["task_tid"], "card": card}
+    quest, tid = _task_fields(ctx, task_ref)
+    quest_party = ctx.conn.execute("SELECT party FROM quests WHERE slug = ?", (quest,)).fetchone()["party"]
+    if quest_party != row["party"]:
+        raise GuildError("task '{}/{}' does not belong to the party of this PR".format(quest, tid), 1)
+    return {"task_quest": quest, "task_tid": tid, "card": card if card is not None else row["card"]}
+
+
 def _blocked_external_value(blocked_external, no_blocked_external, current):
     if no_blocked_external:
         return None
@@ -169,6 +193,44 @@ def _record_pr_set(ctx, actor, project, repo, number, fields):
         )
 
 
+def _relink(ctx, actor, project, row, task_ref, card):
+    fields = _current_fields(row)
+    fields.update(_link_fields(ctx, row, task_ref, card))
+    _record_pr_set(ctx, actor, project, row["repo"], row["number"], fields)
+
+
+def relink_as_human(ctx, ref, task_ref, card):
+    if task_ref is None and card is None:
+        raise GuildError("relink needs a task or a card", 1)
+    repo, number = refs.parse_pr_ref(ref)
+    row = _load_pr(ctx.conn, repo, number)
+    _relink(ctx, None, merge_queue_commands._project_for_repo(ctx, repo), row, task_ref, card)
+    return "PR '{}#{}' updated".format(repo, number)
+
+
+def _record_untracked(ctx, actor, project, repo, number):
+    with db.writing(ctx.conn):
+        events.record(
+            ctx.conn, ctx.now, ctx.origin, actor, ctx.session_id, project,
+            "pr.untracked", "guild", {"repo": repo, "number": number},
+        )
+    return "PR '{}#{}' untracked".format(repo, number)
+
+
+def untrack_as_human(ctx, ref):
+    repo, number = refs.parse_pr_ref(ref)
+    _load_pr(ctx.conn, repo, number)
+    return _record_untracked(ctx, None, merge_queue_commands._project_for_repo(ctx, repo), repo, number)
+
+
+def untrack(ctx, ref):
+    repo, number = refs.parse_pr_ref(ref)
+    row = _load_pr(ctx.conn, repo, number)
+    _require_owner(ctx, row)
+    project = config.require_project(ctx.cwd, ctx.projects_dir)
+    return _record_untracked(ctx, row["party"] or None, project, repo, number)
+
+
 def _set_blocked_external_as_human(ctx, ref, reason):
     repo, number = refs.parse_pr_ref(ref)
     row = _load_pr(ctx.conn, repo, number)
@@ -190,15 +252,18 @@ def unblock_external(ctx, ref):
 
 def set_(
     ctx, ref, lifecycle, waits, needs_ask_answer, needs_human_pr_review, fixes_main, fixes_flaky,
-    blocked_external, no_blocked_external,
+    blocked_external, no_blocked_external, task_ref, card,
 ):
-    options = (lifecycle, waits, needs_ask_answer, needs_human_pr_review, fixes_main, fixes_flaky, blocked_external)
+    options = (
+        lifecycle, waits, needs_ask_answer, needs_human_pr_review, fixes_main, fixes_flaky, blocked_external,
+        task_ref, card,
+    )
     if all(option is None for option in options) and not no_blocked_external:
         raise GuildError(
             "pr set needs at least one of --lifecycle, --waits, --needs-ask-answer/--no-needs-ask-answer,"
             " --needs-human-pr-review/--no-needs-human-pr-review,"
             " --fixes-main/--no-fixes-main, --fixes-flaky/--no-fixes-flaky,"
-            " --blocked-external/--no-blocked-external",
+            " --blocked-external/--no-blocked-external, --task, --card",
             1,
         )
     repo, number = refs.parse_pr_ref(ref)
@@ -213,6 +278,9 @@ def set_(
     fields["fixes_main"] = _flag_value(fixes_main, row["fixes_main"])
     fields["fixes_flaky"] = _flag_value(fixes_flaky, row["fixes_flaky"])
     fields["blocked_external"] = _blocked_external_value(blocked_external, no_blocked_external, row["blocked_external"])
+    if task_ref is not None or card is not None:
+        _require_owner(ctx, row)
+        fields.update(_link_fields(ctx, row, task_ref, card))
     _record_pr_set(ctx, binding["party"], project, repo, number, fields)
     new_lifecycle = fields["lifecycle"]
     message = "PR '{}#{}' updated".format(repo, number)

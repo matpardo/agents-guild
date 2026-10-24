@@ -589,6 +589,26 @@ class CardLagTests(DriftTestCase):
             out,
         )
 
+    def test_untracked_merged_pr_drops_the_card_finding(self):
+        self._record_cards([self._card("DEMO-90", "indeterminate", status="In Progress")])
+        self._track_pr(9, "wave9", "T01")
+        self._set_pr_lifecycle(9, "merged")
+        code, out, err = self.run_cli(["pr", "untrack", "acme/app#9"], "sess-1", self.repo_dir)
+        self.assertEqual(code, 0, err)
+        code, out, err = self._drift()
+        self.assertNotIn("PR merged, card not done", out)
+
+    def test_relinked_merged_pr_drops_the_card_finding(self):
+        self._record_cards([self._card("DEMO-90", "indeterminate", status="In Progress")])
+        self.run_cli(["quest", "add", "loose", "--title", "Loose", "--no-epic"], "sess-1", self.repo_dir)
+        self.run_cli(["task", "add", "loose/T01", "--title", "Spec"], "sess-1", self.repo_dir)
+        self._track_pr(9, "wave9", "T01")
+        self._set_pr_lifecycle(9, "merged")
+        code, out, err = self.run_cli(["pr", "set", "acme/app#9", "--task", "loose/T01"], "sess-1", self.repo_dir)
+        self.assertEqual(code, 0, err)
+        code, out, err = self._drift()
+        self.assertNotIn("PR merged, card not done", out)
+
     def test_merged_prs_on_one_card_are_one_finding(self):
         self._record_cards([self._card("DEMO-90", "indeterminate", status="In Progress")])
         self._track_pr(9, "wave9", "T01")

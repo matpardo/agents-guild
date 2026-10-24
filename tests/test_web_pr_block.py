@@ -86,3 +86,39 @@ class WebPrBlockTests(WebWriteTestCase):
         self.assertIsNone(rows[0]["party"])
         self.assertEqual(rows[0]["project"], "acme")
         self.assertEqual(json.loads(rows[0]["payload"])["blocked_external"], "decision")
+
+    def _link(self):
+        rows = self._query("SELECT task_tid, card FROM prs")
+        return (rows[0]["task_tid"], rows[0]["card"]) if rows else None
+
+    def test_relink_sets_the_card(self):
+        response, payload = self._post_json("/api/prs/acme/app/1/relink", self._good_headers(), {"card": "DEMO-7"})
+        self.assertEqual(response.status, 200, payload)
+        self.assertEqual(self._link(), ("T01", "DEMO-7"))
+
+    def test_relink_moves_the_task(self):
+        self.run_cli(["task", "add", "demo/T02", "--title", "Second"], "sess-1", self.repo_dir)
+        response, payload = self._post_json("/api/prs/acme/app/1/relink", self._good_headers(), {"task": "demo/T02"})
+        self.assertEqual(response.status, 200, payload)
+        self.assertEqual(self._link(), ("T02", None))
+
+    def test_relink_without_target_is_422(self):
+        response, payload = self._post_json("/api/prs/acme/app/1/relink", self._good_headers(), {})
+        self.assertEqual(response.status, 422)
+
+    def test_relink_unknown_task_is_422(self):
+        response, payload = self._post_json("/api/prs/acme/app/1/relink", self._good_headers(), {"task": "demo/T99"})
+        self.assertEqual(response.status, 422)
+
+    def test_relink_non_string_is_400(self):
+        response, payload = self._post_json("/api/prs/acme/app/1/relink", self._good_headers(), {"card": 3})
+        self.assertEqual(response.status, 400)
+
+    def test_untrack_removes_the_pr(self):
+        response, payload = self._post_json("/api/prs/acme/app/1/untrack", self._good_headers(), {})
+        self.assertEqual(response.status, 200, payload)
+        self.assertIsNone(self._link())
+
+    def test_untrack_unknown_pr_is_422(self):
+        response, payload = self._post_json("/api/prs/acme/app/9/untrack", self._good_headers(), {})
+        self.assertEqual(response.status, 422)

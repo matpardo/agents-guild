@@ -16,6 +16,7 @@ _KINDS = (
     "task.blocked",
     "pr.tracked",
     "pr.set",
+    "pr.untracked",
     "pr.synced",
     "ask.created",
     "ask.answered",

@@ -218,8 +218,17 @@ def _handle_pr_set(ctx, args):
             args.fixes_flaky,
             args.blocked_external,
             args.no_blocked_external,
+            args.task,
+            args.card,
         )
     )
+    return 0
+
+
+def _handle_pr_untrack(ctx, args):
+    from guild.commands import pr as pr_commands
+
+    _print(pr_commands.untrack(ctx, args.ref))
     return 0
 
 
@@ -998,7 +1007,13 @@ def _add_pr_parser(subparsers):
     external = set_parser.add_mutually_exclusive_group()
     external.add_argument("--blocked-external", help="block the PR on a decision outside development, with a reason")
     external.add_argument("--no-blocked-external", action="store_true", help="clear the external block")
+    set_parser.add_argument("--task", help="relink the PR to this task, as <quest>/<tid>")
+    set_parser.add_argument("--card", help="relink the PR to this tracker card key")
     set_parser.set_defaults(handler=_handle_pr_set)
+
+    untrack = actions.add_parser("untrack", help="stop tracking a PR")
+    untrack.add_argument("ref")
+    untrack.set_defaults(handler=_handle_pr_untrack)
 
     ready_check = actions.add_parser("ready-check", help="read-only: list everything between a PR and a merge")
     ready_check.add_argument("ref")

@@ -221,6 +221,7 @@ class RecentEventsTests(AskDetailBase):
             "sess-1", self.repo_dir,
         )
         self.run_cli(["pr", "set", "acme/app#41", "--waits", "z"], "sess-1", self.repo_dir)
+        self.run_cli(["pr", "untrack", "acme/app#41"], "sess-1", self.repo_dir)
         self.ask("task:demo/T01")
         with db.writing(self.conn):
             events.record(
@@ -231,6 +232,7 @@ class RecentEventsTests(AskDetailBase):
         summary_by_kind = {event["kind"]: event["summary"] for event in self.model(1)["events"]}
         self.assertEqual(summary_by_kind["pr.tracked"], "acme/app#41")
         self.assertEqual(summary_by_kind["pr.set"], "acme/app#41")
+        self.assertEqual(summary_by_kind["pr.untracked"], "acme/app#41")
         self.assertEqual(summary_by_kind["party.handed_off"], "alpha-g1.md")
         self.assertEqual(summary_by_kind["quest.added"], "demo")
 

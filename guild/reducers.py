@@ -281,21 +281,24 @@ def _pr_set(conn, event):
     payload = event["payload"]
     current = conn.execute(
         "SELECT lifecycle, waits, needs_ask_answer, needs_human_pr_review, last_activity_at,"
-        " fixes_main, fixes_flaky, blocked_external FROM prs WHERE repo = ? AND number = ?",
+        " fixes_main, fixes_flaky, blocked_external, task_quest, task_tid, card FROM prs"
+        " WHERE repo = ? AND number = ?",
         (payload["repo"], payload["number"]),
     ).fetchone()
     values = _flags_and_lifecycle(payload, current)
     blocked_external = payload.get("blocked_external", current["blocked_external"])
+    links = {field: payload.get(field, current[field]) for field in ("task_quest", "task_tid", "card")}
     changed = (
-        current["waits"] != payload["waits"]
+        any(current[field] != links[field] for field in links)
+        or current["waits"] != payload["waits"]
         or current["blocked_external"] != blocked_external
         or any(current[field] != values[field] for field in ("lifecycle",) + _PR_FLAG_FIELDS)
     )
     last_activity_at = event["ts"] if changed else current["last_activity_at"]
     conn.execute(
         "UPDATE prs SET lifecycle = ?, waits = ?, needs_ask_answer = ?, needs_human_pr_review = ?,"
-        " fixes_main = ?, fixes_flaky = ?, blocked_external = ?, last_activity_at = ?"
-        " WHERE repo = ? AND number = ?",
+        " fixes_main = ?, fixes_flaky = ?, blocked_external = ?, last_activity_at = ?,"
+        " task_quest = ?, task_tid = ?, card = ? WHERE repo = ? AND number = ?",
         (
             values["lifecycle"],
             payload["waits"],
@@ -305,10 +308,19 @@ def _pr_set(conn, event):
             values["fixes_flaky"],
             blocked_external,
             last_activity_at,
+            links["task_quest"],
+            links["task_tid"],
+            links["card"],
             payload["repo"],
             payload["number"],
         ),
     )
+
+
+def _pr_untracked(conn, event):
+    payload = event["payload"]
+    for table in ("prs", "pr_shared_areas", "pr_files"):
+        conn.execute("DELETE FROM {} WHERE repo = ? AND number = ?".format(table), (payload["repo"], payload["number"]))
 
 
 _PR_SYNCED_CARRY_FORWARD_FIELDS = (
@@ -787,6 +799,7 @@ _REDUCERS = {
     "finding.recorded": _finding_recorded,
     "pr.tracked": _pr_tracked,
     "pr.set": _pr_set,
+    "pr.untracked": _pr_untracked,
     "pr.synced": _pr_synced,
     "pr.comments_acknowledged": _pr_comments_acknowledged,
     "ask.created": _ask_created,
