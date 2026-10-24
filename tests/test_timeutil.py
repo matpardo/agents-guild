@@ -74,3 +74,29 @@ class AgeLabelTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class DatesLabelTests(unittest.TestCase):
+    _CREATED = datetime(2026, 10, 1, 10, 0, tzinfo=timezone.utc)
+
+    def _label(self, updated):
+        return timeutil.dates_label(
+            self._CREATED.isoformat(), None if updated is None else updated.isoformat()
+        )
+
+    def test_none_created_gives_none(self):
+        self.assertIsNone(timeutil.dates_label(None, None))
+
+    def test_same_minute_gives_created_only(self):
+        expected = "created " + timeutil.issued_label(self._CREATED.isoformat())
+        self.assertEqual(self._label(self._CREATED + timedelta(seconds=30)), expected)
+
+    def test_missing_updated_gives_created_only(self):
+        self.assertEqual(self._label(None), "created " + timeutil.issued_label(self._CREATED.isoformat()))
+
+    def test_later_update_gives_both(self):
+        later = self._CREATED + timedelta(minutes=2)
+        expected = "created {} · updated {}".format(
+            timeutil.issued_label(self._CREATED.isoformat()), timeutil.issued_label(later.isoformat())
+        )
+        self.assertEqual(self._label(later), expected)

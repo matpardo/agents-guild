@@ -1430,6 +1430,20 @@ var NO_SESSION_MESSAGE = "session token not loaded, reload the page";
     return input;
   }
 
+  function ideaDescriptionArea(draft, key, disabled) {
+    var area = el("textarea");
+    area.dataset.focusKey = "idea-" + key + "-description";
+    area.rows = 3;
+    area.className = "answer-field idea-description";
+    area.placeholder = "description";
+    area.value = draft.description;
+    area.disabled = disabled;
+    area.addEventListener("input", function () {
+      draft.description = area.value;
+    });
+    return area;
+  }
+
   function ideaProjectSelect(draft, projectNames, disabled) {
     var select = el("select");
     [""].concat(projectNames).forEach(function (name) {
@@ -1451,7 +1465,7 @@ var NO_SESSION_MESSAGE = "session token not loaded, reload the page";
     var fields = el("div");
     fields.className = "notice-actions idea-fields";
     fields.appendChild(ideaInput(draft, key, "title", "text", "title", busy));
-    fields.appendChild(ideaInput(draft, key, "description", "text", "description", busy));
+    fields.appendChild(ideaDescriptionArea(draft, key, busy));
     fields.appendChild(ideaInput(draft, key, "requester", "text", "requester (optional)", busy));
     fields.appendChild(ideaInput(draft, key, "deadline", "text", "deadline YYYY-MM-DD", busy));
     fields.appendChild(ideaProjectSelect(draft, projectNames, busy));
@@ -1495,6 +1509,9 @@ var NO_SESSION_MESSAGE = "session token not loaded, reload the page";
     }
     if (idea.deadline !== null) {
       parts.push("due " + idea.deadline + (idea.overdue ? " (overdue)" : ""));
+    }
+    if (idea.dates) {
+      parts.push(idea.dates);
     }
     return parts.join(" · ");
   }
@@ -1544,6 +1561,9 @@ var NO_SESSION_MESSAGE = "session token not loaded, reload the page";
     if (idea.parties.length > 0) {
       links.appendChild(textEl("span", "worked by:"));
     }
+    if (idea.parties.length === 0) {
+      links.appendChild(classedText("span", "not linked yet", "muted"));
+    }
     appendAll(
       links,
       idea.parties.map(function (party) {
@@ -1567,7 +1587,7 @@ var NO_SESSION_MESSAGE = "session token not loaded, reload the page";
     var busy = state.ideaBusy[idea.id] === true;
     article.appendChild(textEl("h3", "#" + idea.id + " " + idea.title));
     article.appendChild(classedText("p", ideaMeta(idea), "muted"));
-    article.appendChild(textEl("p", idea.description));
+    article.appendChild(classedText("p", idea.description, "idea-description"));
     article.appendChild(renderIdeaLinks(idea, partyNames));
     var actions = el("div");
     actions.className = "notice-actions";

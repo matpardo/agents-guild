@@ -50,6 +50,15 @@ def issued_label(issued_at_text):
     return from_iso(issued_at_text).astimezone().strftime("%Y-%m-%d %H:%M")
 
 
+def dates_label(created_at, updated_at):
+    if created_at is None:
+        return None
+    created = "created " + issued_label(created_at)
+    if updated_at is None or issued_label(updated_at) == issued_label(created_at):
+        return created
+    return "{} · updated {}".format(created, issued_label(updated_at))
+
+
 def clock_label(expires_at_text):
     return from_iso(expires_at_text).strftime("%H:%M")
 

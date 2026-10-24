@@ -361,7 +361,7 @@ class WebNoticeAndRaidBehaviorTests(unittest.TestCase):
     def _idea(self, **overrides):
         idea = {
             "id": 1, "title": "Dark mode", "description": "night owls", "requester": "ana",
-            "deadline": "2000-01-01", "project": "acme", "created_at": "now", "overdue": True,
+            "deadline": "2000-01-01", "project": "acme", "dates": "created 2026-10-01 10:00", "overdue": True,
             "parties": [],
         }
         return dict(idea, **overrides)
@@ -393,7 +393,24 @@ class WebNoticeAndRaidBehaviorTests(unittest.TestCase):
     def test_idea_without_parties_has_no_worked_by(self):
         out = self._rendered(dict(self._board(False), ideas=[self._idea()]), "ideas")
         self.assertNotIn("worked by", out)
+        self.assertIn("not linked yet", out)
+        self.assertIn("created 2026-10-01 10:00", out)
         self.assertIn("Link", out)
+
+    def test_linked_idea_is_not_marked_unlinked(self):
+        idea = self._idea(parties=[{"name": "a", "state": "active"}])
+        out = self._rendered(dict(self._board(False), ideas=[idea]), "ideas")
+        self.assertNotIn("not linked yet", out)
+
+    def test_idea_description_view_keeps_line_breaks_class(self):
+        board = dict(self._board(False), ideas=[self._idea()])
+        nodes = self._tree_nodes(_render(board, "all", "all", "ideas", "tree"))
+        views = [n for n in nodes if n["tag"] == "p" and "idea-description" in n["className"]]
+        self.assertEqual([n["text"] for n in views], ["night owls"])
+
+    def test_idea_description_input_is_a_textarea(self):
+        area = [n for n in self._idea_form_inputs() if "idea-description" in n["className"]][0]
+        self.assertEqual((area["tag"], area["placeholder"]), ("textarea", "description"))
 
     def test_party_card_lists_its_ideas(self):
         party = dict(_BOARD["parties"][0], ideas=[{"id": 1, "title": "Dark mode"}])
@@ -406,9 +423,7 @@ class WebNoticeAndRaidBehaviorTests(unittest.TestCase):
         self.assertIn("due 2099-01-01", out)
         self.assertNotIn("overdue", out)
 
-    def _idea_form_inputs(self):
-        board = dict(self._board(False), ideas=[], project_names=["acme", "zeta"])
-        out = _render(board, "all", "all", "ideas", "tree")
+    def _tree_nodes(self, out):
         found = []
 
         def walk(node):
@@ -418,6 +433,10 @@ class WebNoticeAndRaidBehaviorTests(unittest.TestCase):
 
         walk(json.loads(out))
         return found
+
+    def _idea_form_inputs(self):
+        board = dict(self._board(False), ideas=[], project_names=["acme", "zeta"])
+        return self._tree_nodes(_render(board, "all", "all", "ideas", "tree"))
 
     def test_idea_deadline_input_is_a_text_field_asking_for_iso_dates(self):
         deadline = [n for n in self._idea_form_inputs() if "idea-deadline" in n["className"]][0]

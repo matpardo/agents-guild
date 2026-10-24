@@ -1016,7 +1016,7 @@ def _idea_model(ctx, row):
         "requester": row["requester"],
         "deadline": row["deadline"],
         "project": row["project"],
-        "created_at": row["created_at"],
+        "dates": timeutil.dates_label(row["created_at"], row["updated_at"]),
         "overdue": idea_commands.is_overdue(ctx.now, row["deadline"]),
         "parties": [
             {"name": party["name"], "state": party["state"]}
