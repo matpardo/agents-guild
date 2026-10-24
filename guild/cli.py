@@ -6,7 +6,7 @@ import sys
 import time
 from pathlib import Path
 
-from guild import db, notify, origin, paths, session_info, timeutil
+from guild import db, notify, origin, paths, pii, session_info, timeutil
 from guild.commands import hook as hook_commands
 from guild.context import RunContext
 from guild.errors import GuildError
@@ -1255,9 +1255,9 @@ def build_parser():
     _add_finding_parser(subparsers)
 
     ask = subparsers.add_parser("ask", help="ask the human a decision")
-    ask.add_argument("question")
+    ask.add_argument("question", help="at most {} characters; put details in --context".format(pii.ASK_QUESTION_MAX_LENGTH))
     ask.add_argument("wait_id", nargs="?", help="ask id, with `guild ask wait <id>`")
-    ask.add_argument("--context", help="short context for the human")
+    ask.add_argument("--context", help="short context for the human, at most {} characters".format(pii.ASK_CONTEXT_MAX_LENGTH))
     ask.add_argument("--timeout", help="with ask wait: give up after this long (default 2h)")
     ask.add_argument("--ref", action="append", help="pr:<owner/repo>#<n>, task:<quest>/<tid> or card:<KEY>; repeatable")
     ask.add_argument("--option", action="append", help="an answer option; repeatable")

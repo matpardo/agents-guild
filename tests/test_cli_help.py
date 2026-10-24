@@ -3,6 +3,7 @@ import contextlib
 import io
 import unittest
 
+from guild import pii
 from guild.cli import build_parser
 
 
@@ -37,6 +38,14 @@ class CliHelpTest(unittest.TestCase):
             "see the README Commands section",
         ):
             self.assertIn(expected.lower(), text.lower())
+
+    def test_ask_help_states_length_limits(self):
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out), self.assertRaises(SystemExit):
+            build_parser().parse_args(["ask", "--help"])
+        text = " ".join(out.getvalue().split())
+        self.assertIn("at most {} characters".format(pii.ASK_QUESTION_MAX_LENGTH), text)
+        self.assertIn("at most {} characters".format(pii.ASK_CONTEXT_MAX_LENGTH), text)
 
 
 if __name__ == "__main__":
