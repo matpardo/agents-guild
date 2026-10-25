@@ -2,7 +2,7 @@ import os
 import subprocess
 from datetime import timedelta
 
-from guild import db, party_status, session_status
+from guild import background, db, party_status, session_status
 from guild.cli import _build_context
 from tests.testutil import GuildTestCase
 
@@ -175,6 +175,39 @@ class PartyStatusTests(GuildTestCase):
     def test_waiting_input(self):
         self._waiting("idle", "")
         self.assertEqual(self._derive()["status"], "waiting-input")
+
+    def _background(self, key, label):
+        background.mark(self._ctx().state_dir, "sess-1", key, label)
+
+    def test_idle_with_pr_wait_is_waiting_background(self):
+        self._waiting("idle", "")
+        self._background(background.pr_key(os.getpid()), "pr acme/app#7")
+        result = self._derive()
+        self.assertEqual(result["status"], "waiting-background")
+        self.assertEqual(result["detail"], "pr acme/app#7")
+
+    def test_stopped_with_subagent_is_waiting_background(self):
+        self._add_task()
+        self._session("session.stopped", {})
+        self._background(background.subagent_key("a1"), "a1")
+        result = self._derive()
+        self.assertEqual((result["status"], result["detail"]), ("waiting-background", "1 subagents"))
+
+    def test_open_ask_beats_background(self):
+        self._ask()
+        self._session("session.stopped", {})
+        self._background(background.pr_key(os.getpid()), "pr acme/app#7")
+        self.assertEqual(self._derive()["status"], "waiting-ask")
+
+    def test_permission_beats_background(self):
+        self._waiting("permission", "ls")
+        self._background(background.pr_key(os.getpid()), "pr acme/app#7")
+        self.assertEqual(self._derive()["status"], "waiting-permission")
+
+    def test_working_ignores_background(self):
+        self._session("session.working", {})
+        self._background(background.pr_key(os.getpid()), "pr acme/app#7")
+        self.assertEqual(self._derive()["status"], "working")
 
     def test_stopped_with_work(self):
         self._add_task()

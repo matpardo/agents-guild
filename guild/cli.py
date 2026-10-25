@@ -6,7 +6,7 @@ import sys
 import time
 from pathlib import Path
 
-from guild import db, notify, origin, paths, pii, session_info, timeutil
+from guild import background, db, notify, origin, paths, pii, session_info, timeutil
 from guild.commands import hook as hook_commands
 from guild.context import RunContext
 from guild.errors import GuildError
@@ -286,9 +286,16 @@ def _handle_ask(ctx, args):
 def _handle_pr_wait(ctx, args):
     from guild.commands import pr as pr_commands
 
-    line, exit_code = pr_commands.wait(
-        ctx.conn, args.ref, timeutil.parse_duration(args.timeout), time.sleep, timeutil.utcnow
-    )
+    key = background.pr_key(os.getpid())
+    if ctx.session_id is not None:
+        background.mark(ctx.state_dir, ctx.session_id, key, "pr {}".format(args.ref))
+    try:
+        line, exit_code = pr_commands.wait(
+            ctx.conn, args.ref, timeutil.parse_duration(args.timeout), time.sleep, timeutil.utcnow
+        )
+    finally:
+        if ctx.session_id is not None:
+            background.clear(ctx.state_dir, ctx.session_id, key)
     _print(line)
     return exit_code
 
@@ -1588,6 +1595,8 @@ def build_parser():
             "pre-commit",
             "notification",
             "stop",
+            "subagent-start",
+            "subagent-stop",
             "pre-compact",
         ],
     )
@@ -1735,6 +1744,12 @@ def _run_stateful_hook(hook_name, stdin_data):
             text = None
         elif hook_name == "stop":
             hook_commands.stop(ctx)
+            text = None
+        elif hook_name == "subagent-start":
+            hook_commands.subagent_start(ctx, stdin_data.get("agent_id"))
+            text = None
+        elif hook_name == "subagent-stop":
+            hook_commands.subagent_stop(ctx, stdin_data.get("agent_id"))
             text = None
         elif hook_name == "pre-compact":
             hook_commands.pre_compact(ctx)

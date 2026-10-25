@@ -754,6 +754,11 @@ main.history-main {
   color: var(--lifecycle-converging-fg);
 }
 
+.status-waiting-background {
+  background: var(--role-solo-bg);
+  color: var(--role-solo-fg);
+}
+
 .status-working {
   background: var(--lifecycle-ready-bg);
   color: var(--lifecycle-ready-fg);

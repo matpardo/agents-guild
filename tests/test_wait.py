@@ -2,6 +2,7 @@ import json
 import sqlite3
 import unittest
 from datetime import timedelta
+from unittest import mock
 
 from guild import db, paths, polling, timeutil
 from guild.cli import _build_context
@@ -284,6 +285,30 @@ class PrWaitTests(WaitTestCase):
         code, out, err = self.run_cli(["pr", "wait", "acme/app#99"], "sess-1", self.repo_dir)
         self.assertEqual(code, 1)
         self.assertIn("not tracked", err)
+
+    def _marker_texts(self, marker_dir):
+        return [entry.read_text() for entry in marker_dir.iterdir()]
+
+    def test_cli_marks_background_only_while_waiting(self):
+        marker_dir = _build_context("sess-1", self.repo_dir).state_dir / "background" / "sess-1"
+        seen = []
+
+        def fake_wait(conn, ref, timeout, sleep, clock):
+            seen.append(self._marker_texts(marker_dir))
+            return "done", 0
+
+        with mock.patch("guild.commands.pr.wait", side_effect=fake_wait):
+            code, out, err = self.run_cli(["pr", "wait", _REF], "sess-1", self.repo_dir)
+        self.assertEqual(code, 0, err)
+        self.assertEqual(seen, [["pr {}".format(_REF)]])
+        self.assertEqual(self._marker_texts(marker_dir), [])
+
+    def test_cli_clears_marker_when_wait_raises(self):
+        marker_dir = _build_context("sess-1", self.repo_dir).state_dir / "background" / "sess-1"
+        with mock.patch("guild.commands.pr.wait", side_effect=KeyboardInterrupt):
+            with self.assertRaises(KeyboardInterrupt):
+                self.run_cli(["pr", "wait", _REF], "sess-1", self.repo_dir)
+        self.assertEqual(self._marker_texts(marker_dir), [])
 
     def test_cli_merged_exits_zero(self):
         self._publish(state="MERGED", mergedAt="2026-10-20T12:00:00Z")

@@ -2,7 +2,7 @@ import json
 import os
 
 
-def _pid_alive(pid):
+def pid_alive(pid):
     if isinstance(pid, bool) or not isinstance(pid, int) or pid <= 0:
         return False
     try:
@@ -56,7 +56,7 @@ def live_session_ids(sessions_dir):
         except (json.JSONDecodeError, OSError):
             continue
         session_id = data.get("sessionId")
-        if session_id is not None and _pid_alive(data.get("pid")):
+        if session_id is not None and pid_alive(data.get("pid")):
             ids.add(session_id)
     return ids
 
