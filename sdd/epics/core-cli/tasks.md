@@ -119,3 +119,10 @@ updated: 2026-10-25
 **Status:** [x] done
 
 **What:** the whole repo is formatted with `ruff format` (line length 120 from `ruff.toml`), and CI runs `ruff format --check .` after the lint and before the tests, so unformatted code fails the build.
+
+## T17 — Keep the pinned CI dependencies current with Dependabot
+
+**Depends on:** T15
+**Status:** [x] done
+
+**What:** `.github/dependabot.yml` checks the GitHub actions and `requirements-lint.txt` monthly and proposes a bump only 14 days after a release, keeping the commit SHA and sha256 pins. `required-version` in `ruff.toml` stays, so a ruff bump fails CI until it is raised in the same branch.
