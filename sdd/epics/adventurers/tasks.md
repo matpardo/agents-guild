@@ -125,3 +125,14 @@ updated: 2026-10-24
 - [x] `adventurer done` reports a PR merged on GitHub as `merged` without a prior sync.
 - [x] `party close` without `--force` succeeds when the only open PR was merged on GitHub.
 - [x] A GitHub failure adds the last-sync note and does not abort the command.
+
+## T12 — Free jobs track PRs without a card
+
+**Depends on:** T11
+**Status:** [x] done
+
+**What:** An adventurer on a free job tracks its PR without `--task`, and `--card` becomes optional, so repos without a tracker can track loose PRs. `--task` on a free job is still refused.
+
+**Acceptance:**
+- [x] A free-job adventurer tracks a PR with neither `--task` nor `--card`, and `adventurer done` reports it.
+- [x] A free-job adventurer passing `--task` is refused.
