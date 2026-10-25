@@ -82,6 +82,7 @@ realmDoctorLines: [],
     raidPauseOpen: {},
     raidStatuses: {},
     raidBusy: {},
+    baseStatuses: {},
     partyHandoffStatuses: {},
     partyHandoffBusy: {},
     compactStatus: "",
@@ -596,6 +597,24 @@ realmDoctorLines: [],
         delete state.raidStatuses[raidName];
       } else {
         state.raidStatuses[raidName] = errorMessage(result.body);
+      }
+      fetchBoard();
+    });
+  }
+
+  function postBaseAction(repo, action) {
+    if (sessionToken === null) {
+      state.baseStatuses[repo] = NO_SESSION_MESSAGE;
+      fetchBoard();
+      return;
+    }
+    state.baseStatuses[repo] = "sending...";
+    fetchBoard();
+    sendPost("/api/bases/" + repo + "/" + action, {}).then(function (result) {
+      if (result.ok) {
+        delete state.baseStatuses[repo];
+      } else {
+        state.baseStatuses[repo] = errorMessage(result.body);
       }
       fetchBoard();
     });
@@ -3720,7 +3739,18 @@ realmDoctorLines: [],
     section.appendChild(textEl("h2", "bases"));
     bases.forEach(function (entry) {
       var line = el("p");
-      line.appendChild(classedText("span", entry.text, "pill res-" + (entry.warn ? "warn" : "ok")));
+      var pillClass = entry.paused ? "pill lifecycle-blocked-external" : "pill res-" + (entry.warn ? "warn" : "ok");
+      line.appendChild(classedText("span", entry.text, pillClass));
+      var action = entry.paused ? "resume" : "pause";
+      var button = textEl("button", action);
+      button.type = "button";
+      button.addEventListener("click", function () {
+        postBaseAction(entry.repo, action);
+      });
+      line.appendChild(button);
+      if (state.baseStatuses[entry.repo]) {
+        line.appendChild(classedText("span", state.baseStatuses[entry.repo], "ask-status"));
+      }
       section.appendChild(line);
     });
   }

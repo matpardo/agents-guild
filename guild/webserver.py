@@ -11,6 +11,7 @@ from urllib.parse import parse_qs, urlsplit
 from guild import ask_detail, context, db, origin, paths, timeutil
 from guild.commands import adventurer as adventurer_commands
 from guild.commands import ask as ask_commands
+from guild.commands import base_pause as base_pause_commands
 from guild.commands import board as board_commands
 from guild.commands import compact as compact_commands
 from guild.commands import handoff as handoff_commands
@@ -43,6 +44,7 @@ _MAX_BODY_BYTES = 16384
 _ASK_ACTION_RE = re.compile(r"^/api/asks/([^/]+)/(answer|dismiss)$")
 _NOTICE_ACTION_RE = re.compile(r"^/api/notices/([^/]+)/(seen|unseen)$")
 _PR_ACTION_RE = re.compile(r"^/api/prs/([^/]+/[^/]+)/(\d+)/(block|unblock|relink|untrack|ack)$")
+_BASE_ACTION_RE = re.compile(r"^/api/bases/([^/]+/[^/]+)/(pause|resume)$")
 _RAID_ACTION_RE = re.compile(r"^/api/raids/([^/]+)/(pause|resume)$")
 _MEMORY_ACTION_RE = re.compile(r"^/api/memory/([^/]+)/([1-9][0-9]*)/rm$")
 _TASK_MOVE_RE = re.compile(r"^/api/quests/([^/]+)/tasks/([^/]+)/move$")
@@ -244,6 +246,16 @@ def _run_adventurer_dismiss(adventurer_id):
     ctx = _action_context()
     try:
         return adventurer_commands.dismiss(ctx, adventurer_id)
+    finally:
+        ctx.conn.close()
+
+
+def _run_base_action(action, repo):
+    ctx = _action_context()
+    try:
+        if action == "pause":
+            return base_pause_commands.pause(ctx, repo)
+        return base_pause_commands.resume(ctx, repo)
     finally:
         ctx.conn.close()
 
@@ -501,6 +513,10 @@ class BoardRequestHandler(http_server.BaseHTTPRequestHandler):
             repo, number, action = pr_match.groups()
             ref = "{}#{}".format(repo, number)
             return self._post_action(action, lambda payload: _run_pr_action(action, ref, payload))
+        base_match = _BASE_ACTION_RE.match(path)
+        if base_match is not None:
+            repo, action = base_match.groups()
+            return self._post_action(action, lambda payload: _run_base_action(action, repo))
         raid_match = _RAID_ACTION_RE.match(path)
         if raid_match is not None:
             raid_name, action = raid_match.groups()

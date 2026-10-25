@@ -302,3 +302,27 @@ class RetiredDispatchRouteTests(WebWriteTestCase):
                 self.assertEqual(response.status, 405)
                 response, body = self._get(path, self._host())
                 self.assertEqual(response.status, 404)
+
+
+class BasePauseRouteTests(WebWriteTestCase):
+    def test_pause_then_resume_succeeds(self):
+        response, payload = self._post_json("/api/bases/acme/app/pause", self._good_headers(), {})
+        self.assertEqual(response.status, 200)
+        self.assertEqual(json.loads(payload), {"ok": True, "message": "base of acme/app paused"})
+        response, payload = self._post_json("/api/bases/acme/app/resume", self._good_headers(), {})
+        self.assertEqual(json.loads(payload), {"ok": True, "message": "base of acme/app resumed"})
+
+    def test_resume_when_not_paused_is_422(self):
+        response, payload = self._post_json("/api/bases/acme/app/resume", self._good_headers(), {})
+        self.assertEqual(response.status, 422)
+        self.assertIn("not paused", self._error(payload))
+
+    def test_unknown_repo_is_422(self):
+        response, payload = self._post_json("/api/bases/acme/other/pause", self._good_headers(), {})
+        self.assertEqual(response.status, 422)
+
+    def test_missing_token_is_rejected(self):
+        headers = self._good_headers()
+        del headers["X-Guild-Token"]
+        response, payload = self._post_json("/api/bases/acme/app/pause", headers, {})
+        self.assertNotEqual(response.status, 200)

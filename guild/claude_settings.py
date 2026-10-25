@@ -43,6 +43,7 @@ EXPECTED_ALLOW_RULES = (
     "Bash(guild claim:*)",
     "Bash(guild release:*)",
     "Bash(guild raid:*)",
+    "Bash(guild base:*)",
     "Bash(guild handoff:*)",
     "Bash(guild sync:*)",
     "Bash(guild memory:*)",

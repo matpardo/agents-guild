@@ -202,6 +202,7 @@ guild raid leave <name>
 guild raid pause <name>               # any active member or the human: ask every member party to stop
 guild raid resume <name>              # lifts the pause and posts a notice to raid:<name>
 guild raids
+guild base pause|resume <owner/repo>   # stop or restart the bases fetch of a repo
 
 guild next [--all]     # ranked action queue for the caller's party
 guild handoff --in-flight "..." --learned "..." [--model <m>] [--respawn] [--close]
@@ -531,6 +532,12 @@ result live with `git rev-list`: one line per clone,
 `<repo> <base>: N behind` (`, M ahead` when above 0) or `<repo> <base>: up to
 date`, followed by `(fetched Xm ago)` or `(never fetched)` from the mtime of the
 clone's `FETCH_HEAD`. A clone without `origin/HEAD` shows `<repo>: no origin/HEAD (git remote set-head origin --auto)` and one whose comparison fails shows `<repo> <base>: cannot compare`, both as warnings. A `paths` entry that is not itself a clone also yields its direct child directories that are clones. Nothing is stored.
+
+Pause a base: `guild base pause <owner/repo>` stops `guild sync --source bases` (and the
+fast-forward after a merge) from fetching that repo's clones, for when you are not working on
+it; `guild base resume <owner/repo>` fetches again. The repo must belong to a project; pausing
+twice or resuming a base that is not paused fails. A paused base shows `<repo>: paused` on the
+board, without a warning. The pause is stored (`base_pauses`) and replays in `guild rebuild`.
 
 Per-PR drift: for each open tracked PR with a `branch` and a located clone, the
 board counts `git rev-list --count origin/<branch>..origin/<base>` in that clone
@@ -1476,7 +1483,7 @@ text and focus; it also keeps the current filters and which blocks are collapsed
 tracker card when the project configures `tracker.browse_url` (see
 "Project config"). A "bases" section in the header, left of "resources" (model key `bases`),
 shows the same local base drift lines as `guild board`: a warning pill when the clone is behind
-`origin/<base>`, an ok pill when it is up to date; read only. A collapsible "resources" section at the bottom shows the
+`origin/<base>`, an ok pill when it is up to date, a neutral `paused` pill for a paused base; each line has a `pause` or `resume` button (`POST /api/bases/<owner>/<repo>/pause|resume`, same function as `guild base`). A collapsible "resources" section at the bottom shows the
 `guild resources` report from `GET /api/resources` (see "`guild resources`").
 
 **Colors**: the page uses the terminal board's meanings, with CSS classes
