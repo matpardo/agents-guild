@@ -694,12 +694,31 @@ def _adventurer_promoted(conn, event):
     )
 
 
+def _close_open_quest_task(conn, event, task):
+    if task is None or "/" not in task:
+        return
+    quest, tid = task.split("/", 1)
+    row = conn.execute("SELECT 1 FROM quests WHERE slug = ? AND epic IS NULL AND party IS NULL", (quest,)).fetchone()
+    if row is None:
+        return
+    conn.execute(
+        "UPDATE quest_tasks SET state = 'done', updated_at = ? WHERE quest = ? AND tid = ?", (event["ts"], quest, tid)
+    )
+    unfinished = conn.execute(
+        "SELECT 1 FROM quest_tasks WHERE quest = ? AND state != 'done' LIMIT 1", (quest,)
+    ).fetchone()
+    if unfinished is None:
+        conn.execute("UPDATE quests SET state = 'done', updated_at = ? WHERE slug = ?", (event["ts"], quest))
+
+
 def _adventurer_done(conn, event):
     payload = event["payload"]
     conn.execute(
         "UPDATE adventurers SET state = 'done', pending = ?, done_at = ? WHERE id = ?",
         (payload["pending"], event["ts"], payload["id"]),
     )
+    adventurer = conn.execute("SELECT task FROM adventurers WHERE id = ?", (payload["id"],)).fetchone()
+    _close_open_quest_task(conn, event, adventurer["task"])
 
 
 def _adventurer_dismissed(conn, event):

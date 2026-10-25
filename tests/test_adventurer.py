@@ -426,3 +426,67 @@ class AdventurerTaskDriftTests(AdventurerTestCase):
         self.ship("chore/T01", 1)
         self.merge(1)
         self.assertNotIn("adventurer task not in SDD", self.drift("--all"))
+
+
+class AdventurerQuestCloseTests(AdventurerTestCase):
+    def add_open_quest(self, slug, tasks, titles):
+        code, out, err = self.cli(
+            ["quest", "add", slug, "--open", "--no-epic", "--title", slug, "--tasks", tasks, "--titles", titles], None
+        )
+        self.assertEqual(code, 0, err)
+
+    def quest_state(self, slug):
+        return self.rows("SELECT state FROM quests WHERE slug = '{}'".format(slug))[0]["state"]
+
+    def task_states(self, slug):
+        rows = self.rows("SELECT tid, state FROM quest_tasks WHERE quest = '{}' ORDER BY tid".format(slug))
+        return [(row["tid"], row["state"]) for row in rows]
+
+    def test_done_closes_the_no_epic_quest_with_its_last_task(self):
+        self.add_open_quest("chore", "T01", "one")
+        self.start("adv-1", "x", "--task", "chore/T01")
+        code, out, err = self.cli(["adventurer", "done", "--pending", "none"], "adv-1")
+        self.assertEqual(code, 0, err)
+        self.assertIn("quest chore done", out)
+        self.assertEqual(self.task_states("chore"), [("T01", "done")])
+        self.assertEqual(self.quest_state("chore"), "done")
+        code, out, err = self.cli(["quest", "board"], None)
+        self.assertEqual(code, 0, err)
+        self.assertNotIn("chore", out)
+
+    def test_done_keeps_the_quest_active_while_other_tasks_are_open(self):
+        self.add_open_quest("chore", "T01,T02", "one,two")
+        self.start("adv-1", "x", "--task", "chore/T01")
+        code, out, err = self.cli(["adventurer", "done", "--pending", "none"], "adv-1")
+        self.assertEqual(code, 0, err)
+        self.assertEqual(self.task_states("chore"), [("T01", "done"), ("T02", "queued")])
+        self.assertEqual(self.quest_state("chore"), "active")
+        self.assertNotIn("quest chore done", out)
+
+    def test_done_on_an_sdd_task_changes_no_quest(self):
+        self.start("adv-1", "x", "--task", "demo-epic/T02")
+        before = self.rows("SELECT slug, state FROM quests ORDER BY slug")
+        self.cli(["adventurer", "done", "--pending", "none"], "adv-1")
+        after = self.rows("SELECT slug, state FROM quests ORDER BY slug")
+        self.assertEqual([tuple(r) for r in before], [tuple(r) for r in after])
+        self.assertEqual(self.rows("SELECT COUNT(*) AS n FROM quest_tasks WHERE state = 'done'")[0]["n"], 0)
+
+    def test_done_leaves_a_party_owned_no_epic_quest_untouched(self):
+        self.cli(["party", "start", "alpha", "--reason", "test reason"], "sess-1")
+        code, out, err = self.cli(
+            ["quest", "add", "owned", "--no-epic", "--title", "owned", "--tasks", "T01", "--titles", "one"], "sess-1"
+        )
+        self.assertEqual(code, 0, err)
+        self.start("adv-1", "x", "--task", "demo-epic/T02")
+        self.cli(["adventurer", "done", "--pending", "none"], "adv-1")
+        self.assertEqual(self.quest_state("owned"), "active")
+        self.assertEqual(self.task_states("owned"), [("T01", "queued")])
+
+    def test_rebuild_closes_the_orphan_quest(self):
+        self.add_open_quest("chore", "T01", "one")
+        self.start("adv-1", "x", "--task", "chore/T01")
+        self.cli(["adventurer", "done", "--pending", "none"], "adv-1")
+        code, out, err = self.cli(["rebuild"], None)
+        self.assertEqual(code, 0, err)
+        self.assertEqual(self.task_states("chore"), [("T01", "done")])
+        self.assertEqual(self.quest_state("chore"), "done")
