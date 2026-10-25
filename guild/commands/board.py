@@ -157,6 +157,12 @@ def _card_prefix(pr_row):
     return "{}  ".format(sanitize.strip_control_sequences(pr_row["card"]))
 
 
+def _behind_label(pr_row):
+    if not pr_row["behind_by"]:
+        return None
+    return "{} behind {}".format(pr_row["behind_by"], _optional_text(pr_row["base_branch"]) or "base")
+
+
 def _pr_lines(ctx, painter, pr_row, indent):
     badges = _badges(ctx, pr_row)
     status_plain = "{}  {}".format(" ".join(label for label, _ in badges), _checks_plain(pr_row))
@@ -182,6 +188,9 @@ def _pr_lines(ctx, painter, pr_row, indent):
     if branch is not None:
         branch_lines = painter.wrap("branch: {}".format(branch), indent + "  ")
         head_lines = head_lines + [painter.paint(line, "dim") for line in branch_lines]
+    behind = _behind_label(pr_row)
+    if behind is not None:
+        head_lines = head_lines + [painter.paint(line, "dim") for line in painter.wrap(behind, indent + "  ")]
     waits = _visible_waits(pr_row)
     if waits:
         head_lines = head_lines + painter.wrap("waits: {}".format(waits), indent + "  ")
@@ -972,6 +981,7 @@ def _pr_model(ctx, pr_row, project_config):
         "review_reasons": merge_queue.review_reasons(
             pr_row["mergeable"], pr_row["review_decision"], pr_row["unresolved_threads"], pr_row["merge_state"]
         ),
+        "behind": _behind_label(pr_row),
         "card": card,
         "card_url": links.card_url(project_config, card),
         "dates": timeutil.dates_label(pr_row["tracked_at"], pr_row["last_activity_at"]),

@@ -132,6 +132,49 @@ class PrActivityTests(GuildTestCase):
         self.assertEqual(code, 0)
         self.assertIsNone(self._pr_row()["unresolved_threads"])
 
+    def _sync_behind(self, behind):
+        self.write_gh_fixture("behind_acme-app_abc123", behind)
+        return self._sync_view(baseRefName="main", headRefOid="abc123")
+
+    def test_sync_stores_behind_by(self):
+        self.assertEqual(self._sync_behind(3)["behind_by"], 3)
+
+    def test_behind_error_keeps_the_old_value_and_reports_failure(self):
+        self._sync_behind(3)
+        (self.gh_fixtures_dir / "behind_acme-app_abc123.json").unlink()
+        self.write_gh_error("behind_acme-app_abc123", "compare down")
+        self.write_gh_fixture(
+            "view_acme-app_1",
+            {
+                "state": "OPEN",
+                "isDraft": False,
+                "headRefName": "feature/x",
+                "title": "t",
+                "baseRefName": "main",
+                "headRefOid": "abc123",
+            },
+        )
+        code, out, err = self.run_cli(["sync", "--source", "gh"], "sess-1", self.repo_dir)
+        self.assertIn("behind base check failed: compare down", out + err)
+        self.assertEqual(self._pr_row()["behind_by"], 3)
+
+    def test_merged_pr_does_not_query_behind_by(self):
+        self.write_gh_error("behind_acme-app_abc123", "must not be called")
+        row = self._sync_view(state="MERGED", mergedAt="2026-01-01T00:00:00Z", baseRefName="main", headRefOid="abc123")
+        self.assertIsNone(row["behind_by"])
+
+    def test_board_and_ready_check_show_the_behind_counter_only_when_behind(self):
+        self._sync_behind(3)
+        code, out, err = self.run_cli(["board"], "sess-1", self.repo_dir)
+        self.assertIn("3 behind main", out)
+        code, out, err = self.run_cli(["pr", "ready-check", "acme/app#1"], "sess-1", self.repo_dir)
+        self.assertIn("- note: 3 behind main", out)
+        self._sync_behind(0)
+        code, out, err = self.run_cli(["board"], "sess-1", self.repo_dir)
+        self.assertNotIn("behind", out)
+        code, out, err = self.run_cli(["pr", "ready-check", "acme/app#1"], "sess-1", self.repo_dir)
+        self.assertNotIn("behind", out)
+
     def test_sync_without_changes_does_not_bump_activity(self):
         self.run_cli(["sync", "--source", "gh"], "sess-1", self.repo_dir)
         before = self._pr_row()["last_activity_at"]

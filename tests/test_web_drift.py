@@ -1076,6 +1076,40 @@ class WebQuestBoardBehaviorTests(unittest.TestCase):
         self.assertNotIn("QUESTDATE", hidden)
         self.assertNotIn("TASKDATE", hidden)
 
+    def test_party_pr_shows_the_behind_pill_only_when_behind(self):
+        def rendered(behind):
+            pr = {
+                "repo": "o/r",
+                "number": 1,
+                "lifecycle": "ready",
+                "task": None,
+                "needs_ask_answer": False,
+                "ask_id": None,
+                "needs_human_pr_review": False,
+                "fixes_main": False,
+                "fixes_flaky": False,
+                "blocked_external": None,
+                "party": "a",
+                "checks_failing": 0,
+                "checks_passing": 0,
+                "checks_pending": 0,
+                "what": "w",
+                "waits": None,
+                "branch": None,
+                "base_branch": None,
+                "review_reasons": [],
+                "behind": behind,
+                "card": None,
+                "card_url": None,
+                "dates": None,
+                "url": "https://example.com/pr",
+            }
+            party = dict(_BOARD["parties"][0], prs=[pr])
+            return _render(dict(_BOARD, parties=[party]), "all", "all", "parties", "text")
+
+        self.assertIn("3 behind main", rendered("3 behind main"))
+        self.assertNotIn("behind", rendered(None))
+
     def test_party_pr_and_claim_show_dates_only_when_known(self):
         def rendered(party_dates, pr_dates, claim_dates):
             pr = {

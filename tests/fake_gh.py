@@ -25,6 +25,14 @@ def _respond_graphql(directory, name):
     return _respond(directory, name)
 
 
+def _respond_default(directory, name, default):
+    if not os.path.isfile(os.path.join(directory, name + ".json")) and not os.path.isfile(
+        os.path.join(directory, name + ".err")
+    ):
+        return subprocess.CompletedProcess([], 0, default, "")
+    return _respond(directory, name)
+
+
 def _threads_response(resolved_flags):
     nodes = [{"isResolved": flag} for flag in resolved_flags]
     return {"data": {"repository": {"pullRequest": {"reviewThreads": {"nodes": nodes}}}}}
@@ -54,6 +62,9 @@ def respond(directory, args):
     if args[:1] == ["api"]:
         parts = args[1].split("/")
         repo = "-".join(parts[1:3])
+        if parts[3] == "compare":
+            head = args[1].split("...", 1)[1].split("?", 1)[0]
+            return _respond_default(directory, "behind_{}_{}".format(repo, head), "0\n")
         if parts[3] == "check-runs":
             return _respond(directory, "annotations_{}_{}".format(repo, parts[4]))
         branch = "-".join(parts[4:-1])
