@@ -10,9 +10,7 @@ _DU_TIMEOUT_SECONDS = 300
 _GLOB_MAGIC_RE = re.compile(r"[*?\[]")
 _EXCLUDE_ESCAPE_RE = re.compile(r"([\\*?\[])")
 _FLAGGED_LIFECYCLES = {"merged": "merged", "closed": "closed"}
-_LATEST_PR_LIFECYCLE_SQL = (
-    "SELECT lifecycle FROM prs WHERE repo = ? AND branch = ? ORDER BY number DESC LIMIT 1"
-)
+_LATEST_PR_LIFECYCLE_SQL = "SELECT lifecycle FROM prs WHERE repo = ? AND branch = ? ORDER BY number DESC LIMIT 1"
 
 
 class Deadline:

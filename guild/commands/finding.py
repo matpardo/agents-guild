@@ -14,8 +14,7 @@ def _count(conn, project, finding_class):
 
 def class_models(conn, project, threshold):
     rows = conn.execute(
-        "SELECT class, COUNT(*) AS total FROM findings WHERE project = ?"
-        " GROUP BY class ORDER BY total DESC, class ASC",
+        "SELECT class, COUNT(*) AS total FROM findings WHERE project = ? GROUP BY class ORDER BY total DESC, class ASC",
         (project,),
     ).fetchall()
     return [

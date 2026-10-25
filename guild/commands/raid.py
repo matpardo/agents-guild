@@ -36,9 +36,7 @@ def leave(ctx, name):
         (name, binding["party"]),
     ).fetchone()
     if row is None or timeutil.is_expired(ctx.now, row["expires_at"]):
-        raise GuildError(
-            "party '{}' is not a member of raid '{}'".format(binding["party"], name), 1
-        )
+        raise GuildError("party '{}' is not a member of raid '{}'".format(binding["party"], name), 1)
     project = config.resolve_project(ctx.cwd, config.load_all_projects(ctx.projects_dir))
     with db.writing(ctx.conn):
         events.record(

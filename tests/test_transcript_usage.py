@@ -23,9 +23,7 @@ class TranscriptUsageTests(GuildTestCase):
         self.assertEqual(len(messages), 1)
         message = messages[0]
         self.assertEqual(message.model, _MODEL)
-        self.assertEqual(
-            (message.input, message.cache_creation, message.cache_read, message.output), (1, 2, 3, 4)
-        )
+        self.assertEqual((message.input, message.cache_creation, message.cache_read, message.output), (1, 2, 3, 4))
         self.assertEqual(next_offset, self.path.stat().st_size)
 
     def test_streamed_chunks_merge_with_max_per_field(self):

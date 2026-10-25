@@ -46,9 +46,7 @@ class ExternalBlockTestCase(MergeQueueTestCase):
         self.assertIsNone(self.column(1))
 
     def test_empty_reason_is_rejected(self):
-        code, out, err = self.run_cli(
-            ["pr", "set", "acme/app#1", "--blocked-external", " "], "sess-1", self.repo_dir
-        )
+        code, out, err = self.run_cli(["pr", "set", "acme/app#1", "--blocked-external", " "], "sess-1", self.repo_dir)
         self.assertEqual(code, 1)
 
     def test_queue_shows_reason_keeps_order_and_skips_head(self):
@@ -70,9 +68,7 @@ class ExternalBlockTestCase(MergeQueueTestCase):
     def test_external_refs_include_transitive(self):
         self.pr_set(1, "--blocked-external", "x")
         self.run_cli(["merge-queue", "pin", "acme/app#1", "--before", "acme/app#2"], "sess-1", self.repo_dir)
-        self.assertEqual(
-            merge_queue_commands.external_blocked_refs(self.conn()), {"acme/app#1", "acme/app#2"}
-        )
+        self.assertEqual(merge_queue_commands.external_blocked_refs(self.conn()), {"acme/app#1", "acme/app#2"})
 
     def test_caps_exclude_external_prs(self):
         self.set_caps(max_open_prs_per_party=2, max_open_prs=2)

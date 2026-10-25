@@ -89,9 +89,7 @@ def _resume_lines(ctx, binding):
         _touch_marker(marker)
         lines = brief_lines + [""] + next_commands.run(ctx, binding, False, False)
         return lines + [""] + memory_lines if memory_lines else lines
-    handoff_content = party_commands.previous_handoff_content(
-        ctx.conn, binding["party"], binding["generation"]
-    )
+    handoff_content = party_commands.previous_handoff_content(ctx.conn, binding["party"], binding["generation"])
     if handoff_content is None:
         return failure_lines
     _touch_marker(marker)
@@ -131,9 +129,11 @@ def _auto_adventurer_lines(ctx, health_job, source):
     if identity.resolve_adventurer(ctx.conn, ctx.session_id) is not None:
         return []
     try:
-        return [adventurer_commands.start(
-            ctx, None, None, health_job, "health job {} launched by the human".format(health_job)
-        )]
+        return [
+            adventurer_commands.start(
+                ctx, None, None, health_job, "health job {} launched by the human".format(health_job)
+            )
+        ]
     except GuildError as error:
         return ["GUILD_ADVENTURER_JOB={} not applied: {}".format(health_job, error.message)]
 
@@ -273,9 +273,7 @@ def notification(ctx, notification_type, message, push_runner):
             return
         if not session_status.is_change(ctx.conn, ctx.session_id, status):
             return
-        session_status.record_change(
-            ctx, binding, "session.waiting", session_status.waiting_payload(wait, message)
-        )
+        session_status.record_change(ctx, binding, "session.waiting", session_status.waiting_payload(wait, message))
     if wait not in _BLOCKING_WAITS:
         return
     _run_push(ctx, binding, wait, push_runner)
@@ -371,10 +369,7 @@ def prompt_submit(ctx):
             marker.touch()
             lines = [UNBOUND_HINT] + lines
     lines = (
-        lines
-        + _ctx_nudge_lines(ctx, binding)
-        + _membership_warning_lines(ctx, binding)
-        + _pause_lines(ctx, binding)
+        lines + _ctx_nudge_lines(ctx, binding) + _membership_warning_lines(ctx, binding) + _pause_lines(ctx, binding)
     )
     with db.writing(ctx.conn):
         inbox_commands.advance_cursor(ctx.conn, identity.cursor_key(ctx.session_id), seq)
@@ -387,10 +382,7 @@ def post_tool_use(ctx):
     message_lines, seq = inbox_commands.new_lines(ctx, binding)
     lines = inbox_commands.framed(message_lines)
     lines = (
-        lines
-        + _ctx_nudge_lines(ctx, binding)
-        + _membership_warning_lines(ctx, binding)
-        + _pause_lines(ctx, binding)
+        lines + _ctx_nudge_lines(ctx, binding) + _membership_warning_lines(ctx, binding) + _pause_lines(ctx, binding)
     )
     with db.writing(ctx.conn):
         inbox_commands.advance_cursor(ctx.conn, identity.cursor_key(ctx.session_id), seq)
@@ -468,15 +460,13 @@ def _push_segments(command):
 def _strip_ref_prefix(ref):
     prefix = "refs/heads/"
     if ref.startswith(prefix):
-        return ref[len(prefix):]
+        return ref[len(prefix) :]
     return ref
 
 
 def _current_branch(cwd):
     try:
-        result = subprocess.run(
-            ["git", "branch", "--show-current"], cwd=str(cwd), capture_output=True, text=True
-        )
+        result = subprocess.run(["git", "branch", "--show-current"], cwd=str(cwd), capture_output=True, text=True)
     except OSError:
         return None
     if result.returncode != 0:
@@ -621,9 +611,7 @@ def _red_main_push_result(ctx, target_dir, branch, open_pr):
     if _fixes_main_pr_exists(ctx, repo, None, branch):
         return None
     if open_pr is None or open_pr["isDraft"]:
-        warning = "guild: main of {} is red: {}; keep iterating in draft, do not mark the PR Ready".format(
-            repo, checks
-        )
+        warning = "guild: main of {} is red: {}; keep iterating in draft, do not mark the PR Ready".format(repo, checks)
         return {"blocked": False, "message": None, "system_message": warning}
     message = (
         "guild: main of {} is red: {}\n"
@@ -639,7 +627,7 @@ def _flag_value(args, flags):
             return args[index + 1]
         for flag in flags:
             if flag.startswith("--") and token.startswith(flag + "="):
-                return token[len(flag) + 1:]
+                return token[len(flag) + 1 :]
     return None
 
 
@@ -835,7 +823,7 @@ def _gh_pr_arguments(args):
             index += 2
             continue
         if token.startswith("--repo="):
-            repo = token[len("--repo="):]
+            repo = token[len("--repo=") :]
         if not token.startswith("-") and positional is None:
             positional = token
         index += 1
@@ -852,13 +840,13 @@ def _gh_pr_command(tokens):
             global_repo = tokens[index + 1]
             index += 2
         elif tokens[index].startswith("--repo="):
-            global_repo = tokens[index][len("--repo="):]
+            global_repo = tokens[index][len("--repo=") :]
             index += 1
         else:
             break
     if index + 1 >= len(tokens) or tokens[index] != "pr":
         return None
-    return global_repo, tokens[index + 1], tokens[index + 2:]
+    return global_repo, tokens[index + 1], tokens[index + 2 :]
 
 
 def _gh_pr_target(tokens, default_cwd):
@@ -899,9 +887,12 @@ def _foreign_pr(ctx, binding, target):
         " ORDER BY repo, number LIMIT 1",
         (
             binding["party"],
-            target["repo"], target["repo"],
-            target["number"], target["number"],
-            target["branch"], target["branch"],
+            target["repo"],
+            target["repo"],
+            target["number"],
+            target["number"],
+            target["branch"],
+            target["branch"],
         ),
     ).fetchone()
 
@@ -942,9 +933,7 @@ def pre_pr_owner(ctx, command):
 
 
 _DENIED_ANSWER_SUBCOMMANDS = ("answer", "dismiss")
-_ANSWER_DENY_REASON = (
-    "guild: agents cannot answer or dismiss an ask; only a human may run this outside a session"
-)
+_ANSWER_DENY_REASON = "guild: agents cannot answer or dismiss an ask; only a human may run this outside a session"
 _REALM_DENY_REASON = (
     "guild: agents cannot run realm commands other than status and doctor; only a human may run this outside a session"
 )
@@ -1001,12 +990,13 @@ def _guild_words(tokens):
         rest = tokens[1:]
     elif _PYTHON_RE.fullmatch(name):
         starts = [
-            index + 2 for index in range(len(tokens) - 1)
+            index + 2
+            for index in range(len(tokens) - 1)
             if tokens[index] == "-m" and tokens[index + 1] in _GUILD_MODULES
         ]
         if not starts:
             return []
-        rest = tokens[starts[0]:]
+        rest = tokens[starts[0] :]
     else:
         return []
     return [token for token in rest if not token.startswith("-")]

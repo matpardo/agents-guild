@@ -20,10 +20,7 @@ def _groups():
     block = _TOOLTIPS_BLOCK_RE.search(_APP_JS)
     if block is None:
         return {}
-    return {
-        name: set(_KEY_RE.findall(body))
-        for name, body in _GROUP_RE.findall(block.group(1))
-    }
+    return {name: set(_KEY_RE.findall(body)) for name, body in _GROUP_RE.findall(block.group(1))}
 
 
 class TooltipCoverageTests(unittest.TestCase):
@@ -53,7 +50,12 @@ class TooltipCoverageTests(unittest.TestCase):
     def test_queue_states(self):
         self.assertCovers(
             "queueState",
-            [merge_queue._READY_STATE, merge_queue.CI_PENDING_STATE, merge_queue._WAITING_STATE, merge_queue._BLOCKED_STATE],
+            [
+                merge_queue._READY_STATE,
+                merge_queue.CI_PENDING_STATE,
+                merge_queue._WAITING_STATE,
+                merge_queue._BLOCKED_STATE,
+            ],
         )
 
     def test_queue_actions(self):
@@ -93,9 +95,19 @@ class TooltipCoverageTests(unittest.TestCase):
         self.assertCovers(
             "partyWait",
             [
-                "checks-pending", "checks-failing", "conflict", "behind", "changes-requested", "threads",
-                "human-review", "human-merge", "draft-green", "ask-open",
-                "ask-answered-unseen", "notices-unread", "limit-reset",
+                "checks-pending",
+                "checks-failing",
+                "conflict",
+                "behind",
+                "changes-requested",
+                "threads",
+                "human-review",
+                "human-merge",
+                "draft-green",
+                "ask-open",
+                "ask-answered-unseen",
+                "notices-unread",
+                "limit-reset",
             ],
         )
 
@@ -114,10 +126,25 @@ class TooltipCoverageTests(unittest.TestCase):
         self.assertCovers(
             "ui",
             [
-                "noticeNew", "issued", "timeLeft", "askBlocks", "mainRed", "mainBlocked",
-                "generation", "leader", "noLeader", "claims", "synced",
-                "ctxHigh", "resumeCommand", "remaining", "allDone",
-                "baseBranch", "nextToMerge", "noMergeReady", "queueDetail",
+                "noticeNew",
+                "issued",
+                "timeLeft",
+                "askBlocks",
+                "mainRed",
+                "mainBlocked",
+                "generation",
+                "leader",
+                "noLeader",
+                "claims",
+                "synced",
+                "ctxHigh",
+                "resumeCommand",
+                "remaining",
+                "allDone",
+                "baseBranch",
+                "nextToMerge",
+                "noMergeReady",
+                "queueDetail",
             ],
         )
 

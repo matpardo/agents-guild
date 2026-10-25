@@ -207,8 +207,13 @@ class RealmFilesTests(GuildTestCase):
         self._join("beta")
         good = {"id": _ID_A, "from": "alpha", "name": "a.md", "size": 1, "sent_at": _SENT_AT}
         bad = [
-            dict(good, id="XYZ"), dict(good, size=True), dict(good, size=hub.CONTENT_MAX_BYTES + 1),
-            dict(good, sent_at="nope"), dict(good, name="x" * 200), dict(good, extra=1), "str",
+            dict(good, id="XYZ"),
+            dict(good, size=True),
+            dict(good, size=hub.CONTENT_MAX_BYTES + 1),
+            dict(good, sent_at="nope"),
+            dict(good, name="x" * 200),
+            dict(good, extra=1),
+            "str",
             dict(good, **{"from": "a b"}),
         ]
         ctx = SimpleNamespace(now=timeutil.utcnow())

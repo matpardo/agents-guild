@@ -24,7 +24,7 @@ def _require_free_session(conn, session_id):
     adventurer = identity.resolve_adventurer(conn, session_id)
     if adventurer is not None:
         raise GuildError(
-            "session is already an adventurer ({}): run `guild adventurer done --pending \"<text>\"`".format(
+            'session is already an adventurer ({}): run `guild adventurer done --pending "<text>"`'.format(
                 adventurer["id"]
             ),
             1,
@@ -36,7 +36,7 @@ def _require_synced_epic(conn, project, epic):
     if row is None:
         raise GuildError(
             "epic '{}' was never synced: run `guild sync --source sdd`, or `guild quest add <slug> --open"
-            " --no-epic --title \"...\" --tasks T01 --titles \"...\"` and start with --task <slug>/T01".format(epic),
+            ' --no-epic --title "..." --tasks T01 --titles "..."` and start with --task <slug>/T01'.format(epic),
             1,
         )
 
@@ -73,8 +73,8 @@ def _resolve_start_job(job, task, health_job):
         if task is None:
             raise GuildError(
                 "adventurer start requires --task <epic>/<tid> (an SDD task, or a new one the PR adds to a synced"
-                " epic); without SDD run `guild quest add <slug> --open --no-epic --title \"...\" --tasks T01"
-                " --titles \"...\"` and pass --task <slug>/T01",
+                ' epic); without SDD run `guild quest add <slug> --open --no-epic --title "..." --tasks T01'
+                ' --titles "..."` and pass --task <slug>/T01',
                 1,
             )
         return job
@@ -195,7 +195,7 @@ def promote(ctx, name, reason):
     message = "adventurer {} promoted to party '{}', generation 1".format(adventurer["id"], name)
     if adventurer["task"] is None:
         return message
-    return "{}\nadd task {} to a quest: `guild quest add <slug> --epic <epic> --tasks <tid> --reason \"<text>\"`".format(
+    return '{}\nadd task {} to a quest: `guild quest add <slug> --epic <epic> --tasks <tid> --reason "<text>"`'.format(
         message, adventurer["task"]
     )
 
@@ -230,9 +230,7 @@ def _list_line(row):
 
 
 def list_adventurers(ctx):
-    active = ctx.conn.execute(
-        "SELECT * FROM adventurers WHERE state = 'active' ORDER BY id ASC"
-    ).fetchall()
+    active = ctx.conn.execute("SELECT * FROM adventurers WHERE state = 'active' ORDER BY id ASC").fetchall()
     recent = ctx.conn.execute(
         "SELECT * FROM adventurers WHERE state = 'done' ORDER BY done_at DESC, id DESC LIMIT ?",
         (_RECENT_DONE_LIMIT,),

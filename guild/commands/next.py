@@ -261,8 +261,7 @@ def _open_quest_offer(conn, project, party):
     if project is None or _queued_tasks(conn, project, party):
         return None
     row = conn.execute(
-        "SELECT slug FROM quests WHERE project = ? AND party IS NULL AND state = 'active'"
-        " ORDER BY rowid ASC",
+        "SELECT slug FROM quests WHERE project = ? AND party IS NULL AND state = 'active' ORDER BY rowid ASC",
         (project,),
     ).fetchone()
     if row is None:
@@ -285,17 +284,13 @@ def _evaluate_next_task(conn, now, project, party):
         if item["epic"] is not None and item["deps"]:
             pending = []
             for dep_tid in item["deps"]:
-                is_done, source, dep_disagreements = resolve.resolve_task_done(
-                    conn, project, item["epic"], dep_tid
-                )
+                is_done, source, dep_disagreements = resolve.resolve_task_done(conn, project, item["epic"], dep_tid)
                 if dep_disagreements:
                     disagreements.append(_disagreement_line(item["epic"], dep_tid, dep_disagreements))
                 if not is_done:
                     pending.append("{} (per {})".format(dep_tid, source or "no source"))
             if pending:
-                blocked.append(
-                    "{}/{}: waiting on {}".format(item["quest"], item["tid"], ", ".join(pending))
-                )
+                blocked.append("{}/{}: waiting on {}".format(item["quest"], item["tid"], ", ".join(pending)))
                 continue
         ref = "task:{}/{}".format(item["quest"], item["tid"])
         ask_id = _open_ask_id_for_ref(conn, ref)
@@ -331,9 +326,7 @@ def _render_all(candidates, drift, next_task, wait, offer, disagreements):
     lines.extend(_drift_line(finding) for finding in drift)
     if next_task is not None:
         lines.append(
-            "task {}/{}: {} — ready".format(
-                next_task["quest"], next_task["tid"], _task_title_display(next_task)
-            )
+            "task {}/{}: {} — ready".format(next_task["quest"], next_task["tid"], _task_title_display(next_task))
         )
     if wait is not None:
         lines.append(wait)
@@ -361,11 +354,7 @@ def _render_single(ctx, candidates, drift, next_task, wait, offer, disagreements
             lines.append("disagreement: {}".format(line))
         return lines
     if next_task is not None:
-        lines = [
-            "task {}/{}: {} — ready".format(
-                next_task["quest"], next_task["tid"], _task_title_display(next_task)
-            )
-        ]
+        lines = ["task {}/{}: {} — ready".format(next_task["quest"], next_task["tid"], _task_title_display(next_task))]
         for line in disagreements:
             lines.append("disagreement: {}".format(line))
         return lines
@@ -391,10 +380,7 @@ def _paused_lines(paused_rows):
 
 
 def _without(candidates, taken):
-    return [
-        candidate for candidate in candidates
-        if (candidate[0]["repo"], candidate[0]["number"]) not in taken
-    ]
+    return [candidate for candidate in candidates if (candidate[0]["repo"], candidate[0]["number"]) not in taken]
 
 
 def _candidates(ctx, party, project):
@@ -452,6 +438,4 @@ def run(ctx, binding, show_all, acknowledge):
 
     if show_all:
         return _render_all(candidates, drift, next_task, wait, offer, disagreements)
-    return _render_single(
-        ctx, candidates, drift, next_task, wait, offer, disagreements, blocked, acknowledge
-    )
+    return _render_single(ctx, candidates, drift, next_task, wait, offer, disagreements, blocked, acknowledge)

@@ -29,40 +29,102 @@ class HistoryTestCase(GuildTestCase):
         self.conn.commit()
 
     def _quest_added(self, hours, slug, party, project, epic, tids):
-        self._event(hours, party, project, "quest.added", {
-            "slug": slug, "project": project, "party": party, "epic": epic, "title": "Quest " + slug,
-            "tasks": [{"tid": tid, "title": tid} for tid in tids],
-        })
+        self._event(
+            hours,
+            party,
+            project,
+            "quest.added",
+            {
+                "slug": slug,
+                "project": project,
+                "party": party,
+                "epic": epic,
+                "title": "Quest " + slug,
+                "tasks": [{"tid": tid, "title": tid} for tid in tids],
+            },
+        )
 
     def _task_done(self, hours, slug, tid, party, project):
         self._event(hours, party, project, "task.done", {"quest": slug, "tid": tid, "summary": "s"})
 
     def _pr_tracked(self, hours, repo, number, party, project, quest, tid):
-        self._event(hours, party, project, "pr.tracked", {
-            "repo": repo, "number": number, "party": party, "task_quest": quest, "task_tid": tid,
-            "what": "w", "waits": "x", "lifecycle": "open", "branch": "b", "title": "t",
-            "gh_state": "OPEN", "gh_draft": False, "seeded": False,
-        })
+        self._event(
+            hours,
+            party,
+            project,
+            "pr.tracked",
+            {
+                "repo": repo,
+                "number": number,
+                "party": party,
+                "task_quest": quest,
+                "task_tid": tid,
+                "what": "w",
+                "waits": "x",
+                "lifecycle": "open",
+                "branch": "b",
+                "title": "t",
+                "gh_state": "OPEN",
+                "gh_draft": False,
+                "seeded": False,
+            },
+        )
 
     def _pr_merged(self, hours, repo, number):
-        self._event(hours, None, None, "pr.synced", {
-            "repo": repo, "number": number, "lifecycle": "merged", "gh_state": "MERGED",
-        })
+        self._event(
+            hours,
+            None,
+            None,
+            "pr.synced",
+            {
+                "repo": repo,
+                "number": number,
+                "lifecycle": "merged",
+                "gh_state": "MERGED",
+            },
+        )
 
     def _lifecycle_ran(self, hours, project, event_kind, status, exit_code, output_tail):
-        self._event(hours, None, project, "lifecycle.ran", {
-            "project": project, "event": event_kind, "repo": project + "/app", "triggers": ["manual"],
-            "argv": ["true"], "cwd": "/tmp", "status": status, "exit_code": exit_code,
-            "duration_ms": 10, "output_tail": output_tail, "reason": None,
-        })
+        self._event(
+            hours,
+            None,
+            project,
+            "lifecycle.ran",
+            {
+                "project": project,
+                "event": event_kind,
+                "repo": project + "/app",
+                "triggers": ["manual"],
+                "argv": ["true"],
+                "cwd": "/tmp",
+                "status": status,
+                "exit_code": exit_code,
+                "duration_ms": 10,
+                "output_tail": output_tail,
+                "reason": None,
+            },
+        )
 
     def _snapshot(self, slug, party, project, started, done):
         return {
-            "started_at": _at(started), "done_at": _at(done), "party": party, "project": project,
-            "epic": "wave4", "title": "Quest " + slug, "tasks_done": 2, "tasks_blocked_events": 1,
-            "sdd_tids": ["T01", "T02"], "epic_progress": {"done": 2, "total": 4, "percent": 50},
-            "jira_cards_done": ["DEMO-21"], "prs_merged": ["acme/app#1"], "handoffs": 1, "sessions": 2,
-            "asks_raised": 3, "asks_answered": 2, "median_answer_seconds": 600.0, "drift": [],
+            "started_at": _at(started),
+            "done_at": _at(done),
+            "party": party,
+            "project": project,
+            "epic": "wave4",
+            "title": "Quest " + slug,
+            "tasks_done": 2,
+            "tasks_blocked_events": 1,
+            "sdd_tids": ["T01", "T02"],
+            "epic_progress": {"done": 2, "total": 4, "percent": 50},
+            "jira_cards_done": ["DEMO-21"],
+            "prs_merged": ["acme/app#1"],
+            "handoffs": 1,
+            "sessions": 2,
+            "asks_raised": 3,
+            "asks_answered": 2,
+            "median_answer_seconds": 600.0,
+            "drift": [],
         }
 
     def _quest_done(self, hours, slug, party, project, snapshot):
@@ -144,16 +206,33 @@ class CompletedQuestTests(HistoryTestCase):
 class LiveHistoryTestCase(HistoryTestCase):
     def _live(self, hours, party, project, kind, payload):
         self._event(hours, party, project, kind, payload)
-        reducers.apply(self.conn, {
-            "kind": kind, "payload": payload, "ts": _at(hours), "project": project, "session_id": None,
-        })
+        reducers.apply(
+            self.conn,
+            {
+                "kind": kind,
+                "payload": payload,
+                "ts": _at(hours),
+                "project": project,
+                "session_id": None,
+            },
+        )
         self.conn.commit()
 
     def _live_quest(self, hours, slug, party, project, epic, tids):
-        self._live(hours, party, project, "quest.added", {
-            "slug": slug, "project": project, "party": party, "epic": epic, "title": "Quest " + slug,
-            "tasks": [{"tid": tid, "title": tid} for tid in tids],
-        })
+        self._live(
+            hours,
+            party,
+            project,
+            "quest.added",
+            {
+                "slug": slug,
+                "project": project,
+                "party": party,
+                "epic": epic,
+                "title": "Quest " + slug,
+                "tasks": [{"tid": tid, "title": tid} for tid in tids],
+            },
+        )
 
     def _live_task(self, hours, kind, slug, tid, party, project):
         self._live(hours, party, project, kind, {"quest": slug, "tid": tid, "summary": "s", "reason": "r"})
@@ -221,9 +300,17 @@ class ActiveQuestTests(LiveHistoryTestCase):
     def test_filters(self):
         self._live_quest(10, "a", "alpha", "acme", None, ["T01"])
         self._live_quest(11, "b", "beta", "other", None, ["T01"])
-        self._event(1, "beta", "other", "raid.joined", {
-            "raid": "docs", "party": "beta", "expires_at": _at(3),
-        })
+        self._event(
+            1,
+            "beta",
+            "other",
+            "raid.joined",
+            {
+                "raid": "docs",
+                "party": "beta",
+                "expires_at": _at(3),
+            },
+        )
         self.assertEqual([q["slug"] for q in self._model(party="alpha")["active_quests"]], ["a"])
         self.assertEqual([q["slug"] for q in self._model(project="other")["active_quests"]], ["b"])
         self.assertEqual([q["slug"] for q in self._model(raid="docs")["active_quests"]], ["b"])
@@ -275,9 +362,11 @@ class StaleHoursTests(LiveHistoryTestCase):
     def _write_project(self, data):
         projects_dir = paths.projects_config_dir()
         projects_dir.mkdir(parents=True, exist_ok=True)
-        (projects_dir / "acme.json").write_text(json.dumps(dict(
-            {"name": "acme", "paths": [str(self.root) + "/*"], "github": {"repos": ["acme/app"]}}, **data
-        )))
+        (projects_dir / "acme.json").write_text(
+            json.dumps(
+                dict({"name": "acme", "paths": [str(self.root) + "/*"], "github": {"repos": ["acme/app"]}}, **data)
+            )
+        )
 
     def test_is_none_without_project_config(self):
         self._live_quest(10, "q1", "alpha", "acme", None, ["T01"])
@@ -350,9 +439,17 @@ class IncompleteQuestTests(HistoryTestCase):
         self.assertEqual(model["totals"]["quests_done"], 1)
 
     def test_marked_quest_is_not_listed_in_raid(self):
-        self._event(1, "alpha", "acme", "raid.joined", {
-            "raid": "ci", "party": "alpha", "expires_at": _at(100),
-        })
+        self._event(
+            1,
+            "alpha",
+            "acme",
+            "raid.joined",
+            {
+                "raid": "ci",
+                "party": "alpha",
+                "expires_at": _at(100),
+            },
+        )
         self._quest_done(10, "q1", "alpha", "acme", self._snapshot("q1", "alpha", "acme", 0, 10))
         self._marked(11, "q1", "alpha", "acme", "x")
         self.assertEqual(self._model()["raids"][0]["quests"], [])
@@ -387,9 +484,17 @@ class IncompleteQuestTests(HistoryTestCase):
 
 class FinishedRaidTests(HistoryTestCase):
     def _join(self, hours, party, raid, expires_at):
-        self._event(hours, party, "acme", "raid.joined", {
-            "raid": raid, "party": party, "expires_at": expires_at,
-        })
+        self._event(
+            hours,
+            party,
+            "acme",
+            "raid.joined",
+            {
+                "raid": raid,
+                "party": party,
+                "expires_at": expires_at,
+            },
+        )
 
     def _seed_ci_raid(self):
         self._join(1, "alpha", "ci", None)
@@ -475,25 +580,40 @@ class TotalsTests(HistoryTestCase):
         self._event(4, "alpha", None, "ask.answered", {"id": 2, "answer": "x"})
         self._event(5, "alpha", "acme", "party.handed_off", {"party": "alpha"})
         self._event(6, "beta", "acme", "party.handed_off", {"party": "beta"})
-        self.assertEqual(self._model()["totals"], {
-            "quests_done": 2,
-            "prs_merged": 1,
-            "tasks_done": 2,
-            "asks_answered": 2,
-            "median_answer_seconds": 7200.0,
-            "handoffs": 2,
-        })
+        self.assertEqual(
+            self._model()["totals"],
+            {
+                "quests_done": 2,
+                "prs_merged": 1,
+                "tasks_done": 2,
+                "asks_answered": 2,
+                "median_answer_seconds": 7200.0,
+                "handoffs": 2,
+            },
+        )
 
     def test_empty_model(self):
         empty_totals = {
-            "quests_done": 0, "prs_merged": 0, "tasks_done": 0, "asks_answered": 0,
-            "median_answer_seconds": None, "handoffs": 0,
+            "quests_done": 0,
+            "prs_merged": 0,
+            "tasks_done": 0,
+            "asks_answered": 0,
+            "median_answer_seconds": None,
+            "handoffs": 0,
         }
-        self.assertEqual(self._model(), {
-            "quests": [], "active_quests": [], "incomplete_quests": [], "raids": [],
-            "lifecycle_failures": [],
-            "totals": empty_totals, "week_totals": empty_totals, "since": None,
-        })
+        self.assertEqual(
+            self._model(),
+            {
+                "quests": [],
+                "active_quests": [],
+                "incomplete_quests": [],
+                "raids": [],
+                "lifecycle_failures": [],
+                "totals": empty_totals,
+                "week_totals": empty_totals,
+                "since": None,
+            },
+        )
 
     def test_since_is_first_event_timestamp(self):
         self._task_done(7, "a", "T01", "alpha", "acme")
@@ -520,14 +640,17 @@ class WeekTotalsTests(HistoryTestCase):
         self._event(old, "alpha", "acme", "party.handed_off", {"party": "alpha"})
         self._event(recent, "alpha", "acme", "party.handed_off", {"party": "alpha"})
         model = self._model()
-        self.assertEqual(model["week_totals"], {
-            "quests_done": 1,
-            "prs_merged": 1,
-            "tasks_done": 1,
-            "asks_answered": 1,
-            "median_answer_seconds": 7200.0,
-            "handoffs": 1,
-        })
+        self.assertEqual(
+            model["week_totals"],
+            {
+                "quests_done": 1,
+                "prs_merged": 1,
+                "tasks_done": 1,
+                "asks_answered": 1,
+                "median_answer_seconds": 7200.0,
+                "handoffs": 1,
+            },
+        )
         self.assertEqual(model["totals"]["quests_done"], 2)
         self.assertEqual(model["totals"]["prs_merged"], 2)
 
@@ -537,12 +660,28 @@ class FilterTests(HistoryTestCase):
         super().setUp()
         self._quest_done(10, "a", "alpha", "acme", self._snapshot("a", "alpha", "acme", 0, 10))
         self._quest_done(20, "b", "beta", "other", self._snapshot("b", "beta", "other", 0, 20))
-        self._event(1, "alpha", "acme", "raid.joined", {
-            "raid": "ci", "party": "alpha", "expires_at": _at(2),
-        })
-        self._event(1, "beta", "other", "raid.joined", {
-            "raid": "docs", "party": "beta", "expires_at": _at(3),
-        })
+        self._event(
+            1,
+            "alpha",
+            "acme",
+            "raid.joined",
+            {
+                "raid": "ci",
+                "party": "alpha",
+                "expires_at": _at(2),
+            },
+        )
+        self._event(
+            1,
+            "beta",
+            "other",
+            "raid.joined",
+            {
+                "raid": "docs",
+                "party": "beta",
+                "expires_at": _at(3),
+            },
+        )
         self._task_done(1, "a", "T01", "alpha", "acme")
         self._task_done(1, "b", "T01", "beta", "other")
 
@@ -632,9 +771,17 @@ class HistoryCliTests(LiveHistoryTestCase):
         self._quest_done(50, "q1", "alpha", "acme", self._snapshot("q1", "alpha", "acme", 0, 50))
         self._quest_added(1, "old", "beta", "acme", None, ["T01"])
         self._quest_done(30, "old", "beta", "acme", None)
-        self._event(1, "alpha", "acme", "raid.joined", {
-            "raid": "ci", "party": "alpha", "expires_at": _at(9),
-        })
+        self._event(
+            1,
+            "alpha",
+            "acme",
+            "raid.joined",
+            {
+                "raid": "ci",
+                "party": "alpha",
+                "expires_at": _at(9),
+            },
+        )
         code, out, err = self.run_cli(["history"], None, self.root)
         self.assertEqual(code, 0, err)
         self.assertIn("Completed quests (2)", out)

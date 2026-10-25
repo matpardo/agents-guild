@@ -22,7 +22,7 @@ BROADCAST_REMINDER = (
 
 LOCAL_ONLY_REMINDER = (
     "guild is local and optional: never mention guild, ask #N, notice #N, party, raid or quest"
-    " in PRs, comments, commits, sdd-docs or cards; cite a decision as \"decisión del dev\" with its date"
+    ' in PRs, comments, commits, sdd-docs or cards; cite a decision as "decisión del dev" with its date'
 )
 
 _EMAIL_RE = re.compile(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}")
@@ -61,9 +61,7 @@ def looks_instruction_like(value):
 
 def _enforce_length(value, field_name, max_length):
     if len(value) > max_length:
-        raise GuildError(
-            "{} exceeds the maximum length of {} characters".format(field_name, max_length), 1
-        )
+        raise GuildError("{} exceeds the maximum length of {} characters".format(field_name, max_length), 1)
 
 
 def _enforce_no_email(value, field_name):
@@ -79,9 +77,7 @@ def _enforce_no_secret(value, field_name):
 def _enforce_project_patterns(value, field_name, patterns):
     for pattern in patterns:
         if re.search(pattern, value):
-            raise GuildError(
-                "{} matches a pattern forbidden for this project".format(field_name), 1
-            )
+            raise GuildError("{} matches a pattern forbidden for this project".format(field_name), 1)
 
 
 def validate_field(value, field_name, max_length, patterns):

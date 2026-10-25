@@ -12,17 +12,22 @@ class QuestAddValidationTests(GuildTestCase):
         self.run_cli(["party", "start", "alpha", "--reason", "test reason"], "sess-1", self.repo_dir)
 
     def test_quest_add_without_project_fails(self):
-        code, out, err = self.run_cli(
-            ["quest", "add", "demo", "--title", "Demo", "--no-epic"], "sess-1", self.root
-        )
+        code, out, err = self.run_cli(["quest", "add", "demo", "--title", "Demo", "--no-epic"], "sess-1", self.root)
         self.assertEqual(code, 1)
         self.assertIn("no project config matches", err)
 
     def test_epic_quest_requires_synced_epic(self):
         code, out, err = self.run_cli(
             [
-                "quest", "add", "demo", "--title", "Demo", "--epic", "compliance",
-                "--tasks", "T01,T02",
+                "quest",
+                "add",
+                "demo",
+                "--title",
+                "Demo",
+                "--epic",
+                "compliance",
+                "--tasks",
+                "T01,T02",
             ],
             "sess-1",
             self.repo_dir,
@@ -32,9 +37,7 @@ class QuestAddValidationTests(GuildTestCase):
         self.assertIn("guild sync --source sdd", err)
 
     def test_epic_quest_without_tasks_is_empty(self):
-        self.sync_sdd(
-            self.repo_dir, "sess-1", "acme", "compliance", "## T01 — First task\n\n**Deps:** —\n"
-        )
+        self.sync_sdd(self.repo_dir, "sess-1", "acme", "compliance", "## T01 — First task\n\n**Deps:** —\n")
         code, out, err = self.run_cli(
             ["quest", "add", "demo", "--title", "Demo", "--epic", "compliance"], "sess-1", self.repo_dir
         )
@@ -93,8 +96,15 @@ class QuestAddValidationTests(GuildTestCase):
         )
         code, out, err = self.run_cli(
             [
-                "quest", "add", "demo", "--title", "Demo", "--epic", "compliance",
-                "--tasks", "T01,T99",
+                "quest",
+                "add",
+                "demo",
+                "--title",
+                "Demo",
+                "--epic",
+                "compliance",
+                "--tasks",
+                "T01,T99",
             ],
             "sess-1",
             self.repo_dir,
@@ -121,9 +131,7 @@ class QuestAddValidationTests(GuildTestCase):
         self.assertIn("Configure retries", out)
 
     def test_no_epic_quest_created_without_tasks(self):
-        code, out, err = self.run_cli(
-            ["quest", "add", "demo", "--title", "Demo", "--no-epic"], "sess-1", self.repo_dir
-        )
+        code, out, err = self.run_cli(["quest", "add", "demo", "--title", "Demo", "--no-epic"], "sess-1", self.repo_dir)
         self.assertEqual(code, 0)
 
     def test_no_epic_quest_created_with_tasks_using_ids_as_titles(self):
@@ -139,8 +147,16 @@ class QuestAddValidationTests(GuildTestCase):
     def test_no_epic_quest_created_with_task_titles(self):
         code, out, err = self.run_cli(
             [
-                "quest", "add", "demo", "--title", "Demo", "--no-epic", "--tasks", "A,B",
-                "--titles", "First,Second",
+                "quest",
+                "add",
+                "demo",
+                "--title",
+                "Demo",
+                "--no-epic",
+                "--tasks",
+                "A,B",
+                "--titles",
+                "First,Second",
             ],
             "sess-1",
             self.repo_dir,
@@ -155,8 +171,16 @@ class QuestAddValidationTests(GuildTestCase):
     def test_titles_length_must_match_tasks(self):
         code, out, err = self.run_cli(
             [
-                "quest", "add", "demo", "--title", "Demo", "--no-epic", "--tasks", "A,B",
-                "--titles", "First",
+                "quest",
+                "add",
+                "demo",
+                "--title",
+                "Demo",
+                "--no-epic",
+                "--tasks",
+                "A,B",
+                "--titles",
+                "First",
             ],
             "sess-1",
             self.repo_dir,
@@ -199,8 +223,17 @@ class QuestFollowupsTests(GuildTestCase):
     def test_followups_creates_no_epic_quest_with_tasks(self):
         code, out, err = self.run_cli(
             [
-                "quest", "add", "next", "--followups-of", "src", "--title", "Next",
-                "--tasks", "A,B", "--titles", "First,Second",
+                "quest",
+                "add",
+                "next",
+                "--followups-of",
+                "src",
+                "--title",
+                "Next",
+                "--tasks",
+                "A,B",
+                "--titles",
+                "First,Second",
             ],
             "sess-1",
             self.repo_dir,
@@ -219,9 +252,7 @@ class QuestFollowupsTests(GuildTestCase):
             self.repo_dir,
         )
         self.assertEqual(code, 0, err)
-        code, out, err = self.run_cli(
-            ["task", "add", "next/T01", "--title", "One"], "sess-1", self.repo_dir
-        )
+        code, out, err = self.run_cli(["task", "add", "next/T01", "--title", "One"], "sess-1", self.repo_dir)
         self.assertEqual(code, 0, err)
 
     def test_followups_rejects_unknown_source(self):
@@ -267,9 +298,7 @@ class QuestFollowupsTests(GuildTestCase):
             "sess-1",
             self.repo_dir,
         )
-        code, out, err = self.run_cli(
-            ["quest", "add", "next", "--title", "N", "--no-epic"], "sess-1", self.repo_dir
-        )
+        code, out, err = self.run_cli(["quest", "add", "next", "--title", "N", "--no-epic"], "sess-1", self.repo_dir)
         self.assertEqual(code, 0, err)
 
 
@@ -323,8 +352,15 @@ class QuestAddConflictTests(GuildTestCase):
         self.run_cli(["claim", "task:compliance/T05", "--ttl", "8h"], "sess-1", self.repo_dir)
         code, out, err = self.run_cli(
             [
-                "quest", "add", "beta-q", "--title", "B", "--epic", "compliance",
-                "--tasks", "T01,T02,T05",
+                "quest",
+                "add",
+                "beta-q",
+                "--title",
+                "B",
+                "--epic",
+                "compliance",
+                "--tasks",
+                "T01,T02,T05",
             ],
             "sess-2",
             self.repo_dir,
@@ -413,14 +449,10 @@ class TaskLifecycleTests(GuildTestCase):
         super().setUp()
         self.repo_dir = self.register_project("acme", ["acme/app"])
         self.run_cli(["party", "start", "alpha", "--reason", "test reason"], "sess-1", self.repo_dir)
-        self.run_cli(
-            ["quest", "add", "demo", "--title", "Demo", "--no-epic"], "sess-1", self.repo_dir
-        )
+        self.run_cli(["quest", "add", "demo", "--title", "Demo", "--no-epic"], "sess-1", self.repo_dir)
 
     def test_add_task_to_no_epic_quest(self):
-        code, out, err = self.run_cli(
-            ["task", "add", "demo/T01", "--title", "First task"], "sess-1", self.repo_dir
-        )
+        code, out, err = self.run_cli(["task", "add", "demo/T01", "--title", "First task"], "sess-1", self.repo_dir)
         self.assertEqual(code, 0)
 
     def _add_epic_quest(self):
@@ -439,17 +471,13 @@ class TaskLifecycleTests(GuildTestCase):
 
     def test_add_task_to_epic_quest_prints_the_sdd_hint(self):
         self._add_epic_quest()
-        code, out, err = self.run_cli(
-            ["task", "add", "epicq/T10", "--title", "Extra"], "sess-1", self.repo_dir
-        )
+        code, out, err = self.run_cli(["task", "add", "epicq/T10", "--title", "Extra"], "sess-1", self.repo_dir)
         self.assertEqual(code, 0, err)
         self.assertIn("task 'epicq/T10' added", out)
         self.assertIn("add T10 to compliance tasks.md in the SDD", out)
 
     def test_add_task_to_no_epic_quest_prints_no_hint(self):
-        code, out, err = self.run_cli(
-            ["task", "add", "demo/T01", "--title", "First task"], "sess-1", self.repo_dir
-        )
+        code, out, err = self.run_cli(["task", "add", "demo/T01", "--title", "First task"], "sess-1", self.repo_dir)
         self.assertNotIn("tasks.md", out)
 
     def test_add_task_held_by_another_party_on_an_epic_quest_is_refused(self):
@@ -472,9 +500,7 @@ class TaskLifecycleTests(GuildTestCase):
             "sess-2",
             self.repo_dir,
         )
-        code, out, err = self.run_cli(
-            ["task", "add", "betaq/T09", "--title", "dup"], "sess-2", self.repo_dir
-        )
+        code, out, err = self.run_cli(["task", "add", "betaq/T09", "--title", "dup"], "sess-2", self.repo_dir)
         self.assertEqual(code, 1)
         self.assertIn("T09 is in quest alphaq of party alpha", err)
 
@@ -491,17 +517,13 @@ class TaskLifecycleTests(GuildTestCase):
 
     def test_cannot_add_task_to_done_quest(self):
         self.run_cli(["quest", "done", "demo", "--force"], "sess-1", self.repo_dir)
-        code, out, err = self.run_cli(
-            ["task", "add", "demo/T01", "--title", "First"], "sess-1", self.repo_dir
-        )
+        code, out, err = self.run_cli(["task", "add", "demo/T01", "--title", "First"], "sess-1", self.repo_dir)
         self.assertEqual(code, 1)
         self.assertIn("quest 'demo' is done", err)
 
     def test_start_block_done_cycle(self):
         self.run_cli(["task", "add", "demo/T01", "--title", "First"], "sess-1", self.repo_dir)
-        code, out, err = self.run_cli(
-            ["task", "start", "demo/T01", "--summary", "wip"], "sess-1", self.repo_dir
-        )
+        code, out, err = self.run_cli(["task", "start", "demo/T01", "--summary", "wip"], "sess-1", self.repo_dir)
         self.assertEqual(code, 0)
         code, out, err = self.run_cli(
             ["task", "block", "demo/T01", "--reason", "waiting on ci"], "sess-1", self.repo_dir
@@ -509,9 +531,7 @@ class TaskLifecycleTests(GuildTestCase):
         self.assertEqual(code, 0)
         code, out, err = self.run_cli(["board"], "sess-1", self.repo_dir)
         self.assertIn("blocked: T01 — waiting on ci", out)
-        code, out, err = self.run_cli(
-            ["task", "done", "demo/T01", "--summary", "shipped"], "sess-1", self.repo_dir
-        )
+        code, out, err = self.run_cli(["task", "done", "demo/T01", "--summary", "shipped"], "sess-1", self.repo_dir)
         self.assertEqual(code, 0)
 
     def test_block_requires_reason(self):

@@ -37,9 +37,9 @@ class ReadyCheckTests(MergeQueueTestCase):
 
     def test_lists_every_blocker(self):
         self.track("sess-1", 3, "qa/T03", "ready")
-        self.write_gh_fixture("view_acme-app_3", dict(
-            OPEN_VIEW, mergeable="CONFLICTING", statusCheckRollup=[{"conclusion": "FAILURE"}]
-        ))
+        self.write_gh_fixture(
+            "view_acme-app_3", dict(OPEN_VIEW, mergeable="CONFLICTING", statusCheckRollup=[{"conclusion": "FAILURE"}])
+        )
         self.sync_gh("sess-1")
         self.run_cli(["pr", "set", "acme/app#3", "--needs-ask-answer"], "sess-1", self.repo_dir)
         code, out, err = self.check(3)
@@ -51,9 +51,9 @@ class ReadyCheckTests(MergeQueueTestCase):
 
     def test_billing_blocked_checks_are_not_a_blocker(self):
         self.track("sess-1", 3, "qa/T03", "ready")
-        self.write_gh_fixture("view_acme-app_3", dict(
-            OPEN_VIEW, statusCheckRollup=[{"conclusion": "FAILURE"}], headRefOid="head"
-        ))
+        self.write_gh_fixture(
+            "view_acme-app_3", dict(OPEN_VIEW, statusCheckRollup=[{"conclusion": "FAILURE"}], headRefOid="head")
+        )
         self.write_gh_fixture(
             "branch_checks_acme-app_head",
             {"check_runs": [{"id": 11, "name": "a", "conclusion": "failure", "output": {"annotations_count": 1}}]},
@@ -79,19 +79,25 @@ class ReadyCheckTests(MergeQueueTestCase):
 
     def test_comment_after_head_is_listed_as_missing(self):
         self.track("sess-1", 3, "qa/T03", "ready")
-        self.write_gh_fixture("view_acme-app_3", dict(
-            OPEN_VIEW,
-            author={"login": "me"},
-            commits=[{"committedDate": "2026-10-20T10:00:00Z"}],
-            comments=[{"author": {"login": "bot"}, "createdAt": "2026-10-20T11:00:00Z"}],
-        ))
+        self.write_gh_fixture(
+            "view_acme-app_3",
+            dict(
+                OPEN_VIEW,
+                author={"login": "me"},
+                commits=[{"committedDate": "2026-10-20T10:00:00Z"}],
+                comments=[{"author": {"login": "bot"}, "createdAt": "2026-10-20T11:00:00Z"}],
+            ),
+        )
         self.sync_gh("sess-1")
         code, out, err = self.check(3)
         self.assertEqual(code, 1)
         self.assertEqual(
             out.splitlines(),
-            ["acme/app#3 blocked", "- 1 comment after head",
-             "- gate: 1 review comment since last read (guild pr ack acme/app#3)"],
+            [
+                "acme/app#3 blocked",
+                "- 1 comment after head",
+                "- gate: 1 review comment since last read (guild pr ack acme/app#3)",
+            ],
         )
 
     def _comment_view(self, count):
@@ -153,7 +159,9 @@ class ReadyCheckTests(MergeQueueTestCase):
         self.sync_gh("sess-1")
         code, out, err = self.check(3)
         self.assertEqual(code, 1)
-        self.assertEqual(out.splitlines(), ["acme/app#3 waiting", "- review trace not validated: validator could not start"])
+        self.assertEqual(
+            out.splitlines(), ["acme/app#3 waiting", "- review trace not validated: validator could not start"]
+        )
 
     def test_no_checks_without_label_config_waits(self):
         self.track("sess-1", 3, "qa/T03", "ready")
@@ -182,12 +190,15 @@ class ReadyCheckTests(MergeQueueTestCase):
     def test_successor_of_a_commented_predecessor_is_not_ready(self):
         self.track("sess-1", 2, "qa/T02", "ready")
         self.track("sess-1", 3, "qa/T03", "ready")
-        self.write_gh_fixture("view_acme-app_3", dict(
-            OPEN_VIEW,
-            author={"login": "me"},
-            commits=[{"committedDate": "2026-10-20T10:00:00Z"}],
-            comments=[{"author": {"login": "bot"}, "createdAt": "2026-10-20T11:00:00Z"}],
-        ))
+        self.write_gh_fixture(
+            "view_acme-app_3",
+            dict(
+                OPEN_VIEW,
+                author={"login": "me"},
+                commits=[{"committedDate": "2026-10-20T10:00:00Z"}],
+                comments=[{"author": {"login": "bot"}, "createdAt": "2026-10-20T11:00:00Z"}],
+            ),
+        )
         self.sync_gh("sess-1")
         code, out, err = self.run_cli(
             ["merge-queue", "pin", "acme/app#3", "--before", "acme/app#2"], "sess-1", self.repo_dir
@@ -224,9 +235,18 @@ class ExternalReadyCheckTests(ReadyCheckTests):
 
 def _entry(lifecycle, labels):
     return {
-        "lifecycle": lifecycle, "labels": labels, "number": 7, "repo": "acme/app",
-        "checks_billing": 0, "checks_failing": 0, "checks_passing": 0, "checks_pending": 0, "ci_label": None, "human_state": "ready",
-        "unseen_comments": 0, "ref": "acme/app#7",
+        "lifecycle": lifecycle,
+        "labels": labels,
+        "number": 7,
+        "repo": "acme/app",
+        "checks_billing": 0,
+        "checks_failing": 0,
+        "checks_passing": 0,
+        "checks_pending": 0,
+        "ci_label": None,
+        "human_state": "ready",
+        "unseen_comments": 0,
+        "ref": "acme/app#7",
     }
 
 
@@ -243,16 +263,12 @@ class GatesTests(unittest.TestCase):
 
     def test_unseen_comments_gate_with_the_ack_hint(self):
         entry = dict(self.entry("ready", []), unseen_comments=2)
-        self.assertEqual(
-            merge_queue.gates(entry, []), ["2 review comments since last read (guild pr ack acme/app#7)"]
-        )
+        self.assertEqual(merge_queue.gates(entry, []), ["2 review comments since last read (guild pr ack acme/app#7)"])
         entry = dict(entry, unseen_comments=1)
         self.assertEqual(merge_queue.gates(entry, []), ["1 review comment since last read (guild pr ack acme/app#7)"])
 
     def test_human_review_label_gates(self):
-        self.assertEqual(
-            merge_queue.gates(self.entry("ready", ["needs-human-pr-review"]), []), ["needs human review"]
-        )
+        self.assertEqual(merge_queue.gates(self.entry("ready", ["needs-human-pr-review"]), []), ["needs human review"])
 
     def test_billing_blocked_main_is_not_a_gate(self):
         rows = [{"repo": "acme/app", "reason": "boom", "source": "gh", "external": "billing"}]
@@ -263,9 +279,7 @@ class GatesTests(unittest.TestCase):
             {"repo": "acme/app", "reason": "boom", "source": "ci", "external": None},
             {"repo": "acme/other", "reason": "x", "source": "ci", "external": None},
         ]
-        self.assertEqual(
-            merge_queue.gates(self.entry("ready", []), rows), ["main red acme/app \u2014 boom (ci)"]
-        )
+        self.assertEqual(merge_queue.gates(self.entry("ready", []), rows), ["main red acme/app \u2014 boom (ci)"])
 
 
 class NotesTests(unittest.TestCase):

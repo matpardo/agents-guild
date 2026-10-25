@@ -19,7 +19,8 @@ class PrActivityTests(GuildTestCase):
         )
         self.run_cli(
             ["pr", "track", "acme/app#1", "--task", "demo/T01", "--what", "x", "--waits", "y"],
-            "sess-1", self.repo_dir,
+            "sess-1",
+            self.repo_dir,
         )
 
     def _pr_row(self):
@@ -40,7 +41,10 @@ class PrActivityTests(GuildTestCase):
         self.write_gh_fixture(
             "view_acme-app_1",
             {
-                "state": "OPEN", "isDraft": True, "headRefName": "feature/x", "title": "t",
+                "state": "OPEN",
+                "isDraft": True,
+                "headRefName": "feature/x",
+                "title": "t",
                 "mergeable": "CONFLICTING",
                 "comments": [{"id": 1}, {"id": 2}],
                 "reviews": [{"id": 3}],
@@ -119,7 +123,9 @@ class PrActivityTests(GuildTestCase):
         self._write_threads([False])
         self._sync_view()
         conn = db.connect(paths.db_path())
-        conn.execute("UPDATE events SET payload = json_remove(payload, '$.unresolved_threads') WHERE kind = 'pr.synced'")
+        conn.execute(
+            "UPDATE events SET payload = json_remove(payload, '$.unresolved_threads') WHERE kind = 'pr.synced'"
+        )
         conn.commit()
         conn.close()
         code, out, err = self.run_cli(["rebuild"], None, None)
@@ -139,7 +145,10 @@ class PrActivityTests(GuildTestCase):
         self.write_gh_fixture(
             "view_acme-app_1",
             {
-                "state": "OPEN", "isDraft": True, "headRefName": "feature/x", "title": "t",
+                "state": "OPEN",
+                "isDraft": True,
+                "headRefName": "feature/x",
+                "title": "t",
                 "comments": [{"id": 1}],
             },
         )
@@ -210,9 +219,7 @@ class PrActivityTests(GuildTestCase):
 
     def test_legacy_pr_set_needs_human_replays_as_draft_with_the_ask_flag(self):
         row = self._apply_pr_set({"lifecycle": "needs-human"})
-        self.assertEqual(
-            (row["lifecycle"], row["needs_ask_answer"], row["needs_human_pr_review"]), ("draft", 1, 0)
-        )
+        self.assertEqual((row["lifecycle"], row["needs_ask_answer"], row["needs_human_pr_review"]), ("draft", 1, 0))
 
     def test_legacy_pr_set_without_flag_keys_carries_flags_forward(self):
         self.run_cli(["pr", "set", "acme/app#1", "--needs-human-pr-review"], "sess-1", self.repo_dir)
@@ -229,9 +236,19 @@ class PrActivityTests(GuildTestCase):
                 "ts": timeutil.to_iso(timeutil.utcnow()),
                 "kind": "pr.tracked",
                 "payload": {
-                    "repo": "acme/app", "number": 2, "party": "alpha", "task_quest": "demo",
-                    "task_tid": "T01", "what": "x", "waits": "y", "lifecycle": "needs-human",
-                    "branch": None, "title": None, "gh_state": None, "gh_draft": None, "seeded": 1,
+                    "repo": "acme/app",
+                    "number": 2,
+                    "party": "alpha",
+                    "task_quest": "demo",
+                    "task_tid": "T01",
+                    "what": "x",
+                    "waits": "y",
+                    "lifecycle": "needs-human",
+                    "branch": None,
+                    "title": None,
+                    "gh_state": None,
+                    "gh_draft": None,
+                    "seeded": 1,
                 },
             },
         )
@@ -241,10 +258,20 @@ class PrActivityTests(GuildTestCase):
                 "ts": timeutil.to_iso(timeutil.utcnow()),
                 "kind": "pr.tracked",
                 "payload": {
-                    "repo": "acme/app", "number": 3, "party": "alpha", "task_quest": "demo",
-                    "task_tid": "T01", "what": "x", "waits": "y", "lifecycle": "draft",
+                    "repo": "acme/app",
+                    "number": 3,
+                    "party": "alpha",
+                    "task_quest": "demo",
+                    "task_tid": "T01",
+                    "what": "x",
+                    "waits": "y",
+                    "lifecycle": "draft",
                     "needs_human_pr_review": 1,
-                    "branch": None, "title": None, "gh_state": None, "gh_draft": None, "seeded": 0,
+                    "branch": None,
+                    "title": None,
+                    "gh_state": None,
+                    "gh_draft": None,
+                    "seeded": 0,
                 },
             },
         )
@@ -262,7 +289,10 @@ class PrActivityTests(GuildTestCase):
         self.write_gh_fixture(
             "view_acme-app_1",
             {
-                "state": "OPEN", "isDraft": True, "headRefName": "feature/x", "title": "t",
+                "state": "OPEN",
+                "isDraft": True,
+                "headRefName": "feature/x",
+                "title": "t",
                 "comments": [{"id": 1}, {"id": 2}],
             },
         )

@@ -112,7 +112,11 @@ class AskAdventurerDatesTests(ItemDatesTests):
         self.assertNotIn("answered:", out)
 
     def test_adventurer_done_shows_started_and_done(self):
-        self.at(0, ["quest", "add", "chore", "--open", "--no-epic", "--title", "c", "--tasks", "T01", "--titles", "one"], None)
+        self.at(
+            0,
+            ["quest", "add", "chore", "--open", "--no-epic", "--title", "c", "--tasks", "T01", "--titles", "one"],
+            None,
+        )
         self.at(0, ["adventurer", "start", "fix typo", "--task", "chore/T01", "--reason", "r"], "sess-1")
         started = timeutil.issued_label(_iso(0))
         self.assertEqual(board_commands.board_model(self.ctx())["adventurers"][0]["dates"], "created " + started)

@@ -40,8 +40,14 @@ class MergeQueueModelTestCase(MergeQueueTestCase):
     def model(self):
         conn = db.connect(paths.db_path())
         ctx = context.RunContext(
-            conn, None, None, timeutil.utcnow(), None,
-            paths.claude_sessions_dir(), paths.projects_config_dir(), paths.state_dir(),
+            conn,
+            None,
+            None,
+            timeutil.utcnow(),
+            None,
+            paths.claude_sessions_dir(),
+            paths.projects_config_dir(),
+            paths.state_dir(),
         )
         try:
             return board_commands.board_model(ctx)
@@ -84,10 +90,33 @@ class MergeQueueModelTests(MergeQueueModelTestCase):
         self.assertEqual(
             set(first),
             {
-                "position", "ref", "repo", "number", "party", "task", "lifecycle", "branch",
-                "checks_failing", "checks_passing", "checks_pending", "labels", "blocked_external", "unblocks", "state", "next_action",
-                "action", "why", "reasons", "blockers", "waits", "gates", "url",
-                "human_state", "human_missing", "notes", "unseen_comments",
+                "position",
+                "ref",
+                "repo",
+                "number",
+                "party",
+                "task",
+                "lifecycle",
+                "branch",
+                "checks_failing",
+                "checks_passing",
+                "checks_pending",
+                "labels",
+                "blocked_external",
+                "unblocks",
+                "state",
+                "next_action",
+                "action",
+                "why",
+                "reasons",
+                "blockers",
+                "waits",
+                "gates",
+                "url",
+                "human_state",
+                "human_missing",
+                "notes",
+                "unseen_comments",
             },
         )
         self.assertEqual([entry["position"] for entry in queue], [1, 2, 3])
@@ -107,7 +136,9 @@ class MergeQueueModelTests(MergeQueueModelTestCase):
         code, out, err = self.sync_gh("sess-1")
         self.assertEqual(code, 0, err)
         first = self.queues_by_scope()["raid:ci"]["queue"][0]
-        self.assertEqual((first["human_state"], first["human_missing"]), ("blocked", ["review trace invalid: no trace"]))
+        self.assertEqual(
+            (first["human_state"], first["human_missing"]), ("blocked", ["review trace invalid: no trace"])
+        )
 
     def test_draft_entry_is_ready_with_a_label_and_a_promote_action(self):
         queue = self.queues_by_scope()["raid:ci"]["queue"]
@@ -212,8 +243,16 @@ class MergeQueuePageTests(MergeQueueTestCase):
         self.assertIn("merge_queues", self.js)
 
     def test_page_renders_reason_pills_ready_check_detail_and_next_to_merge(self):
-        for token in ("renderReasonPills(entry.reasons)", "entry.gates", "entry.blockers", "entry.waits",
-                      "next to merge: ", "no PR ready to merge", "queue.head", "state.queueDetailOpen"):
+        for token in (
+            "renderReasonPills(entry.reasons)",
+            "entry.gates",
+            "entry.blockers",
+            "entry.waits",
+            "next to merge: ",
+            "no PR ready to merge",
+            "queue.head",
+            "state.queueDetailOpen",
+        ):
             with self.subTest(token=token):
                 self.assertIn(token, self.js)
 

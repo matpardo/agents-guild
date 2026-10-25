@@ -23,4 +23,5 @@ jobs:
           python-version: "3.10"
       - run: pip install --require-hashes -r requirements-lint.txt
       - run: ruff check .
+      - run: ruff format --check .
       - run: TMPDIR=/dev/shm python3 tests/run_parallel.py

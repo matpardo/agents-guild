@@ -4,9 +4,7 @@ from datetime import timezone
 
 from guild.timeutil import from_iso
 
-UsageMessage = namedtuple(
-    "UsageMessage", ("timestamp", "model", "input", "cache_creation", "cache_read", "output")
-)
+UsageMessage = namedtuple("UsageMessage", ("timestamp", "model", "input", "cache_creation", "cache_read", "output"))
 
 _SYNTHETIC_MODEL = "<synthetic>"
 _TAIL_BYTES = 65536

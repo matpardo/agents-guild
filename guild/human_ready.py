@@ -31,9 +31,7 @@ def comments_after_head(head_date, author, comments, reviews):
 def _is_notice(entry, notice_rules):
     login = (_login(entry) or "").casefold()
     body = (entry.get("body") or "").casefold()
-    return any(
-        login == rule["author"].casefold() and rule["text"].casefold() in body for rule in notice_rules
-    )
+    return any(login == rule["author"].casefold() and rule["text"].casefold() in body for rule in notice_rules)
 
 
 def other_author_comments(author, comments, reviews, notice_rules):

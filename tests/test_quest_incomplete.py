@@ -20,9 +20,7 @@ class QuestIncompleteTests(GuildTestCase):
 
     def _events(self):
         conn = db.connect(paths.db_path())
-        return conn.execute(
-            "SELECT visibility, payload FROM events WHERE kind = 'quest.marked_incomplete'"
-        ).fetchall()
+        return conn.execute("SELECT visibility, payload FROM events WHERE kind = 'quest.marked_incomplete'").fetchall()
 
     def test_marks_done_quest_incomplete_and_records_event(self):
         self._finish()

@@ -25,12 +25,10 @@ _NOT_FOUND = "(not found)"
 
 
 def _card_ref(ctx, project, project_config, ref):
-    key = ref[len("card:"):]
+    key = ref[len("card:") :]
     row = None
     if project is not None:
-        row = ctx.conn.execute(
-            "SELECT status FROM cards WHERE project = ? AND key = ?", (project, key)
-        ).fetchone()
+        row = ctx.conn.execute("SELECT status FROM cards WHERE project = ? AND key = ?", (project, key)).fetchone()
     if row is None and not ask_commands.card_known(ctx, project, project_config, key):
         return {"kind": "card", "ref": ref, "key": key, "missing": True}
     return {
@@ -43,7 +41,7 @@ def _card_ref(ctx, project, project_config, ref):
 
 
 def _pr_ref(ctx, ref):
-    repo, number = ref[len("pr:"):].rsplit("#", 1)
+    repo, number = ref[len("pr:") :].rsplit("#", 1)
     row = ctx.conn.execute(
         "SELECT lifecycle, waits, checks_failing, checks_passing, checks_pending FROM prs"
         " WHERE repo = ? AND number = ?",
@@ -117,8 +115,9 @@ def _event_summary(kind, payload):
 def _recent_events(ctx, party):
     placeholders = ", ".join("?" for _ in _EVENT_KINDS)
     rows = ctx.conn.execute(
-        "SELECT ts, kind, payload FROM events WHERE party = ? AND kind IN ({})"
-        " ORDER BY seq DESC LIMIT ?".format(placeholders),
+        "SELECT ts, kind, payload FROM events WHERE party = ? AND kind IN ({}) ORDER BY seq DESC LIMIT ?".format(
+            placeholders
+        ),
         (party, *_EVENT_KINDS, _EVENT_LIMIT),
     ).fetchall()
     return [
@@ -153,9 +152,7 @@ def build(ctx, ask_row):
         "answer": ask_row["answer"],
         "answered_at": ask_row["answered_at"],
         "answered": _optional_label(ask_row["answered_at"]),
-        "refs": [
-            _expand_ref(ctx, project, project_config, ref) for ref in json.loads(ask_row["refs"])
-        ],
+        "refs": [_expand_ref(ctx, project, project_config, ref) for ref in json.loads(ask_row["refs"])],
         "origin": origin,
         "resume": _resume(ctx, ask_row, origin),
         "events": _recent_events(ctx, ask_row["party"]),
@@ -196,7 +193,7 @@ def _card_lines(ref):
 
 def _pr_lines(ref):
     if ref.get("missing"):
-        return [_joined(["pr      {}".format(ref["ref"][len("pr:"):]), _NOT_FOUND, ref["url"]])]
+        return [_joined(["pr      {}".format(ref["ref"][len("pr:") :]), _NOT_FOUND, ref["url"]])]
     checks = "checks: {} passing, {} failing, {} pending".format(
         ref["checks_passing"], ref["checks_failing"], ref["checks_pending"]
     )
@@ -204,7 +201,7 @@ def _pr_lines(ref):
     return [
         _joined(
             [
-                "pr      {}".format(ref["ref"][len("pr:"):]),
+                "pr      {}".format(ref["ref"][len("pr:") :]),
                 ref["url"],
                 "lifecycle: {}".format(ref["lifecycle"]),
                 checks,
@@ -230,9 +227,7 @@ def _origin_lines(origin):
         "origin (at creation)",
         "  session: {}".format(session),
         "  in progress: {}".format(in_progress or "none"),
-        "  epics: {}   cards: {}".format(
-            ", ".join(origin["epics"]) or "none", ", ".join(origin["cards"]) or "none"
-        ),
+        "  epics: {}   cards: {}".format(", ".join(origin["epics"]) or "none", ", ".join(origin["cards"]) or "none"),
     ]
     if origin.get("handoff_path"):
         lines.append("  handoff: {}".format(origin["handoff_path"]))
@@ -252,9 +247,7 @@ def _closing_lines(model):
 
 def render_lines(model):
     lines = [
-        "ask #{} · {} · {} · created {}".format(
-            model["id"], model["party"], model["state"], model["created"]
-        ),
+        "ask #{} · {} · {} · created {}".format(model["id"], model["party"], model["state"], model["created"]),
         "  {}".format(model["question"]),
         "  context: {}".format(model["context"]),
     ]

@@ -22,9 +22,9 @@ def triggers_by_project(projects, triggers):
         project = _project_for_repo(projects, repo)
         if project is None or event_kind not in project.get("lifecycle", {}):
             continue
-        groups.setdefault((project["name"], event_kind), {"project": project, "triggers": []})[
-            "triggers"
-        ].append((repo, number))
+        groups.setdefault((project["name"], event_kind), {"project": project, "triggers": []})["triggers"].append(
+            (repo, number)
+        )
     return [
         {
             "project": groups[key]["project"],
@@ -68,9 +68,7 @@ def _notify_failure(ctx, payload):
     if notice_commands.announced(ctx.conn, announces):
         return
     text = _NOTICE_TEMPLATE.format(payload["event"], payload["project"], _failure_detail(payload))
-    notice_commands.create_announcing(
-        ctx, None, text, "project:{}".format(payload["project"]), _NOTICE_TTL, announces
-    )
+    notice_commands.create_announcing(ctx, None, text, "project:{}".format(payload["project"]), _NOTICE_TTL, announces)
 
 
 def _status_of(result):

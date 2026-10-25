@@ -75,7 +75,9 @@ class QuestDatesTests(QuestBoardTestCase):
         self.at(0, ["quest", "add", "q1", "--open", "--title", "Plan", "--epic", "demo-epic", "--tasks", "T02"], None)
         model = quest_board.data(self.ctx(), "acme")["open_quests"][0]
         self.assertTrue(model["dates"].startswith("created "))
-        self.assertIn("(epic demo-epic · {}): Plan".format(model["dates"]), "\n".join(quest_board.board(self.ctx(), "acme")))
+        self.assertIn(
+            "(epic demo-epic · {}): Plan".format(model["dates"]), "\n".join(quest_board.board(self.ctx(), "acme"))
+        )
         summary = quest_board.summary_lines(dict(quest_board.data(self.ctx(), "acme"), name="acme"))
         self.assertIn("  open quest q1 (1 tasks · {})".format(model["dates"]), summary)
 
@@ -107,7 +109,9 @@ class UndatedRowsTests(QuestBoardTestCase):
         self.assertIn("  q1 (epic demo-epic): q1", lines)
         self.assertNotIn("created", lines)
         _, out, _ = self.run_cli(["doctor"], None, self.repo_dir)
-        self.assertIn("2 rows predate stored dates: run guild compact, then guild rebuild, with no session working", out)
+        self.assertIn(
+            "2 rows predate stored dates: run guild compact, then guild rebuild, with no session working", out
+        )
         self.ok(["rebuild"], None)
         _, out, _ = self.run_cli(["doctor"], None, self.repo_dir)
         self.assertNotIn("predate stored dates", out)
@@ -115,8 +119,12 @@ class UndatedRowsTests(QuestBoardTestCase):
     def test_old_schema_db_gains_null_columns(self):
         db_path = self.data_home / "guild.db"
         raw = sqlite3.connect(str(db_path))
-        raw.execute("CREATE TABLE quests (slug TEXT PRIMARY KEY, project TEXT, party TEXT, epic TEXT, title TEXT NOT NULL, state TEXT NOT NULL)")
-        raw.execute("CREATE TABLE quest_tasks (quest TEXT NOT NULL, tid TEXT NOT NULL, title TEXT NOT NULL, state TEXT NOT NULL, summary TEXT, blocked_reason TEXT, PRIMARY KEY (quest, tid))")
+        raw.execute(
+            "CREATE TABLE quests (slug TEXT PRIMARY KEY, project TEXT, party TEXT, epic TEXT, title TEXT NOT NULL, state TEXT NOT NULL)"
+        )
+        raw.execute(
+            "CREATE TABLE quest_tasks (quest TEXT NOT NULL, tid TEXT NOT NULL, title TEXT NOT NULL, state TEXT NOT NULL, summary TEXT, blocked_reason TEXT, PRIMARY KEY (quest, tid))"
+        )
         raw.execute("INSERT INTO quests VALUES ('q', 'acme', NULL, 'e', 't', 'active')")
         raw.execute("INSERT INTO quest_tasks VALUES ('q', 'T01', 't', 'queued', NULL, NULL)")
         raw.commit()

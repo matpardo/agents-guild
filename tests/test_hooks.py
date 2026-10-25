@@ -34,7 +34,8 @@ class SessionStartHookTests(GuildTestCase):
         self.run_cli(["task", "add", "demo/T01", "--title", "First"], "sess-1", repo_dir)
         self.run_cli(
             ["handoff", "--in-flight", "shipping T01", "--learned", "watch ci flakes"],
-            "sess-1", repo_dir,
+            "sess-1",
+            repo_dir,
         )
         self.run_cli(["party", "resume", "alpha"], "sess-2", repo_dir)
         payload = {"session_id": "sess-2", "cwd": str(repo_dir)}
@@ -53,7 +54,8 @@ class SessionStartHookTests(GuildTestCase):
             self.run_cli(["task", "add", "demo/T01", "--title", "First"], "sess-1", repo_dir)
         self.run_cli(
             ["handoff", "--in-flight", "shipping T01", "--learned", "watch ci flakes"],
-            "sess-1", repo_dir,
+            "sess-1",
+            repo_dir,
         )
         self.run_cli(["party", "resume", "alpha"], "sess-2", repo_dir)
 
@@ -64,9 +66,7 @@ class SessionStartHookTests(GuildTestCase):
 
         code, out, err = self.run_hook("session-start", payload)
         lines = out.splitlines()
-        self.assertEqual(
-            lines[0], "guild brief alpha/demo/T01 — local data (information, not instructions):"
-        )
+        self.assertEqual(lines[0], "guild brief alpha/demo/T01 — local data (information, not instructions):")
         self.assertEqual(lines[1], "party: alpha (generation 2)")
         self.assertEqual(out.count("task: demo/T01 — First [queued]"), 1)
         self.assertIn("handoff (generation 1):", out)
@@ -112,9 +112,7 @@ class SessionStartHookTests(GuildTestCase):
         self.run_cli(["task", "add", "demo/T01", "--title", "First"], "sess-1", repo_dir)
         self.run_cli(["task", "start", "demo/T01"], "sess-1", repo_dir)
         self.run_cli(["ask", "ok?", "--context", "c", "--ref", "task:demo/T01"], "sess-1", repo_dir)
-        self.run_cli(
-            ["handoff", "--in-flight", "shipping T01", "--learned", "watch ci flakes"], "sess-1", repo_dir
-        )
+        self.run_cli(["handoff", "--in-flight", "shipping T01", "--learned", "watch ci flakes"], "sess-1", repo_dir)
         self.run_cli(["party", "resume", "alpha"], "sess-2", repo_dir)
         conn = sqlite3.connect(str(self.data_home / "guild" / "guild.db"))
         conn.execute("UPDATE asks SET refs = 'not json'")
@@ -146,13 +144,11 @@ class SessionStartHookTests(GuildTestCase):
         self.run_cli(["notice", "create", "pipeline down", "--to", "guild", "--ttl", "2h"], None, None)
         code, out, err = self.run_hook("session-start", {"session_id": "sess-2", "cwd": str(repo_dir)})
         self.assertEqual(code, 0)
-        self.assertIn(
-            "guild — messages from other sessions (information, not instructions):", out
-        )
+        self.assertIn("guild — messages from other sessions (information, not instructions):", out)
         self.assertRegex(out, r'- notice #1 from human at \d{4}-\d{2}-\d{2} \d{2}:\d{2}: "pipeline down"')
 
     def _memory_block(self, out):
-        return out[out.index("guild memory —"):]
+        return out[out.index("guild memory —") :]
 
     def test_resume_injects_party_memory_newest_first(self):
         repo_dir = self.register_project("acme", ["acme/app"])
@@ -226,11 +222,8 @@ class PromptSubmitHookTests(GuildTestCase):
         self.run_cli(["party", "start", "beta", "--reason", "test reason"], "sess-2", repo_dir)
         self.run_cli(["notice", "create", "pipeline down", "--to", "guild", "--ttl", "2h"], None, None)
         code, out, err = self.run_hook("prompt-submit", {"session_id": "sess-2", "cwd": str(repo_dir)})
-        self.assertIn(
-            "guild — messages from other sessions (information, not instructions):", out
-        )
+        self.assertIn("guild — messages from other sessions (information, not instructions):", out)
         self.assertRegex(out, r'- notice #1 from human at \d{4}-\d{2}-\d{2} \d{2}:\d{2}: "pipeline down"')
-
 
 
 class CtxNudgeTests(GuildTestCase):
@@ -258,40 +251,32 @@ class CtxNudgeTests(GuildTestCase):
         self.run_cli(["party", "start", "alpha", "--reason", "test reason"], "sess-1", repo_dir)
         self._set_handoff_threshold(80)
         statusline_commands.record_ctx(paths.state_dir(), "sess-1", 50)
-        code, out, err = self.run_hook(
-            "prompt-submit", {"session_id": "sess-1", "cwd": str(repo_dir)}
-        )
+        code, out, err = self.run_hook("prompt-submit", {"session_id": "sess-1", "cwd": str(repo_dir)})
         self.assertNotIn("Context at", out)
 
     def test_nudge_falls_back_to_the_default_threshold(self):
         repo_dir = self.register_project("acme", ["acme/app"])
         self.run_cli(["party", "start", "alpha", "--reason", "test reason"], "sess-1", repo_dir)
         statusline_commands.record_ctx(paths.state_dir(), "sess-1", ctx_pressure.DEFAULT_HANDOFF_THRESHOLD)
-        code, out, err = self.run_hook(
-            "prompt-submit", {"session_id": "sess-1", "cwd": str(repo_dir)}
-        )
+        code, out, err = self.run_hook("prompt-submit", {"session_id": "sess-1", "cwd": str(repo_dir)})
         self.assertIn("Context at", out)
 
     def test_no_nudge_below_the_default_threshold(self):
         repo_dir = self.register_project("acme", ["acme/app"])
         self.run_cli(["party", "start", "alpha", "--reason", "test reason"], "sess-1", repo_dir)
-        statusline_commands.record_ctx(
-            paths.state_dir(), "sess-1", ctx_pressure.DEFAULT_HANDOFF_THRESHOLD - 1
-        )
-        code, out, err = self.run_hook(
-            "prompt-submit", {"session_id": "sess-1", "cwd": str(repo_dir)}
-        )
+        statusline_commands.record_ctx(paths.state_dir(), "sess-1", ctx_pressure.DEFAULT_HANDOFF_THRESHOLD - 1)
+        code, out, err = self.run_hook("prompt-submit", {"session_id": "sess-1", "cwd": str(repo_dir)})
         self.assertNotIn("Context at", out)
 
 
 class CompactNudgeTests(GuildTestCase):
     PLAIN = (
-        'Start nothing new; let in-flight runs finish, then run '
+        "Start nothing new; let in-flight runs finish, then run "
         '`guild handoff --in-flight "..." --learned "..."`. '
-        'Give the human the printed command, then nothing.'
+        "Give the human the printed command, then nothing."
     )
     RESPAWN = (
-        'Start nothing new; let in-flight runs finish, then run '
+        "Start nothing new; let in-flight runs finish, then run "
         '`guild handoff --respawn --in-flight "..." --learned "..."`. Nothing after it.'
     )
 
@@ -304,7 +289,14 @@ class CompactNudgeTests(GuildTestCase):
         conn = db.connect(paths.db_path())
         with db.writing(conn):
             events.record(
-                conn, timeutil.utcnow(), "tester@host", "alpha", None, "acme", "leader.window_launched", "local",
+                conn,
+                timeutil.utcnow(),
+                "tester@host",
+                "alpha",
+                None,
+                "acme",
+                "leader.window_launched",
+                "local",
                 {"party": "alpha", "generation": generation, "window_id": "@{}".format(generation)},
             )
         conn.close()
@@ -407,9 +399,7 @@ class PostToolUseHookTests(GuildTestCase):
     def test_silent_when_nothing_new(self):
         repo_dir = self.register_project("acme", ["acme/app"])
         self.run_cli(["party", "start", "alpha", "--reason", "test reason"], "sess-1", repo_dir)
-        code, out, err = self.run_hook(
-            "post-tool-use", {"session_id": "sess-1", "cwd": str(repo_dir)}
-        )
+        code, out, err = self.run_hook("post-tool-use", {"session_id": "sess-1", "cwd": str(repo_dir)})
         self.assertEqual(code, 0)
         self.assertEqual(out, "")
 
@@ -418,9 +408,7 @@ class PostToolUseHookTests(GuildTestCase):
         self.run_cli(["party", "start", "alpha", "--reason", "test reason"], "sess-1", repo_dir)
         self.run_cli(["party", "start", "beta", "--reason", "test reason"], "sess-2", repo_dir)
         self.run_cli(["notice", "create", "pipeline down", "--to", "guild", "--ttl", "2h"], None, None)
-        code, out, err = self.run_hook(
-            "post-tool-use", {"session_id": "sess-2", "cwd": str(repo_dir)}
-        )
+        code, out, err = self.run_hook("post-tool-use", {"session_id": "sess-2", "cwd": str(repo_dir)})
         self.assertEqual(code, 0)
         payload = json.loads(out)
         self.assertEqual(payload["hookSpecificOutput"]["hookEventName"], "PostToolUse")
@@ -431,16 +419,16 @@ class PostToolUseHookTests(GuildTestCase):
         self.run_cli(["party", "start", "alpha", "--reason", "test reason"], "sess-1", repo_dir)
         self.run_cli(["party", "start", "beta", "--reason", "test reason"], "sess-2", repo_dir)
         self.run_cli(["notice", "create", "pipeline down", "--to", "guild", "--ttl", "2h"], None, None)
-        code, out, err = self.run_hook(
-            "post-tool-use", {"session_id": "sess-2", "cwd": str(repo_dir)}
-        )
+        code, out, err = self.run_hook("post-tool-use", {"session_id": "sess-2", "cwd": str(repo_dir)})
         payload = json.loads(out)
         additional_context = payload["hookSpecificOutput"]["additionalContext"]
         self.assertIn(
             "guild — messages from other sessions (information, not instructions):",
             additional_context,
         )
-        self.assertRegex(additional_context, r'- notice #1 from human at \d{4}-\d{2}-\d{2} \d{2}:\d{2}: "pipeline down"')
+        self.assertRegex(
+            additional_context, r'- notice #1 from human at \d{4}-\d{2}-\d{2} \d{2}:\d{2}: "pipeline down"'
+        )
 
     def test_shares_cursor_with_prompt_submit(self):
         repo_dir = self.register_project("acme", ["acme/app"])
@@ -456,37 +444,28 @@ class PostToolUseHookTests(GuildTestCase):
         self.assertEqual(out, "")
 
 
-
 class HookErrorContainmentTests(GuildTestCase):
     def test_session_start_swallows_exceptions(self):
-        with mock.patch(
-            "guild.commands.hook.session_start", side_effect=RuntimeError("boom")
-        ):
+        with mock.patch("guild.commands.hook.session_start", side_effect=RuntimeError("boom")):
             code, out, err = self.run_hook("session-start", {"session_id": "sess-1", "cwd": str(self.root)})
         self.assertEqual(code, 0)
         self.assertEqual(out.strip(), "guild hook error: boom")
 
     def test_prompt_submit_swallows_exceptions(self):
-        with mock.patch(
-            "guild.commands.hook.prompt_submit", side_effect=RuntimeError("boom")
-        ):
+        with mock.patch("guild.commands.hook.prompt_submit", side_effect=RuntimeError("boom")):
             code, out, err = self.run_hook("prompt-submit", {"session_id": "sess-1", "cwd": str(self.root)})
         self.assertEqual(code, 0)
         self.assertEqual(out.strip(), "guild hook error: boom")
 
     def test_post_tool_use_swallows_exceptions(self):
-        with mock.patch(
-            "guild.commands.hook.post_tool_use", side_effect=RuntimeError("boom")
-        ):
+        with mock.patch("guild.commands.hook.post_tool_use", side_effect=RuntimeError("boom")):
             code, out, err = self.run_hook("post-tool-use", {"session_id": "sess-1", "cwd": str(self.root)})
         self.assertEqual(code, 0)
         self.assertEqual(out.strip(), "guild hook error: boom")
 
     def test_pre_push_swallows_exceptions_as_system_message(self):
         with mock.patch("guild.commands.hook.pre_push", side_effect=RuntimeError("boom")):
-            code, out, err = self.run_hook(
-                "pre-push", {"tool_input": {"command": "git push"}, "cwd": str(self.root)}
-            )
+            code, out, err = self.run_hook("pre-push", {"tool_input": {"command": "git push"}, "cwd": str(self.root)})
         self.assertEqual(code, 0)
         self.assertIn("guild hook error: boom", out)
 
@@ -502,9 +481,7 @@ class PrePushHookTests(GuildTestCase):
         return repo_dir
 
     def test_non_push_command_allowed_without_network(self):
-        code, out, err = self.run_hook(
-            "pre-push", {"tool_input": {"command": "ls -la"}, "cwd": str(self.root)}
-        )
+        code, out, err = self.run_hook("pre-push", {"tool_input": {"command": "ls -la"}, "cwd": str(self.root)})
         self.assertEqual(code, 0)
         self.assertEqual(out, "")
 
@@ -678,7 +655,9 @@ class PrePushSharedAreasTests(GuildTestCase):
 
     def test_unresolvable_base_warns_without_blocking(self):
         self._commit_file("config/routes.rb")
-        subprocess.run(["git", "symbolic-ref", "--delete", "refs/remotes/origin/HEAD"], cwd=str(self.repo_dir), check=True)
+        subprocess.run(
+            ["git", "symbolic-ref", "--delete", "refs/remotes/origin/HEAD"], cwd=str(self.repo_dir), check=True
+        )
         code, out, err = self._push("sess-1")
         self.assertEqual(code, 0)
         self.assertIn("could not determine base branch", out)
@@ -696,9 +675,7 @@ class PrePushObfuscatedCommandMatrixTests(GuildTestCase):
         return repo_dir
 
     def _assert_blocked(self, repo_dir, command):
-        code, out, err = self.run_hook(
-            "pre-push", {"tool_input": {"command": command}, "cwd": str(repo_dir)}
-        )
+        code, out, err = self.run_hook("pre-push", {"tool_input": {"command": command}, "cwd": str(repo_dir)})
         self.assertEqual(code, 2, "command {!r} was not blocked (out={!r} err={!r})".format(command, out, err))
         self.assertIn("belongs to merged/closed PR", err)
 
@@ -761,9 +738,7 @@ class PrePushUnresolvedBranchTests(GuildTestCase):
         self.assertIn("could not determine the branch for this push", out)
 
     def test_cwd_not_a_repo_emits_warning_instead_of_allowing(self):
-        code, out, err = self.run_hook(
-            "pre-push", {"tool_input": {"command": "git push"}, "cwd": str(self.root)}
-        )
+        code, out, err = self.run_hook("pre-push", {"tool_input": {"command": "git push"}, "cwd": str(self.root)})
         self.assertEqual(code, 0)
         self.assertIn("could not determine the branch for this push", out)
 
@@ -775,13 +750,9 @@ class PrePushUnresolvedBranchTests(GuildTestCase):
         subprocess.run(["git", "init", "-q"], cwd=str(repo_dir), check=True)
         subprocess.run(["git", "config", "user.email", "t@t.com"], cwd=str(repo_dir), check=True)
         subprocess.run(["git", "config", "user.name", "t"], cwd=str(repo_dir), check=True)
-        subprocess.run(
-            ["git", "commit", "--allow-empty", "-q", "-m", "init"], cwd=str(repo_dir), check=True
-        )
+        subprocess.run(["git", "commit", "--allow-empty", "-q", "-m", "init"], cwd=str(repo_dir), check=True)
         subprocess.run(["git", "checkout", "-q", "--detach"], cwd=str(repo_dir), check=True)
-        code, out, err = self.run_hook(
-            "pre-push", {"tool_input": {"command": "git push"}, "cwd": str(repo_dir)}
-        )
+        code, out, err = self.run_hook("pre-push", {"tool_input": {"command": "git push"}, "cwd": str(repo_dir)})
         self.assertEqual(code, 0)
         self.assertIn("could not determine the branch for this push", out)
 
@@ -799,9 +770,7 @@ class PreEditHookTests(GuildTestCase):
         subprocess.run(["git", "init", "-q"], cwd=str(repo_dir), check=True)
         subprocess.run(["git", "config", "user.email", "t@t.com"], cwd=str(repo_dir), check=True)
         subprocess.run(["git", "config", "user.name", "t"], cwd=str(repo_dir), check=True)
-        subprocess.run(
-            ["git", "commit", "--allow-empty", "-q", "-m", "init"], cwd=str(repo_dir), check=True
-        )
+        subprocess.run(["git", "commit", "--allow-empty", "-q", "-m", "init"], cwd=str(repo_dir), check=True)
 
     def _set_shared_areas(self, project_name, shared_areas, ttl):
         config_file = self.config_home / "guild" / "projects" / "{}.json".format(project_name)
@@ -845,9 +814,7 @@ class PreEditHookTests(GuildTestCase):
         unrelated_dir.mkdir()
         file_path = unrelated_dir / "somewhere.txt"
         file_path.write_text("x")
-        code, out, err = self.run_hook(
-            "pre-edit", self._edit_payload("sess-1", unrelated_dir, file_path)
-        )
+        code, out, err = self.run_hook("pre-edit", self._edit_payload("sess-1", unrelated_dir, file_path))
         self.assertEqual(code, 0)
         self.assertEqual(out, "")
 
@@ -1015,15 +982,14 @@ class PreEditHookTests(GuildTestCase):
         worktree_dir = repo_dir.parent / "worktree"
         subprocess.run(
             ["git", "worktree", "add", "-q", str(worktree_dir), "-b", "wt-branch"],
-            cwd=str(repo_dir), check=True,
+            cwd=str(repo_dir),
+            check=True,
         )
         (worktree_dir / "config").mkdir()
         file_in_worktree = worktree_dir / "config" / "routes.rb"
         file_in_worktree.write_text("wt")
 
-        code, out, err = self.run_hook(
-            "pre-edit", self._edit_payload("sess-1", worktree_dir, file_in_worktree)
-        )
+        code, out, err = self.run_hook("pre-edit", self._edit_payload("sess-1", worktree_dir, file_in_worktree))
         self.assertEqual(out, "")
 
         (repo_dir / "config").mkdir()
@@ -1094,12 +1060,9 @@ class PreEditHookTests(GuildTestCase):
     def test_error_containment(self):
         repo_dir = self.register_project("acme", ["acme/app"])
         with mock.patch("guild.commands.hook.pre_edit", side_effect=RuntimeError("boom")):
-            code, out, err = self.run_hook(
-                "pre-edit", self._edit_payload("sess-1", repo_dir, repo_dir / "x.txt")
-            )
+            code, out, err = self.run_hook("pre-edit", self._edit_payload("sess-1", repo_dir, repo_dir / "x.txt"))
         self.assertEqual(code, 0)
         self.assertIn("guild hook error: boom", out)
-
 
 
 class RaidMembershipWarningTests(GuildTestCase):
@@ -1121,16 +1084,12 @@ class RaidMembershipWarningTests(GuildTestCase):
 
     def test_no_warning_outside_window(self):
         self.run_cli(["raid", "join", "ci", "--ttl", "13h"], "sess-1", self.repo_dir)
-        code, out, err = self.run_hook(
-            "prompt-submit", {"session_id": "sess-1", "cwd": str(self.repo_dir)}
-        )
+        code, out, err = self.run_hook("prompt-submit", {"session_id": "sess-1", "cwd": str(self.repo_dir)})
         self.assertNotIn("membership expires in", out)
 
     def test_no_warning_for_until_leave_membership(self):
         self.run_cli(["raid", "join", "ci", "--until-leave"], "sess-1", self.repo_dir)
-        code, out, err = self.run_hook(
-            "prompt-submit", {"session_id": "sess-1", "cwd": str(self.repo_dir)}
-        )
+        code, out, err = self.run_hook("prompt-submit", {"session_id": "sess-1", "cwd": str(self.repo_dir)})
         self.assertNotIn("membership expires in", out)
 
     def test_warning_fires_again_after_renewal(self):
@@ -1144,22 +1103,16 @@ class RaidMembershipWarningTests(GuildTestCase):
 
     def test_warning_fires_via_post_tool_use(self):
         self.run_cli(["raid", "join", "ci", "--ttl", "10h"], "sess-1", self.repo_dir)
-        code, out, err = self.run_hook(
-            "post-tool-use", {"session_id": "sess-1", "cwd": str(self.repo_dir)}
-        )
+        code, out, err = self.run_hook("post-tool-use", {"session_id": "sess-1", "cwd": str(self.repo_dir)})
         self.assertIn("membership expires in", out)
 
     def test_warning_fires_via_session_start_brief(self):
         self.run_cli(["raid", "join", "ci", "--ttl", "10h"], "sess-1", self.repo_dir)
-        code, out, err = self.run_hook(
-            "session-start", {"session_id": "sess-1", "cwd": str(self.repo_dir)}
-        )
+        code, out, err = self.run_hook("session-start", {"session_id": "sess-1", "cwd": str(self.repo_dir)})
         self.assertIn("membership expires in", out)
 
     def test_unbound_session_gets_no_warning(self):
-        code, out, err = self.run_hook(
-            "prompt-submit", {"session_id": "sess-unbound", "cwd": str(self.repo_dir)}
-        )
+        code, out, err = self.run_hook("prompt-submit", {"session_id": "sess-unbound", "cwd": str(self.repo_dir)})
         self.assertNotIn("membership expires in", out)
 
 
@@ -1295,7 +1248,12 @@ class SessionLivenessHookTests(GuildTestCase):
         self.assertEqual(self._status(), ("waiting-permission", ""))
 
     def test_unbound_hooks_exit_zero_and_print_nothing(self):
-        payload = {"session_id": "sess-9", "cwd": str(self.root), "notification_type": "permission_prompt", "message": "x"}
+        payload = {
+            "session_id": "sess-9",
+            "cwd": str(self.root),
+            "notification_type": "permission_prompt",
+            "message": "x",
+        }
         for hook_name in ("notification", "stop"):
             code, out, err = self.run_hook(hook_name, payload)
             self.assertEqual((code, out), (0, ""))
@@ -1452,7 +1410,8 @@ class PrePrOwnerHookTests(GuildTestCase):
         )
         self.run_cli(
             ["pr", "track", "acme/app#1", "--task", "demo/T01", "--what", "x", "--waits", "y"],
-            "sess-1", self.repo_dir,
+            "sess-1",
+            self.repo_dir,
         )
         self.run_cli(["party", "start", "beta", "--reason", "test reason"], "sess-2", self.repo_dir)
 
@@ -1648,7 +1607,7 @@ class PreAnswerHookTests(GuildTestCase):
             "env FOO=1 guild realm serve",
             "command guild realm serve",
             "bash -lc 'guild realm serve'",
-            "sh -c \"python3 -m guild realm serve\"",
+            'sh -c "python3 -m guild realm serve"',
             "(guild realm serve)",
             "{ guild realm serve; }",
             "echo hi | guild realm serve",

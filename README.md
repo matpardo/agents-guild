@@ -2878,13 +2878,15 @@ Every action in a workflow is pinned by its full commit SHA, with the
 release tag beside it; `tests/test_ci_pins.py` fails on a tag or branch ref.
 
 Lint (dev-only, not a runtime dependency): ruff, pinned by version and
-sha256 in `requirements-lint.txt`, configured in `ruff.toml`. CI runs it
-before the tests.
+sha256 in `requirements-lint.txt`, configured in `ruff.toml`. CI runs the
+lint and the format check before the tests; `ruff format .` fixes the
+format.
 
 ```
 python3 -m venv .venv
 .venv/bin/pip install --require-hashes -r requirements-lint.txt
 .venv/bin/ruff check .
+.venv/bin/ruff format --check .
 ```
 
 Coverage (dev-only, not a runtime dependency):

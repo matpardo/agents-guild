@@ -55,9 +55,7 @@ def _seed_quest(ctx, quest):
             payload["reason"] = task.get("reason", "")
         else:
             payload["summary"] = task.get("summary")
-        events.record(
-            ctx.conn, ctx.now, ctx.origin, quest["party"], None, quest.get("project"), kind, "local", payload
-        )
+        events.record(ctx.conn, ctx.now, ctx.origin, quest["party"], None, quest.get("project"), kind, "local", payload)
 
 
 def _seed_pr(ctx, pr):

@@ -49,9 +49,7 @@ def _connect_pinned(config):
         raise GuildError("realm hub unreachable: {}".format(type(error).__name__), 1) from error
     if not hmac.compare_digest(got.encode("ascii"), config["fingerprint"].encode("ascii")):
         connection.close()
-        raise GuildError(
-            "realm hub fingerprint mismatch: expected {}, got {}".format(config["fingerprint"], got), 1
-        )
+        raise GuildError("realm hub fingerprint mismatch: expected {}, got {}".format(config["fingerprint"], got), 1)
     return connection
 
 

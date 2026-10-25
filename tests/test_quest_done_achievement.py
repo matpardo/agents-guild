@@ -16,14 +16,13 @@ class QuestDoneTestCase(DriftTestCase):
     def _add_quest(self, slug, epic, tasks):
         code, out, err = self.run_cli(
             ["quest", "add", slug, "--title", "Quest " + slug, "--epic", epic, "--tasks", tasks],
-            "sess-1", self.repo_dir,
+            "sess-1",
+            self.repo_dir,
         )
         self.assertEqual(code, 0, err)
 
     def _done_payload(self, slug):
-        rows = self.conn.execute(
-            "SELECT payload FROM events WHERE kind = 'quest.done' ORDER BY seq"
-        ).fetchall()
+        rows = self.conn.execute("SELECT payload FROM events WHERE kind = 'quest.done' ORDER BY seq").fetchall()
         payloads = [json.loads(row["payload"]) for row in rows]
         return [payload for payload in payloads if payload["slug"] == slug][-1]
 
@@ -33,10 +32,12 @@ class QuestDoneTestCase(DriftTestCase):
     def _prepare_clean_epic(self):
         self._write_epic("wave4", "jira: DEMO-20\nstatus: active\n", _NO_DRIFT_EPIC)
         self._sync_sdd()
-        self._record_cards([
-            self._card("DEMO-21", "done", parent_key="DEMO-20"),
-            self._card("DEMO-22", "new", parent_key="DEMO-20"),
-        ])
+        self._record_cards(
+            [
+                self._card("DEMO-21", "done", parent_key="DEMO-20"),
+                self._card("DEMO-22", "new", parent_key="DEMO-20"),
+            ]
+        )
         self._add_quest("wave4-q", "wave4", "T01")
         self.run_cli(["task", "done", "wave4-q/T01", "--summary", "shipped"], "sess-1", self.repo_dir)
 
@@ -119,7 +120,8 @@ class SnapshotShapeTests(QuestDoneTestCase):
     def test_blocked_events_are_counted(self):
         self.run_cli(
             ["quest", "add", "blk-q", "--title", "Blk", "--no-epic", "--tasks", "a"],
-            "sess-1", self.repo_dir,
+            "sess-1",
+            self.repo_dir,
         )
         self.run_cli(["task", "block", "blk-q/a", "--reason", "x"], "sess-1", self.repo_dir)
         self.run_cli(["task", "start", "blk-q/a", "--summary", "s"], "sess-1", self.repo_dir)
@@ -130,7 +132,8 @@ class SnapshotShapeTests(QuestDoneTestCase):
     def test_no_epic_quest_skips_gate_and_has_no_epic_fields(self):
         self.run_cli(
             ["quest", "add", "free-q", "--title", "Free", "--no-epic", "--tasks", "a,b"],
-            "sess-1", self.repo_dir,
+            "sess-1",
+            self.repo_dir,
         )
         self.run_cli(["task", "done", "free-q/a"], "sess-1", self.repo_dir)
         code, out, err = self.run_cli(["quest", "done", "free-q", "--force"], "sess-1", self.repo_dir)
@@ -156,13 +159,18 @@ class SnapshotShapeTests(QuestDoneTestCase):
 
 class LegacyEventTests(QuestDoneTestCase):
     def test_quest_done_event_without_achievement_still_applies(self):
-        self.run_cli(
-            ["quest", "add", "old-q", "--title", "Old", "--no-epic"], "sess-1", self.repo_dir
-        )
+        self.run_cli(["quest", "add", "old-q", "--title", "Old", "--no-epic"], "sess-1", self.repo_dir)
         with db.writing(self.conn):
             events.record(
-                self.conn, timeutil.utcnow(), "test@host", "alpha", None, "acme",
-                "quest.done", "local", {"slug": "old-q"},
+                self.conn,
+                timeutil.utcnow(),
+                "test@host",
+                "alpha",
+                None,
+                "acme",
+                "quest.done",
+                "local",
+                {"slug": "old-q"},
             )
         self.assertEqual(self._quest_state("old-q"), "done")
 
@@ -172,7 +180,8 @@ class WindowMetricTests(QuestDoneTestCase):
         super().setUp()
         self.run_cli(
             ["quest", "add", "win-q", "--title", "Win", "--no-epic", "--tasks", "a"],
-            "sess-1", self.repo_dir,
+            "sess-1",
+            self.repo_dir,
         )
         self.started = timeutil.from_iso(
             self.conn.execute("SELECT ts FROM events WHERE kind = 'quest.added'").fetchone()["ts"]
@@ -181,13 +190,22 @@ class WindowMetricTests(QuestDoneTestCase):
     def _record(self, offset_seconds, party, kind, payload):
         with db.writing(self.conn):
             events.record(
-                self.conn, self.started + timedelta(seconds=offset_seconds), "test@host",
-                party, None, "acme", kind, "local", payload,
+                self.conn,
+                self.started + timedelta(seconds=offset_seconds),
+                "test@host",
+                party,
+                None,
+                "acme",
+                kind,
+                "local",
+                payload,
             )
 
     def _ask(self, ask_id, party, created_offset, answered_offset):
         self._record(
-            created_offset, party, "ask.created",
+            created_offset,
+            party,
+            "ask.created",
             {"id": ask_id, "party": party, "question": "q", "context": "c", "refs": [], "options": []},
         )
         if answered_offset is not None:
@@ -238,10 +256,15 @@ class WindowMetricTests(QuestDoneTestCase):
         self.assertIsNone(self._build(100)["median_answer_seconds"])
 
     def test_percent_rounds_down_to_whole_number(self):
-        self._write_epic("wave6", "status: active\n", _DRIFT_EPIC.replace("[ ] pending", "[x] done") + (
-            "\n## T02 — B\n\n**Deps:** —\n**Status:** [ ] pending\n"
-            "\n## T03 — C\n\n**Deps:** —\n**Status:** [ ] pending\n"
-        ))
+        self._write_epic(
+            "wave6",
+            "status: active\n",
+            _DRIFT_EPIC.replace("[ ] pending", "[x] done")
+            + (
+                "\n## T02 — B\n\n**Deps:** —\n**Status:** [ ] pending\n"
+                "\n## T03 — C\n\n**Deps:** —\n**Status:** [ ] pending\n"
+            ),
+        )
         self._sync_sdd()
         self._add_quest("wave6-q", "wave6", "T01")
         snapshot = achievement.build(self.conn, "wave6-q", timeutil.utcnow(), [])

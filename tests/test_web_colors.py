@@ -21,7 +21,7 @@ _CHECK_CLASSES = ("checks-failing", "checks-clear", "checks-passing", "checks-pe
 
 def _dark_block(css):
     start = css.index("prefers-color-scheme: dark")
-    return css[start:css.index("\n}\n", start)]
+    return css[start : css.index("\n}\n", start)]
 
 
 class LifecycleColorTests(unittest.TestCase):
@@ -33,8 +33,12 @@ class LifecycleColorTests(unittest.TestCase):
         self.assertIn('"pill lifecycle-" + pr.lifecycle', self.js)
 
     def test_app_js_renders_the_flag_badges_and_filters_on_them(self):
-        for token in ("lifecycle-needs-ask-answer", "lifecycle-needs-human-pr-review", "pr.needs_ask_answer",
-                      "pr.needs_human_pr_review"):
+        for token in (
+            "lifecycle-needs-ask-answer",
+            "lifecycle-needs-human-pr-review",
+            "pr.needs_ask_answer",
+            "pr.needs_human_pr_review",
+        ):
             with self.subTest(token=token):
                 self.assertIn(token, self.js)
 
@@ -42,7 +46,7 @@ class LifecycleColorTests(unittest.TestCase):
         html = (_WEB_DIR / "index.html").read_text()
         self.assertIn('<option value="needs-ask-answer">', html)
         self.assertIn('<option value="needs-human-pr-review">', html)
-        self.assertNotIn("needs-human\"", html)
+        self.assertNotIn('needs-human"', html)
 
     def test_app_js_renders_the_urgency_marks_and_filters_on_them(self):
         for token in ("lifecycle-fixes-main", "lifecycle-fixes-flaky", "pr.fixes_main", "pr.fixes_flaky"):
@@ -135,7 +139,7 @@ class RoleBadgeTests(unittest.TestCase):
 
     def test_role_colors_defined_in_both_themes(self):
         dark = _dark_block(self.css)
-        light = self.css[:self.css.index("prefers-color-scheme: dark")]
+        light = self.css[: self.css.index("prefers-color-scheme: dark")]
         for role in ("member", "solo"):
             for suffix in ("fg", "bg"):
                 variable = "--role-{}-{}:".format(role, suffix)

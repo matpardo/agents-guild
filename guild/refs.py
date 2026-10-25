@@ -33,9 +33,7 @@ def parse_ask_ref(text):
     match = _ASK_REF_RE.match(text)
     if not match:
         raise GuildError(
-            "invalid ask ref '{}': expected pr:owner/repo#number, task:quest/tid or card:KEY".format(
-                text
-            ),
+            "invalid ask ref '{}': expected pr:owner/repo#number, task:quest/tid or card:KEY".format(text),
             1,
         )
     kind, rest = match.group(1), match.group(2)
@@ -51,8 +49,5 @@ def parse_ask_ref(text):
 def parse_until(text):
     match = _UNTIL_RE.match(text)
     if not match:
-        raise GuildError(
-            "invalid --until '{}': expected pr:owner/repo#number:merged|closed".format(text), 1
-        )
+        raise GuildError("invalid --until '{}': expected pr:owner/repo#number:merged|closed".format(text), 1)
     return {"repo": match.group(1), "number": int(match.group(2)), "state": match.group(3)}
-

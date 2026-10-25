@@ -12,8 +12,14 @@ class AdventurerBoardTests(AdventurerTestCase):
         conn = db.connect(paths.db_path())
         self.addCleanup(conn.close)
         ctx = context.RunContext(
-            conn, None, None, timeutil.utcnow(), None,
-            paths.claude_sessions_dir(), paths.projects_config_dir(), paths.state_dir(),
+            conn,
+            None,
+            None,
+            timeutil.utcnow(),
+            None,
+            paths.claude_sessions_dir(),
+            paths.projects_config_dir(),
+            paths.state_dir(),
         )
         return board_commands.board_model(ctx)
 
@@ -25,10 +31,14 @@ class AdventurerBoardTests(AdventurerTestCase):
     def test_active_adventurer_is_listed_with_liveness_and_prs(self):
         self.write_gh_fixture("view_acme-app_7", dict(OPEN_VIEW))
         self.start("adv-1", "fix typo", "--task", "demo-epic/T02")
-        code, out, err = self.cli(["pr", "track", "acme/app#7", "--task", "demo-epic/T02", "--what", "typo", "--waits", "review"], "adv-1")
+        code, out, err = self.cli(
+            ["pr", "track", "acme/app#7", "--task", "demo-epic/T02", "--what", "typo", "--waits", "review"], "adv-1"
+        )
         self.assertEqual(code, 0, err)
         entry = self._model()["adventurers"][0]
-        self.assertEqual((entry["id"], entry["job"], entry["task"], entry["state"]), (1, "fix typo", "demo-epic/T02", "active"))
+        self.assertEqual(
+            (entry["id"], entry["job"], entry["task"], entry["state"]), (1, "fix typo", "demo-epic/T02", "active")
+        )
         self.assertEqual(entry["project"], "acme")
         self.assertEqual([pr["number"] for pr in entry["prs"]], [7])
         self.assertTrue(entry["stopped_without_report"])
@@ -45,7 +55,9 @@ class AdventurerBoardTests(AdventurerTestCase):
         self.start("adv-1", "x", "--task", "demo-epic/T90")
         self.cli(["adventurer", "done", "--pending", "left the tests"], "adv-1")
         entry = self._model()["adventurers"][0]
-        self.assertEqual((entry["state"], entry["pending"], entry["stopped_without_report"]), ("done", "left the tests", False))
+        self.assertEqual(
+            (entry["state"], entry["pending"], entry["stopped_without_report"]), ("done", "left the tests", False)
+        )
         code, out, err = self.cli(["adventurer", "dismiss", "1"], None)
         self.assertEqual(code, 0, err)
         self.assertEqual(self._model()["adventurers"], [])

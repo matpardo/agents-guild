@@ -25,7 +25,9 @@ class UpdateScriptTests(unittest.TestCase):
         _git(self.dev, "config", "user.name", "t")
         (self.dev / "install.sh").write_text("#!/usr/bin/env bash\necho installed\n")
         (self.dev / "bin").mkdir()
-        (self.dev / "bin" / "guild").write_text("#!/usr/bin/env bash\necho \"doctor says ${DOCTOR_EXIT:-0}\"\nexit ${DOCTOR_EXIT:-0}\n")
+        (self.dev / "bin" / "guild").write_text(
+            '#!/usr/bin/env bash\necho "doctor says ${DOCTOR_EXIT:-0}"\nexit ${DOCTOR_EXIT:-0}\n'
+        )
         (self.dev / "update.sh").write_text(_SOURCE_SCRIPT.read_text())
         os.chmod(self.dev / "update.sh", 0o755)
         os.chmod(self.dev / "install.sh", 0o755)

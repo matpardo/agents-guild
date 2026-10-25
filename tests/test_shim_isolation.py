@@ -37,9 +37,7 @@ class ShimIsolationTests(unittest.TestCase):
             with mock.patch("subprocess.Popen") as popen:
                 hook_commands._spawn_background_sync(decoy)
             argv = popen.call_args.args[0]
-            result = subprocess.run(
-                argv[:-3] + ["--help"], cwd=str(decoy), capture_output=True, text=True
-            )
+            result = subprocess.run(argv[:-3] + ["--help"], cwd=str(decoy), capture_output=True, text=True)
         self.assertEqual(argv[-3:], ["sync", "--source", "gh"])
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertNotIn("DECOY GUILD", result.stdout)

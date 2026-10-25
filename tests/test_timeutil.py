@@ -80,9 +80,7 @@ class DatesLabelTests(unittest.TestCase):
     _CREATED = datetime(2026, 10, 1, 10, 0, tzinfo=timezone.utc)
 
     def _label(self, updated):
-        return timeutil.dates_label(
-            self._CREATED.isoformat(), None if updated is None else updated.isoformat()
-        )
+        return timeutil.dates_label(self._CREATED.isoformat(), None if updated is None else updated.isoformat())
 
     def test_none_created_gives_none(self):
         self.assertIsNone(timeutil.dates_label(None, None))

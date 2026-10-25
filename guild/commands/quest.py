@@ -8,13 +8,9 @@ _TASK_CLAIM_PREFIX = "task:{}/"
 
 
 def _resolve_epic_tasks(conn, project, epic, tasks_csv):
-    epic_row = conn.execute(
-        "SELECT epic FROM epics WHERE project = ? AND epic = ?", (project, epic)
-    ).fetchone()
+    epic_row = conn.execute("SELECT epic FROM epics WHERE project = ? AND epic = ?", (project, epic)).fetchone()
     if epic_row is None:
-        raise GuildError(
-            "epic '{}' was never synced: run `guild sync --source sdd`".format(epic), 1
-        )
+        raise GuildError("epic '{}' was never synced: run `guild sync --source sdd`".format(epic), 1)
     tasks = []
     for tid in tasks_csv.split(","):
         tid = tid.strip()
@@ -25,9 +21,7 @@ def _resolve_epic_tasks(conn, project, epic, tasks_csv):
             (project, epic, tid),
         ).fetchone()
         if task_row is None:
-            raise GuildError(
-                "task '{}' not found in epic '{}': run `guild sync --source sdd`".format(tid, epic), 1
-            )
+            raise GuildError("task '{}' not found in epic '{}': run `guild sync --source sdd`".format(tid, epic), 1)
         tasks.append({"tid": task_row["tid"], "title": task_row["title"]})
     return tasks
 
@@ -39,8 +33,7 @@ def _quest_holders(conn, project, epic, party, allow_open_quests):
     rows = conn.execute(
         "SELECT q.slug AS slug, q.party AS party, qt.tid AS tid"
         " FROM quests q JOIN quest_tasks qt ON qt.quest = q.slug"
-        " WHERE q.project = ? AND q.epic = ? AND q.state = 'active' AND " + party_filter
-        + " ORDER BY q.slug, qt.tid",
+        " WHERE q.project = ? AND q.epic = ? AND q.state = 'active' AND " + party_filter + " ORDER BY q.slug, qt.tid",
         (project, epic, party),
     ).fetchall()
     holders = {}
@@ -61,7 +54,7 @@ def _claim_holders(conn, now, project, epic, party):
             continue
         if timeutil.is_expired(now, row["expires_at"]):
             continue
-        holders[row["area"][len(prefix):]] = row
+        holders[row["area"][len(prefix) :]] = row
     return holders
 
 
@@ -106,9 +99,7 @@ def reject_taken_tasks(conn, now, project, epic, tasks, party, allow_open_quests
             conflicts.append("{} is in open quest {}".format(tid, quest_holder["slug"]))
             continue
         if quest_holder is not None:
-            conflicts.append(
-                "{} is in quest {} of party {}".format(tid, quest_holder["slug"], quest_holder["party"])
-            )
+            conflicts.append("{} is in quest {} of party {}".format(tid, quest_holder["slug"], quest_holder["party"]))
             continue
         claim_holder = claim_holders.get(tid)
         if claim_holder is not None:
@@ -130,9 +121,7 @@ def refresh_sdd_snapshot(ctx, project):
         failures = [error.message]
     if not failures:
         return []
-    return [
-        "sdd snapshot may be stale ({}): run `guild sync --source sdd`".format("; ".join(failures))
-    ]
+    return ["sdd snapshot may be stale ({}): run `guild sync --source sdd`".format("; ".join(failures))]
 
 
 def _owner_sections(split):
@@ -190,22 +179,16 @@ def unfinished_work(conn, slug, project, epic):
 
 def done(ctx, slug, accept_drift, force):
     binding = identity.require_binding(ctx.conn, ctx.session_id)
-    row = ctx.conn.execute(
-        "SELECT party, project, epic, state FROM quests WHERE slug = ?", (slug,)
-    ).fetchone()
+    row = ctx.conn.execute("SELECT party, project, epic, state FROM quests WHERE slug = ?", (slug,)).fetchone()
     if row is None:
         raise GuildError("unknown quest '{}'".format(slug), 1)
     if row["party"] != binding["party"]:
-        raise GuildError(
-            "quest '{}' is not owned by party '{}'".format(slug, binding["party"]), 1
-        )
+        raise GuildError("quest '{}' is not owned by party '{}'".format(slug, binding["party"]), 1)
     if row["state"] != "active":
         raise GuildError("quest '{}' is already {}".format(slug, row["state"]), 1)
     _gate_unfinished_tasks(ctx.conn, slug, force)
     stale_notes = [] if row["epic"] is None else refresh_sdd_snapshot(ctx, row["project"])
-    findings = _gate_drift(
-        ctx, row["project"], row["epic"], binding["party"], accept_drift, stale_notes
-    )
+    findings = _gate_drift(ctx, row["project"], row["epic"], binding["party"], accept_drift, stale_notes)
     snapshot = achievement.build(ctx.conn, slug, ctx.now, findings)
     with db.writing(ctx.conn):
         events.record(
@@ -233,9 +216,7 @@ def incomplete(ctx, slug, reason):
     if row is None:
         raise GuildError("unknown quest '{}'".format(slug), 1)
     if row["party"] != binding["party"]:
-        raise GuildError(
-            "quest '{}' is not owned by party '{}'".format(slug, binding["party"]), 1
-        )
+        raise GuildError("quest '{}' is not owned by party '{}'".format(slug, binding["party"]), 1)
     if row["state"] != "done":
         raise GuildError("quest '{}' is not done: only done quests can be marked incomplete".format(slug), 1)
     if not reason.strip():
@@ -276,9 +257,7 @@ def _require_followup_source(ctx, binding, source):
     if row is None:
         raise GuildError("unknown quest '{}'".format(source), 1)
     if row["party"] != binding["party"]:
-        raise GuildError(
-            "quest '{}' is not owned by party '{}'".format(source, binding["party"]), 1
-        )
+        raise GuildError("quest '{}' is not owned by party '{}'".format(source, binding["party"]), 1)
 
 
 def _require_new_slug(ctx, slug):
@@ -355,9 +334,7 @@ def add(ctx, slug, title, epic, tasks_csv, titles_csv, no_epic, followups_of, op
 
 
 def _load_quest(conn, slug):
-    row = conn.execute(
-        "SELECT slug, project, party, epic, state FROM quests WHERE slug = ?", (slug,)
-    ).fetchone()
+    row = conn.execute("SELECT slug, project, party, epic, state FROM quests WHERE slug = ?", (slug,)).fetchone()
     if row is None:
         raise GuildError("unknown quest '{}'".format(slug), 1)
     return row
@@ -418,7 +395,7 @@ def release_blockers(ctx, row):
     for claim in claims:
         if not claim["area"].startswith(prefix) or timeutil.is_expired(ctx.now, claim["expires_at"]):
             continue
-        if claim["area"][len(prefix):] in task_tids:
+        if claim["area"][len(prefix) :] in task_tids:
             blockers.append("claim {}".format(claim["area"]))
     return blockers
 
@@ -430,9 +407,7 @@ def _release(ctx, row):
         raise GuildError("quest '{}' is already {}".format(row["slug"], row["state"]), 1)
     blockers = release_blockers(ctx, row)
     if blockers:
-        raise GuildError(
-            "quest '{}' cannot be released: {}".format(row["slug"], "; ".join(blockers)), 1
-        )
+        raise GuildError("quest '{}' cannot be released: {}".format(row["slug"], "; ".join(blockers)), 1)
     with db.writing(ctx.conn):
         events.record(
             ctx.conn,
@@ -452,9 +427,7 @@ def release(ctx, slug):
     binding = identity.require_binding(ctx.conn, ctx.session_id)
     row = _load_quest(ctx.conn, slug)
     if row["party"] != binding["party"]:
-        raise GuildError(
-            "quest '{}' is not owned by party '{}'".format(slug, binding["party"]), 1
-        )
+        raise GuildError("quest '{}' is not owned by party '{}'".format(slug, binding["party"]), 1)
     return _release(ctx, row)
 
 

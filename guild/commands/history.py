@@ -72,8 +72,7 @@ class _Scope:
 def _load_events(conn):
     marks = ", ".join("?" for _ in _KINDS)
     rows = conn.execute(
-        "SELECT seq, ts, party, project, kind, payload FROM events"
-        " WHERE kind IN ({}) ORDER BY seq ASC".format(marks),
+        "SELECT seq, ts, party, project, kind, payload FROM events WHERE kind IN ({}) ORDER BY seq ASC".format(marks),
         _KINDS,
     ).fetchall()
     by_kind = {kind: [] for kind in _KINDS}
@@ -93,9 +92,7 @@ def _load_events(conn):
 def _raid_parties(by_kind, raid):
     if raid is None:
         return None
-    return {
-        event["payload"]["party"] for event in by_kind["raid.joined"] if event["payload"]["raid"] == raid
-    }
+    return {event["payload"]["party"] for event in by_kind["raid.joined"] if event["payload"]["raid"] == raid}
 
 
 def _ref(repo, number):
@@ -159,9 +156,7 @@ def _snapshot_quest(slug, snapshot):
 
 
 def _distinct_done_tids(by_kind, slug):
-    return sorted(
-        {event["payload"]["tid"] for event in by_kind["task.done"] if event["payload"]["quest"] == slug}
-    )
+    return sorted({event["payload"]["tid"] for event in by_kind["task.done"] if event["payload"]["quest"] == slug})
 
 
 def _legacy_quest(by_kind, merged_prs, added_by_slug, done_event):
@@ -302,9 +297,7 @@ def _active_quests(conn, by_kind, now, projects_dir, scope):
     started_by_slug = {}
     for event in by_kind["quest.added"]:
         started_by_slug.setdefault(event["payload"]["slug"], event["ts"])
-    rows = conn.execute(
-        "SELECT slug, party, project, epic, title FROM quests WHERE state = 'active'"
-    ).fetchall()
+    rows = conn.execute("SELECT slug, party, project, epic, title FROM quests WHERE state = 'active'").fetchall()
     entries = [
         _active_quest_entry(conn, by_kind, now, projects_dir, started_by_slug.get(row["slug"]), row)
         for row in rows
@@ -379,8 +372,7 @@ def _incomplete_quests(by_kind, scope, every_quest):
     for event in by_kind["quest.added"]:
         added_by_slug.setdefault(event["payload"]["slug"], event)
     entries = [
-        _incomplete_entry(by_kind, quests_by_slug, added_by_slug, mark)
-        for mark in _first_marks(by_kind).values()
+        _incomplete_entry(by_kind, quests_by_slug, added_by_slug, mark) for mark in _first_marks(by_kind).values()
     ]
     admitted = [entry for entry in entries if scope.admits(entry["party"], entry["project"])]
     return _newest_created_first(admitted, "slug")
@@ -438,9 +430,7 @@ def _membership_spans(by_kind):
 
 
 def _is_active(now, spans):
-    return any(
-        span["ended_at"] is None and not timeutil.is_expired(now, span["expires_at"]) for span in spans
-    )
+    return any(span["ended_at"] is None and not timeutil.is_expired(now, span["expires_at"]) for span in spans)
 
 
 def _span_end(span):
@@ -574,9 +564,7 @@ def _lifecycle_failures(by_kind, scope):
 
 
 def _first_event_ts(by_kind):
-    return _earliest(
-        [event["ts"] for events in by_kind.values() for event in events]
-    )
+    return _earliest([event["ts"] for events in by_kind.values() for event in events])
 
 
 def _earliest(timestamps):

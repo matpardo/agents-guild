@@ -54,25 +54,19 @@ class RunGroupTests(LifecycleFixture):
         self._run(FakeRunner([failed_result()]))
         payload = self.ran_payloads()[0]
         self.assertEqual((payload["status"], payload["exit_code"]), ("failed", 1))
-        self.assertEqual(
-            self.notice_texts(), ["lifecycle on_pr_merged failed for acme (exit 1): see guild history"]
-        )
+        self.assertEqual(self.notice_texts(), ["lifecycle on_pr_merged failed for acme (exit 1): see guild history"])
 
     def test_timeout_records_status_and_posts_notice(self):
         self._run(FakeRunner([timeout_result()]))
         self.assertEqual(self.ran_payloads()[0]["status"], "timeout")
-        self.assertEqual(
-            self.notice_texts(), ["lifecycle on_pr_merged failed for acme (timeout): see guild history"]
-        )
+        self.assertEqual(self.notice_texts(), ["lifecycle on_pr_merged failed for acme (timeout): see guild history"])
 
     def test_launch_error_records_reason_and_posts_notice(self):
         self._run(FakeRunner([error_result()]))
         payload = self.ran_payloads()[0]
         self.assertEqual((payload["status"], payload["reason"]), ("error", "permission denied"))
         self.assertIsNone(payload["exit_code"])
-        self.assertEqual(
-            self.notice_texts(), ["lifecycle on_pr_merged failed for acme (error): see guild history"]
-        )
+        self.assertEqual(self.notice_texts(), ["lifecycle on_pr_merged failed for acme (error): see guild history"])
 
     def test_notice_never_carries_output_or_argv(self):
         self._run(FakeRunner([failed_result()]))
@@ -146,9 +140,7 @@ class RunSyncTriggersTests(LifecycleFixture):
         runner = FakeRunner([ok_result(), ok_result()])
         self._run([("on_pr_merged", "acme/app", 1), ("on_pr_closed", "acme/app", 2)], runner)
         self.assertEqual(len(runner.calls), 2)
-        self.assertEqual(
-            sorted(payload["event"] for payload in self.ran_payloads()), ["on_pr_closed", "on_pr_merged"]
-        )
+        self.assertEqual(sorted(payload["event"] for payload in self.ran_payloads()), ["on_pr_closed", "on_pr_merged"])
 
     def test_unconfigured_event_is_not_run(self):
         self.set_lifecycle(["on_pr_closed"])
@@ -181,9 +173,7 @@ class RunSyncTriggersTests(LifecycleFixture):
         self.assertEqual(payloads["on_pr_closed"]["status"], "error")
         self.assertEqual(payloads["on_pr_closed"]["reason"], "RuntimeError: boom")
         self.assertEqual(payloads["on_pr_merged"]["status"], "ok")
-        self.assertEqual(
-            self.notice_texts(), ["lifecycle on_pr_closed failed for acme (error): see guild history"]
-        )
+        self.assertEqual(self.notice_texts(), ["lifecycle on_pr_closed failed for acme (error): see guild history"])
 
     def test_lock_failure_is_recorded_as_error(self):
         with mock.patch("guild.locking.paths.ensure_private_dir", side_effect=OSError("disk full")):

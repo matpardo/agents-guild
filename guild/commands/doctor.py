@@ -58,9 +58,7 @@ def _allow_rule_lines(settings):
         if blanket or rule in configured:
             lines.append((True, "ok      allow rule {}".format(rule)))
             continue
-        lines.append(
-            (True, "warn    allow rule missing {} (a permission prompt can stall the session)".format(rule))
-        )
+        lines.append((True, "warn    allow rule missing {} (a permission prompt can stall the session)".format(rule)))
     return lines
 
 
@@ -144,7 +142,9 @@ def _compaction_lines(state_dir, global_config, data):
     threshold = ctx_pressure.threshold(state_dir, global_config, data)["value"]
     if threshold < compaction:
         return []
-    message = "warn    project {} handoff_threshold {}% is above the last compaction at {}%: lower it or set handoff_margin"
+    message = (
+        "warn    project {} handoff_threshold {}% is above the last compaction at {}%: lower it or set handoff_margin"
+    )
     return [(True, message.format(data["name"], threshold, compaction))]
 
 
@@ -160,7 +160,14 @@ def _project_lines(projects_dir, state_dir, global_config):
             continue
         lines.append((True, "ok      project {}".format(data["name"])))
         if "dispatcher" in data:
-            lines.append((True, "warn    project {} still has a 'dispatcher' key: the dispatcher was retired, remove it".format(data["name"])))
+            lines.append(
+                (
+                    True,
+                    "warn    project {} still has a 'dispatcher' key: the dispatcher was retired, remove it".format(
+                        data["name"]
+                    ),
+                )
+            )
         lines.extend(_compaction_lines(state_dir, global_config, data))
         for warning in localbase.behind_warning_lines(data):
             lines.append((True, "warn    {}".format(warning)))
@@ -179,10 +186,7 @@ def _pr_trace_places(pr):
         places.append("body")
     if any(_has_trace(comment["body"]) for comment in pr["comments"]):
         places.append("comment")
-    if any(
-        _has_trace(commit["messageHeadline"]) or _has_trace(commit["messageBody"])
-        for commit in pr["commits"]
-    ):
+    if any(_has_trace(commit["messageHeadline"]) or _has_trace(commit["messageBody"]) for commit in pr["commits"]):
         places.append("commit")
     return places
 

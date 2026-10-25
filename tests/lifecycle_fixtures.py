@@ -35,9 +35,7 @@ class FakeRunner:
 
 
 def lifecycle_config(events_configured):
-    return {
-        event: {"command": list(ARGV), "timeout_minutes": TIMEOUT_MINUTES} for event in events_configured
-    }
+    return {event: {"command": list(ARGV), "timeout_minutes": TIMEOUT_MINUTES} for event in events_configured}
 
 
 def init_clone(path, repo):
@@ -70,9 +68,7 @@ class LifecycleFixture(GuildTestCase):
         return json.loads(self.config_file().read_text())
 
     def ran_payloads(self):
-        rows = self.ctx.conn.execute(
-            "SELECT payload FROM events WHERE kind = 'lifecycle.ran' ORDER BY seq"
-        ).fetchall()
+        rows = self.ctx.conn.execute("SELECT payload FROM events WHERE kind = 'lifecycle.ran' ORDER BY seq").fetchall()
         return [json.loads(row["payload"]) for row in rows]
 
     def notice_texts(self):

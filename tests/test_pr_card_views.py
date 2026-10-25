@@ -22,8 +22,14 @@ class CardPrViewsTestCase(GuildTestCase):
     def _model(self):
         conn = db.connect(paths.db_path())
         ctx = context.RunContext(
-            conn, None, None, timeutil.utcnow(), None,
-            paths.claude_sessions_dir(), paths.projects_config_dir(), paths.state_dir(),
+            conn,
+            None,
+            None,
+            timeutil.utcnow(),
+            None,
+            paths.claude_sessions_dir(),
+            paths.projects_config_dir(),
+            paths.state_dir(),
         )
         try:
             return board_commands.board_model(ctx)
@@ -33,11 +39,14 @@ class CardPrViewsTestCase(GuildTestCase):
 
 class CardPrBoardTests(CardPrViewsTestCase):
     def test_pr_on_a_queued_task_is_listed_outside_active_tasks(self):
-        self.run_cli(["quest", "add", "demo", "--title", "Demo", "--no-epic", "--tasks", "T01"], "sess-1", self.repo_dir)
+        self.run_cli(
+            ["quest", "add", "demo", "--title", "Demo", "--no-epic", "--tasks", "T01"], "sess-1", self.repo_dir
+        )
         self.write_gh_fixture("view_acme-app_2", _OPEN_VIEW)
         code, out, err = self.run_cli(
             ["pr", "track", "acme/app#2", "--task", "demo/T01", "--what", "queued work", "--waits", "review"],
-            "sess-1", self.repo_dir,
+            "sess-1",
+            self.repo_dir,
         )
         self.assertEqual(code, 0, err)
         code, out, err = self.run_cli(["board"], None, None)
@@ -48,14 +57,30 @@ class CardPrBoardTests(CardPrViewsTestCase):
         self.write_gh_fixture("view_acme-app_3", _OPEN_VIEW)
         self.run_cli(
             ["quest", "add", "chore", "--open", "--no-epic", "--title", "chore", "--tasks", "T01", "--titles", "one"],
-            None, self.repo_dir,
+            None,
+            self.repo_dir,
         )
         self.run_cli(
-            ["adventurer", "start", "fix typo", "--task", "chore/T01", "--reason", "test reason"], "adv-1", self.repo_dir
+            ["adventurer", "start", "fix typo", "--task", "chore/T01", "--reason", "test reason"],
+            "adv-1",
+            self.repo_dir,
         )
         code, out, err = self.run_cli(
-            ["pr", "track", "acme/app#3", "--task", "chore/T01", "--card", "ABC-9", "--what", "typo fix", "--waits", "review"],
-            "adv-1", self.repo_dir,
+            [
+                "pr",
+                "track",
+                "acme/app#3",
+                "--task",
+                "chore/T01",
+                "--card",
+                "ABC-9",
+                "--what",
+                "typo fix",
+                "--waits",
+                "review",
+            ],
+            "adv-1",
+            self.repo_dir,
         )
         self.assertEqual(code, 0, err)
         model = self._model()
@@ -83,7 +108,8 @@ class CardPrBoardTests(CardPrViewsTestCase):
         self.write_gh_fixture("view_acme-app_2", _OPEN_VIEW)
         self.run_cli(
             ["pr", "track", "acme/app#2", "--task", "demo/T01", "--what", "x", "--waits", "y"],
-            "sess-1", self.repo_dir,
+            "sess-1",
+            self.repo_dir,
         )
         task_prs = self._model()["parties"][0]["quests"][0]["tasks"][0]["prs"]
         self.assertIsNone(task_prs[0]["card"])
@@ -105,9 +131,7 @@ class CardPrQueueTests(CardPrViewsTestCase):
 
 class CardPrNextTests(CardPrViewsTestCase):
     def test_failing_checks_of_a_card_pr_are_reported(self):
-        self.write_gh_fixture(
-            "view_acme-app_1", dict(_OPEN_VIEW, statusCheckRollup=[{"conclusion": "FAILURE"}])
-        )
+        self.write_gh_fixture("view_acme-app_1", dict(_OPEN_VIEW, statusCheckRollup=[{"conclusion": "FAILURE"}]))
         self.run_cli(["sync", "--source", "gh"], "sess-1", self.repo_dir)
         code, out, err = self.run_cli(["next"], "sess-1", self.repo_dir)
         self.assertEqual(code, 0, err)

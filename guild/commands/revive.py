@@ -106,8 +106,7 @@ def _quest_label(conn, party):
     labels = []
     for quest in quests:
         counts = conn.execute(
-            "SELECT COUNT(*) AS total, COALESCE(SUM(state = 'done'), 0) AS done"
-            " FROM quest_tasks WHERE quest = ?",
+            "SELECT COUNT(*) AS total, COALESCE(SUM(state = 'done'), 0) AS done FROM quest_tasks WHERE quest = ?",
             (quest["slug"],),
         ).fetchone()
         labels.append("{} {}/{}".format(quest["slug"], counts["done"], counts["total"]))
@@ -131,9 +130,9 @@ def _entry(ctx, transcripts_dir, party):
     if checkout is not None:
         cwd = checkout
         transcript = None
-    last_activity = ctx.conn.execute(
-        "SELECT MAX(ts) AS ts FROM events WHERE party = ?", (party["name"],)
-    ).fetchone()["ts"]
+    last_activity = ctx.conn.execute("SELECT MAX(ts) AS ts FROM events WHERE party = ?", (party["name"],)).fetchone()[
+        "ts"
+    ]
     return _Entry(
         party["name"],
         party["project"],

@@ -199,7 +199,9 @@ class DeltaTests(ReportFixture):
 
     def test_growth_under_one_mebibyte_is_noise(self):
         self.sample("gamma", _ago(days=2), [_row("worktree", "/home/u/g", _GB, "ok", "", "b")], _PLAIN_MACHINE)
-        self.sample("gamma", _ago(hours=1), [_row("worktree", "/home/u/g", _GB + _MIB - 1, "ok", "", "b")], _PLAIN_MACHINE)
+        self.sample(
+            "gamma", _ago(hours=1), [_row("worktree", "/home/u/g", _GB + _MIB - 1, "ok", "", "b")], _PLAIN_MACHINE
+        )
         self.assertEqual(self.model("gamma", "1d")["projects"][0]["growers"], [])
 
 
@@ -274,8 +276,18 @@ class MachineTests(ReportFixture):
     def test_untracked_growth_counts_unattributed_deltas_as_tracked(self):
         self.sample("acme", _ago(days=2), [], _machine(400 * _GB, 500 * _GB, None))
         self.sample("acme", _ago(hours=1), [], _machine(406 * _GB, 500 * _GB, None))
-        self.sample(None, _ago(days=2), [_row("docker_volume", "v", 1 * _GB, "ok", "", "")], _machine(400 * _GB, 500 * _GB, None))
-        self.sample(None, _ago(hours=1), [_row("docker_volume", "v", 7 * _GB, "ok", "", "")], _machine(406 * _GB, 500 * _GB, None))
+        self.sample(
+            None,
+            _ago(days=2),
+            [_row("docker_volume", "v", 1 * _GB, "ok", "", "")],
+            _machine(400 * _GB, 500 * _GB, None),
+        )
+        self.sample(
+            None,
+            _ago(hours=1),
+            [_row("docker_volume", "v", 7 * _GB, "ok", "", "")],
+            _machine(406 * _GB, 500 * _GB, None),
+        )
         self.assertIsNone(self.model(None, "1d")["machine"]["untracked_growth"])
 
     def test_untracked_growth_is_null_without_any_tracked_delta(self):
@@ -296,7 +308,10 @@ class ScopeTests(ReportFixture):
         super().setUp()
         for project in ("acme", "zeta", None):
             self.sample(
-                project, _ago(hours=1), [_row("worktree", "/home/u/{}".format(project), _GB, "ok", "", "b")], _PLAIN_MACHINE
+                project,
+                _ago(hours=1),
+                [_row("worktree", "/home/u/{}".format(project), _GB, "ok", "", "b")],
+                _PLAIN_MACHINE,
             )
 
     def test_projects_are_sorted_and_unattributed_is_separate(self):
@@ -395,7 +410,9 @@ class RenderTests(ReportFixture):
 
     def test_oldest_available_baseline_is_labeled(self):
         for when, size in ((_ago(hours=5), 1), (_ago(hours=1), 3)):
-            self.sample("acme", when, [_row("worktree", "/home/u/acme/app", size * _GB, "ok", "", "main")], _PLAIN_MACHINE)
+            self.sample(
+                "acme", when, [_row("worktree", "/home/u/acme/app", size * _GB, "ok", "", "main")], _PLAIN_MACHINE
+            )
         header = [line for line in self._lines(None, "1d") if line.startswith("acme")][0]
         self.assertIn("(oldest available)", header)
 
@@ -403,21 +420,27 @@ class RenderTests(ReportFixture):
         self.assertEqual(self._lines(None, "1d"), ["no samples yet; run guild resources collect"])
 
     def test_single_sample_says_no_earlier_sample_and_shows_no_deltas(self):
-        self.sample("acme", _ago(hours=1), [_row("worktree", "/home/u/acme/app", 4100000000, "ok", "", "main")], _PLAIN_MACHINE)
+        self.sample(
+            "acme", _ago(hours=1), [_row("worktree", "/home/u/acme/app", 4100000000, "ok", "", "main")], _PLAIN_MACHINE
+        )
         lines = self._lines(None, "1d")
         header = [line for line in lines if line.startswith("acme")][0]
         self.assertIn("no earlier sample", header)
-        self.assertNotIn("+", "".join(lines[lines.index(header):]))
+        self.assertNotIn("+", "".join(lines[lines.index(header) :]))
 
     def test_unmeasured_items_render_a_question_mark(self):
         self.sample("acme", _ago(days=2), [_row("worktree", "/home/u/acme/app", _GB, "ok", "", "main")], _PLAIN_MACHINE)
-        self.sample("acme", _ago(hours=1), [_row("worktree", "/home/u/acme/app", None, "skipped", "", "main")], _PLAIN_MACHINE)
+        self.sample(
+            "acme", _ago(hours=1), [_row("worktree", "/home/u/acme/app", None, "skipped", "", "main")], _PLAIN_MACHINE
+        )
         lines = self._lines(None, "1d")
         item_line = [line for line in lines if line.startswith("    /home/u/acme/app")][0]
         self.assertRegex(item_line, r"\?\s+\?")
 
     def test_docker_marker_renders_as_unavailable_category(self):
-        self.sample(None, _ago(hours=1), [_row("docker", "-", None, "unavailable", "", "permission denied")], _PLAIN_MACHINE)
+        self.sample(
+            None, _ago(hours=1), [_row("docker", "-", None, "unavailable", "", "permission denied")], _PLAIN_MACHINE
+        )
         lines = self._lines(None, "1d")
         self.assertIn("  docker             unavailable (permission denied)", lines)
 
@@ -431,7 +454,10 @@ class RenderTests(ReportFixture):
         self.assertIn("docker n/a", lines[1])
 
     def test_categories_show_top_ten_items_and_a_remainder(self):
-        items = [_row("worktree", "/home/u/many/{:02d}".format(index), (index + 1) * _GB, "ok", "", "b") for index in range(13)]
+        items = [
+            _row("worktree", "/home/u/many/{:02d}".format(index), (index + 1) * _GB, "ok", "", "b")
+            for index in range(13)
+        ]
         self.sample("acme", _ago(hours=1), items, _PLAIN_MACHINE)
         lines = self._lines(None, "1d")
         shown = [line for line in lines if line.startswith("    /home/u/many/")]

@@ -8,8 +8,8 @@ ADVENTURER_LABEL = "adventurer {}"
 UNBOUND_HINT = (
     "session not bound: continuing a party's work \u2192 `guild party resume <party>`;"
     " otherwise, when the work will change a repo, pick yourself: one PR job \u2192"
-    " `guild adventurer start \"<job>\" --task <epic>/<tid> --reason \"<why>\"`, several PRs \u2192"
-    " `guild party start <name> --reason \"<why>\"`; ask the human only when unsure;"
+    ' `guild adventurer start "<job>" --task <epic>/<tid> --reason "<why>"`, several PRs \u2192'
+    ' `guild party start <name> --reason "<why>"`; ask the human only when unsure;'
     " questions and commands stay unbound"
 )
 ADVENTURER_REFUSAL = "adventurers do one job; quests and tasks belong to parties"
@@ -23,8 +23,7 @@ def resolve_adventurer(conn, session_id):
     if session_id is None:
         return None
     return conn.execute(
-        "SELECT id, project, job, task FROM adventurers WHERE session_id = ? AND state = 'active'"
-        " ORDER BY id DESC",
+        "SELECT id, project, job, task FROM adventurers WHERE session_id = ? AND state = 'active' ORDER BY id DESC",
         (session_id,),
     ).fetchone()
 

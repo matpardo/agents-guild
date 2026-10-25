@@ -22,7 +22,9 @@ class ThresholdTests(GuildTestCase):
         self.assertEqual(ctx_pressure.DEFAULT_HANDOFF_THRESHOLD, 80)
 
     def test_margin_without_a_compaction_uses_the_configured_value(self):
-        self.assertEqual(self._value({"handoff_margin": 10}, {"handoff_threshold": 70}), {"value": 70, "source": "configured"})
+        self.assertEqual(
+            self._value({"handoff_margin": 10}, {"handoff_threshold": 70}), {"value": 70, "source": "configured"}
+        )
 
     def test_compaction_without_a_margin_uses_the_configured_value(self):
         statusline_commands.record_compact_pct(paths.state_dir(), 85)
@@ -114,8 +116,14 @@ class ForPartyTests(GuildTestCase):
 
     def _ctx(self):
         return context.RunContext(
-            self.conn, None, None, timeutil.utcnow(), None,
-            paths.claude_sessions_dir(), paths.projects_config_dir(), paths.state_dir(),
+            self.conn,
+            None,
+            None,
+            timeutil.utcnow(),
+            None,
+            paths.claude_sessions_dir(),
+            paths.projects_config_dir(),
+            paths.state_dir(),
         )
 
     def _party_row(self):

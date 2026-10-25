@@ -7,20 +7,20 @@ _TASK_AREA_PREFIX = "task:"
 
 def _validate_area(area):
     if area.startswith(_TASK_AREA_PREFIX):
-        refs.parse_task_ref(area[len(_TASK_AREA_PREFIX):])
+        refs.parse_task_ref(area[len(_TASK_AREA_PREFIX) :])
 
 
 def _task_adventurer(ctx, project, area):
     if not area.startswith(_TASK_AREA_PREFIX):
         return None
-    epic, tid = refs.parse_task_ref(area[len(_TASK_AREA_PREFIX):])
+    epic, tid = refs.parse_task_ref(area[len(_TASK_AREA_PREFIX) :])
     return quest_commands.adventurer_holder(ctx.conn, project, epic, tid)
 
 
 def _task_open_quest(ctx, project, area):
     if not area.startswith(_TASK_AREA_PREFIX):
         return None
-    epic, tid = refs.parse_task_ref(area[len(_TASK_AREA_PREFIX):])
+    epic, tid = refs.parse_task_ref(area[len(_TASK_AREA_PREFIX) :])
     return quest_commands.open_quest_holder(ctx.conn, project, epic, tid)
 
 
@@ -40,9 +40,7 @@ def claim(ctx, area, ttl, agent_type):
     if row is not None and not timeutil.is_expired(ctx.now, row["expires_at"]):
         if row["party"] != binding["party"]:
             raise GuildError(
-                "area '{}' is claimed by party '{}' until {}".format(
-                    area, row["party"], row["expires_at"]
-                ),
+                "area '{}' is claimed by party '{}' until {}".format(area, row["party"], row["expires_at"]),
                 1,
             )
     expires_at = timeutil.expires_at_iso(ctx.now, ttl)
@@ -84,9 +82,7 @@ def check(ctx, area):
 def release(ctx, area):
     binding = identity.require_binding(ctx.conn, ctx.session_id)
     project = config.require_project(ctx.cwd, ctx.projects_dir)
-    row = ctx.conn.execute(
-        "SELECT party FROM claims WHERE project = ? AND area = ?", (project, area)
-    ).fetchone()
+    row = ctx.conn.execute("SELECT party FROM claims WHERE project = ? AND area = ?", (project, area)).fetchone()
     if row is None or row["party"] != binding["party"]:
         raise GuildError("party '{}' does not hold claim on '{}'".format(binding["party"], area), 1)
     release_for_party(ctx, project, binding["party"], area)

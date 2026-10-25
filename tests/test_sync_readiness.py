@@ -11,7 +11,8 @@ class SyncReadinessTests(GuildTestCase):
         self.write_view({"state": "OPEN", "isDraft": True})
         self.run_cli(
             ["pr", "track", "acme/app#1", "--task", "demo/T01", "--what", "x", "--waits", "y"],
-            "sess-1", self.repo_dir,
+            "sess-1",
+            self.repo_dir,
         )
 
     def write_view(self, fields):
@@ -20,9 +21,7 @@ class SyncReadinessTests(GuildTestCase):
         self.write_gh_fixture("view_acme-app_1", view)
 
     def set_lifecycle(self, lifecycle):
-        code, out, err = self.run_cli(
-            ["pr", "set", "acme/app#1", "--lifecycle", lifecycle], "sess-1", self.repo_dir
-        )
+        code, out, err = self.run_cli(["pr", "set", "acme/app#1", "--lifecycle", lifecycle], "sess-1", self.repo_dir)
         self.assertEqual(code, 0, err)
         return out
 
@@ -54,7 +53,8 @@ class SyncReadinessTests(GuildTestCase):
     def test_sync_keeps_both_flags_when_pr_goes_ready_on_github(self):
         code, out, err = self.run_cli(
             ["pr", "set", "acme/app#1", "--needs-ask-answer", "--needs-human-pr-review"],
-            "sess-1", self.repo_dir,
+            "sess-1",
+            self.repo_dir,
         )
         self.assertEqual(code, 0, err)
         board = self.sync_board({"state": "OPEN", "isDraft": False})
@@ -84,9 +84,7 @@ class SyncReadinessTests(GuildTestCase):
 
     def test_set_ready_hints_when_pr_is_draft_on_github(self):
         out = self.set_lifecycle("ready")
-        self.assertIn(
-            "PR is draft on GitHub; mark it ready there (gh pr ready 1) or the next sync reverts it", out
-        )
+        self.assertIn("PR is draft on GitHub; mark it ready there (gh pr ready 1) or the next sync reverts it", out)
 
     def test_set_ready_no_hint_when_pr_is_not_draft_on_github(self):
         self.sync_board({"state": "OPEN", "isDraft": False})

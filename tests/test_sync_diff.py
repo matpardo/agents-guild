@@ -6,8 +6,12 @@ from guild.adapters import github
 from tests.testutil import GuildTestCase
 
 _OPEN_VIEW = {
-    "state": "OPEN", "isDraft": False, "headRefName": "feature/x", "title": "t",
-    "statusCheckRollup": [{"conclusion": "SUCCESS"}], "mergeable": "MERGEABLE",
+    "state": "OPEN",
+    "isDraft": False,
+    "headRefName": "feature/x",
+    "title": "t",
+    "statusCheckRollup": [{"conclusion": "SUCCESS"}],
+    "mergeable": "MERGEABLE",
 }
 
 
@@ -34,14 +38,13 @@ class SyncDiffTestCase(GuildTestCase):
         )
         self.run_cli(
             ["pr", "track", "acme/app#1", "--task", "demo/T01", "--what", "x", "--waits", "y"],
-            "sess-1", self.repo_dir,
+            "sess-1",
+            self.repo_dir,
         )
         self.write_gh_fixture("view_acme-app_1", _OPEN_VIEW)
         self.write_gh_fixture(
             "view_files_acme-app_1",
-            _diff_fixture(
-                ["shared/a.yml", "config/locales/es.yml", "src/app.py"], 10, 2, "2026-09-01T10:00:00Z"
-            ),
+            _diff_fixture(["shared/a.yml", "config/locales/es.yml", "src/app.py"], 10, 2, "2026-09-01T10:00:00Z"),
         )
 
     def _set_shared_areas(self, globs):
@@ -89,9 +92,7 @@ class RaidMemberFetchTests(SyncDiffTestCase):
 
     def test_resync_replaces_globs(self):
         self._sync()
-        self.write_gh_fixture(
-            "view_files_acme-app_1", _diff_fixture(["shared/b.yml"], 3, 1, "2026-09-01T10:00:00Z")
-        )
+        self.write_gh_fixture("view_files_acme-app_1", _diff_fixture(["shared/b.yml"], 3, 1, "2026-09-01T10:00:00Z"))
         self._sync()
         self.assertEqual(self._globs(), ["shared/**"])
         self.assertEqual(self._pr_row()["additions"], 3)
@@ -118,16 +119,18 @@ class RaidMemberFetchTests(SyncDiffTestCase):
         self.run_cli(["rebuild"], None, None)
         self.assertEqual(self._globs(), ["config/locales/es.yml", "shared/**"])
         row = self._pr_row()
-        self.assertEqual(
-            (row["additions"], row["deletions"], row["created_at"]), (10, 2, "2026-09-01T10:00:00Z")
-        )
+        self.assertEqual((row["additions"], row["deletions"], row["created_at"]), (10, 2, "2026-09-01T10:00:00Z"))
 
     def test_merged_pr_is_fetched_once_for_merge_handling_only(self):
         self.write_gh_fixture(
             "view_acme-app_1",
             {
-                "state": "MERGED", "isDraft": False, "headRefName": "feature/x", "title": "t",
-                "mergedAt": "2026-01-01T00:00:00Z", "statusCheckRollup": [],
+                "state": "MERGED",
+                "isDraft": False,
+                "headRefName": "feature/x",
+                "title": "t",
+                "mergedAt": "2026-01-01T00:00:00Z",
+                "statusCheckRollup": [],
             },
         )
         with mock.patch.object(github, "pr_diff", wraps=github.pr_diff) as pr_diff:

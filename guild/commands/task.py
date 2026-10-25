@@ -6,9 +6,7 @@ from guild.errors import GuildError
 
 
 def _load_quest(ctx, quest):
-    row = ctx.conn.execute(
-        "SELECT slug, project, party, epic, state FROM quests WHERE slug = ?", (quest,)
-    ).fetchone()
+    row = ctx.conn.execute("SELECT slug, project, party, epic, state FROM quests WHERE slug = ?", (quest,)).fetchone()
     if row is None:
         raise GuildError("unknown quest '{}'".format(quest), 1)
     return row
@@ -20,9 +18,7 @@ def _require_owner(binding, quest_row):
             "quest '{}' is open: run `guild quest take {}`".format(quest_row["slug"], quest_row["slug"]), 1
         )
     if quest_row["party"] != binding["party"]:
-        raise GuildError(
-            "quest '{}' is owned by party '{}'".format(quest_row["slug"], quest_row["party"]), 1
-        )
+        raise GuildError("quest '{}' is owned by party '{}'".format(quest_row["slug"], quest_row["party"]), 1)
 
 
 def _load_task(ctx, quest, tid):
@@ -46,9 +42,7 @@ def add(ctx, quest, tid, title, reason):
     _require_owner(binding, quest_row)
     if quest_row["state"] != "active":
         raise GuildError("quest '{}' is done".format(quest), 1)
-    existing = ctx.conn.execute(
-        "SELECT tid FROM quest_tasks WHERE quest = ? AND tid = ?", (quest, tid)
-    ).fetchone()
+    existing = ctx.conn.execute("SELECT tid FROM quest_tasks WHERE quest = ? AND tid = ?", (quest, tid)).fetchone()
     if existing is not None:
         raise GuildError("task '{}/{}' already exists".format(quest, tid), 1)
     if quest_row["epic"] is not None:
@@ -71,9 +65,7 @@ def add(ctx, quest, tid, title, reason):
             "local",
             payload,
         )
-    return _with_sdd_hint(
-        "task '{}/{}' added".format(quest, tid), quest_row, "add {} to {} tasks.md in the SDD", tid
-    )
+    return _with_sdd_hint("task '{}/{}' added".format(quest, tid), quest_row, "add {} to {} tasks.md in the SDD", tid)
 
 
 def start(ctx, quest, tid, summary):
@@ -179,10 +171,10 @@ def _require_move_target(source_row, target_row, target):
 def _require_movable(ctx, quest_row, target, tid):
     task_row = _load_task(ctx, quest_row["slug"], tid)
     if task_row["state"] not in ("queued", "blocked"):
-        raise GuildError("task '{}/{}' is {}: only queued or blocked tasks move".format(quest_row["slug"], tid, task_row["state"]), 1)
-    taken = ctx.conn.execute(
-        "SELECT tid FROM quest_tasks WHERE quest = ? AND tid = ?", (target, tid)
-    ).fetchone()
+        raise GuildError(
+            "task '{}/{}' is {}: only queued or blocked tasks move".format(quest_row["slug"], tid, task_row["state"]), 1
+        )
+    taken = ctx.conn.execute("SELECT tid FROM quest_tasks WHERE quest = ? AND tid = ?", (target, tid)).fetchone()
     if taken is not None:
         raise GuildError("task '{}/{}' already exists".format(target, tid), 1)
     open_pr = ctx.conn.execute(
@@ -191,7 +183,9 @@ def _require_movable(ctx, quest_row, target, tid):
         (quest_row["slug"], tid),
     ).fetchone()
     if open_pr is not None:
-        raise GuildError("task '{}/{}' has open PR {}#{}".format(quest_row["slug"], tid, open_pr["repo"], open_pr["number"]), 1)
+        raise GuildError(
+            "task '{}/{}' has open PR {}#{}".format(quest_row["slug"], tid, open_pr["repo"], open_pr["number"]), 1
+        )
     area = next_commands.claim_area({"epic": quest_row["epic"], "quest": quest_row["slug"], "tid": tid})
     claim = ctx.conn.execute(
         "SELECT expires_at FROM claims WHERE project = ? AND area = ? AND party = ?",

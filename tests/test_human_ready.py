@@ -20,7 +20,11 @@ def _review(login, submitted_at):
 
 class CommentsAfterHeadTests(unittest.TestCase):
     def test_counts_only_strictly_later_entries(self):
-        comments = [_comment("bot", "2026-10-20T09:59:59Z"), _comment("bot", _HEAD), _comment("bot", "2026-10-20T10:00:01Z")]
+        comments = [
+            _comment("bot", "2026-10-20T09:59:59Z"),
+            _comment("bot", _HEAD),
+            _comment("bot", "2026-10-20T10:00:01Z"),
+        ]
         self.assertEqual(human_ready.comments_after_head(_HEAD, "me", comments, []), 1)
 
     def test_excludes_the_pr_author(self):
@@ -187,7 +191,10 @@ class SyncFreshnessFactsTests(MergeQueueTestCase):
         self.assertEqual(self._row()["ci_label"], 0)
 
     def test_counts_after_the_head_commit_picked_by_sha(self):
-        commits = [{"oid": "head", "committedDate": "2026-10-20T10:30:00Z"}, {"oid": "old", "committedDate": "2026-10-20T12:00:00Z"}]
+        commits = [
+            {"oid": "head", "committedDate": "2026-10-20T10:30:00Z"},
+            {"oid": "old", "committedDate": "2026-10-20T12:00:00Z"},
+        ]
         self._view(headRefOid="head", commits=commits, reviews=[_review("bot", "2026-10-20T10:45:00Z")])
         self.sync_gh("sess-1")
         self.assertEqual(self._row()["comments_after_head"], 2)
@@ -209,9 +216,7 @@ class SyncFreshnessFactsTests(MergeQueueTestCase):
         self.assertEqual(after["last_activity_at"], before)
 
     def test_stores_other_author_comments_excluding_notice_rules(self):
-        self._set_project_config(
-            {"human_ready": {"notice_comments": [{"author": "bot", "text": "usage"}]}}
-        )
+        self._set_project_config({"human_ready": {"notice_comments": [{"author": "bot", "text": "usage"}]}})
         notice = _body(_comment("bot", "2026-10-20T11:00:00Z"), "Usage notice")
         real = _body(_comment("human", "2026-10-20T09:00:00Z"), "please fix")
         self._view(comments=[notice, real, _comment("me", "2026-10-20T11:00:00Z")], reviews=[])
@@ -242,7 +247,12 @@ _FAILING_ROLLUP = [{"conclusion": "FAILURE"}, {"conclusion": "FAILURE"}]
 
 
 def _run(run_id, conclusion, annotations):
-    return {"id": run_id, "name": "job{}".format(run_id), "conclusion": conclusion, "output": {"annotations_count": annotations}}
+    return {
+        "id": run_id,
+        "name": "job{}".format(run_id),
+        "conclusion": conclusion,
+        "output": {"annotations_count": annotations},
+    }
 
 
 class ChecksBillingTests(MergeQueueTestCase):
@@ -290,10 +300,12 @@ class ChecksBillingTests(MergeQueueTestCase):
         self.assertEqual(self._value(), 0)
 
     def test_failing_status_context_beside_billing_run_stores_zero(self):
-        self._view(statusCheckRollup=[
-            {"__typename": "CheckRun", "conclusion": "FAILURE"},
-            {"__typename": "StatusContext", "state": "FAILURE"},
-        ])
+        self._view(
+            statusCheckRollup=[
+                {"__typename": "CheckRun", "conclusion": "FAILURE"},
+                {"__typename": "StatusContext", "state": "FAILURE"},
+            ]
+        )
         self._runs([_run(11, "failure", 1)])
         self._annotate(11, _BILLING_TEXT)
         self.sync_gh("sess-1")

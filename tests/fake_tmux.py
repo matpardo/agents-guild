@@ -36,4 +36,3 @@ class FakeTmux:
 
     def verbs(self):
         return [call[0] for call in self.calls]
-

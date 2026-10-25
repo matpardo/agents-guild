@@ -18,7 +18,9 @@ class FindingTests(GuildTestCase):
         config_file.write_text(json.dumps(data))
 
     def _record(self, number, cls="missing-audit", repo="acme/app"):
-        return self.run_cli(["finding", "record", "{}#{}".format(repo, number), "--class", cls], "sess-1", self.repo_dir)
+        return self.run_cli(
+            ["finding", "record", "{}#{}".format(repo, number), "--class", cls], "sess-1", self.repo_dir
+        )
 
     def _rows(self):
         conn = _build_context("sess-1", self.root).conn
@@ -33,7 +35,9 @@ class FindingTests(GuildTestCase):
         self.assertEqual(code, 0)
         self.assertIn("1 PR(s)", out)
         row = self._rows()[0]
-        self.assertEqual((row["project"], row["class"], row["repo"], row["number"]), ("acme", "missing-audit", "acme/app", 1))
+        self.assertEqual(
+            (row["project"], row["class"], row["repo"], row["number"]), ("acme", "missing-audit", "acme/app", 1)
+        )
 
     def test_same_pr_and_class_counts_once(self):
         self._record(1)

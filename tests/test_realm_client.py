@@ -48,12 +48,27 @@ class RealmClientTests(GuildTestCase):
         self.register_project("idle", ["acme/idle"])
         conn = db.connect(paths.db_path())
         try:
-            _insert(conn, "INSERT INTO parties (name, project, generation, state) VALUES ('p1', 'acme', 1, 'active')", ())
-            _insert(conn, "INSERT INTO parties (name, project, generation, state) VALUES ('p2', 'acme', 1, 'closed')", ())
-            _insert(conn, "INSERT INTO quests (slug, project, party, epic, title, state) VALUES ('q1', 'acme', 'p1', NULL, 't', 'active')", ())
-            _insert(conn, "INSERT INTO quests (slug, project, party, epic, title, state) VALUES ('q2', 'acme', 'p1', NULL, 't', 'done')", ())
+            _insert(
+                conn, "INSERT INTO parties (name, project, generation, state) VALUES ('p1', 'acme', 1, 'active')", ()
+            )
+            _insert(
+                conn, "INSERT INTO parties (name, project, generation, state) VALUES ('p2', 'acme', 1, 'closed')", ()
+            )
+            _insert(
+                conn,
+                "INSERT INTO quests (slug, project, party, epic, title, state) VALUES ('q1', 'acme', 'p1', NULL, 't', 'active')",
+                (),
+            )
+            _insert(
+                conn,
+                "INSERT INTO quests (slug, project, party, epic, title, state) VALUES ('q2', 'acme', 'p1', NULL, 't', 'done')",
+                (),
+            )
             for repo, number, lifecycle in (
-                ("acme/app", 1, "ready"), ("acme/lib", 2, "draft"), ("acme/app", 3, "merged"), ("acme/idle", 4, "closed"),
+                ("acme/app", 1, "ready"),
+                ("acme/lib", 2, "draft"),
+                ("acme/app", 3, "merged"),
+                ("acme/idle", 4, "closed"),
             ):
                 _insert(
                     conn,
@@ -70,8 +85,16 @@ class RealmClientTests(GuildTestCase):
                 "INSERT INTO asks (id, party, question, context, refs, options, state, created_at) VALUES (2, 'p1', 'q', 'c', '[]', '[]', 'answered', '2026-10-24T10:00:00+00:00')",
                 (),
             )
-            _insert(conn, "INSERT INTO main_status (repo, source, red, reason, updated_at) VALUES ('acme/lib', 'manual', 1, 'r', '2026-10-24T10:00:00+00:00')", ())
-            _insert(conn, "INSERT INTO main_status (repo, source, red, reason, updated_at, external) VALUES ('acme/idle', 'gh', 1, 'billing', '2026-10-24T10:00:00+00:00', 'billing')", ())
+            _insert(
+                conn,
+                "INSERT INTO main_status (repo, source, red, reason, updated_at) VALUES ('acme/lib', 'manual', 1, 'r', '2026-10-24T10:00:00+00:00')",
+                (),
+            )
+            _insert(
+                conn,
+                "INSERT INTO main_status (repo, source, red, reason, updated_at, external) VALUES ('acme/idle', 'gh', 1, 'billing', '2026-10-24T10:00:00+00:00', 'billing')",
+                (),
+            )
         finally:
             conn.close()
 
@@ -91,7 +114,9 @@ class RealmClientTests(GuildTestCase):
 
     def test_join_without_a_guild_name_says_where_to_set_it(self):
         with mock.patch("getpass.getpass", return_value=self.tokens["alpha"]):
-            code, out, err = self.run_cli(["realm", "join", self.url, "--fingerprint", self.fingerprint], None, self.root)
+            code, out, err = self.run_cli(
+                ["realm", "join", self.url, "--fingerprint", self.fingerprint], None, self.root
+            )
         self.assertNotEqual(code, 0)
         self.assertIn('set "name" in {}'.format(paths.global_config_path()), err)
         self.assertIn("suggested: ", err)
@@ -109,7 +134,10 @@ class RealmClientTests(GuildTestCase):
     def test_join_rejects_a_malformed_whoami(self):
         self._name_guild("alpha")
         for payload in ({"member": "alpha"}, {"member": "alpha", "realm": "../x"}, {"member": 1, "realm": "r"}):
-            with mock.patch("getpass.getpass", return_value="t"), mock.patch.object(client, "request", return_value=payload):
+            with (
+                mock.patch("getpass.getpass", return_value="t"),
+                mock.patch.object(client, "request", return_value=payload),
+            ):
                 with self.assertRaises(GuildError):
                     realm_commands.join(self.url, self.fingerprint, False, None)
         self.assertFalse(paths.realm_config_path().exists())
@@ -117,13 +145,22 @@ class RealmClientTests(GuildTestCase):
     def test_join_does_not_echo_an_invalid_member(self):
         self._name_guild("alpha")
         payload = {"member": "\x1b[31mevil\n", "realm": "hearth"}
-        with mock.patch("getpass.getpass", return_value="t"), mock.patch.object(client, "request", return_value=payload):
+        with (
+            mock.patch("getpass.getpass", return_value="t"),
+            mock.patch.object(client, "request", return_value=payload),
+        ):
             with self.assertRaises(GuildError) as raised:
                 realm_commands.join(self.url, self.fingerprint, False, None)
         self.assertEqual(raised.exception.message, "realm hub sent an invalid response")
 
     def test_hub_error_text_is_stripped_and_capped(self):
-        config = {"url": self.url, "fingerprint": self.fingerprint, "guild": "alpha", "realm": "test-realm", "token": "nope"}
+        config = {
+            "url": self.url,
+            "fingerprint": self.fingerprint,
+            "guild": "alpha",
+            "realm": "test-realm",
+            "token": "nope",
+        }
         hostile = "\x1b[31mred\nline\x7f\x85" + "x" * 500
 
         class Reply:
@@ -164,7 +201,9 @@ class RealmClientTests(GuildTestCase):
 
     def test_cache_with_an_invalid_realm_is_malformed(self):
         paths.realm_cache_path().parent.mkdir(parents=True, exist_ok=True)
-        paths.realm_cache_path().write_text('{"fetched_at": "2026-10-24T10:00:00+00:00", "realm": "\\u001b[31m", "guilds": []}')
+        paths.realm_cache_path().write_text(
+            '{"fetched_at": "2026-10-24T10:00:00+00:00", "realm": "\\u001b[31m", "guilds": []}'
+        )
         with self.assertRaises(GuildError) as raised:
             realm_commands.cached_status_model()
         self.assertIn("malformed", raised.exception.message)
@@ -198,18 +237,32 @@ class RealmClientTests(GuildTestCase):
 
     def test_fingerprint_mismatch_sends_nothing(self):
         wrong = ":".join(["00"] * 32)
-        config = {"url": self.url, "fingerprint": wrong, "guild": "alpha", "realm": "test-realm", "token": self.tokens["alpha"]}
+        config = {
+            "url": self.url,
+            "fingerprint": wrong,
+            "guild": "alpha",
+            "realm": "test-realm",
+            "token": self.tokens["alpha"],
+        }
         with mock.patch.object(http.client.HTTPSConnection, "request") as sent:
             with self.assertRaises(GuildError) as raised:
                 client.request(config, "GET", "/status", None)
         sent.assert_not_called()
-        self.assertIn("fingerprint mismatch: expected {}, got {}".format(wrong, self.fingerprint), raised.exception.message)
+        self.assertIn(
+            "fingerprint mismatch: expected {}, got {}".format(wrong, self.fingerprint), raised.exception.message
+        )
 
     def _serve(self, wrap):
         return realm_hub_fixture.serve_once(self, wrap)
 
     def _assert_tls_refused(self, url):
-        config = {"url": url, "fingerprint": self.fingerprint, "guild": "alpha", "realm": "test-realm", "token": self.tokens["alpha"]}
+        config = {
+            "url": url,
+            "fingerprint": self.fingerprint,
+            "guild": "alpha",
+            "realm": "test-realm",
+            "token": self.tokens["alpha"],
+        }
         with mock.patch.object(http.client.HTTPSConnection, "request") as sent:
             with self.assertRaises(GuildError) as raised:
                 client.request(config, "GET", "/status", None)
@@ -229,13 +282,25 @@ class RealmClientTests(GuildTestCase):
         self._assert_tls_refused(self._serve(lambda peer: peer.sendall(b"HTTP/1.0 400 Bad Request\r\n\r\n")))
 
     def test_unreachable_hub_is_a_guild_error(self):
-        config = {"url": "https://127.0.0.1:1", "fingerprint": self.fingerprint, "guild": "alpha", "realm": "test-realm", "token": "t"}
+        config = {
+            "url": "https://127.0.0.1:1",
+            "fingerprint": self.fingerprint,
+            "guild": "alpha",
+            "realm": "test-realm",
+            "token": "t",
+        }
         with self.assertRaises(GuildError) as raised:
             client.request(config, "GET", "/status", None)
         self.assertIn("realm hub unreachable: ", raised.exception.message)
 
     def test_oversize_response_is_refused(self):
-        config = {"url": self.url, "fingerprint": self.fingerprint, "guild": "alpha", "realm": "test-realm", "token": self.tokens["alpha"]}
+        config = {
+            "url": self.url,
+            "fingerprint": self.fingerprint,
+            "guild": "alpha",
+            "realm": "test-realm",
+            "token": self.tokens["alpha"],
+        }
         with mock.patch.object(client, "MAX_RESPONSE_BYTES", 5):
             with self.assertRaises(GuildError) as raised:
                 client.request(config, "GET", "/status", None)
@@ -300,7 +365,9 @@ class RealmClientTests(GuildTestCase):
     def test_invalid_entries_are_dropped_and_reported(self):
         self._join("alpha", [])
         good = {
-            "guild": "beta", "generated_at": "2026-10-24T10:00:00+00:00", "received_at": "2026-10-24T10:00:00+00:00",
+            "guild": "beta",
+            "generated_at": "2026-10-24T10:00:00+00:00",
+            "received_at": "2026-10-24T10:00:00+00:00",
             "projects": [],
         }
         payload = {"realm": "test-realm", "guilds": [good, {"guild": "evil", "projects": "x"}]}
@@ -362,8 +429,16 @@ class RealmClientTests(GuildTestCase):
         self._join("alpha", [])
         conn = db.connect(paths.db_path())
         try:
-            ctx = RunContext(conn, None, self.root, timeutil.utcnow(), "t@h", self.sessions_dir,
-                             self.config_home / "guild" / "projects", self.state_home)
+            ctx = RunContext(
+                conn,
+                None,
+                self.root,
+                timeutil.utcnow(),
+                "t@h",
+                self.sessions_dir,
+                self.config_home / "guild" / "projects",
+                self.state_home,
+            )
             body = snapshot.build(ctx, "alpha")
         finally:
             conn.close()

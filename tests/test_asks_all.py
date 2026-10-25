@@ -5,9 +5,7 @@ from guild.commands import board
 from tests.testutil import GuildTestCase
 
 _NOW = timeutil.utcnow()
-_ANSWERED_DATES = timeutil.dates_label(
-    timeutil.to_iso(_NOW - timedelta(days=2)), "2026-10-03T09:12:40+00:00"
-)
+_ANSWERED_DATES = timeutil.dates_label(timeutil.to_iso(_NOW - timedelta(days=2)), "2026-10-03T09:12:40+00:00")
 
 
 class AsksAllTests(GuildTestCase):
@@ -22,24 +20,49 @@ class AsksAllTests(GuildTestCase):
     def _create(self, ask_id, party, question, moment):
         with db.writing(self.conn):
             events.record(
-                self.conn, moment, "test@host", party, None, "acme", "ask.created", "local",
+                self.conn,
+                moment,
+                "test@host",
+                party,
+                None,
+                "acme",
+                "ask.created",
+                "local",
                 {
-                    "id": ask_id, "party": party, "question": question, "context": "x",
-                    "refs": ["task:demo/T01"], "options": [],
+                    "id": ask_id,
+                    "party": party,
+                    "question": question,
+                    "context": "x",
+                    "refs": ["task:demo/T01"],
+                    "options": [],
                 },
             )
 
     def _answer(self, ask_id, text, moment):
         with db.writing(self.conn):
             events.record(
-                self.conn, moment, "test@host", None, None, "acme", "ask.answered", "local",
+                self.conn,
+                moment,
+                "test@host",
+                None,
+                None,
+                "acme",
+                "ask.answered",
+                "local",
                 {"id": ask_id, "answer": text},
             )
 
     def _dismiss(self, ask_id):
         with db.writing(self.conn):
             events.record(
-                self.conn, _NOW, "test@host", None, None, "acme", "ask.dismissed", "local",
+                self.conn,
+                _NOW,
+                "test@host",
+                None,
+                None,
+                "acme",
+                "ask.dismissed",
+                "local",
                 {"id": ask_id},
             )
 

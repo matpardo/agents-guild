@@ -50,9 +50,7 @@ class RunProcessTests(unittest.TestCase):
         self.assertIn("fine", result["output"])
 
     def test_output_tail_is_capped_and_keeps_the_end(self):
-        result = _run(
-            _python("print('a' * 5000); print('the-end')"), self.cwd, _TIMEOUT_SECONDS
-        )
+        result = _run(_python("print('a' * 5000); print('the-end')"), self.cwd, _TIMEOUT_SECONDS)
         self.assertEqual(len(result["output"]), 2000)
         self.assertTrue(result["output"].endswith("the-end\n"))
 
@@ -65,16 +63,12 @@ class RunProcessTests(unittest.TestCase):
         self.assertEqual(result["output"], "redbell")
 
     def test_undecodable_bytes_are_replaced(self):
-        result = _run(
-            _python("import sys; sys.stdout.buffer.write(b'ok\\xff')"), self.cwd, _TIMEOUT_SECONDS
-        )
+        result = _run(_python("import sys; sys.stdout.buffer.write(b'ok\\xff')"), self.cwd, _TIMEOUT_SECONDS)
         self.assertTrue(result["output"].startswith("ok"))
 
     def test_timeout_kills_the_process_group(self):
         pid_file = Path(self.cwd) / "grandchild.pid"
-        child_code = "import os, time; open({!r}, 'w').write(str(os.getpid())); time.sleep(60)".format(
-            str(pid_file)
-        )
+        child_code = "import os, time; open({!r}, 'w').write(str(os.getpid())); time.sleep(60)".format(str(pid_file))
         code = "import subprocess, sys, time; subprocess.Popen([sys.executable, '-c', {!r}]); time.sleep(60)".format(
             child_code
         )
@@ -91,9 +85,7 @@ class RunProcessTests(unittest.TestCase):
 
     def _spawn_detached_grandchild_code(self, parent_tail):
         pid_file = Path(self.cwd) / "detached.pid"
-        child_code = "import os, time; open({!r}, 'w').write(str(os.getpid())); time.sleep(15)".format(
-            str(pid_file)
-        )
+        child_code = "import os, time; open({!r}, 'w').write(str(os.getpid())); time.sleep(15)".format(str(pid_file))
         code = (
             "import subprocess, sys, time\n"
             "subprocess.Popen([sys.executable, '-c', {!r}], start_new_session=True)\n"
@@ -135,9 +127,7 @@ class RunProcessTests(unittest.TestCase):
         self.assertTrue(result["output"].endswith("the-end\n"))
 
     def test_stdin_is_closed(self):
-        result = _run(
-            _python("import sys; print(repr(sys.stdin.read()))"), self.cwd, _TIMEOUT_SECONDS
-        )
+        result = _run(_python("import sys; print(repr(sys.stdin.read()))"), self.cwd, _TIMEOUT_SECONDS)
         self.assertEqual(result["output"], "''\n")
         self.assertEqual(result["exit_code"], 0)
 

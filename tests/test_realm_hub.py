@@ -26,8 +26,13 @@ def _status_body(guild):
         "generated_at": _NOW,
         "projects": [
             {
-                "name": "acme", "parties": 1, "open_quests": 2, "open_prs": 3,
-                "ready_prs": 1, "open_asks": 0, "main_red": False,
+                "name": "acme",
+                "parties": 1,
+                "open_quests": 2,
+                "open_prs": 3,
+                "ready_prs": 1,
+                "open_asks": 0,
+                "main_red": False,
             }
         ],
     }

@@ -88,7 +88,8 @@ class PartyStatusTests(GuildTestCase):
         )
         self.run_cli(
             ["pr", "track", "acme/app#1", "--task", "demo/T01", "--what", "x", "--waits", "y"],
-            "sess-1", self.repo_dir,
+            "sess-1",
+            self.repo_dir,
         )
         self.run_cli(["pr", "set", "acme/app#1", "--needs-ask-answer"], "sess-1", self.repo_dir)
         self.run_cli(["ask", "more?", "--context", "c", "--ref", "pr:acme/app#1"], "sess-1", self.repo_dir)

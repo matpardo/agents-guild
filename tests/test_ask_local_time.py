@@ -22,9 +22,7 @@ class AskLocalTimeTests(GuildTestCase):
         self.run_cli(["quest", "add", "demo", "--title", "Demo", "--no-epic"], "sess-1", self.repo_dir)
         self.run_cli(["task", "add", "demo/T01", "--title", "First"], "sess-1", self.repo_dir)
         with mock.patch("guild.timeutil.utcnow", return_value=_CREATED):
-            self.run_cli(
-                ["ask", "Ship it?", "--context", "x", "--ref", "task:demo/T01"], "sess-1", self.repo_dir
-            )
+            self.run_cli(["ask", "Ship it?", "--context", "x", "--ref", "task:demo/T01"], "sess-1", self.repo_dir)
         with mock.patch("guild.timeutil.utcnow", return_value=_ANSWERED):
             self.run_cli(["answer", "1", "yes"], None, None)
 
@@ -46,8 +44,14 @@ class AskLocalTimeTests(GuildTestCase):
     def test_web_model_carries_local_labels(self):
         conn = db.connect(paths.db_path())
         ctx = context.RunContext(
-            conn, None, None, _ANSWERED, None,
-            paths.claude_sessions_dir(), paths.projects_config_dir(), None,
+            conn,
+            None,
+            None,
+            _ANSWERED,
+            None,
+            paths.claude_sessions_dir(),
+            paths.projects_config_dir(),
+            None,
         )
         row = conn.execute("SELECT * FROM asks WHERE id = 1").fetchone()
         model = json.loads(json.dumps(ask_detail.build(ctx, row)))

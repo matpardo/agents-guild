@@ -24,15 +24,16 @@ def project_model(ctx, project, caps):
         "max_open_prs": caps["project_cap"],
         "wait": caps["project_wait"],
         "hot_files": hot_files,
-        "finding_classes": finding_commands.class_models(ctx.conn, project, project_data.get("finding_guard_threshold")),
+        "finding_classes": finding_commands.class_models(
+            ctx.conn, project, project_data.get("finding_guard_threshold")
+        ),
         "freshness": {name: _age(ctx.conn, ctx.now, project, kind) for name, kind in _SYNC_KINDS.items()},
     }
 
 
 def freshness_text(freshness):
     return ", ".join(
-        "{} synced {}".format(name, "never" if age is None else "{} ago".format(age))
-        for name, age in freshness.items()
+        "{} synced {}".format(name, "never" if age is None else "{} ago".format(age)) for name, age in freshness.items()
     )
 
 

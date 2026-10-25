@@ -33,7 +33,7 @@ def sdd_paths(project_config, epic):
 
 
 def task_ref(ctx, project_config, ref):
-    quest, tid = ref[len("task:"):].split("/", 1)
+    quest, tid = ref[len("task:") :].split("/", 1)
     row = ctx.conn.execute(
         "SELECT quest_tasks.title AS title, quest_tasks.state AS state, quests.epic AS epic"
         " FROM quest_tasks LEFT JOIN quests ON quests.slug = quest_tasks.quest"

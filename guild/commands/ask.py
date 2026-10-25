@@ -7,9 +7,7 @@ from guild.ids import next_id
 
 def card_known(ctx, project, project_config, key):
     if project is not None:
-        row = ctx.conn.execute(
-            "SELECT key FROM cards WHERE project = ? AND key = ?", (project, key)
-        ).fetchone()
+        row = ctx.conn.execute("SELECT key FROM cards WHERE project = ? AND key = ?", (project, key)).fetchone()
         if row is not None:
             return True
     if project_config is None:
@@ -26,24 +24,18 @@ def _validate_refs(ctx, project, project_config, ref_list):
         parsed = refs.parse_ask_ref(raw)
         normalized.append(parsed)
         if parsed.startswith("pr:"):
-            repo_and_number = parsed[len("pr:"):]
+            repo_and_number = parsed[len("pr:") :]
             repo, number = repo_and_number.rsplit("#", 1)
-            row = ctx.conn.execute(
-                "SELECT repo FROM prs WHERE repo = ? AND number = ?", (repo, int(number))
-            ).fetchone()
+            row = ctx.conn.execute("SELECT repo FROM prs WHERE repo = ? AND number = ?", (repo, int(number))).fetchone()
             if row is None:
                 raise GuildError("ask ref '{}' does not match a tracked PR".format(raw), 1)
         elif parsed.startswith("card:"):
-            if not card_known(ctx, project, project_config, parsed[len("card:"):]):
+            if not card_known(ctx, project, project_config, parsed[len("card:") :]):
                 raise GuildError("ask ref '{}' does not match a known card".format(raw), 1)
         else:
-            quest, tid = parsed[len("task:"):].split("/", 1)
-            row = ctx.conn.execute(
-                "SELECT tid FROM quest_tasks WHERE quest = ? AND tid = ?", (quest, tid)
-            ).fetchone()
-            held = ctx.conn.execute(
-                "SELECT id FROM adventurers WHERE task = ?", (parsed[len("task:"):],)
-            ).fetchone()
+            quest, tid = parsed[len("task:") :].split("/", 1)
+            row = ctx.conn.execute("SELECT tid FROM quest_tasks WHERE quest = ? AND tid = ?", (quest, tid)).fetchone()
+            held = ctx.conn.execute("SELECT id FROM adventurers WHERE task = ?", (parsed[len("task:") :],)).fetchone()
             if row is None and held is None:
                 raise GuildError("ask ref '{}' does not match a known task".format(raw), 1)
     return normalized
@@ -73,9 +65,7 @@ def _task_card_key(conn, project, task):
 
 
 def _pr_card_keys(conn, party):
-    rows = conn.execute(
-        "SELECT DISTINCT card FROM prs WHERE party = ? AND card IS NOT NULL", (party,)
-    ).fetchall()
+    rows = conn.execute("SELECT DISTINCT card FROM prs WHERE party = ? AND card IS NOT NULL", (party,)).fetchall()
     return [row["card"] for row in rows]
 
 
@@ -96,10 +86,7 @@ def _origin_snapshot(ctx, party, project, in_progress):
     return {
         "session_id": ctx.session_id,
         "session_name": session_info.read_session_name(ctx.sessions_dir, ctx.session_id),
-        "in_progress": [
-            {"quest": task["quest"], "tid": task["tid"], "title": task["title"]}
-            for task in in_progress
-        ],
+        "in_progress": [{"quest": task["quest"], "tid": task["tid"], "title": task["title"]} for task in in_progress],
         "epics": sorted({task["epic"] for task in in_progress if task["epic"] is not None}),
         "cards": sorted(card_keys),
         "handoff_path": _latest_handoff_path(ctx.conn, party),
@@ -119,9 +106,7 @@ def create(ctx, question, context_text, ref_list, option_list):
     in_progress = _in_progress_tasks(ctx.conn, actor_party)
     ref_list, auto_ref = _resolve_auto_ref(ref_list, in_progress)
     if not ref_list:
-        raise GuildError(
-            "ask needs at least one --ref (no single in-progress task to reference automatically)", 1
-        )
+        raise GuildError("ask needs at least one --ref (no single in-progress task to reference automatically)", 1)
     project = config.resolve_project(ctx.cwd, config.load_all_projects(ctx.projects_dir))
     patterns = pii.project_patterns(ctx.projects_dir, project)
     pii.validate_field(question, "ask question", pii.ASK_QUESTION_MAX_LENGTH, patterns)

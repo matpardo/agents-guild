@@ -53,9 +53,7 @@ def all_events(conn):
 
 
 def events_after(conn, seq):
-    rows = conn.execute(
-        "SELECT * FROM events WHERE seq > ? ORDER BY seq ASC", (seq,)
-    ).fetchall()
+    rows = conn.execute("SELECT * FROM events WHERE seq > ? ORDER BY seq ASC", (seq,)).fetchall()
     events = []
     for row in rows:
         events.append(

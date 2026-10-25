@@ -28,9 +28,7 @@ def _measure(ctx, projects, runner, deadline):
     found = disk.discover(projects)
     sampled = disk.sample_worktrees(ctx.conn, found["entries"], runner, deadline)
     sampled.extend(
-        claude_dirs.sample(
-            found["entries"], paths.claude_scratch_dir(), paths.claude_projects_dir(), runner, deadline
-        )
+        claude_dirs.sample(found["entries"], paths.claude_scratch_dir(), paths.claude_projects_dir(), runner, deadline)
     )
     scan = docker.scan(runner)
     rows_by_project = {project["name"]: [] for project in projects}
@@ -72,9 +70,7 @@ def _summary(payloads, scan, elapsed_seconds):
     unavailable = []
     if not scan["ok"]:
         unavailable.append("docker ({})".format(scan["reason"]))
-    other_unavailable = [
-        row for row in rows if row[3] == "unavailable" and row[0] != docker.MARKER_CATEGORY
-    ]
+    other_unavailable = [row for row in rows if row[3] == "unavailable" and row[0] != docker.MARKER_CATEGORY]
     if other_unavailable:
         unavailable.append(_plural(len(other_unavailable), "item"))
     skipped = [row for row in rows if row[3] == "skipped"]

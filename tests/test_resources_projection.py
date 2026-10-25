@@ -45,9 +45,7 @@ class ResourcesProjectionTests(GuildTestCase):
             )
 
     def _samples(self):
-        return self.ctx.conn.execute(
-            "SELECT * FROM resource_samples ORDER BY project, ts, category, item"
-        ).fetchall()
+        return self.ctx.conn.execute("SELECT * FROM resource_samples ORDER BY project, ts, category, item").fetchall()
 
     def _machine(self):
         return self.ctx.conn.execute("SELECT * FROM resource_machine ORDER BY ts").fetchall()
@@ -126,7 +124,9 @@ class ResourcesProjectionTests(GuildTestCase):
         self._record(
             "acme", sampled_payload([["worktree", "/home/u/acme/app", 4096, "ok", "merged", "feat-x"]], _DOCKER)
         )
-        self._record(None, sampled_payload([["docker_image", "<none> 5e6f7a8b9c0d", None, "unavailable", "dangling", ""]], None))
+        self._record(
+            None, sampled_payload([["docker_image", "<none> 5e6f7a8b9c0d", None, "unavailable", "dangling", ""]], None)
+        )
         before = ([dict(row) for row in self._samples()], [dict(row) for row in self._machine()])
         code, out, err = self.run_cli(["rebuild"], None, None)
         self.assertEqual(code, 0, err)

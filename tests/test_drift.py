@@ -51,8 +51,15 @@ class DriftTestCase(GuildTestCase):
     def _record_cards(self, cards):
         with db.writing(self.conn):
             events.record(
-                self.conn, timeutil.utcnow(), "test@host", None, None, "acme",
-                "tracker.synced", "local", {"project": "acme", "cards": cards},
+                self.conn,
+                timeutil.utcnow(),
+                "test@host",
+                None,
+                None,
+                "acme",
+                "tracker.synced",
+                "local",
+                {"project": "acme", "cards": cards},
             )
 
     def _card(self, key, status_category, parent_key=None, status=None):
@@ -71,22 +78,43 @@ class DriftTestCase(GuildTestCase):
         )
         code, out, err = self.run_cli(
             [
-                "pr", "track", "acme/app#{}".format(number), "--task", "{}/{}".format(quest, tid),
-                "--what", "x", "--waits", "y",
+                "pr",
+                "track",
+                "acme/app#{}".format(number),
+                "--task",
+                "{}/{}".format(quest, tid),
+                "--what",
+                "x",
+                "--waits",
+                "y",
             ],
-            "sess-1", self.repo_dir,
+            "sess-1",
+            self.repo_dir,
         )
         self.assertEqual(code, 0, err)
 
     def _set_pr_lifecycle(self, number, lifecycle):
         with db.writing(self.conn):
             events.record(
-                self.conn, timeutil.utcnow(), "test@host", None, None, None,
-                "pr.synced", "guild",
+                self.conn,
+                timeutil.utcnow(),
+                "test@host",
+                None,
+                None,
+                None,
+                "pr.synced",
+                "guild",
                 {
-                    "repo": "acme/app", "number": number, "gh_state": None, "gh_draft": False,
-                    "branch": None, "title": None, "checks_failing": 0, "checks_passing": 0,
-                    "lifecycle": lifecycle, "synced_at": timeutil.to_iso(timeutil.utcnow()),
+                    "repo": "acme/app",
+                    "number": number,
+                    "gh_state": None,
+                    "gh_draft": False,
+                    "branch": None,
+                    "title": None,
+                    "checks_failing": 0,
+                    "checks_passing": 0,
+                    "lifecycle": lifecycle,
+                    "synced_at": timeutil.to_iso(timeutil.utcnow()),
                 },
             )
 
@@ -103,9 +131,7 @@ class NoDriftTests(DriftTestCase):
         self._sync_sdd()
         code, out, err = self._drift()
         self.assertEqual(code, 0, err)
-        self.assertEqual(
-            out.strip(), "scope: no epics in active quests\nno drift"
-        )
+        self.assertEqual(out.strip(), "scope: no epics in active quests\nno drift")
 
 
 class MergedPrTaskNotDoneTests(DriftTestCase):
@@ -115,7 +141,8 @@ class MergedPrTaskNotDoneTests(DriftTestCase):
         self._sync_sdd()
         self.run_cli(
             ["quest", "add", "wave1", "--title", "Wave 1", "--epic", "wave1", "--tasks", "T01"],
-            "sess-1", self.repo_dir,
+            "sess-1",
+            self.repo_dir,
         )
         self._track_pr(1, "wave1", "T01")
 
@@ -145,13 +172,15 @@ class TrackerSddDisagreeTests(DriftTestCase):
     def setUp(self):
         super().setUp()
         self._write_epic(
-            "wave2", "status: active\n",
+            "wave2",
+            "status: active\n",
             "## T01 — First\n\n**JIRA:** DEMO-1\n**Deps:** —\n**Status:** [ ] pending\n",
         )
         self._sync_sdd()
         self.run_cli(
             ["quest", "add", "wave2", "--title", "Wave 2", "--epic", "wave2", "--tasks", "T01"],
-            "sess-1", self.repo_dir,
+            "sess-1",
+            self.repo_dir,
         )
 
     def test_card_done_and_sdd_pending_is_a_finding(self):
@@ -171,13 +200,15 @@ class TrackerSddDisagreeTests(DriftTestCase):
 class SddTaskWithoutCardTests(DriftTestCase):
     def test_keyed_epic_with_unkeyed_task_is_a_finding(self):
         self._write_epic(
-            "wave3", "jira: DEMO-9\nstatus: active\n",
+            "wave3",
+            "jira: DEMO-9\nstatus: active\n",
             "## T01 — First\n\n**Deps:** —\n**Status:** [ ] pending\n",
         )
         self._sync_sdd()
         self.run_cli(
             ["quest", "add", "wave3", "--title", "Wave 3", "--epic", "wave3", "--tasks", "T01"],
-            "sess-1", self.repo_dir,
+            "sess-1",
+            self.repo_dir,
         )
         code, out, err = self._drift()
         self.assertEqual(code, 0, err)
@@ -185,9 +216,7 @@ class SddTaskWithoutCardTests(DriftTestCase):
         self.assertIn("task:wave3/T01: no tracker key (epic wave3 is keyed DEMO-9)", out)
 
     def test_unkeyed_epic_with_unkeyed_task_is_not_a_finding(self):
-        self._write_epic(
-            "wave3b", "status: active\n", "## T01 — First\n\n**Deps:** —\n**Status:** [ ] pending\n"
-        )
+        self._write_epic("wave3b", "status: active\n", "## T01 — First\n\n**Deps:** —\n**Status:** [ ] pending\n")
         self._sync_sdd()
         code, out, err = self._drift()
         self.assertEqual(code, 0, err)
@@ -198,13 +227,15 @@ class CardNotUnderEpicTests(DriftTestCase):
     def setUp(self):
         super().setUp()
         self._write_epic(
-            "wave4", "jira: DEMO-20\nstatus: active\n",
+            "wave4",
+            "jira: DEMO-20\nstatus: active\n",
             "## T01 — First\n\n**JIRA:** DEMO-21\n**Deps:** —\n**Status:** [ ] pending\n",
         )
         self._sync_sdd()
         self.run_cli(
             ["quest", "add", "wave4", "--title", "Wave 4", "--epic", "wave4", "--tasks", "T01"],
-            "sess-1", self.repo_dir,
+            "sess-1",
+            self.repo_dir,
         )
 
     def test_card_with_no_parent_is_a_finding(self):
@@ -225,13 +256,15 @@ class PrOpenCardNotStartedTests(DriftTestCase):
     def setUp(self):
         super().setUp()
         self._write_epic(
-            "wave5", "status: active\n",
+            "wave5",
+            "status: active\n",
             "## T01 — First\n\n**JIRA:** DEMO-30\n**Deps:** —\n**Status:** [ ] pending\n",
         )
         self._sync_sdd()
         self.run_cli(
             ["quest", "add", "wave5", "--title", "Wave 5", "--epic", "wave5", "--tasks", "T01"],
-            "sess-1", self.repo_dir,
+            "sess-1",
+            self.repo_dir,
         )
         self._track_pr(5, "wave5", "T01")
 
@@ -256,7 +289,8 @@ class PrClosedUnmergedTests(DriftTestCase):
         self._sync_sdd()
         self.run_cli(
             ["quest", "add", "wave6", "--title", "Wave 6", "--epic", "wave6", "--tasks", "T01"],
-            "sess-1", self.repo_dir,
+            "sess-1",
+            self.repo_dir,
         )
         self._track_pr(6, "wave6", "T01")
 
@@ -286,7 +320,8 @@ class PartyWithoutLeaderTests(DriftTestCase):
         self.run_cli(["party", "start", "beta", "--reason", "test reason"], "sess-2", self.repo_dir)
         self.run_cli(
             ["handoff", "--in-flight", "still going", "--learned", "nothing new"],
-            "sess-2", self.repo_dir,
+            "sess-2",
+            self.repo_dir,
         )
         code, out, err = self._drift()
         self.assertEqual(code, 0, err)
@@ -304,7 +339,8 @@ class EpicDoneWithOpenWorkTests(DriftTestCase):
         self._sync_sdd()
         self.run_cli(
             ["quest", "add", "wave8", "--title", "Wave 8", "--epic", "wave8", "--tasks", "T01"],
-            "sess-1", self.repo_dir,
+            "sess-1",
+            self.repo_dir,
         )
         code, out, err = self._drift()
         self.assertEqual(code, 0, err)
@@ -316,7 +352,8 @@ class EpicDoneWithOpenWorkTests(DriftTestCase):
         self._sync_sdd()
         self.run_cli(
             ["quest", "add", "wave8b", "--title", "Wave 8b", "--epic", "wave8b", "--tasks", "T01"],
-            "sess-1", self.repo_dir,
+            "sess-1",
+            self.repo_dir,
         )
         self.run_cli(["task", "done", "wave8b/T01"], "sess-1", self.repo_dir)
         self._track_pr(8, "wave8b", "T01")
@@ -330,7 +367,8 @@ class EpicDoneWithOpenWorkTests(DriftTestCase):
         self._sync_sdd()
         self.run_cli(
             ["quest", "add", "wave8c", "--title", "Wave 8c", "--epic", "wave8c", "--tasks", "T01"],
-            "sess-1", self.repo_dir,
+            "sess-1",
+            self.repo_dir,
         )
         self.run_cli(["task", "done", "wave8c/T01"], "sess-1", self.repo_dir)
         code, out, err = self._drift()
@@ -342,7 +380,8 @@ class EpicDoneWithOpenWorkTests(DriftTestCase):
         self._sync_sdd()
         self.run_cli(
             ["quest", "add", "wave8d", "--title", "Wave 8d", "--epic", "wave8d", "--tasks", "T01"],
-            "sess-1", self.repo_dir,
+            "sess-1",
+            self.repo_dir,
         )
         code, out, err = self._drift()
         self.assertEqual(code, 0, err)
@@ -356,7 +395,8 @@ class QuestTaskNotInSddTests(DriftTestCase):
         self._sync_sdd()
         self.run_cli(
             ["quest", "add", "wave9", "--title", "Wave 9", "--epic", "wave9", "--tasks", "T01"],
-            "sess-1", self.repo_dir,
+            "sess-1",
+            self.repo_dir,
         )
 
     def test_task_added_to_an_epic_quest_but_not_to_the_sdd_is_a_finding(self):
@@ -369,7 +409,8 @@ class QuestTaskNotInSddTests(DriftTestCase):
     def test_task_present_in_the_sdd_is_not_a_finding(self):
         self.run_cli(["task", "add", "wave9/T09", "--title", "Extra"], "sess-1", self.repo_dir)
         self._write_epic(
-            "wave9", "status: active\n",
+            "wave9",
+            "status: active\n",
             "## T01 — First\n\n**Deps:** —\n**Status:** [ ] pending\n\n"
             "## T09 — Extra\n\n**Deps:** —\n**Status:** [ ] pending\n",
         )
@@ -399,7 +440,8 @@ class TaskDoneSddNotDoneTests(DriftTestCase):
         self._sync_sdd()
         self.run_cli(
             ["quest", "add", "wave10", "--title", "Wave 10", "--epic", "wave10", "--tasks", "T01"],
-            "sess-1", self.repo_dir,
+            "sess-1",
+            self.repo_dir,
         )
         self.run_cli(["task", "done", "wave10/T01"], "sess-1", self.repo_dir)
 
@@ -425,21 +467,25 @@ class EpicFilterTests(DriftTestCase):
     def setUp(self):
         super().setUp()
         self._write_epic(
-            "wave9", "jira: DEMO-90\nstatus: active\n",
+            "wave9",
+            "jira: DEMO-90\nstatus: active\n",
             "## T01 — First\n\n**Deps:** —\n**Status:** [ ] pending\n",
         )
         self._write_epic(
-            "wave10", "jira: DEMO-100\nstatus: active\n",
+            "wave10",
+            "jira: DEMO-100\nstatus: active\n",
             "## T01 — First\n\n**Deps:** —\n**Status:** [ ] pending\n",
         )
         self._sync_sdd()
         self.run_cli(
             ["quest", "add", "wave9", "--title", "Wave 9", "--epic", "wave9", "--tasks", "T01"],
-            "sess-1", self.repo_dir,
+            "sess-1",
+            self.repo_dir,
         )
         self.run_cli(
             ["quest", "add", "wave10", "--title", "Wave 10", "--epic", "wave10", "--tasks", "T01"],
-            "sess-1", self.repo_dir,
+            "sess-1",
+            self.repo_dir,
         )
 
     def test_epic_filter_restricts_findings_to_that_epic(self):
@@ -458,21 +504,21 @@ class EpicFilterTests(DriftTestCase):
 class NoNetworkTests(DriftTestCase):
     def test_drift_never_invokes_gh_or_acli(self):
         self._write_epic(
-            "wave11", "jira: DEMO-110\nstatus: done\n",
+            "wave11",
+            "jira: DEMO-110\nstatus: done\n",
             "## T01 — First\n\n**JIRA:** DEMO-111\n**Deps:** —\n**Status:** [ ] pending\n",
         )
         self._sync_sdd()
         self._record_cards([self._card("DEMO-111", "new")])
         self.run_cli(
             ["quest", "add", "wave11", "--title", "Wave 11", "--epic", "wave11", "--tasks", "T01"],
-            "sess-1", self.repo_dir,
+            "sess-1",
+            self.repo_dir,
         )
         self._track_pr(11, "wave11", "T01")
 
         original_path = os.environ["PATH"]
-        stripped = os.pathsep.join(
-            part for part in original_path.split(os.pathsep) if part != str(self.bin_dir)
-        )
+        stripped = os.pathsep.join(part for part in original_path.split(os.pathsep) if part != str(self.bin_dir))
         os.environ["PATH"] = stripped
         try:
             code, out, err = self._drift()
@@ -485,7 +531,8 @@ class NoNetworkTests(DriftTestCase):
 class DefaultScopeTests(DriftTestCase):
     def test_epic_without_active_quest_excluded_by_default_and_included_with_all(self):
         self._write_epic(
-            "wave20", "jira: DEMO-200\nstatus: active\n",
+            "wave20",
+            "jira: DEMO-200\nstatus: active\n",
             "## T01 — First\n\n**Deps:** —\n**Status:** [ ] pending\n",
         )
         self._sync_sdd()
@@ -506,13 +553,12 @@ class DefaultScopeTests(DriftTestCase):
         self._sync_sdd()
         self.run_cli(
             ["quest", "add", "wave21", "--title", "Wave 21", "--epic", "wave21", "--tasks", "T01"],
-            "sess-1", self.repo_dir,
+            "sess-1",
+            self.repo_dir,
         )
         code, out, err = self._drift()
         self.assertEqual(code, 0, err)
-        self.assertEqual(
-            out.splitlines()[0], "scope: 1 epics in active quests (use --all for the whole project)"
-        )
+        self.assertEqual(out.splitlines()[0], "scope: 1 epics in active quests (use --all for the whole project)")
 
     def test_scope_line_all(self):
         code, out, err = self.run_cli(["drift", "--all"], "sess-1", self.repo_dir)
@@ -525,9 +571,7 @@ class DefaultScopeTests(DriftTestCase):
         self.assertEqual(out.splitlines()[0], "scope: epic somewhere")
 
     def test_epic_and_all_are_mutually_exclusive(self):
-        code, out, err = self.run_cli(
-            ["drift", "--epic", "somewhere", "--all"], "sess-1", self.repo_dir
-        )
+        code, out, err = self.run_cli(["drift", "--epic", "somewhere", "--all"], "sess-1", self.repo_dir)
         self.assertEqual(code, 2)
 
 
@@ -541,13 +585,15 @@ class CardLagTests(DriftTestCase):
     def setUp(self):
         super().setUp()
         self._write_epic(
-            "wave9", "status: active\n",
+            "wave9",
+            "status: active\n",
             "## T01 — First\n\n**JIRA:** DEMO-90\n**Deps:** —\n**Status:** [ ] pending\n",
         )
         self._sync_sdd()
         self.run_cli(
             ["quest", "add", "wave9", "--title", "Wave 9", "--epic", "wave9", "--tasks", "T01"],
-            "sess-1", self.repo_dir,
+            "sess-1",
+            self.repo_dir,
         )
 
     def _track_with_card(self, number, card):
@@ -563,9 +609,7 @@ class CardLagTests(DriftTestCase):
         code, out, err = self._drift()
         self.assertEqual(code, 0, err)
         self.assertIn("task started, card not started (1)", out)
-        self.assertIn(
-            "task:wave9/T01 started, card DEMO-90 not started (To Do): move DEMO-90 to In Progress", out
-        )
+        self.assertIn("task:wave9/T01 started, card DEMO-90 not started (To Do): move DEMO-90 to In Progress", out)
 
     def test_started_task_with_card_in_progress_is_not_a_finding(self):
         self._record_cards([self._card("DEMO-90", "indeterminate")])

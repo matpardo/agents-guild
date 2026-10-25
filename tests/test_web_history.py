@@ -26,10 +26,21 @@ class HistoryRouteTests(WebServerTestCase):
         conn.close()
 
     def _seed_done_quest(self, slug, party, project):
-        self._seed_event("added-" + slug, 0, party, project, "quest.added", {
-            "slug": slug, "project": project, "party": party, "epic": None, "title": "Quest " + slug,
-            "tasks": [],
-        })
+        self._seed_event(
+            "added-" + slug,
+            0,
+            party,
+            project,
+            "quest.added",
+            {
+                "slug": slug,
+                "project": project,
+                "party": party,
+                "epic": None,
+                "title": "Quest " + slug,
+                "tasks": [],
+            },
+        )
         self._seed_event("done-" + slug, 5, party, project, "quest.done", {"slug": slug})
 
     def _get_history(self, query):
@@ -132,10 +143,21 @@ class HistoryRouteTests(WebServerTestCase):
         self.assertIn(b'progress.done + "/" + progress.total', body)
 
     def test_api_active_quest_exposes_activity_and_stale_hours(self):
-        self._seed_event("added-wip", 0, "alpha", "acme", "quest.added", {
-            "slug": "wip", "project": "acme", "party": "alpha", "epic": None, "title": "Quest wip",
-            "tasks": [{"tid": "T01", "title": "T01"}],
-        })
+        self._seed_event(
+            "added-wip",
+            0,
+            "alpha",
+            "acme",
+            "quest.added",
+            {
+                "slug": "wip",
+                "project": "acme",
+                "party": "alpha",
+                "epic": None,
+                "title": "Quest wip",
+                "tasks": [{"tid": "T01", "title": "T01"}],
+            },
+        )
         conn = db.connect(paths.db_path())
         conn.execute(
             "INSERT INTO quests (slug, party, project, epic, title, state) VALUES ('wip', 'alpha', 'acme', NULL, 'Quest wip', 'active')"

@@ -21,9 +21,7 @@ def _validate_tracker_config(tracker_config):
         raise GuildError("project config 'tracker' must be an object", 1)
     if tracker_config.get("kind") not in TRACKER_KINDS:
         raise GuildError(
-            "project config 'tracker.kind' is required and must be one of {}".format(
-                ", ".join(TRACKER_KINDS)
-            ),
+            "project config 'tracker.kind' is required and must be one of {}".format(", ".join(TRACKER_KINDS)),
             1,
         )
     browse_url = tracker_config.get("browse_url")
@@ -31,9 +29,7 @@ def _validate_tracker_config(tracker_config):
         return
     if not isinstance(browse_url, str) or not browse_url.startswith(_TRACKER_BROWSE_URL_PREFIX):
         raise GuildError(
-            "project config 'tracker.browse_url' must start with '{}'".format(
-                _TRACKER_BROWSE_URL_PREFIX
-            ),
+            "project config 'tracker.browse_url' must start with '{}'".format(_TRACKER_BROWSE_URL_PREFIX),
             1,
         )
 
@@ -58,9 +54,7 @@ def _validate_shared_areas_config(data):
         raise GuildError("project config 'shared_areas' must be a list of strings", 1)
     ttl = data.get("shared_area_claim_ttl")
     if ttl is None:
-        raise GuildError(
-            "project config 'shared_area_claim_ttl' is required when 'shared_areas' is set", 1
-        )
+        raise GuildError("project config 'shared_area_claim_ttl' is required when 'shared_areas' is set", 1)
     timeutil.parse_duration(ttl)
 
 
@@ -106,15 +100,9 @@ def _validate_trace_validator(validator):
         raise GuildError("project config 'human_ready.trace_validator' must be an object", 1)
     for key in validator:
         if key not in ("command", "timeout_seconds"):
-            raise GuildError(
-                "project config 'human_ready.trace_validator' has unknown key '{}'".format(key), 1
-            )
+            raise GuildError("project config 'human_ready.trace_validator' has unknown key '{}'".format(key), 1)
     command = validator.get("command")
-    if (
-        not isinstance(command, list)
-        or not command
-        or not all(isinstance(part, str) and part for part in command)
-    ):
+    if not isinstance(command, list) or not command or not all(isinstance(part, str) and part for part in command):
         raise GuildError(
             "project config 'human_ready.trace_validator.command' must be a non-empty list of non-empty strings",
             1,
@@ -182,9 +170,7 @@ def _validate_lifecycle_command(event, command):
 
 def _validate_lifecycle_timeout(event, timeout):
     if isinstance(timeout, bool) or not isinstance(timeout, int) or timeout <= 0:
-        raise GuildError(
-            "project config 'lifecycle.{}.timeout_minutes' must be a positive integer".format(event), 1
-        )
+        raise GuildError("project config 'lifecycle.{}.timeout_minutes' must be a positive integer".format(event), 1)
     if timeout > _LIFECYCLE_MAX_TIMEOUT_MINUTES:
         raise GuildError(
             "project config 'lifecycle.{}.timeout_minutes' must be at most {}".format(
@@ -197,16 +183,12 @@ def _validate_lifecycle_timeout(event, timeout):
 def _validate_lifecycle_entry(event, entry):
     if not isinstance(entry, dict):
         raise GuildError(
-            "project config 'lifecycle.{}' must be an object with 'command' and 'timeout_minutes'".format(
-                event
-            ),
+            "project config 'lifecycle.{}' must be an object with 'command' and 'timeout_minutes'".format(event),
             1,
         )
     if set(entry) != _LIFECYCLE_ENTRY_KEYS:
         raise GuildError(
-            "project config 'lifecycle.{}' must have exactly the keys 'command' and 'timeout_minutes'".format(
-                event
-            ),
+            "project config 'lifecycle.{}' must have exactly the keys 'command' and 'timeout_minutes'".format(event),
             1,
         )
     _validate_lifecycle_command(event, entry["command"])
@@ -362,9 +344,7 @@ def load_project(projects_dir, name):
     config_file = projects_dir / "{}.json".format(name)
     if not config_file.is_file():
         raise GuildError(
-            "unknown project '{}': known projects are {}".format(
-                name, _known_projects_label(projects_dir)
-            ),
+            "unknown project '{}': known projects are {}".format(name, _known_projects_label(projects_dir)),
             1,
         )
     return load_project_file(config_file)

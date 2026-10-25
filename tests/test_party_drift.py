@@ -7,13 +7,15 @@ class PartyDriftTestCase(DriftTestCase):
         self.write_session(2, "sess-2", "beta-session")
         self.run_cli(["party", "start", "beta", "--reason", "test reason"], "sess-2", self.repo_dir)
         self._write_epic(
-            "wave9", "status: active\n",
+            "wave9",
+            "status: active\n",
             "## T01 — First\n\n**JIRA:** DEMO-90\n**Deps:** —\n**Status:** [ ] pending\n",
         )
         self._sync_sdd()
         self.run_cli(
             ["quest", "add", "wave9", "--title", "Wave 9", "--epic", "wave9", "--tasks", "T01"],
-            "sess-1", self.repo_dir,
+            "sess-1",
+            self.repo_dir,
         )
 
     def _start_task(self):
@@ -102,8 +104,12 @@ class MergeNoticeMovesTests(PartyDriftTestCase):
         self.write_gh_fixture(
             "view_acme-app_1",
             {
-                "state": "MERGED", "isDraft": False, "headRefName": "feature/1", "title": "t",
-                "mergedAt": "2026-01-01T00:00:00Z", "statusCheckRollup": [],
+                "state": "MERGED",
+                "isDraft": False,
+                "headRefName": "feature/1",
+                "title": "t",
+                "mergedAt": "2026-01-01T00:00:00Z",
+                "statusCheckRollup": [],
             },
         )
 
@@ -119,7 +125,8 @@ class MergeNoticeMovesTests(PartyDriftTestCase):
     def test_done_card_and_sdd_task_stay_silent(self):
         self._record_cards([self._card("DEMO-90", "done")])
         self._write_epic(
-            "wave9", "status: active\n",
+            "wave9",
+            "status: active\n",
             "## T01 — First\n\n**JIRA:** DEMO-90\n**Deps:** —\n**Status:** [x] done\n",
         )
         self._sync_sdd()

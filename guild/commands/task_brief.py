@@ -91,8 +91,7 @@ def _task_lines(task):
 
 def _pr_rows(conn, party, quest, tid):
     return conn.execute(
-        "SELECT * FROM prs WHERE party = ? AND task_quest = ? AND task_tid = ?"
-        " ORDER BY number DESC LIMIT ?",
+        "SELECT * FROM prs WHERE party = ? AND task_quest = ? AND task_tid = ? ORDER BY number DESC LIMIT ?",
         (party, quest, tid, _MAX_PRS),
     ).fetchall()
 
@@ -135,10 +134,7 @@ def _notice_lines(ctx, party, project):
 
 def _claim_lines(ctx, party):
     rows = [row for row in claim_commands.list_claims(ctx.conn, ctx.now) if row["party"] == party]
-    return [
-        "claim: {} until {}".format(_single(row["area"]), _single(row["expires_at"]))
-        for row in rows[:_MAX_CLAIMS]
-    ]
+    return ["claim: {} until {}".format(_single(row["area"]), _single(row["expires_at"])) for row in rows[:_MAX_CLAIMS]]
 
 
 def _section_body(lines, header):
@@ -160,9 +156,7 @@ def _wrapped_section(title, body_lines):
     wrapped = textwrap.wrap(text, _LINE_MAX) or [""]
     prefix = "{}: ".format(title)
     indent = " " * len(prefix)
-    return [
-        _HANDOFF_MARKER + (prefix if index == 0 else indent) + line for index, line in enumerate(wrapped)
-    ]
+    return [_HANDOFF_MARKER + (prefix if index == 0 else indent) + line for index, line in enumerate(wrapped)]
 
 
 def _handoff_lines(ctx, party, generation):
@@ -171,8 +165,12 @@ def _handoff_lines(ctx, party, generation):
         return ["handoff: none recorded"]
     raw_lines = sanitize.strip_control_sequences(content).splitlines()
     lines = ["handoff (generation {}):".format(generation - 1)]
-    lines.extend(_wrapped_section(handoff_commands.IN_FLIGHT_TITLE, _section_body(raw_lines, handoff_commands.IN_FLIGHT_TITLE)))
-    lines.extend(_wrapped_section(handoff_commands.LEARNED_TITLE, _section_body(raw_lines, handoff_commands.LEARNED_TITLE)))
+    lines.extend(
+        _wrapped_section(handoff_commands.IN_FLIGHT_TITLE, _section_body(raw_lines, handoff_commands.IN_FLIGHT_TITLE))
+    )
+    lines.extend(
+        _wrapped_section(handoff_commands.LEARNED_TITLE, _section_body(raw_lines, handoff_commands.LEARNED_TITLE))
+    )
     return lines
 
 
@@ -207,17 +205,13 @@ def render_from_ref(ctx, text):
         raise GuildError("unknown party '{}'".format(party), 1)
     if party_row["state"] == "closed":
         raise GuildError("party is closed", 1)
-    quest_row = ctx.conn.execute(
-        "SELECT slug FROM quests WHERE slug = ? AND party = ?", (quest, party)
-    ).fetchone()
+    quest_row = ctx.conn.execute("SELECT slug FROM quests WHERE slug = ? AND party = ?", (quest, party)).fetchone()
     if quest_row is None:
         raise GuildError("quest not owned by party", 1)
     _, project_config = task_context.project_config(ctx, party)
     if task_context.task_ref(ctx, project_config, "task:{}/{}".format(quest, tid)).get("missing"):
         raise GuildError("unknown task '{}/{}'".format(quest, tid), 1)
-    return _render(
-        ctx, party, party_row["project"], party_row["generation"] + 1, {"quest": quest, "tid": tid}
-    )
+    return _render(ctx, party, party_row["project"], party_row["generation"] + 1, {"quest": quest, "tid": tid})
 
 
 def _active_task(conn, party):

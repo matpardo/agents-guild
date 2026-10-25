@@ -43,9 +43,7 @@ class FakeTmux:
 def _write_transcript(projects_dir, encoded, session_id, lines):
     directory = projects_dir / encoded
     directory.mkdir(parents=True, exist_ok=True)
-    (directory / "{}.jsonl".format(session_id)).write_text(
-        "\n".join(json.dumps(line) for line in lines) + "\n"
-    )
+    (directory / "{}.jsonl".format(session_id)).write_text("\n".join(json.dumps(line) for line in lines) + "\n")
 
 
 class ResumeHelperTests(GuildTestCase):
@@ -56,15 +54,11 @@ class ResumeHelperTests(GuildTestCase):
         )
 
     def test_resume_command_omits_unknown_mode(self):
-        self.assertEqual(
-            resume.resume_command("sess-1", "alpha", 3, None), "claude --resume sess-1 --name alpha-g3"
-        )
+        self.assertEqual(resume.resume_command("sess-1", "alpha", 3, None), "claude --resume sess-1 --name alpha-g3")
 
     def test_fresh_command_keeps_generation_name_and_adds_mode(self):
         command = resume.fresh_command("alpha", 3, None, "plan", resume.RESUME_PROMPT)
-        self.assertTrue(
-            command.startswith("GUILD_RESUME=alpha claude -n alpha-g3 --permission-mode plan ")
-        )
+        self.assertTrue(command.startswith("GUILD_RESUME=alpha claude -n alpha-g3 --permission-mode plan "))
 
     def test_fresh_command_without_mode_or_model(self):
         command = resume.fresh_command("alpha", 2, None, None, resume.RESUME_PROMPT)
@@ -102,9 +96,7 @@ class TranscriptTests(GuildTestCase):
         self.assertEqual(revive.read_location(path), ("/a", "plan"))
 
     def test_read_location_collects_across_lines(self):
-        _write_transcript(
-            self.claude_projects_dir, "-x", "s1", [{"cwd": "/a"}, {"permissionMode": "default"}]
-        )
+        _write_transcript(self.claude_projects_dir, "-x", "s1", [{"cwd": "/a"}, {"permissionMode": "default"}])
         path = revive.find_transcript(self.claude_projects_dir, "s1")
         self.assertEqual(revive.read_location(path), ("/a", "default"))
 
@@ -141,9 +133,7 @@ class ReviveBase(GuildTestCase):
 
     def _set_leader(self, party, cwd, mode):
         with db.writing(self.conn):
-            self.conn.execute(
-                "UPDATE leaders SET cwd = ?, permission_mode = ? WHERE party = ?", (cwd, mode, party)
-            )
+            self.conn.execute("UPDATE leaders SET cwd = ?, permission_mode = ? WHERE party = ?", (cwd, mode, party))
 
     def _revive(self, party_names, select_all, list_only, tmux, ask_numbers):
         return revive.run(
@@ -351,8 +341,17 @@ class LaunchTests(ReviveBase):
         out = self._revive(["alpha"], False, False, tmux, None)
         self.assertIn(
             [
-                "new-session", "-d", "-s", "guild", "-n", "alpha", "-c", str(self.work_a),
-                "-P", "-F", "#{window_id}",
+                "new-session",
+                "-d",
+                "-s",
+                "guild",
+                "-n",
+                "alpha",
+                "-c",
+                str(self.work_a),
+                "-P",
+                "-F",
+                "#{window_id}",
                 "claude --resume sess-a --name alpha-g1 --permission-mode acceptEdits",
             ],
             tmux.calls,
@@ -370,8 +369,11 @@ class LaunchTests(ReviveBase):
     def _copy_command_calls(self, env, tools):
         tmux = self._tmux()
         isolated = {key: os.environ[key] for key in ("XDG_CONFIG_HOME", "XDG_DATA_HOME", "XDG_STATE_HOME")}
-        with mock.patch.dict(os.environ, dict(env, **isolated), clear=True), mock.patch(
-            "guild.tmux_windows.shutil.which", side_effect=lambda name: "/bin/" + name if name in tools else None
+        with (
+            mock.patch.dict(os.environ, dict(env, **isolated), clear=True),
+            mock.patch(
+                "guild.tmux_windows.shutil.which", side_effect=lambda name: "/bin/" + name if name in tools else None
+            ),
         ):
             self._revive([], True, False, tmux, None)
         return [call for call in tmux.calls if "copy-command" in call]

@@ -39,6 +39,4 @@ def health_command(job_name, prompt):
 
 
 def tab_command(party, cwd, command):
-    return "printf '\\033]0;%s\\007' {} && cd {} && {}".format(
-        shlex.quote(party), shlex.quote(cwd), command
-    )
+    return "printf '\\033]0;%s\\007' {} && cd {} && {}".format(shlex.quote(party), shlex.quote(cwd), command)

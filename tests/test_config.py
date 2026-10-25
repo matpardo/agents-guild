@@ -11,9 +11,7 @@ _BASE_CONFIG = {"name": "acme", "paths": ["/tmp/acme/*"], "github": {"repos": ["
 
 class ValidateProjectConfigTests(unittest.TestCase):
     def test_accepts_minimal_valid_config(self):
-        config.validate_project_config(
-            {"name": "acme", "paths": ["/tmp/acme/*"], "github": {"repos": ["acme/app"]}}
-        )
+        config.validate_project_config({"name": "acme", "paths": ["/tmp/acme/*"], "github": {"repos": ["acme/app"]}})
 
     def test_rejects_missing_name(self):
         with self.assertRaises(GuildError):
@@ -222,9 +220,7 @@ class ValidateProjectConfigTests(unittest.TestCase):
         self._assert_lifecycle_rejected(["x"], "'lifecycle' must be an object")
 
     def test_rejects_unknown_lifecycle_event(self):
-        self._assert_lifecycle_rejected(
-            {"on_main_red": {"command": ["x"], "timeout_minutes": 1}}, "on_main_red"
-        )
+        self._assert_lifecycle_rejected({"on_main_red": {"command": ["x"], "timeout_minutes": 1}}, "on_main_red")
 
     def test_rejects_lifecycle_command_string(self):
         self._assert_lifecycle_rejected(
@@ -262,9 +258,7 @@ class ValidateProjectConfigTests(unittest.TestCase):
                 )
 
     def test_rejects_timeout_above_one_day(self):
-        self._assert_lifecycle_rejected(
-            {"on_pr_merged": {"command": ["x"], "timeout_minutes": 1441}}, "at most 1440"
-        )
+        self._assert_lifecycle_rejected({"on_pr_merged": {"command": ["x"], "timeout_minutes": 1441}}, "at most 1440")
 
     def test_accepts_timeout_of_one_day(self):
         config.validate_project_config(
@@ -379,9 +373,7 @@ class LoadProjectUnknownProjectTests(unittest.TestCase):
             directory = Path(tmp)
             with self.assertRaises(GuildError) as raised:
                 config.load_project(directory, "ghost")
-            self.assertEqual(
-                raised.exception.message, "unknown project 'ghost': known projects are none"
-            )
+            self.assertEqual(raised.exception.message, "unknown project 'ghost': known projects are none")
 
 
 class RequireProjectUnknownProjectTests(unittest.TestCase):

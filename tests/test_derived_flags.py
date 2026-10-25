@@ -13,9 +13,7 @@ class AskFlagTests(MergeQueueTestCase):
         self.assertEqual(self.sync_gh("sess-1")[0], 0)
 
     def ask(self, ref):
-        code, out, err = self.run_cli(
-            ["ask", "ok?", "--context", "x", "--ref", ref], "sess-1", self.repo_dir
-        )
+        code, out, err = self.run_cli(["ask", "ok?", "--context", "x", "--ref", ref], "sess-1", self.repo_dir)
         self.assertEqual(code, 0, err)
 
     def queue_out(self):
@@ -108,7 +106,8 @@ class RedMainPushTests(MergeQueueTestCase):
         self.write_gh_fixture("view_acme-app_9", dict(OPEN_VIEW, headRefName="feature/fix"))
         code, out, err = self.run_cli(
             ["pr", "track", "acme/app#9", "--task", "qa/T01", "--what", "fix", "--waits", "review"] + flag,
-            "sess-1", self.repo_dir,
+            "sess-1",
+            self.repo_dir,
         )
         self.assertEqual(code, 0, err)
 
@@ -135,9 +134,7 @@ class RedMainPushTests(MergeQueueTestCase):
         )
 
     def list_pr(self, is_draft):
-        self.write_gh_fixture(
-            "list_feature-fix", [{"number": 9, "state": "OPEN", "url": "u", "isDraft": is_draft}]
-        )
+        self.write_gh_fixture("list_feature-fix", [{"number": 9, "state": "OPEN", "url": "u", "isDraft": is_draft}])
 
     def test_no_pr_push_warns_while_main_is_red(self):
         self.mark_red()
@@ -240,9 +237,7 @@ class RedMainPushTests(MergeQueueTestCase):
         )
 
     def list_worktree_pr(self, is_draft):
-        self.write_gh_fixture(
-            "list_feature-wt", [{"number": 9, "state": "OPEN", "url": "u", "isDraft": is_draft}]
-        )
+        self.write_gh_fixture("list_feature-wt", [{"number": 9, "state": "OPEN", "url": "u", "isDraft": is_draft}])
 
     def test_cd_into_worktree_push_to_ready_pr_is_refused(self):
         self.mark_red()

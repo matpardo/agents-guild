@@ -13,7 +13,9 @@ def _server(harness_name):
         return server
     server = subprocess.Popen(
         ["node", str(_TESTS_DIR / harness_name)],
-        stdin=subprocess.PIPE, stdout=subprocess.PIPE, text=True,
+        stdin=subprocess.PIPE,
+        stdout=subprocess.PIPE,
+        text=True,
     )
     _servers[harness_name] = server
     return server

@@ -50,9 +50,7 @@ class SddDocsTests(unittest.TestCase):
                 self.assertEqual(spec["epic"], epic_dir.name)
                 self.assertEqual(spec["type"], "spec")
                 self.assertIn(spec["status"], _STATUSES)
-                self.assertGreaterEqual(
-                    date.fromisoformat(spec["updated"]), date.fromisoformat(spec["created"])
-                )
+                self.assertGreaterEqual(date.fromisoformat(spec["updated"]), date.fromisoformat(spec["created"]))
 
     def test_child_documents_inherit_from_spec(self):
         for epic_dir in _epic_dirs():
@@ -124,7 +122,9 @@ class EphemeralBriefDocsTests(unittest.TestCase):
         self.assertIn("### Task brief", _README)
         self.assertIn("'Continue the work described in the guild brief.'", _README)
         self.assertNotIn("described in the guild handoff", _README)
-        self.assertIn("Recommended: 40, so sessions stay short and each fresh generation starts from the brief.", _README)
+        self.assertIn(
+            "Recommended: 40, so sessions stay short and each fresh generation starts from the brief.", _README
+        )
         self.assertIn('"handoff_threshold": 40,', _README)
 
     def test_guild_md_says_sessions_are_short(self):
@@ -163,7 +163,10 @@ class DispatcherRetirementDocsTests(unittest.TestCase):
 
     def test_guild_md_tells_sessions_how_to_wait(self):
         self.assertIn("**Blocked on an ask with nothing else to do?**", _GUILD_MD)
-        self.assertIn("the board shows what the party waits on and the human relaunches with `guild revive --party <party>`", _GUILD_MD)
+        self.assertIn(
+            "the board shows what the party waits on and the human relaunches with `guild revive --party <party>`",
+            _GUILD_MD,
+        )
 
 
 if __name__ == "__main__":

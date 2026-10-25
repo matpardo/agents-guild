@@ -19,9 +19,7 @@ class InitProjectTests(GuildTestCase):
         self.assertIn("does not match", err)
 
     def test_rejects_missing_file(self):
-        code, out, err = self.run_cli(
-            ["init-project", "acme", "--config", "/tmp/_does_not_exist.json"], None, None
-        )
+        code, out, err = self.run_cli(["init-project", "acme", "--config", "/tmp/_does_not_exist.json"], None, None)
         self.assertEqual(code, 1)
 
     def test_rejects_invalid_json(self):
@@ -66,9 +64,7 @@ class InitProjectTests(GuildTestCase):
         config_file.write_text(
             json.dumps({"name": "../../tmp/x", "paths": ["/tmp/acme/*"], "github": {"repos": ["acme/app"]}})
         )
-        code, out, err = self.run_cli(
-            ["init-project", "../../tmp/x", "--config", str(config_file)], None, None
-        )
+        code, out, err = self.run_cli(["init-project", "../../tmp/x", "--config", str(config_file)], None, None)
         self.assertEqual(code, 1)
         self.assertIn("invalid project name", err)
 
