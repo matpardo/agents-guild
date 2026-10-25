@@ -343,6 +343,33 @@ def _rule_task_done_sdd_not_done(conn, project, epics, party_scope):
     ]
 
 
+def _rule_adventurer_task_not_in_sdd(conn, project, epics):
+    rows = conn.execute(
+        "SELECT * FROM (SELECT adventurers.id AS id, adventurers.task AS task, adventurers.project AS project,"
+        " substr(adventurers.task, 1, instr(adventurers.task, '/') - 1) AS epic,"
+        " substr(adventurers.task, instr(adventurers.task, '/') + 1) AS tid"
+        " FROM adventurers WHERE adventurers.project = ? AND adventurers.task IS NOT NULL) AS held"
+        " WHERE EXISTS (SELECT 1 FROM epics WHERE epics.project = held.project AND epics.epic = held.epic)"
+        " AND EXISTS (SELECT 1 FROM prs WHERE prs.adventurer = held.id AND prs.lifecycle = 'merged')"
+        " AND NOT EXISTS (SELECT 1 FROM tasks WHERE tasks.project = held.project"
+        " AND tasks.epic = held.epic AND tasks.tid = held.tid)"
+        + _epic_clause("held", epics) + " ORDER BY held.id",
+        _epic_params(project, epics),
+    ).fetchall()
+    return [
+        "adventurer {}: task {} not in epic {} tasks.md, add it or run `guild sync --source sdd`".format(
+            row["id"], row["task"], row["epic"]
+        )
+        for row in rows
+    ]
+
+
+def _adventurer_epics(epics, party_scope):
+    if party_scope is not None:
+        return None
+    return epics
+
+
 def _collect_epic_scoped(conn, project, epics, party_scope):
     return [
         ("merged PR, task not done", _rule_merged_pr_task_not_done(conn, project, epics, party_scope)),
@@ -363,6 +390,9 @@ def _collect(conn, project, epics, party_scope, sessions_dir):
     groups = _collect_epic_scoped(conn, project, epics, party_scope)
     groups.insert(8, ("party has no running leader", _rule_party_without_leader(conn, project, sessions_dir)))
     groups.insert(9, ("session leads several parties", identity.double_bindings(conn, project)))
+    groups.append(
+        ("adventurer task not in SDD", _rule_adventurer_task_not_in_sdd(conn, project, _adventurer_epics(epics, party_scope)))
+    )
     return groups
 
 

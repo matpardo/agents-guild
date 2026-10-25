@@ -241,6 +241,7 @@ realmDoctorLines: [],
       "epic done with open work": "The epic is marked done but still has open work.",
       "quest task not in SDD": "A quest task has no matching task in the SDD.",
       "task done, SDD not done": "A task is done in guild but not in the SDD.",
+      "adventurer task not in SDD": "An adventurer's PR merged but its task id never appeared in the epic's SDD tasks.",
     },
     resourceCategory: {
       worktree: "Disk used by a git checkout of the project; worktrees nested inside it are counted on their own.",

@@ -1200,7 +1200,8 @@ SDD not done`, `task started, card not started`) runs only on epics referenced b
 `active` quest of the project, and every PR rule (`merged PR, task not
 done`, `PR open, card not started`, `PR merged, card not done`, `PR closed unmerged`) runs only on PRs
 tracked by a party that is `active` or `awaiting-leader`. `party has no
-running leader` and `session leads several parties` are unaffected by scope, always project-wide. `--all` drops
+running leader` and `session leads several parties` are unaffected by scope, always project-wide;
+`adventurer task not in SDD` is project-wide too, and only `--epic` narrows it. `--all` drops
 this default and reports the whole project (the audit mode). `--epic <slug>`
 restricts every epic-scoped rule to that epic, regardless of quest state;
 `--epic` and `--all` are mutually exclusive. The first line always states
@@ -1225,6 +1226,7 @@ naming the refs and what each source says:
 | `epic done with open work` | the epic's `sdd_status == done` but it still has a non-done quest task, or an open tracked PR linked to it |
 | `quest task not in SDD` | a task of an epic quest has no synced task with that tid in the epic's `tasks.md` (typically added with `guild task add` and never written to the SDD) |
 | `task done, SDD not done` | a task of an epic quest is `done` in guild while the epic's synced `sdd_status` for that tid is not `done` |
+| `adventurer task not in SDD` | an adventurer held `<epic>/<tid>` of a synced epic, one of its tracked PRs is `merged`, and the epic has no synced task with that tid (a mistyped tid, or a task the PR never added to `tasks.md`); a sync of the SDD after the merge clears a correct one |
 
 The last line is `N findings` or `no drift`. `guild drift` never writes to
 SDD or the tracker: fixing drift stays with humans and the normal skills.
@@ -1951,7 +1953,8 @@ and claim.
   no queued task.
 - An adventurer always starts on a task (`adventurer start --task`, required
   except for health jobs): a synced SDD task `<epic>/<tid>`, a new task the PR
-  adds to an epic already synced, or `<quest>/<tid>` of a no-epic open quest
+  adds to an epic already synced (`guild drift` reports `adventurer task not in
+  SDD` if it is still missing after the PR merged), or `<quest>/<tid>` of a no-epic open quest
   (`guild quest add <slug> --open --no-epic --tasks T01 --titles "..."` when the
   project has no SDD).
 
