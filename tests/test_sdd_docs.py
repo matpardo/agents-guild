@@ -79,6 +79,7 @@ class SddDocsTests(unittest.TestCase):
                 tasks = sdd.parse_tasks_file(epic_dir / "tasks.md", _PATTERNS)
                 self.assertTrue(tasks)
                 tids = {task["tid"] for task in tasks}
+                self.assertEqual(len(tids), len(tasks), "duplicate task ids")
                 for task in tasks:
                     self.assertTrue(set(task["deps"]) <= tids, task["tid"])
                 if status == "done":

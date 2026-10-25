@@ -192,6 +192,23 @@ class SyncSddTests(GuildTestCase):
         )
         self.assertEqual(code, 0)
 
+    def test_duplicate_task_ids_fail_the_epic_and_the_others_still_sync(self):
+        (self.sdd_root / "epics" / "dupes").mkdir(parents=True)
+        (self.sdd_root / "epics" / "dupes" / "tasks.md").write_text("## T01 — one\n\n## T01 — one again\n")
+        self._write_project_config(
+            sdd_config=dict(_PATTERNS, root=str(self.sdd_root), epics_dir="epics")
+        )
+        code, out, err = self.run_cli(["sync", "--source", "sdd"], "sess-1", self.repo_dir)
+        self.assertEqual(code, 1)
+        self.assertIn("dupes", err)
+        self.assertIn("duplicate task ids: T01", err)
+        self.assertNotIn("Traceback", err)
+        code, out, err = self.run_cli(
+            ["quest", "add", "wave1", "--title", "Wave 1", "--epic", "widget-rollout", "--tasks", "T01"],
+            "sess-1", self.repo_dir,
+        )
+        self.assertEqual(code, 0, err)
+
     def test_rebuild_is_idempotent_for_epic_tasks(self):
         self._write_project_config(
             sdd_config=dict(_PATTERNS, root=str(self.sdd_root), epics_dir="epics")
