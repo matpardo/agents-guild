@@ -1353,7 +1353,7 @@ The same flag marks an active party whose leader session is gone without a
 `guild handoff` (the party is not `awaiting-leader`), in the CLI board and as a
 pill on the web party card.
 
-### Solo players (health jobs)
+### Health jobs
 
 `health_jobs` in the project config (see "Project config") names recurring
 jobs. A job is `due` when no adventurer on it has reported (`done`, dismissed
@@ -1361,12 +1361,10 @@ or not) or the latest report is older than `every`; it is `running` while an
 adventurer on it is active, and `ok` otherwise. This is computed on read from
 the adventurers table: nothing runs on a timer and nothing launches by itself.
 
-A health job is a solo player and may carry a hero name (`hero` in the job). `guild board` lists every job per
-project in a `SOLO PLAYERS` section (hidden under `--party` and `--raid`), one row `<hero> (<job>) — <state>` (the job
-name alone without a hero), and the web shows the same in `solo players`; a due job carries the command to run,
-`guild adventurer launch <name>`, as text to copy, and a job with a report shows its latest `pending:` text. An
-adventurer on a job with a hero is shown by the hero in the board, the web, `adventurer list|show`, the brief and the
-final report. Open asks raised by an adventurer of the job show as `ask #<id>: <question>` under its row (they stay in NEEDS YOU too). The web has no launch button.
+`guild board` lists due and running jobs per project in a `HEALTH JOBS` section
+(hidden under `--party` and `--raid`) and the web shows the same in `health
+jobs`; a due job carries the command to run, `guild adventurer launch <name>`,
+as text to copy. The web has no launch button.
 
 `guild adventurer launch <name>` is for the human terminal and refuses inside a
 Claude Code session. Run from a checkout of the project, it opens a tmux window
@@ -1428,7 +1426,7 @@ after updating guild.
 sidebar sits above the pane. The sidebar links to the views, kept in the URL hash so a
 reload or the 10-second refresh keeps them: `#needs-you` (default: open asks, ready for
 you, answered asks), `#party/<name>`, `#raid/<name>` (asks, merge queue, parties, memory),
-`#adventurers` (adventurers and solo players), `#ideas`, `#quests` (quest board) and
+`#adventurers` (adventurers and health jobs), `#ideas`, `#quests` (quest board) and
 `#overview` (notices, raids, drift, projects). It lists parties grouped by raid (a party in
 two raids shows under both) and a `solo` group for parties outside raids, with counts for
 asks, ready PRs, blocked and context-high parties (a count above zero is a pill coloured by
@@ -2127,7 +2125,7 @@ generation after it too.
     "on_pr_closed": {"command": ["scripts/cleanup-merged.sh"], "timeout_minutes": 30}
   },
   "health_jobs": [
-    {"name": "red-main", "command": "/check-main", "every": "1d", "hero": "Kahziel the Paladin"},
+    {"name": "red-main", "command": "/check-main", "every": "1d"},
     {"name": "drift", "command": "/check-drift", "every": "3d"}
   ]
 }
@@ -2164,7 +2162,7 @@ All keys. The loader rejects a wrong type with a clear error for every key excep
 - `shared_area_claim_ttl` (duration `30m`/`8h`/`3d`, required with `shared_areas`): the TTL the guards claim a matched area for.
 - `migration_paths` (list of globs, absent: the migration clash check is skipped and no extra `gh` call is made): matched with `fnmatch` against changed file paths, e.g. `db/migrate/*`. See "Migration version clash" under `sync`.
 - `fast_forward_base` (boolean, absent or `false`: no clone is ever modified): `true` makes `sync --source gh` fast-forward the local base branch of merged repos (see "Base branch fast-forward" under `sync`).
-- `health_jobs` (list of `{"name", "command", "every", "hero"}` with `hero` optional, absent: no jobs): recurring jobs that keep the project healthy, the solo players (see "Solo players (health jobs)"). `hero` is a non-empty display name without control characters, such as `Kahziel the Paladin`; without it the job name is shown. `name` is a unique slug, `command` a non-empty string that does not start with `-`, the prompt or skill the job's session runs first, and `every` a duration like `30m`, `12h` or `3d`. Any other shape fails to load with an error naming `health_jobs`.
+- `health_jobs` (list of `{"name", "command", "every"}`, absent: no jobs): recurring jobs that keep the project healthy (see "Health jobs"). `name` is a unique slug, `command` a non-empty string that does not start with `-`, the prompt or skill the job's session runs first, and `every` a duration like `30m`, `12h` or `3d`. Any other shape fails to load with an error naming `health_jobs`.
 - `lifecycle` (object, absent: no command ever runs): commands run on PR lifecycle events (see "Lifecycle commands"). Keys are `on_pr_merged` and `on_pr_closed`, any other key fails to load. Each value has exactly `command` (non-empty list of non-empty strings, never a shell string) and `timeout_minutes` (integer from 1 to 1440, required).
 
 ### SDD parsing rules

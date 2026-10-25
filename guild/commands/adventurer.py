@@ -221,11 +221,9 @@ def dismiss(ctx, adventurer_id):
     return "adventurer {} dismissed".format(adventurer_id)
 
 
-def _list_line(ctx, row):
+def _list_line(row):
     parts = [row["project"], row["state"], row["task"] and "task " + row["task"]]
-    line = "{} {} ({})".format(
-        row["id"], health_jobs.job_text(ctx.projects_dir, row), ", ".join(part for part in parts if part)
-    )
+    line = "{} {} ({})".format(row["id"], row["job"], ", ".join(part for part in parts if part))
     if row["state"] == "done":
         line += " pending: {}".format(row["pending"])
     return line
@@ -239,17 +237,14 @@ def list_adventurers(ctx):
     ).fetchall()
     if not active and not recent:
         return ["no adventurers"]
-    return [_list_line(ctx, row) for row in active + recent]
+    return [_list_line(row) for row in active + recent]
 
 
 def show(ctx, adventurer_id):
     row = ctx.conn.execute("SELECT * FROM adventurers WHERE id = ?", (adventurer_id,)).fetchone()
     if row is None:
         raise GuildError("unknown adventurer {}".format(adventurer_id), 1)
-    lines = [
-        "adventurer {}: {}".format(row["id"], health_jobs.job_text(ctx.projects_dir, row)),
-        "state: {}".format(row["state"]),
-    ]
+    lines = ["adventurer {}: {}".format(row["id"], row["job"]), "state: {}".format(row["state"])]
     lines.append("project: {}".format(row["project"]))
     if row["task"] is not None:
         lines.append("task: {}".format(row["task"]))

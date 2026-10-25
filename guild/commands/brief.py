@@ -1,4 +1,4 @@
-from guild import config, health_jobs, identity, localbase, pii, render
+from guild import config, identity, localbase, pii, render
 from guild.commands import claim as claim_commands
 from guild.commands import drift as drift_commands
 from guild.commands import inbox as inbox_commands
@@ -44,10 +44,8 @@ def _drift_lines(ctx, binding):
     return lines
 
 
-def _adventurer_line(ctx, adventurer):
-    line = "{}: {}".format(
-        identity.adventurer_label(adventurer["id"]), health_jobs.job_text(ctx.projects_dir, adventurer)
-    )
+def _adventurer_line(adventurer):
+    line = "{}: {}".format(identity.adventurer_label(adventurer["id"]), adventurer["job"])
     if adventurer["task"] is not None:
         line += " (task {})".format(adventurer["task"])
     return line + '; before you stop run `guild adventurer done --pending "<text>"`'
@@ -61,7 +59,7 @@ def render_brief(ctx):
     adventurer = identity.resolve_adventurer(ctx.conn, ctx.session_id)
     if binding is None:
         project = _resolve_project(ctx)
-        lines = [_adventurer_line(ctx, adventurer)] if adventurer is not None else [UNBOUND_HINT]
+        lines = [_adventurer_line(adventurer)] if adventurer is not None else [UNBOUND_HINT]
         lines.extend(targeting_lines(active, project, set()))
         lines.extend(_base_warning_lines(ctx, project))
         lines.append(pii.LOCAL_ONLY_REMINDER)

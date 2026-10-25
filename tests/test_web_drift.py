@@ -376,9 +376,6 @@ def _health_job(**overrides):
         "project": "acme",
         "name": "red-main",
         "state": "due",
-        "hero": None,
-        "pending": None,
-        "asks": [],
         "last_done": None,
         "every": "1d",
         "launch": "guild adventurer launch red-main",
@@ -401,23 +398,8 @@ class WebHealthJobBehaviorTests(unittest.TestCase):
         self.assertIn("running", out)
         self.assertNotIn("guild adventurer launch", out)
 
-    def test_ok_job_is_listed_under_the_solo_players_title(self):
-        out = self._text([_health_job(state="ok", last_done="2026-10-23T00:00:00+00:00")])
-        self.assertIn("solo players (1)", out)
-        self.assertIn("red-main \u2014 ok", out)
-        self.assertNotIn("guild adventurer launch", out)
-
-    def test_hero_and_pending_text_are_shown(self):
-        out = self._text([_health_job(hero="Kahziel the Paladin", pending="two open PRs")])
-        self.assertIn("Kahziel the Paladin (red-main) \u2014 due", out)
-        self.assertIn("pending: two open PRs", out)
-
-    def test_open_ask_shows_under_the_job(self):
-        out = self._text([_health_job(asks=[{"id": 7, "question": "Merge the fix?"}])])
-        self.assertIn("ask #7: Merge the fix?", out)
-
-    def test_no_jobs_renders_nothing(self):
-        self.assertEqual(self._text([]), "")
+    def test_ok_job_is_hidden(self):
+        self.assertEqual(self._text([_health_job(state="ok", last_done="2026-10-23T00:00:00+00:00")]), "")
 
     def test_jobs_survive_the_party_filter(self):
         self.assertIn("red-main", self._text([_health_job()], "a"))
@@ -490,7 +472,6 @@ def _adventurer(**overrides):
         "id": 1,
         "project": "acme",
         "job": "fix typo",
-        "hero": None,
         "task": "demo/T02",
         "state": "active",
         "pending": None,
@@ -519,10 +500,6 @@ class WebAskDatesBehaviorTests(unittest.TestCase):
 class WebAdventurerBehaviorTests(unittest.TestCase):
     def _text(self, adventurers, party_filter="all"):
         return _render(dict(_BOARD, adventurers=adventurers), party_filter, "all", "adventurers", "text")
-
-    def test_hero_replaces_the_job_in_the_title(self):
-        out = self._text([_adventurer(job="red-main", hero="Kahziel the Paladin (red-main)")])
-        self.assertIn("adventurer 1 Kahziel the Paladin (red-main)", out)
 
     def test_active_stopped_adventurer_shows_job_state_and_the_flag(self):
         out = self._text([_adventurer()])
