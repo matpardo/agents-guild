@@ -12,6 +12,8 @@ _ALL_HOOKS = {
     "PostToolUse": [{"hooks": [{"type": "command", "command": "guild hook post-tool-use"}]}],
     "Notification": [{"hooks": [{"type": "command", "command": "guild hook notification"}]}],
     "Stop": [{"hooks": [{"type": "command", "command": "guild hook stop"}]}],
+    "SubagentStart": [{"hooks": [{"type": "command", "command": "guild hook subagent-start"}]}],
+    "SubagentStop": [{"hooks": [{"type": "command", "command": "guild hook subagent-stop"}]}],
     "PreCompact": [{"matcher": "auto", "hooks": [{"type": "command", "command": "guild hook pre-compact"}]}],
     "PreToolUse": [
         {"matcher": "Bash", "hooks": [{"type": "command", "command": "guild hook pre-push"}]},
@@ -94,7 +96,7 @@ class DoctorTests(GuildTestCase):
         self._link_rules()
         code, out, err = self.run_cli(["doctor"], None, None)
         self.assertEqual(code, 1)
-        self.assertEqual(out.count("missing hook"), 10)
+        self.assertEqual(out.count("missing hook"), 12)
         self.assertEqual(out.count("missing ask rule"), len(claude_settings.EXPECTED_ASK_RULES))
 
     def test_missing_notification_and_stop_hooks_fail_and_name_them(self):

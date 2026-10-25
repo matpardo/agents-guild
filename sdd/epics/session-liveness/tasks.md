@@ -63,3 +63,10 @@ updated: 2026-10-04
 **Status:** [x] done — #66
 
 **What:** a party whose leader session never reported a status shows `unknown`, not `working`.
+
+## T08 — Background work is not waiting input
+
+**Depends on:** T03
+**Status:** [x] done
+
+**What:** a leader that is idle or stopped while its own `guild pr wait` or subagents run shows `waiting-background`, not `waiting-input`; markers are ephemeral files fed by `pr wait` and the `SubagentStart`/`SubagentStop` hooks.

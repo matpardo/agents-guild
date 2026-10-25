@@ -1,4 +1,4 @@
-from guild import session_info, session_status, timeutil
+from guild import background, session_info, session_status, timeutil
 from guild.commands import next as next_commands
 
 
@@ -51,6 +51,10 @@ def derive(ctx, party_row):
     ask_since = _oldest_open_ask_since(ctx.conn, party_row["name"])
     if ask_since is not None and session_state != "working":
         return _result("waiting-ask", ask_since, None)
+    if session_state in ("waiting-input", "stopped"):
+        background_labels = background.labels(ctx.state_dir, party_row["leader_session_id"], ctx.now)
+        if background_labels:
+            return _result("waiting-background", session_row["since"], ", ".join(background_labels))
     if session_state == "waiting-input":
         return _result("waiting-input", session_row["since"], session_row["detail"])
     if session_state == "stopped":

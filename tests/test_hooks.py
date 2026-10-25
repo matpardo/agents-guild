@@ -1172,6 +1172,45 @@ if __name__ == "__main__":
     unittest.main()
 
 
+class SubagentHookTests(GuildTestCase):
+    def setUp(self):
+        super().setUp()
+        self.repo_dir = self.register_project("acme", ["acme/app"])
+        self.run_cli(["party", "start", "alpha", "--reason", "test reason"], "sess-1", self.repo_dir)
+        self.marker = paths.state_dir() / "background" / "sess-1" / "subagent-a1"
+
+    def _payload(self, **extra):
+        payload = {"session_id": "sess-1", "cwd": str(self.repo_dir)}
+        payload.update(extra)
+        return payload
+
+    def test_start_and_stop_write_and_remove_marker(self):
+        self.run_hook("subagent-start", self._payload(agent_id="a1"))
+        self.assertTrue(self.marker.exists())
+        self.run_hook("subagent-stop", self._payload(agent_id="a1"))
+        self.assertFalse(self.marker.exists())
+
+    def test_unbound_session_writes_nothing(self):
+        payload = {"session_id": "sess-9", "cwd": str(self.repo_dir), "agent_id": "a1"}
+        self.run_hook("subagent-start", payload)
+        self.assertFalse((paths.state_dir() / "background" / "sess-9").exists())
+
+    def test_missing_agent_id_is_a_no_op(self):
+        self.run_hook("subagent-start", self._payload())
+        self.run_hook("subagent-stop", self._payload())
+        self.assertFalse(self.marker.exists())
+
+    def test_session_start_startup_clears_subagent_markers(self):
+        self.run_hook("subagent-start", self._payload(agent_id="a1"))
+        self.run_hook("session-start", self._payload(source="startup"))
+        self.assertFalse(self.marker.exists())
+
+    def test_session_start_compact_keeps_subagent_markers(self):
+        self.run_hook("subagent-start", self._payload(agent_id="a1"))
+        self.run_hook("session-start", self._payload(source="compact"))
+        self.assertTrue(self.marker.exists())
+
+
 class SessionLivenessHookTests(GuildTestCase):
     def _bound(self):
         repo_dir = self.register_project("acme", ["acme/app"])

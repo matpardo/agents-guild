@@ -244,6 +244,8 @@ guild hook pre-edit
 guild hook pre-commit      # git hook: no stdin, session from CLAUDE_CODE_SESSION_ID
 guild hook notification    # records the session status
 guild hook stop
+guild hook subagent-start  # marks a running subagent
+guild hook subagent-stop
 guild hook pre-compact     # records the context percentage before an automatic compaction
 
 guild seed <file.json>
@@ -2386,6 +2388,12 @@ which merges this block and keeps what is already there:
     "Stop": [
       {"hooks": [{"type": "command", "command": "guild hook stop"}]}
     ],
+    "SubagentStart": [
+      {"hooks": [{"type": "command", "command": "guild hook subagent-start"}]}
+    ],
+    "SubagentStop": [
+      {"hooks": [{"type": "command", "command": "guild hook subagent-stop"}]}
+    ],
     "PreCompact": [
       {"matcher": "auto", "hooks": [{"type": "command", "command": "guild hook pre-compact"}]}
     ],
@@ -2595,6 +2603,9 @@ Without a hooks manager, add the same call to the repository's
   over `CLAUDE_CODE_IDLE_COMPACT_MIN_TOKENS`), not the context limit, and nothing
   is recorded.
 
+- `subagent-start` and `subagent-stop`: mark and unmark a running subagent
+  of the session (`agent_id` from stdin) for the `waiting-background` status;
+  `session-start` clears the session's subagent marks on `startup` and `resume`.
 - `notification` and `stop`: record the session status (see "Session
   status"). They print nothing, ignore unbound sessions and exit 0 whatever
   the stdin carries.
@@ -2624,10 +2635,11 @@ status is ignored.
 | 4 | no live leader otherwise | `idle` |
 | 5 | live leader blocked on a permission prompt | `waiting-permission` |
 | 6 | live leader, open ask and session not working | `waiting-ask` |
-| 7 | live leader waiting on an idle prompt or an elicitation | `waiting-input` |
-| 8 | live leader stopped | `stopped-with-work` when `guild next` would still return work, otherwise `done` |
-| 9 | live leader that never reported a status (for example a session started before the `Notification`/`Stop` hooks were wired) | `unknown` |
-| 10 | live leader otherwise | `working` |
+| 7 | live leader idle or stopped while it has background work: a running `guild pr wait` or a live subagent | `waiting-background` (detail `pr <ref>`, `N subagents`) |
+| 8 | live leader waiting on an idle prompt or an elicitation | `waiting-input` |
+| 9 | live leader stopped | `stopped-with-work` when `guild next` would still return work, otherwise `done` |
+| 10 | live leader that never reported a status (for example a session started before the `Notification`/`Stop` hooks were wired) | `unknown` |
+| 11 | live leader otherwise | `working` |
 
 `idle` and `queued` carry no age. The stored party state `awaiting-leader` is
 unchanged and is never a display status.

@@ -8,7 +8,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-from guild import config, ctx_pressure, db, identity, localbase, names, paths, session_status, timeutil, tmux_windows
+from guild import background, config, ctx_pressure, db, identity, localbase, names, paths, session_status, timeutil, tmux_windows
 from guild.adapters import github
 from guild.commands import adventurer as adventurer_commands
 from guild.commands import brief as brief_commands
@@ -209,6 +209,18 @@ def stop(ctx):
         session_status.record_change(ctx, binding, "session.stopped", {})
 
 
+def subagent_start(ctx, agent_id):
+    if agent_id is None or _session_actor(ctx) is None:
+        return
+    background.mark(ctx.state_dir, ctx.session_id, background.subagent_key(agent_id), agent_id)
+
+
+def subagent_stop(ctx, agent_id):
+    if agent_id is None or _session_actor(ctx) is None:
+        return
+    background.clear(ctx.state_dir, ctx.session_id, background.subagent_key(agent_id))
+
+
 _BLOCKING_WAITS = ("permission", "elicitation")
 
 
@@ -251,6 +263,8 @@ def notification(ctx, notification_type, message, push_runner):
 
 
 def session_start(ctx, resume_party, health_job, permission_mode, source):
+    if source in ("startup", "resume") and ctx.session_id is not None:
+        background.clear_subagents(ctx.state_dir, ctx.session_id)
     lines = _auto_resume_lines(ctx, resume_party, permission_mode)
     lines.extend(_auto_adventurer_lines(ctx, health_job, source))
     binding = identity.resolve_binding(ctx.conn, ctx.session_id)
