@@ -3,7 +3,7 @@ epic: party-waits
 type: tasks
 title: Show what each party waits on
 status: active
-updated: 2026-10-16
+updated: 2026-10-25
 ---
 
 # Tasks: Show what each party waits on
@@ -39,3 +39,15 @@ updated: 2026-10-16
 **Acceptance:**
 - [x] No command, board field, web control or config key mentions a fix request.
 - [x] An old `pr.fix_requested` event replays in `guild rebuild`.
+
+## T04 — Commits behind base per PR
+
+**Depends on:** T01
+**Status:** [x] done
+
+**What:** `guild sync --source gh` stores how many commits each open PR branch is behind its base (`prs.behind_by`, one compare API call per PR). The board PR line, the web PR card and `guild pr ready-check` show `N behind <base>` when it is above 0. It is display only: it is not a review reason and does not affect `guild next`, the merge queue or the waits.
+
+**Acceptance:**
+- [x] A failed compare call keeps the previous value and is reported; merged and closed PRs make no call.
+- [x] The counter shows only above 0 in the board, the web card and `pr ready-check`, and changes no exit code.
+- [x] An old `pr.synced` event without the field replays in `guild rebuild`.

@@ -109,6 +109,16 @@ def _open_pr_unresolved_threads(ctx, row, lifecycle, failures):
         return None
 
 
+def _open_pr_behind_by(ctx, row, lifecycle, base, head_sha, failures):
+    if lifecycle in ("merged", "closed") or not base or not head_sha:
+        return None
+    try:
+        return github.behind_by(ctx.cwd, row["repo"], base, head_sha)
+    except github.GhCommandError as error:
+        failures.append("{}#{}: behind base check failed: {}".format(row["repo"], row["number"], error))
+        return None
+
+
 def _pr_checks_billing(ctx, row, head_sha, failing, failures):
     if failing == 0:
         return None
@@ -205,6 +215,9 @@ def _sync_pr(ctx, projects, row, failures, lifecycle_runner):
     unresolved_threads = _open_pr_unresolved_threads(ctx, row, lifecycle, failures)
     if unresolved_threads is not None:
         payload["unresolved_threads"] = unresolved_threads
+    behind_by = _open_pr_behind_by(ctx, row, lifecycle, gh_data.get("baseRefName"), gh_data.get("headRefOid"), failures)
+    if behind_by is not None:
+        payload["behind_by"] = behind_by
     change_set = _open_pr_change_set(ctx, projects, row, lifecycle, failures)
     if change_set is not None:
         payload["change_set"] = change_set

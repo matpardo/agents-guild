@@ -373,6 +373,7 @@ _COLUMN_MIGRATIONS = (
     ("prs", "mergeable", "TEXT"),
     ("prs", "review_decision", "TEXT"),
     ("prs", "merge_state", "TEXT"),
+    ("prs", "behind_by", "INTEGER"),
     ("prs", "base_branch", "TEXT"),
     ("prs", "unresolved_threads", "INTEGER"),
     ("prs", "review_comment_count", "INTEGER"),
