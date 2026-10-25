@@ -148,3 +148,14 @@ updated: 2026-10-24
 - [x] `adventurer start` without `--task` or `--job` is refused, naming both ways to get a task.
 - [x] A new task id in a synced epic is accepted; an epic never synced is refused.
 - [x] A health-job adventurer tracks a PR without `--task` and is refused with one.
+
+## T14 — Drift flags adventurer tasks missing from the SDD
+
+**Depends on:** T13
+**Status:** [x] done
+
+**What:** `guild drift` and the board report `adventurer task not in SDD` when an adventurer held a task of a synced epic, one of its PRs merged, and the epic has no synced task with that id. It catches a mistyped task id accepted at start.
+
+**Acceptance:**
+- [x] A merged adventurer PR whose task id is missing from the synced epic is a finding, in the default scope, with `--epic` and with `--all`.
+- [x] A task present in the SDD, or a task of an open quest outside any epic, is not a finding.

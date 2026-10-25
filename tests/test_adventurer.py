@@ -341,3 +341,42 @@ class AdventurerHookTests(AdventurerTestCase):
         self.assertNotIn("session not bound", out)
         self.assertIn("adventurer 1", out)
         self.assertIn("fix typo", out)
+
+
+class AdventurerTaskDriftTests(AdventurerTestCase):
+    def ship(self, task, number):
+        self.write_gh_fixture("view_acme-app_{}".format(number), dict(OPEN_VIEW))
+        self.start("adv-1", "x", "--task", task)
+        self.cli(["pr", "track", "acme/app#{}".format(number), "--task", task, "--what", "w", "--waits", "r"], "adv-1")
+
+    def merge(self, number):
+        self.write_gh_fixture(
+            "view_acme-app_{}".format(number), dict(OPEN_VIEW, state="MERGED", mergedAt="2026-01-01T00:00:00Z")
+        )
+        code, out, err = self.cli(["adventurer", "done", "--pending", "none"], "adv-1")
+        self.assertEqual(code, 0, err)
+
+    def drift(self, *extra):
+        code, out, err = self.cli(["drift"] + list(extra), None)
+        self.assertEqual(code, 0, err)
+        return out
+
+    def test_merged_pr_on_a_task_missing_from_the_sdd_is_drift(self):
+        self.ship("demo-epic/T99", 1)
+        self.assertNotIn("adventurer task not in SDD", self.drift())
+        self.merge(1)
+        expected = "adventurer 1: task demo-epic/T99 not in epic demo-epic tasks.md"
+        self.assertIn(expected, self.drift())
+        self.assertIn(expected, self.drift("--epic", "demo-epic"))
+        self.assertIn(expected, self.drift("--all"))
+
+    def test_task_present_in_the_sdd_is_not_drift(self):
+        self.ship("demo-epic/T02", 2)
+        self.merge(2)
+        self.assertNotIn("adventurer task not in SDD", self.drift("--all"))
+
+    def test_open_quest_task_outside_any_epic_is_not_drift(self):
+        self.cli(["quest", "add", "chore", "--open", "--no-epic", "--title", "c", "--tasks", "T01", "--titles", "one"], None)
+        self.ship("chore/T01", 1)
+        self.merge(1)
+        self.assertNotIn("adventurer task not in SDD", self.drift("--all"))
