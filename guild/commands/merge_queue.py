@@ -91,7 +91,6 @@ def _pr_record(conn, row):
         "trace_valid": row["trace_valid"],
         "trace_reason": row["trace_reason"],
         "merge_state": row["merge_state"],
-        "behind_by": row["behind_by"],
         "additions": row["additions"] or 0,
         "deletions": row["deletions"] or 0,
         "created_at": row["created_at"],

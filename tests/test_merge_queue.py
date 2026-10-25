@@ -25,7 +25,6 @@ def _pr(number, **overrides):
         "review_decision": None,
         "unresolved_threads": None,
         "merge_state": None,
-        "behind_by": None,
         "additions": 10,
         "deletions": 0,
         "created_at": "2026-09-01T10:00:00Z",

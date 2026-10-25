@@ -148,21 +148,3 @@ def unresolved_thread_count(cwd, repo, number):
         raise GhCommandError(result.stderr.strip() or "gh api graphql failed")
     nodes = json.loads(result.stdout)["data"]["repository"]["pullRequest"]["reviewThreads"]["nodes"]
     return sum(1 for node in nodes if not node["isResolved"])
-
-
-def behind_by(cwd, repo, base, head_sha):
-    result = _run(
-        [
-            "gh",
-            "api",
-            "repos/{}/compare/{}...{}?per_page=1".format(repo, base, head_sha),
-            "--jq",
-            ".behind_by",
-        ],
-        cwd=str(cwd),
-        capture_output=True,
-        text=True,
-    )
-    if result.returncode != 0:
-        raise GhCommandError(result.stderr.strip() or "gh api compare failed")
-    return int(result.stdout.strip())

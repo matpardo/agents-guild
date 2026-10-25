@@ -8,6 +8,7 @@ from guild import (
     health_jobs,
     identity,
     links,
+    localbase,
     merge_queue,
     party_progress,
     party_status,
@@ -157,12 +158,6 @@ def _card_prefix(pr_row):
     return "{}  ".format(sanitize.strip_control_sequences(pr_row["card"]))
 
 
-def _behind_label(pr_row):
-    if not pr_row["behind_by"]:
-        return None
-    return "{} behind {}".format(pr_row["behind_by"], _optional_text(pr_row["base_branch"]) or "base")
-
-
 def _pr_lines(ctx, painter, pr_row, indent):
     badges = _badges(ctx, pr_row)
     status_plain = "{}  {}".format(" ".join(label for label, _ in badges), _checks_plain(pr_row))
@@ -188,9 +183,6 @@ def _pr_lines(ctx, painter, pr_row, indent):
     if branch is not None:
         branch_lines = painter.wrap("branch: {}".format(branch), indent + "  ")
         head_lines = head_lines + [painter.paint(line, "dim") for line in branch_lines]
-    behind = _behind_label(pr_row)
-    if behind is not None:
-        head_lines = head_lines + [painter.paint(line, "dim") for line in painter.wrap(behind, indent + "  ")]
     waits = _visible_waits(pr_row)
     if waits:
         head_lines = head_lines + painter.wrap("waits: {}".format(waits), indent + "  ")
@@ -735,6 +727,60 @@ def _project_lines(ctx, painter, party_rows, projects_by_name):
     return lines
 
 
+def _fetched_label(ctx, fetched_at):
+    if fetched_at is None:
+        return "never fetched"
+    return "fetched {} ago".format(timeutil.age_label(ctx.now, fetched_at))
+
+
+def _drift_text(entry):
+    if not entry["behind"] and not entry["ahead"]:
+        return "up to date"
+    parts = ["{} behind".format(entry["behind"])]
+    if entry["ahead"]:
+        parts.append("{} ahead".format(entry["ahead"]))
+    return ", ".join(parts)
+
+
+def _drift_line(ctx, entry):
+    if entry["base"] is None:
+        return "{}: {}".format(entry["repo"], entry["error"])
+    if entry["error"] is not None:
+        return "{} {}: {}".format(entry["repo"], entry["base"], entry["error"])
+    return "{} {}: {} ({})".format(
+        entry["repo"], entry["base"], _drift_text(entry), _fetched_label(ctx, entry["fetched_at"])
+    )
+
+
+def _bases_model(ctx, projects):
+    return [
+        {
+            "repo": entry["repo"],
+            "base": entry["base"],
+            "behind": entry["behind"],
+            "ahead": entry["ahead"],
+            "warn": entry["error"] is not None or entry["behind"] > 0,
+            "text": _drift_line(ctx, entry),
+        }
+        for project in projects
+        for entry in localbase.base_drift(project)
+    ]
+
+
+def _bases_projects(projects_by_name, party_rows, party_filter, raid_filter):
+    if party_filter is None and raid_filter is None:
+        return [projects_by_name[name] for name in sorted(projects_by_name)]
+    names = sorted({row["project"] for row in party_rows if row["project"] in projects_by_name})
+    return [projects_by_name[name] for name in names]
+
+
+def _bases_lines(ctx, projects):
+    lines = [model["text"] for model in _bases_model(ctx, projects)]
+    if lines:
+        lines.append("")
+    return lines
+
+
 def _quest_board_lines(ctx, painter, projects_by_name):
     lines = []
     for model in quest_board.models(ctx, projects_by_name):
@@ -945,6 +991,7 @@ def render_board(ctx, party_filter, raid_filter, color, width):
     if party_filter is None and raid_filter is None:
         lines.extend(_adventurer_lines(ctx, painter))
         lines.extend(_health_job_lines(painter, projects_by_name, ctx))
+    lines.extend(_bases_lines(ctx, _bases_projects(projects_by_name, party_rows, party_filter, raid_filter)))
     lines.extend(_project_lines(ctx, painter, party_rows, projects_by_name))
     lines.extend(_quest_board_lines(ctx, painter, projects_by_name))
     for party_row in party_rows:
@@ -981,7 +1028,6 @@ def _pr_model(ctx, pr_row, project_config):
         "review_reasons": merge_queue.review_reasons(
             pr_row["mergeable"], pr_row["review_decision"], pr_row["unresolved_threads"], pr_row["merge_state"]
         ),
-        "behind": _behind_label(pr_row),
         "card": card,
         "card_url": links.card_url(project_config, card),
         "dates": timeutil.dates_label(pr_row["tracked_at"], pr_row["last_activity_at"]),
@@ -1253,6 +1299,7 @@ def board_model(ctx):
         "merge_queues": merge_queue_commands.board_models(ctx.projects_dir, ctx.now, scopes),
         "ready_for_you": merge_queue_commands.ready_for_you(ctx.conn, ctx.projects_dir, scopes),
         "projects": _project_models(ctx, party_rows, projects_by_name),
+        "bases": _bases_model(ctx, [projects_by_name[name] for name in sorted(projects_by_name)]),
         "project_names": sorted(projects_by_name),
         "quest_boards": quest_board.models(ctx, projects_by_name),
         "realm": _realm_model(),

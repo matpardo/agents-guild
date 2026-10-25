@@ -126,8 +126,6 @@ def _entry(pr):
         "checks_pending": pr["checks_pending"],
         "checks_billing": pr["checks_billing"],
         "ci_label": pr["ci_label"],
-        "behind_by": pr["behind_by"],
-        "base_branch": pr["base_branch"],
         "labels": _labels(pr),
         "unseen_comments": pr["unseen_comments"],
     }

@@ -29,14 +29,17 @@ class FileOpenPrCapTestCase(GuildTestCase):
     def setUp(self):
         super().setUp()
         self.repo_dir = self.register_project("acme", ["acme/app", "acme/docs"])
+        remote = self.root / "remotes" / "acme" / "app.git"
+        remote.mkdir(parents=True)
+        subprocess.run(["git", "init", "-q", "--bare", str(remote)], check=True)
         for command in (
             ["git", "init", "-q", "-b", "main"],
             ["git", "config", "user.email", "t@t.com"],
             ["git", "config", "user.name", "t"],
             ["git", "commit", "--allow-empty", "-q", "-m", "init"],
-            ["git", "update-ref", "refs/remotes/origin/main", "HEAD"],
+            ["git", "remote", "add", "origin", str(remote)],
+            ["git", "push", "-q", "origin", "main"],
             ["git", "symbolic-ref", "refs/remotes/origin/HEAD", "refs/remotes/origin/main"],
-            ["git", "remote", "add", "origin", "git@github.com:acme/app.git"],
             ["git", "checkout", "-q", "-b", "feature/mine"],
         ):
             subprocess.run(command, cwd=str(self.repo_dir), check=True)

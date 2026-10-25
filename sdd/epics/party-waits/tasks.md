@@ -51,3 +51,15 @@ updated: 2026-10-25
 - [x] A failed compare call keeps the previous value and is reported; merged and closed PRs make no call.
 - [x] The counter shows only above 0 in the board, the web card and `pr ready-check`, and changes no exit code.
 - [x] An old `pr.synced` event without the field replays in `guild rebuild`.
+
+## T05 — Local base drift per repo
+
+**Depends on:** T04
+**Status:** [x] done
+
+**What:** Replaces T04's per-PR count. `guild sync --source gh` runs `git fetch origin <base>` in every located clone of every project and reports a failed fetch. `guild board` and the web header show, per clone, how many commits the local base branch is behind (and ahead of) `origin/<base>` and when it was last fetched. The `prs.behind_by` column and the PR `N behind <base>` display are removed.
+
+**Acceptance:**
+- [x] A sync fetch moves `origin/<base>` without touching local branches or worktrees; a failed fetch is a sync failure.
+- [x] The board and the web header show behind, ahead, up to date and fetch age per clone; clones without `origin/HEAD` are skipped.
+- [x] A database with `prs.behind_by` loses the column on open, and an old `pr.synced` event carrying `behind_by` replays in `guild rebuild`.

@@ -166,6 +166,7 @@ class BoardEndpointTests(WebServerTestCase):
                 "ready_for_you",
                 "blocked",
                 "projects",
+                "bases",
                 "project_names",
                 "quest_boards",
                 "realm",

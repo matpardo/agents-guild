@@ -339,7 +339,6 @@ class BoardModelShapeTests(BoardModelTestCase):
                 "blocked_external",
                 "base_branch",
                 "review_reasons",
-                "behind",
                 "ask_id",
                 "party",
             },

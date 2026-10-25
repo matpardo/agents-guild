@@ -109,16 +109,6 @@ def _open_pr_unresolved_threads(ctx, row, lifecycle, failures):
         return None
 
 
-def _open_pr_behind_by(ctx, row, lifecycle, base, head_sha, failures):
-    if lifecycle in ("merged", "closed") or not base or not head_sha:
-        return None
-    try:
-        return github.behind_by(ctx.cwd, row["repo"], base, head_sha)
-    except github.GhCommandError as error:
-        failures.append("{}#{}: behind base check failed: {}".format(row["repo"], row["number"], error))
-        return None
-
-
 def _pr_checks_billing(ctx, row, head_sha, failing, failures):
     if failing == 0:
         return None
@@ -215,9 +205,6 @@ def _sync_pr(ctx, projects, row, failures, lifecycle_runner):
     unresolved_threads = _open_pr_unresolved_threads(ctx, row, lifecycle, failures)
     if unresolved_threads is not None:
         payload["unresolved_threads"] = unresolved_threads
-    behind_by = _open_pr_behind_by(ctx, row, lifecycle, gh_data.get("baseRefName"), gh_data.get("headRefOid"), failures)
-    if behind_by is not None:
-        payload["behind_by"] = behind_by
     change_set = _open_pr_change_set(ctx, projects, row, lifecycle, failures)
     if change_set is not None:
         payload["change_set"] = change_set
@@ -405,6 +392,17 @@ def _fast_forward_merged_bases_mutating_git(ctx, projects, merged_repos):
         for clone in localbase.locate_clones(project):
             if clone["repo"] in merged_repos:
                 _fast_forward_clone_mutating_git(ctx, project, clone)
+
+
+def _fetch_bases_mutating_git(projects, failures):
+    for project in projects:
+        for clone in localbase.locate_clones(project):
+            base = localbase.base_branch(clone["path"])
+            if base is None:
+                continue
+            error = localbase.fetch_base_mutating_git(clone["path"], base)
+            if error is not None:
+                failures.append("{}: base fetch failed: {}".format(clone["repo"], error))
 
 
 def _migration_versions(migration_paths, changed_files):
@@ -619,6 +617,7 @@ def _sync_gh(ctx, lifecycle_runner):
         if trigger is not None:
             triggers.append(trigger)
     _fast_forward_merged_bases_mutating_git(ctx, projects, merged_repos)
+    _fetch_bases_mutating_git(projects, failures)
     _check_migration_clashes(ctx, projects, failures)
     _sync_main_status(ctx, projects, failures)
     _close_met_notices(ctx)

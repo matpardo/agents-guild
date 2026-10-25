@@ -356,7 +356,6 @@ _PR_SYNCED_CARRY_FORWARD_FIELDS = (
     "merge_state",
     "base_branch",
     "unresolved_threads",
-    "behind_by",
 )
 
 
@@ -378,7 +377,7 @@ def _pr_synced(conn, event):
     current = conn.execute(
         "SELECT lifecycle, gh_state, gh_draft, branch, title, checks_failing, checks_passing,"
         " checks_pending, mergeable, review_comment_count, review_decision, merge_state, base_branch,"
-        " unresolved_threads, behind_by, head_sha, last_activity_at FROM prs WHERE repo = ? AND number = ?",
+        " unresolved_threads, head_sha, last_activity_at FROM prs WHERE repo = ? AND number = ?",
         (payload["repo"], payload["number"]),
     ).fetchone()
     last_activity_at = event["ts"] if _pr_synced_changed(current, payload) else current["last_activity_at"]
@@ -386,7 +385,7 @@ def _pr_synced(conn, event):
         "UPDATE prs SET lifecycle = ?, gh_state = ?, gh_draft = ?, branch = ?, title = ?,"
         " checks_failing = ?, checks_passing = ?, checks_pending = ?, mergeable = ?, review_comment_count = ?,"
         " review_decision = ?, merge_state = ?, base_branch = ?, unresolved_threads = ?,"
-        " behind_by = ?, head_sha = ?, synced_at = ?, last_activity_at = ?, comments_after_head = ?, ci_label = ?,"
+        " head_sha = ?, synced_at = ?, last_activity_at = ?, comments_after_head = ?, ci_label = ?,"
         " checks_billing = ?, trace_valid = ?, trace_reason = ?, other_author_comments = ?"
         " WHERE repo = ? AND number = ?",
         (
@@ -404,7 +403,6 @@ def _pr_synced(conn, event):
             _pr_synced_field(current, payload, "merge_state"),
             _pr_synced_field(current, payload, "base_branch"),
             _pr_synced_field(current, payload, "unresolved_threads"),
-            _pr_synced_field(current, payload, "behind_by"),
             payload.get("head_sha") or current["head_sha"],
             payload["synced_at"],
             last_activity_at,
