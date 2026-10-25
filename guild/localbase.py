@@ -102,6 +102,20 @@ def _count(clone_path, revision_range):
     return int(out)
 
 
+def repo_clones(projects):
+    clones = {}
+    for project in projects:
+        for clone in locate_clones(project):
+            if clone["repo"] in clones:
+                continue
+            clones[clone["repo"]] = {"path": clone["path"], "base": base_branch(clone["path"])}
+    return clones
+
+
+def branch_behind(clone_path, branch, base):
+    return _count(clone_path, "{}/{}..{}/{}".format(_ORIGIN, branch, _ORIGIN, base))
+
+
 def _commits_behind(clone_path, base):
     return _count(clone_path, "{}..{}/{}".format(base, _ORIGIN, base))
 

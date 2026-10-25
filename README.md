@@ -102,7 +102,7 @@ re-runs `guild wire-settings`, which only adds what is missing and drops retired
 `~/.claude/GUILD.md` exists and that every project config loads; it exits 1
 and names what is missing. It also checks that the guild state commands are in
 `permissions.allow` (see "Hooks"); a missing allow rule is a `warn` line and
-never changes the exit code. It also warns for a session that leads more than one active party (`session leads 2 active parties: a, b`). On Linux with `systemctl` it also warns for each of the five systemd timers (see "`guild sync-timer`") that is missing or drifted from its unit template, with `run timers.sh`; an interval you chose is not drift. It also warns about a leftover `guild-dispatch.timer` or `guild-dispatch.service` unit file (`install.sh` removes both) and about a project config that still has a `dispatcher` key (ignored, safe to delete). With a global `handoff_margin` (see "Global config") and a recorded compaction it prints `ok      handoff at 76% (compaction 85% − 10%)`, plus a `warn` when that handoff sits less than 5 points above the starting percentage of the latest session (the handoff would fire on a fresh session, so sessions hand off at that start + 5 instead); without a margin it warns when a project's `handoff_threshold` is at or above the last compaction (recorded by the `PreCompact` hook), since that threshold never fires. An invalid `guild.json` fails the check.
+never changes the exit code. It also warns for a session that leads more than one active party (`session leads 2 active parties: a, b`). On Linux with `systemctl` it also warns for each of the six systemd timers (see "`guild sync-timer`") that is missing or drifted from its unit template, with `run timers.sh`; an interval you chose is not drift. It also warns about a leftover `guild-dispatch.timer` or `guild-dispatch.service` unit file (`install.sh` removes both) and about a project config that still has a `dispatcher` key (ignored, safe to delete). With a global `handoff_margin` (see "Global config") and a recorded compaction it prints `ok      handoff at 76% (compaction 85% − 10%)`, plus a `warn` when that handoff sits less than 5 points above the starting percentage of the latest session (the handoff would fire on a fresh session, so sessions hand off at that start + 5 instead); without a margin it warns when a project's `handoff_threshold` is at or above the last compaction (recorded by the `PreCompact` hook), since that threshold never fires. An invalid `guild.json` fails the check.
 
 `guild doctor --scan-prs` additionally lists the open PRs of every project's
 `github.repos` through `gh` and scans title, body, comments and commit
@@ -223,10 +223,11 @@ guild resources collect                                # measure and record a re
 guild resources-timer install --every <dur> | uninstall | print
 guild board [--party <name> | --raid <name>]
 guild web [--port <n>]   # local board in a browser: board, in-progress and achievements pages
-guild sync --source gh|sdd|tracker [--all-projects]   # --all-projects: every project config, for timers (sdd and tracker)
+guild sync --source gh|sdd|tracker|bases [--all-projects]   # --all-projects: every project config, for timers (sdd and tracker)
 guild sync-timer install --every <dur> | uninstall | print
 guild sync-sdd-timer install --every <dur> | uninstall | print
 guild sync-tracker-timer install --every <dur> | uninstall | print
+guild sync-bases-timer install --every <dur> | uninstall | print   # e.g. --every 1m
 guild lifecycle run on_pr_merged|on_pr_closed [--repo <owner/repo>] [--dry-run]   # run a project's lifecycle command by hand
 guild drift [--epic <slug> | --all]
 guild revive [--party <name> ...] [--all] [--list]   # relaunch active or handed-off parties
@@ -519,14 +520,27 @@ a clone. `guild doctor` and `guild brief` warn when a located local base is
 behind its `origin/<base>` ref regardless of the flag (they never fetch, so
 the comparison uses the last fetched state).
 
-Base drift: every `sync --source gh` run also runs `git fetch origin <base>` in
-each located clone of every project, regardless of `fast_forward_base`. It only
-updates `origin/<base>`; local branches and worktrees are never touched. A failed
-fetch is a sync failure (`<repo>: base fetch failed: <error>`). `guild board` and
-the web header read the result live with `git rev-list`: one line per clone,
+Base drift: `guild sync --source bases` runs `git fetch origin <base>` in
+each located clone of every project, regardless of `fast_forward_base`; it makes
+no GitHub call and touches no tracker or SDD data, so a fast timer
+(`guild sync-bases-timer install --every 1m`) keeps it fresh. `sync --source gh`
+does not fetch bases. The fetch only updates `origin/<base>`; local branches and
+worktrees are never touched. A failed fetch is a sync failure
+(`<repo>: base fetch failed: <error>`). `guild board` and the web header read the
+result live with `git rev-list`: one line per clone,
 `<repo> <base>: N behind` (`, M ahead` when above 0) or `<repo> <base>: up to
 date`, followed by `(fetched Xm ago)` or `(never fetched)` from the mtime of the
 clone's `FETCH_HEAD`. A clone without `origin/HEAD` shows `<repo>: no origin/HEAD (git remote set-head origin --auto)` and one whose comparison fails shows `<repo> <base>: cannot compare`, both as warnings. A `paths` entry that is not itself a clone also yields its direct child directories that are clones. Nothing is stored.
+
+Per-PR drift: for each open tracked PR with a `branch` and a located clone, the
+board counts `git rev-list --count origin/<branch>..origin/<base>` in that clone
+(`<base>` is the PR's base branch, else the clone's) and shows a dim
+`N behind <base>` line under the PR, and a pill on the web PR card
+(`behind` in the board model), only when N is above 0. It is read from local refs
+at read time and stored nowhere, so it is as fresh as the last local push of the
+branch and the last bases fetch; a branch pushed from another machine, or missing
+locally, shows nothing. It is informational: not a review reason, and it changes
+no order, wait or exit code.
 
 `guild` has no daemon, so this only fires when someone runs the sync. Someone
 in the raid should keep a watcher running for the duration of the raid, e.g.
@@ -885,8 +899,8 @@ available; use `print` there. Nothing is pushed to running sessions: the timer
 only refreshes the synced state that sessions read.
 
 `guild resources-timer` takes the same
-`install --every <dur> | uninstall | print` (see "`guild resources`"). `guild sync-sdd-timer` and `guild sync-tracker-timer` do too and manage their own units
-(`guild-sync-sdd.*`, `guild-sync-tracker.*`), so `guild drift` and `guild next`
+`install --every <dur> | uninstall | print` (see "`guild resources`"). `guild sync-sdd-timer`, `guild sync-tracker-timer` and `guild sync-bases-timer` do too and manage their own units
+(`guild-sync-sdd.*`, `guild-sync-tracker.*`, `guild-sync-bases.*`), so `guild drift` and `guild next`
 do not go stale between manual runs. They run `guild sync --source sdd|tracker
 --all-projects`: a timer has no working directory inside a project, so the sync
 visits every project config that has an `sdd` (or `tracker`) block and skips the
@@ -894,7 +908,7 @@ rest without a failure. A project whose sync fails (unreadable SDD root, `acli`
 missing or not logged in) is reported as `<project>: <reason>` and the run exits
 non-zero; the previous tracker snapshot is kept.
 
-`./timers.sh`, run from the guild clone, installs or refreshes the five timers in one go (`sync-timer`, `sync-sdd-timer`, `sync-tracker-timer` every 10m, `resources-timer` every 2h, `compact-timer` every 1d) and keeps the interval of any timer already installed. `install.sh` and `update.sh` never run it: `guild doctor`, which `update.sh` ends with, tells you when it is due.
+`./timers.sh`, run from the guild clone, installs or refreshes the six timers in one go (`sync-timer`, `sync-sdd-timer`, `sync-tracker-timer` every 10m, `sync-bases-timer` every 1m, `resources-timer` every 2h, `compact-timer` every 1d) and keeps the interval of any timer already installed. `install.sh` and `update.sh` never run it: `guild doctor`, which `update.sh` ends with, tells you when it is due.
 
 ### `guild merge-queue`
 

@@ -41,6 +41,7 @@ class TimersScriptTests(unittest.TestCase):
                 "sync-timer install --every 10m",
                 "sync-sdd-timer install --every 10m",
                 "sync-tracker-timer install --every 10m",
+                "sync-bases-timer install --every 1m",
                 "resources-timer install --every 2h",
                 "compact-timer install --every 1d",
             ],

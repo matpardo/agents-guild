@@ -37,6 +37,12 @@ class SourceSyncUnitTests(unittest.TestCase):
         self.assertIn("ExecStart=/opt/bin/guild sync --source tracker --all-projects\n", service)
         self.assertIn("Unit=guild-sync-tracker.service", timer)
 
+    def test_bases_service_fetches_every_clone(self):
+        service, timer = timer_commands.render_units(timer_commands.SYNC_BASES, "/opt/bin/guild", "1m")
+        self.assertIn("ExecStart=/opt/bin/guild sync --source bases\n", service)
+        self.assertIn("Unit=guild-sync-bases.service", timer)
+        self.assertIn("OnUnitActiveSec=60s", timer)
+
     def test_install_and_uninstall_touch_only_their_own_units(self):
         with tempfile.TemporaryDirectory() as directory:
             unit_dir = Path(directory)
@@ -72,6 +78,12 @@ class SourceSyncTimerCliTests(GuildTestCase):
             code, out, err = self.run_cli(["sync-tracker-timer", "print", "--every", "10m"], None, None)
         self.assertEqual(code, 0, err)
         self.assertIn("ExecStart=/opt/bin/guild sync --source tracker --all-projects", out)
+
+    def test_print_renders_the_bases_exec_start(self):
+        with mock.patch("shutil.which", return_value="/opt/bin/guild"):
+            code, out, err = self.run_cli(["sync-bases-timer", "print", "--every", "1m"], None, None)
+        self.assertEqual(code, 0, err)
+        self.assertIn("ExecStart=/opt/bin/guild sync --source bases\n", out)
 
     def test_install_goes_through_the_runner(self):
         runner = _RecordingRunner()

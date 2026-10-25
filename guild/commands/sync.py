@@ -394,8 +394,9 @@ def _fast_forward_merged_bases_mutating_git(ctx, projects, merged_repos):
                 _fast_forward_clone_mutating_git(ctx, project, clone)
 
 
-def _fetch_bases_mutating_git(projects, failures):
-    for project in projects:
+def _sync_bases_mutating_git(ctx):
+    failures = []
+    for project in config.load_all_projects(ctx.projects_dir):
         for clone in localbase.locate_clones(project):
             base = localbase.base_branch(clone["path"])
             if base is None:
@@ -403,6 +404,7 @@ def _fetch_bases_mutating_git(projects, failures):
             error = localbase.fetch_base_mutating_git(clone["path"], base)
             if error is not None:
                 failures.append("{}: base fetch failed: {}".format(clone["repo"], error))
+    return failures
 
 
 def _migration_versions(migration_paths, changed_files):
@@ -617,7 +619,6 @@ def _sync_gh(ctx, lifecycle_runner):
         if trigger is not None:
             triggers.append(trigger)
     _fast_forward_merged_bases_mutating_git(ctx, projects, merged_repos)
-    _fetch_bases_mutating_git(projects, failures)
     _check_migration_clashes(ctx, projects, failures)
     _sync_main_status(ctx, projects, failures)
     _close_met_notices(ctx)
@@ -848,6 +849,10 @@ def _sync_all_projects(ctx, source):
 
 
 def run(ctx, source, all_projects, lifecycle_runner):
+    if source == "bases":
+        if all_projects:
+            raise GuildError("--all-projects applies to sdd and tracker sources only", 1)
+        return _sync_bases_mutating_git(ctx)
     if source == "gh":
         if all_projects:
             raise GuildError("--all-projects applies to sdd and tracker sources only", 1)

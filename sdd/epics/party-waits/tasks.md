@@ -63,3 +63,15 @@ updated: 2026-10-25
 - [x] A sync fetch moves `origin/<base>` without touching local branches or worktrees; a failed fetch is a sync failure.
 - [x] The board and the web header show behind, ahead, up to date and fetch age per clone; clones without `origin/HEAD` are skipped.
 - [x] A database with `prs.behind_by` loses the column on open, and an old `pr.synced` event carrying `behind_by` replays in `guild rebuild`.
+
+## T06 — Bases sync source and per-PR drift from local refs
+
+**Depends on:** T05
+**Status:** [x] done
+
+**What:** `guild sync --source bases` (with `guild sync-bases-timer`) runs the per-clone `git fetch origin <base>` and nothing else; `sync --source gh` no longer fetches bases. The board PR line and the web PR card show `N behind <base>` computed at read time from local refs (`origin/<branch>` against `origin/<base>` in the located clone), only above 0; a missing ref shows nothing. Display only: it changes no reason, order or wait.
+
+**Acceptance:**
+- [x] `sync --source bases` fetches every clone, makes no GitHub call, and reports a failed fetch as a failure with a non-zero exit; `sync --source gh` leaves `origin/<base>` unchanged.
+- [x] `sync-bases-timer print --every 1m` renders units that run `guild sync --source bases`, and `timers.sh` and `guild doctor` cover them.
+- [x] The board text, the board model `behind` field and the web pill show the count only above 0; no stored data is added.
