@@ -31,13 +31,13 @@ def _require_free_session(conn, session_id):
         )
 
 
-def _require_task(conn, project, epic, tid):
-    row = conn.execute(
-        "SELECT tid FROM tasks WHERE project = ? AND epic = ? AND tid = ?", (project, epic, tid)
-    ).fetchone()
+def _require_synced_epic(conn, project, epic):
+    row = conn.execute("SELECT 1 FROM epics WHERE project = ? AND epic = ?", (project, epic)).fetchone()
     if row is None:
         raise GuildError(
-            "task '{}/{}' not found: run `guild sync --source sdd`".format(epic, tid), 1
+            "epic '{}' was never synced: run `guild sync --source sdd`, or `guild quest add <slug> --open"
+            " --no-epic --title \"...\" --tasks T01 --titles \"...\"` and start with --task <slug>/T01".format(epic),
+            1,
         )
 
 
@@ -56,7 +56,7 @@ def _validate_task(ctx, project, task):
         return
     epic, tid = refs.parse_task_ref(task)
     if not _is_open_free_quest_task(ctx.conn, project, epic, tid):
-        _require_task(ctx.conn, project, epic, tid)
+        _require_synced_epic(ctx.conn, project, epic)
     quest_commands.reject_taken_tasks(ctx.conn, ctx.now, project, epic, [{"tid": tid}], "", True)
 
 
@@ -70,6 +70,13 @@ def _resolve_start_job(job, task, health_job):
     if health_job is None:
         if job is None:
             raise GuildError("adventurer start requires a job text or --job <name>", 1)
+        if task is None:
+            raise GuildError(
+                "adventurer start requires --task <epic>/<tid> (an SDD task, or a new one the PR adds to a synced"
+                " epic); without SDD run `guild quest add <slug> --open --no-epic --title \"...\" --tasks T01"
+                " --titles \"...\"` and pass --task <slug>/T01",
+                1,
+            )
         return job
     if job is not None or task is not None:
         raise GuildError("--job cannot be combined with a job text or --task", 1)

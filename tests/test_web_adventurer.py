@@ -6,7 +6,13 @@ from tests.test_web_write import WebWriteTestCase
 class WebAdventurerDismissTests(WebWriteTestCase):
     def setUp(self):
         super().setUp()
-        self.run_cli(["adventurer", "start", "fix typo", "--reason", "test reason"], "adv-1", self.repo_dir)
+        self.run_cli(
+            ["quest", "add", "chore", "--open", "--no-epic", "--title", "chore", "--tasks", "T01", "--titles", "one"],
+            None, self.repo_dir,
+        )
+        self.run_cli(
+            ["adventurer", "start", "fix typo", "--task", "chore/T01", "--reason", "test reason"], "adv-1", self.repo_dir
+        )
 
     def _adventurers(self):
         response, body = self._get("/api/board", self._host())

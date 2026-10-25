@@ -39,7 +39,7 @@ def _adventurer_work(adventurer, task_ref, card):
         raise GuildError("an adventurer on a task tracks PRs with --task equal to its own task", 1)
     if task_ref is None:
         return
-    raise GuildError("an adventurer with a free job tracks PRs without --task (--card optional)", 1)
+    raise GuildError("a health-job adventurer tracks PRs without --task (--card optional)", 1)
 
 
 def _tracking_fields(ctx, task_ref, card):

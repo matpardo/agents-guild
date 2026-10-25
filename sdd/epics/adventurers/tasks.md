@@ -136,3 +136,15 @@ updated: 2026-10-24
 **Acceptance:**
 - [x] A free-job adventurer tracks a PR with neither `--task` nor `--card`, and `adventurer done` reports it.
 - [x] A free-job adventurer passing `--task` is refused.
+
+## T13 — Adventurers always hold a task
+
+**Depends on:** T12
+**Status:** [x] done
+
+**What:** `adventurer start` requires `--task` unless it starts a health job. The task is a synced SDD task, a new task the PR adds to an epic already synced, or a task of a no-epic open quest when the project has no SDD. Only health-job adventurers track PRs without `--task`.
+
+**Acceptance:**
+- [x] `adventurer start` without `--task` or `--job` is refused, naming both ways to get a task.
+- [x] A new task id in a synced epic is accepted; an epic never synced is refused.
+- [x] A health-job adventurer tracks a PR without `--task` and is refused with one.

@@ -142,8 +142,8 @@ guild task block <quest>/<tid> --reason "..."
 guild task done  <quest>/<tid> [--summary "..."]   # epic quests: also mark it done in the epic's tasks.md
 guild task move  <quest>/<tid>[,<tid>...] --to <quest>   # queued or blocked tasks, same epic, to another party's quest
 
-guild pr track <owner/repo>#<n> (--task <quest>/<tid> [--card <KEY>] | [--card <KEY>]) --what "..." --waits "..." [--needs-human-pr-review]
-                               # a party needs --task; an adventurer on a task needs --task equal to its own, on a free job no --task, --card optional
+guild pr track <owner/repo>#<n> --task <quest>/<tid> [--card <KEY>] --what "..." --waits "..." [--needs-human-pr-review]
+                               # a party needs --task; an adventurer needs --task equal to its own; a health-job adventurer passes no --task, --card optional
                                [--fixes-main] [--fixes-flaky]
 guild pr set   <owner/repo>#<n> [--lifecycle draft|converging|ready] [--waits "..."]
                                [--needs-ask-answer | --no-needs-ask-answer]   # manual override; an open ask on the PR also counts
@@ -179,7 +179,7 @@ guild idea link <id> [--party <name>]     # a session links its own party; the h
 guild idea unlink <id> [--party <name>]   # refused once the party tracks a PR
 guild ideas [<id> | --project <name>]   # sorted by deadline, no deadline last; overdue marked; <id> shows one in full
 
-guild adventurer start "<job>" --reason "<why>" [--task <epic>/<tid>]   # this session becomes an adventurer; no permission prompt
+guild adventurer start "<job>" --task <epic>/<tid> --reason "<why>"   # this session becomes an adventurer; no permission prompt; --task required
 guild adventurer start --job <name> --reason "<why>"    # the same for a health job of the project config; no job text, no --task
 guild adventurer promote <party> --reason "<why>"       # the active adventurer becomes the leader of a new party; its PRs move to it
 guild adventurer launch <name>                          # human terminal only: tmux window running a health job in the project's first path
@@ -1301,7 +1301,7 @@ adventurer tracked (`<repo>#<n> | what | state`, refreshed from GitHub first)
 and the pending text.
 
 An adventurer can track its PRs (`guild pr track ... --task` equal to its own
-`<epic>/<tid>` when it holds a task, no `--task` for a free job, with `--card <KEY>` optional; the PR records the adventurer and an empty
+`<epic>/<tid>`, `--card <KEY>` optional; a health-job adventurer passes no `--task`; the PR records the adventurer and an empty
 party), post notices, add ideas and open asks (labelled `adventurer <id>`), and
 the Stop hook records `session.stopped` for it like for a leader. Any command
 that needs a party (quests, tasks, handoff, claims, `next`) refuses with
@@ -1949,8 +1949,11 @@ and claim.
   and only while every task is queued with no open PR and no claim.
 - `guild next` answers `take open quest <slug>` (oldest first) to a party with
   no queued task.
-- An adventurer may start on a task of an open quest: `adventurer start --task
-  <epic>/<tid>` (or `<quest>/<tid>` for a no-epic open quest).
+- An adventurer always starts on a task (`adventurer start --task`, required
+  except for health jobs): a synced SDD task `<epic>/<tid>`, a new task the PR
+  adds to an epic already synced, or `<quest>/<tid>` of a no-epic open quest
+  (`guild quest add <slug> --open --no-epic --tasks T01 --titles "..."` when the
+  project has no SDD).
 
 `guild board` prints a `QUEST BOARD` block per such project: each open quest with
 its task count and dates and the number of free tasks per epic.
@@ -1995,7 +1998,7 @@ message, a wrong type `400`.
 Actor resolution: `CLAUDE_CODE_SESSION_ID` (or, for hooks, the `session_id`
 field on stdin) → `leaders` table → party. An unbound session cannot write;
 it gets refused with a hint to run `guild party start <name> --reason "<why>"`,
-`guild adventurer start "<job>" --reason "<why>"` or `guild party resume <party>`.
+`guild adventurer start "<job>" --task <epic>/<tid> --reason "<why>"` or `guild party resume <party>`.
 Reads always work.
 
 No session id at all (a plain terminal) resolves to the actor `human`,
