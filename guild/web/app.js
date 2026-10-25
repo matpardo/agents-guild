@@ -133,7 +133,7 @@ realmDoctorLines: [],
 
   var TOOLTIPS = deepFreeze({
     partyStatus: {
-      "waiting-permission": "The leader session is blocked on a Claude Code permission prompt; approve or deny it in that session.",
+      "waiting-permission": "The leader session is blocked on a Claude Code permission prompt or dialog; respond to it in that session.",
       "waiting-ask": "The party has an open ask and its leader is not working; answer the ask below.",
       "waiting-input": "The leader session is idle and waiting for you to type something in it.",
       "waiting-background": "The leader is waiting on its own background work (a PR wait or subagents); nothing for you to do.",
@@ -226,7 +226,7 @@ realmDoctorLines: [],
       "limit-reset": "The leader hit its usage limit; resume it by hand once the limit resets.",
     },
     blockedWait: {
-      permission: "The session is blocked on a Claude Code permission prompt; approve or deny it in that session.",
+      permission: "The session is blocked on a Claude Code permission prompt or dialog; respond to it in that session.",
     },
     drift: {
       "merged PR, task not done": "A PR was merged but its task is not marked done.",

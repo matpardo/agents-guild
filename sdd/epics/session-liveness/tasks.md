@@ -70,3 +70,10 @@ updated: 2026-10-04
 **Status:** [x] done
 
 **What:** a leader that is idle or stopped while its own `guild pr wait` or subagents run shows `waiting-background`, not `waiting-input`; markers are ephemeral files fed by `pr wait` and the `SubagentStart`/`SubagentStop` hooks.
+
+## T09 — Background status cannot hide a stopped subagent or a dialog
+
+**Depends on:** T08
+**Status:** [x] done
+
+**What:** a subagent marker is dropped once Claude Code's own subagent meta file says it finished, and an elicitation dialog maps to `waiting-permission` so background work cannot hide it.

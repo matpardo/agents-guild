@@ -204,6 +204,11 @@ class PartyStatusTests(GuildTestCase):
         self._background(background.pr_key(os.getpid()), "pr acme/app#7")
         self.assertEqual(self._derive()["status"], "waiting-permission")
 
+    def test_elicitation_beats_background(self):
+        self._waiting("elicitation", "pick")
+        self._background(background.subagent_key("a1"), "a1")
+        self.assertEqual(self._derive()["status"], "waiting-permission")
+
     def test_working_ignores_background(self):
         self._session("session.working", {})
         self._background(background.pr_key(os.getpid()), "pr acme/app#7")
