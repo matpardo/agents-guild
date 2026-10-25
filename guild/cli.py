@@ -1098,7 +1098,7 @@ def _add_pr_parser(subparsers):
     parser = subparsers.add_parser("pr", help="track PRs and set their state")
     actions = parser.add_subparsers(dest="pr_action", required=True, metavar="<subcommand>")
 
-    track = actions.add_parser("track", help="start tracking a PR against a task (party) or a card (adventurer)")
+    track = actions.add_parser("track", help="start tracking a PR against a task (party) or a card (adventurer, optional)")
     track.add_argument("ref")
     track.add_argument("--task", help="task as <quest>/<tid>")
     track.add_argument("--card", help="tracker card key")

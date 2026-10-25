@@ -218,14 +218,23 @@ class AdventurerPermissionTests(AdventurerTestCase):
         self.assertIn("acme/app#2 | fixes typo | open", out)
         self.assertIn("(PR state as of last sync)", out)
 
-    def test_pr_track_on_a_free_job_needs_a_card(self):
+    def test_pr_track_on_a_free_job_refuses_a_task(self):
         self.cli(["adventurer", "done", "--pending", "none"], "adv-1")
         self.start("adv-2", "free job")
         code, out, err = self.cli(["pr", "track", "acme/app#1", "--task", "demo-epic/T02", "--what", "w", "--waits", "r"], "adv-2")
         self.assertEqual(code, 1)
-        self.assertIn("--card alone", err)
+        self.assertIn("without --task", err)
         code, out, err = self.cli(["pr", "track", "acme/app#1", "--card", "ABC-1", "--what", "w", "--waits", "r"], "adv-2")
         self.assertEqual(code, 0, err)
+
+    def test_pr_track_on_a_free_job_needs_no_card(self):
+        self.cli(["adventurer", "done", "--pending", "none"], "adv-1")
+        self.start("adv-2", "free job")
+        code, out, err = self.cli(["pr", "track", "acme/app#1", "--what", "fixes typo", "--waits", "r"], "adv-2")
+        self.assertEqual(code, 0, err)
+        code, out, err = self.cli(["adventurer", "done", "--pending", "none"], "adv-2")
+        self.assertEqual(code, 0, err)
+        self.assertIn("acme/app#1 | fixes typo", out)
 
     def test_adventurer_prs_do_not_break_party_views(self):
         self.cli(["pr", "track", "acme/app#2", "--task", "demo-epic/T02", "--what", "w", "--waits", "r"], "adv-1")

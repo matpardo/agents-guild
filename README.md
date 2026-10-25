@@ -142,8 +142,8 @@ guild task block <quest>/<tid> --reason "..."
 guild task done  <quest>/<tid> [--summary "..."]   # epic quests: also mark it done in the epic's tasks.md
 guild task move  <quest>/<tid>[,<tid>...] --to <quest>   # queued or blocked tasks, same epic, to another party's quest
 
-guild pr track <owner/repo>#<n> (--task <quest>/<tid> [--card <KEY>] | --card <KEY>) --what "..." --waits "..." [--needs-human-pr-review]
-                               # a party needs --task; an adventurer on a task needs --task equal to its own, on a free job --card alone
+guild pr track <owner/repo>#<n> (--task <quest>/<tid> [--card <KEY>] | [--card <KEY>]) --what "..." --waits "..." [--needs-human-pr-review]
+                               # a party needs --task; an adventurer on a task needs --task equal to its own, on a free job no --task, --card optional
                                [--fixes-main] [--fixes-flaky]
 guild pr set   <owner/repo>#<n> [--lifecycle draft|converging|ready] [--waits "..."]
                                [--needs-ask-answer | --no-needs-ask-answer]   # manual override; an open ask on the PR also counts
@@ -1301,7 +1301,7 @@ adventurer tracked (`<repo>#<n> | what | state`, refreshed from GitHub first)
 and the pending text.
 
 An adventurer can track its PRs (`guild pr track ... --task` equal to its own
-`<epic>/<tid>` when it holds a task, `--card <KEY>` alone for a free job; the PR records the adventurer and an empty
+`<epic>/<tid>` when it holds a task, no `--task` for a free job, with `--card <KEY>` optional; the PR records the adventurer and an empty
 party), post notices, add ideas and open asks (labelled `adventurer <id>`), and
 the Stop hook records `session.stopped` for it like for a leader. Any command
 that needs a party (quests, tasks, handoff, claims, `next`) refuses with
