@@ -1,4 +1,3 @@
-import http.client
 import json
 import re
 
@@ -157,7 +156,7 @@ class RejectionTests(WebWriteTestCase):
             conn.putheader(name, value)
         conn.endheaders()
         response = conn.getresponse()
-        payload = response.read()
+        response.read()
         conn.close()
         self.assertEqual(response.status, 411)
 

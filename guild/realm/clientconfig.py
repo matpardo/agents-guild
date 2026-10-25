@@ -47,7 +47,7 @@ def load():
     try:
         config = json.loads(path.read_text(encoding="utf-8"))
     except ValueError:
-        raise GuildError("realm config is not valid JSON: {}".format(path), 1)
+        raise GuildError("realm config is not valid JSON: {}".format(path), 1) from None
     found = problems(config)
     if found:
         raise GuildError("realm config is malformed: {}".format(found[0]), 1)

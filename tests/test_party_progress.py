@@ -1,4 +1,4 @@
-from guild import db, paths, party_progress
+from guild import db, party_progress, paths
 from tests.testutil import GuildTestCase
 
 _OPEN_VIEW = {"state": "OPEN", "isDraft": False, "headRefName": "feature/x", "title": "t"}

@@ -75,7 +75,7 @@ def track(ctx, ref, task_ref, card, what, waits, needs_human_pr_review, fixes_ma
     try:
         gh_data = github.pr_view(ctx.cwd, repo, number, ["state", "isDraft", "headRefName", "title"])
     except github.GhCommandError as error:
-        raise GuildError("gh pr view failed for '{}#{}': {}".format(repo, number, error), 1)
+        raise GuildError("gh pr view failed for '{}#{}': {}".format(repo, number, error), 1) from error
     with db.writing(ctx.conn):
         events.record(
             ctx.conn,

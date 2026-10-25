@@ -2,19 +2,35 @@ import json
 import shlex
 import textwrap
 
-from guild import config, ctx_pressure, health_jobs, identity, links, merge_queue, party_progress, party_status, party_waits, pii, pr_asks, resume
-from guild import paths, sanitize, session_info, session_status, timeutil
+from guild import (
+    config,
+    ctx_pressure,
+    health_jobs,
+    identity,
+    links,
+    merge_queue,
+    party_progress,
+    party_status,
+    party_waits,
+    paths,
+    pii,
+    pr_asks,
+    resume,
+    sanitize,
+    session_info,
+    session_status,
+    timeutil,
+)
 from guild.commands import brief as brief_commands
 from guild.commands import claim as claim_commands
 from guild.commands import drift as drift_commands
 from guild.commands import idea as idea_commands
-from guild.commands import quest as quest_commands
-from guild.commands import quest_board
 from guild.commands import memory as memory_commands
 from guild.commands import merge_queue as merge_queue_commands
 from guild.commands import next as next_commands
 from guild.commands import notice as notice_commands
-from guild.commands import project_status
+from guild.commands import project_status, quest_board
+from guild.commands import quest as quest_commands
 from guild.commands import raid as raid_commands
 from guild.commands import realm as realm_commands
 from guild.errors import GuildError

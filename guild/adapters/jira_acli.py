@@ -38,13 +38,13 @@ def _search(jql):
             text=True,
         )
     except OSError as error:
-        raise JiraAcliError("acli could not run: {}".format(error))
+        raise JiraAcliError("acli could not run: {}".format(error)) from error
     if result.returncode != 0:
         raise JiraAcliError(result.stderr.strip() or "acli jira workitem search failed")
     try:
         items = json.loads(result.stdout)
     except json.JSONDecodeError as error:
-        raise JiraAcliError("unparseable acli output: {}".format(error))
+        raise JiraAcliError("unparseable acli output: {}".format(error)) from error
     return [_parse_item(item) for item in items]
 
 

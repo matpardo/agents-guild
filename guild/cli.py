@@ -1631,7 +1631,7 @@ def _current_dir():
     except FileNotFoundError:
         shell_pwd = os.environ.get("PWD")
         if not shell_pwd:
-            raise GuildError("the current directory was deleted and PWD is not set", 1)
+            raise GuildError("the current directory was deleted and PWD is not set", 1) from None
         return _nearest_existing_dir(Path(shell_pwd))
 
 

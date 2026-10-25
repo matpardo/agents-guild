@@ -5,7 +5,6 @@ from pathlib import Path
 from unittest import mock
 
 from guild import paths
-from guild.commands import board as board_commands
 from guild.errors import GuildError
 from tests import node_harness
 from tests.test_web_write import WebWriteTestCase

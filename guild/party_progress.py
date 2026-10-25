@@ -35,7 +35,7 @@ def remaining(conn, party_name):
     return {
         "quests": [
             {"slug": slug, "done": count["done"], "total": count["total"]}
-            for slug, count in zip(slugs, counts)
+            for slug, count in zip(slugs, counts, strict=True)
         ],
         "active": active,
         "blocked": blocked,

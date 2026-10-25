@@ -255,7 +255,7 @@ def _validate_health_jobs_config(data):
         try:
             _validate_health_job(job)
         except GuildError as error:
-            raise GuildError("project config 'health_jobs': {}".format(error.message), 1)
+            raise GuildError("project config 'health_jobs': {}".format(error.message), 1) from error
     job_names = [job["name"] for job in jobs]
     if len(set(job_names)) != len(job_names):
         raise GuildError("project config 'health_jobs' names must be unique", 1)
@@ -316,7 +316,7 @@ def load_global(config_file):
     try:
         data = json.loads(config_file.read_text())
     except (OSError, json.JSONDecodeError) as error:
-        raise GuildError("invalid global config '{}': {}".format(config_file, error), 1)
+        raise GuildError("invalid global config '{}': {}".format(config_file, error), 1) from error
     if not isinstance(data, dict):
         raise GuildError("invalid global config '{}': must be a JSON object".format(config_file), 1)
     margin = data.get("handoff_margin")
@@ -332,11 +332,11 @@ def load_project_file(config_file):
     try:
         raw = config_file.read_text()
     except OSError as error:
-        raise GuildError("cannot read config file '{}': {}".format(config_file, error), 1)
+        raise GuildError("cannot read config file '{}': {}".format(config_file, error), 1) from error
     try:
         data = json.loads(raw)
     except json.JSONDecodeError as error:
-        raise GuildError("invalid JSON in '{}': {}".format(config_file, error), 1)
+        raise GuildError("invalid JSON in '{}': {}".format(config_file, error), 1) from error
     validate_project_config(data)
     return data
 

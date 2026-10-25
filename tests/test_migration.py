@@ -1,7 +1,7 @@
 import sqlite3
 import unittest
 
-from guild import db, events, paths, schema, timeutil
+from guild import db, events, paths, timeutil
 from tests.testutil import GuildTestCase
 
 _OLD_LEADERS = """

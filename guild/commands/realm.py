@@ -211,7 +211,7 @@ def cached_status_model():
         realm = cached["realm"]
         guilds = _valid_entries(cached["guilds"])
     except (ValueError, KeyError, TypeError):
-        raise GuildError("realm cache is malformed: {}".format(path), 1)
+        raise GuildError("realm cache is malformed: {}".format(path), 1) from None
     if not _is_valid_name(realm):
         raise GuildError("realm cache is malformed: {}".format(path), 1)
     return {"fetched_at": fetched_at, "realm": realm, "guilds": guilds, "dropped": 0}
@@ -303,7 +303,7 @@ def _read_local_markdown(file_path):
     try:
         return path.name, data.decode("utf-8")
     except UnicodeDecodeError:
-        raise GuildError("file is not valid UTF-8: {}".format(file_path), 1)
+        raise GuildError("file is not valid UTF-8: {}".format(file_path), 1) from None
 
 
 def send(target_guild, file_path, claudecode):
@@ -366,7 +366,7 @@ def _checked_file(payload):
     try:
         data = content.encode("utf-8")
     except UnicodeEncodeError:
-        raise GuildError("realm file is not valid UTF-8", 1)
+        raise GuildError("realm file is not valid UTF-8", 1) from None
     if payload.get("size") != len(data) or len(data) > hub.CONTENT_MAX_BYTES:
         raise GuildError("realm file size does not match its content", 1)
     return sender, hub.safe_name(name), data
@@ -391,7 +391,7 @@ def _save_file(directory, file_name, file_id, data):
     try:
         return _create_exclusive(directory, alternate, data)
     except FileExistsError:
-        raise GuildError("realm file already saved: {}".format(directory / alternate), 1)
+        raise GuildError("realm file already saved: {}".format(directory / alternate), 1) from None
 
 
 def _check_file_id(file_id):

@@ -2,8 +2,8 @@ import json
 
 from guild import config, db, events, identity, names, pii, refs, sanitize, timeutil
 from guild.commands import raid as raid_commands
-from guild.ids import next_id
 from guild.errors import GuildError
+from guild.ids import next_id
 
 _PROJECT_SCOPE_PREFIX = "project:"
 _RAID_SCOPE_PREFIX = "raid:"

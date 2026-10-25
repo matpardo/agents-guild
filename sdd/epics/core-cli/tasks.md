@@ -3,7 +3,7 @@ epic: core-cli
 type: tasks
 title: Core CLI for coordinating parallel sessions
 status: done
-updated: 2026-10-24
+updated: 2026-10-25
 ---
 
 # Tasks: Core CLI for coordinating parallel sessions
@@ -98,3 +98,10 @@ updated: 2026-10-24
 **Status:** [x] done
 
 **What:** `guild ask --help` states the question and context length limits, `GUILD.md` and the README repeat them, and the README warns that the SDD `root` mode reads a possibly stale checkout while `git_repo` + `git_ref` reads the fetched ref.
+
+## T14 — Lint the code with a hash-pinned ruff
+
+**Depends on:** T13
+**Status:** [x] done
+
+**What:** `ruff check .` passes on the whole repo with the rules in `ruff.toml` (pyflakes, import order, bugbear and the default error set), and CI runs it before the tests. Ruff installs only from `requirements-lint.txt`, pinned by version and the sha256 of every published wheel, so a swapped package fails the install. Findings are fixed in code: unused imports removed, exceptions raised inside `except` chained with `from`, and `zip` over same-length lists marked `strict=True`.

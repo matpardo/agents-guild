@@ -1,8 +1,8 @@
 import re
 
 from guild import config, db, events, identity, pii, polling, refs, session_info
-from guild.ids import next_id
 from guild.errors import GuildError
+from guild.ids import next_id
 
 
 def card_known(ctx, project, project_config, key):

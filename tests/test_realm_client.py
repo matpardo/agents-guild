@@ -2,19 +2,17 @@ import http.client
 import json
 import os
 import shutil
-import socket
 import ssl
 import stat
-import threading
 import unittest
 from unittest import mock
 
 from guild import db, paths, timeutil
-from guild.commands import doctor as doctor_commands
 from guild.commands import realm as realm_commands
 from guild.context import RunContext
 from guild.errors import GuildError
-from guild.realm import checks as realm_checks, client, clientconfig, hubconfig, pin, snapshot, status
+from guild.realm import checks as realm_checks
+from guild.realm import client, clientconfig, hubconfig, pin, snapshot, status
 from tests import realm_hub_fixture
 from tests.testutil import GuildTestCase
 

@@ -1,10 +1,10 @@
 import os
 import signal
 import sys
+import tempfile
 import time
 import unittest
 from pathlib import Path
-import tempfile
 
 from guild import probe
 

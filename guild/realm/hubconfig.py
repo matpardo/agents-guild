@@ -28,7 +28,7 @@ def load():
     try:
         config = json.loads(path.read_text(encoding="utf-8"))
     except ValueError:
-        raise GuildError("realm hub config is not valid JSON: {}".format(path), 1)
+        raise GuildError("realm hub config is not valid JSON: {}".format(path), 1) from None
     if not isinstance(config, dict) or not isinstance(config.get("members"), dict):
         raise GuildError("realm hub config is malformed: {}".format(path), 1)
     if not _has_valid_name(config):

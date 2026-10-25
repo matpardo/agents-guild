@@ -1,8 +1,20 @@
 import os
 import subprocess
 
-from guild import db, events, handoff_prune, identity, names, party_status, paths, pii, render, resume
-from guild import timeutil, tmux_windows
+from guild import (
+    db,
+    events,
+    handoff_prune,
+    identity,
+    names,
+    party_status,
+    paths,
+    pii,
+    render,
+    resume,
+    timeutil,
+    tmux_windows,
+)
 from guild.commands import claim as claim_commands
 from guild.commands import memory as memory_commands
 from guild.commands import next as next_commands

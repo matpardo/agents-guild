@@ -8,7 +8,19 @@ import subprocess
 import sys
 from pathlib import Path
 
-from guild import background, config, ctx_pressure, db, identity, localbase, names, paths, session_status, timeutil, tmux_windows
+from guild import (
+    background,
+    config,
+    ctx_pressure,
+    db,
+    identity,
+    localbase,
+    names,
+    paths,
+    session_status,
+    timeutil,
+    tmux_windows,
+)
 from guild.adapters import github
 from guild.commands import adventurer as adventurer_commands
 from guild.commands import brief as brief_commands
