@@ -61,6 +61,14 @@ SYNC_TRACKER = _UnitSpec(
     "sync-tracker-timer",
     "",
 )
+SYNC_BASES = _UnitSpec(
+    "guild-sync-bases.service",
+    "guild-sync-bases.timer",
+    "guild sync --source bases",
+    "sync --source bases",
+    "sync-bases-timer",
+    "",
+)
 RESOURCES_COLLECT = _UnitSpec(
     "guild-resources-collect.service",
     "guild-resources-collect.timer",
@@ -81,6 +89,7 @@ UNITS = {
     "sync-gh": SYNC_GH,
     "sync-sdd": SYNC_SDD,
     "sync-tracker": SYNC_TRACKER,
+    "sync-bases": SYNC_BASES,
     "resources-collect": RESOURCES_COLLECT,
     "compact": COMPACT,
 }

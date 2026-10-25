@@ -57,3 +57,25 @@ updated: 2026-10-23
 
 **Acceptance:**
 - [x] The config example in `README.md` loads.
+
+## T06 — Heroes and solo players section
+
+**Depends on:** T05
+**Status:** [x] done
+
+**What:** a health job takes an optional `hero` name; `guild board` and the web list every job in a `SOLO PLAYERS` section with its state and latest `pending:` text, and show the hero for the job's adventurer.
+
+**Acceptance:**
+- [x] A config with `hero` loads; an empty or non-string `hero` fails.
+- [x] The node harness covers the solo players rows.
+
+## T07 — Remove heroes and solo players section
+
+**Depends on:** T06
+**Status:** [x] done
+
+**What:** T06 is removed: no project used it. Health jobs go back to the T05 behavior: no `hero` key, the `HEALTH JOBS` section lists due and running jobs only, and no asks show under a job.
+
+**Acceptance:**
+- [x] A config with `hero` fails to load again.
+- [x] The board and the web show the `HEALTH JOBS` section as before T06.

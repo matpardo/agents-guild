@@ -108,6 +108,7 @@ _BOARD = {
     "adventurers": [],
     "health_jobs": [],
     "project_names": [],
+    "bases": [],
     "memory": [],
     "blocked": [],
     "merge_queues": [],
@@ -405,6 +406,46 @@ class WebHealthJobBehaviorTests(unittest.TestCase):
 
     def test_there_is_no_launch_post_from_the_web(self):
         self.assertNotIn("/api/health", _APP_JS)
+
+
+@unittest.skipIf(shutil.which("node") is None, "node not installed")
+class WebBasesBehaviorTests(unittest.TestCase):
+    def _tree(self, bases):
+        return json.loads(_render(dict(_BOARD, bases=bases), "all", "all", "bases", "tree"))
+
+    def _pills(self, bases):
+        tree = self._tree(bases)
+        return [(line["children"][0]["className"], line["children"][0]["text"]) for line in tree["children"][1:]]
+
+    def test_behind_repo_shows_a_warning_pill_and_up_to_date_an_ok_pill(self):
+        bases = [
+            {
+                "repo": "o/a",
+                "base": "main",
+                "behind": 2,
+                "ahead": 0,
+                "warn": True,
+                "text": "o/a main: 2 behind (never fetched)",
+            },
+            {
+                "repo": "o/b",
+                "base": "main",
+                "behind": 0,
+                "ahead": 0,
+                "warn": False,
+                "text": "o/b main: up to date (fetched 1m ago)",
+            },
+        ]
+        self.assertEqual(
+            self._pills(bases),
+            [
+                ("pill res-warn", "o/a main: 2 behind (never fetched)"),
+                ("pill res-ok", "o/b main: up to date (fetched 1m ago)"),
+            ],
+        )
+
+    def test_no_bases_renders_nothing(self):
+        self.assertEqual(self._tree([])["children"], [])
 
 
 def _ask(**overrides):
@@ -1075,6 +1116,40 @@ class WebQuestBoardBehaviorTests(unittest.TestCase):
         hidden = rendered(None, None)
         self.assertNotIn("QUESTDATE", hidden)
         self.assertNotIn("TASKDATE", hidden)
+
+    def test_party_pr_shows_the_behind_pill_only_when_behind(self):
+        def rendered(behind):
+            pr = {
+                "repo": "o/r",
+                "number": 1,
+                "lifecycle": "ready",
+                "task": None,
+                "needs_ask_answer": False,
+                "ask_id": None,
+                "needs_human_pr_review": False,
+                "fixes_main": False,
+                "fixes_flaky": False,
+                "blocked_external": None,
+                "party": "a",
+                "checks_failing": 0,
+                "checks_passing": 0,
+                "checks_pending": 0,
+                "what": "w",
+                "waits": None,
+                "branch": None,
+                "base_branch": None,
+                "review_reasons": [],
+                "behind": behind,
+                "card": None,
+                "card_url": None,
+                "dates": None,
+                "url": "https://example.com/pr",
+            }
+            party = dict(_BOARD["parties"][0], prs=[pr])
+            return _render(dict(_BOARD, parties=[party]), "all", "all", "parties", "text")
+
+        self.assertIn("3 behind main", rendered("3 behind main"))
+        self.assertNotIn("behind", rendered(None))
 
     def test_party_pr_and_claim_show_dates_only_when_known(self):
         def rendered(party_dates, pr_dates, claim_dates):

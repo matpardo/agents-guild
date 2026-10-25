@@ -40,5 +40,6 @@ install_timer() {
 install_timer sync-timer guild-sync-gh.timer 10m
 install_timer sync-sdd-timer guild-sync-sdd.timer 10m
 install_timer sync-tracker-timer guild-sync-tracker.timer 10m
+install_timer sync-bases-timer guild-sync-bases.timer 1m
 install_timer resources-timer guild-resources-collect.timer 2h
 install_timer compact-timer guild-compact.timer 1d
