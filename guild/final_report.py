@@ -1,4 +1,4 @@
-from guild import identity, timeutil
+from guild import health_jobs, identity, timeutil
 from guild.commands import idea as idea_commands
 
 _CLOSED_LIFECYCLES = ("merged", "closed")
@@ -123,7 +123,10 @@ def adventurer_report(ctx, adventurer, pending):
         "SELECT repo, number, what, lifecycle FROM prs WHERE adventurer = ? ORDER BY repo ASC, number ASC",
         (adventurer["id"],),
     ).fetchall()
-    lines = ["final report for adventurer {}:".format(adventurer["id"]), "job: {}".format(adventurer["job"])]
+    lines = [
+        "final report for adventurer {}:".format(adventurer["id"]),
+        "job: {}".format(health_jobs.job_text(ctx.projects_dir, adventurer)),
+    ]
     if adventurer["task"] is not None:
         lines.append("task: {}".format(adventurer["task"]))
     lines.extend(_pr_section(prs))

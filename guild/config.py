@@ -2,7 +2,7 @@ import fnmatch
 import json
 from pathlib import Path
 
-from guild import names, timeutil
+from guild import names, sanitize, timeutil
 from guild.errors import GuildError
 
 _REQUIRED_KEYS = ("name", "paths", "github")
@@ -214,8 +214,20 @@ def _validate_lifecycle_config(data):
 
 
 def _validate_health_job(job):
-    if not isinstance(job, dict) or set(job) != {"name", "command", "every"}:
-        raise GuildError("entries must be objects with exactly 'name', 'command' and 'every'", 1)
+    if not isinstance(job, dict) or not {"name", "command", "every"} <= set(job) <= {
+        "name",
+        "command",
+        "every",
+        "hero",
+    }:
+        raise GuildError("entries must be objects with 'name', 'command' and 'every', and optionally 'hero'", 1)
+    if "hero" in job and (
+        not isinstance(job["hero"], str)
+        or not job["hero"].strip()
+        or sanitize.strip_control_sequences(job["hero"]) != job["hero"]
+        or any(char in job["hero"] for char in "\n\t")
+    ):
+        raise GuildError("'hero' must be a non-empty string without control characters", 1)
     if not isinstance(job["name"], str) or not job["name"]:
         raise GuildError("'name' must be a non-empty string", 1)
     names.validate_name(job["name"], "health job name")

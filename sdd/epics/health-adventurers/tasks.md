@@ -57,3 +57,14 @@ updated: 2026-10-23
 
 **Acceptance:**
 - [x] The config example in `README.md` loads.
+
+## T06 — Heroes and solo players section
+
+**Depends on:** T05
+**Status:** [x] done
+
+**What:** a health job takes an optional `hero` name; `guild board` and the web list every job in a `SOLO PLAYERS` section with its state and latest `pending:` text, and show the hero for the job's adventurer.
+
+**Acceptance:**
+- [x] A config with `hero` loads; an empty or non-string `hero` fails.
+- [x] The node harness covers the solo players rows.
