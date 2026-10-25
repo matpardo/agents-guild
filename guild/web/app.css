@@ -107,7 +107,8 @@ header {
   justify-content: space-between;
 }
 
-.header-resources {
+.header-resources,
+.header-bases {
   min-width: 0;
 }
 
@@ -167,11 +168,13 @@ main {
   gap: 0.25rem;
 }
 
-.header-resources h2 {
+.header-resources h2,
+.header-bases h2 {
   margin: 0.25rem 0;
 }
 
-.header-resources p {
+.header-resources p,
+.header-bases p {
   margin: 0.25rem 0;
 }
 
@@ -280,8 +283,9 @@ main {
 }
 
 @media (min-width: 1000px) {
-  .header-resources {
-    flex: 0 1 calc(50% - 0.75rem);
+  .header-resources,
+  .header-bases {
+    flex: 1 1 0;
   }
 }
 

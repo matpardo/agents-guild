@@ -2428,12 +2428,6 @@ realmDoctorLines: [],
       row.appendChild(explain(base, "ui", "baseBranch"));
     }
     appendAll(row, renderReasonPills(pr.review_reasons));
-    if (pr.behind) {
-      var behind = textEl("span", pr.behind);
-      behind.className = "pill behind-pill";
-      behind.title = "The PR branch is " + pr.behind.split(" ")[0] + " commits behind its base branch.";
-      row.appendChild(behind);
-    }
     row.appendChild(renderChecks(pr));
     row.appendChild(renderPrBlockControls(pr.repo + "#" + pr.number, pr.blocked_external, "card"));
     if (pr.card_url) {
@@ -3711,6 +3705,20 @@ realmDoctorLines: [],
     nav.appendChild(top);
   }
 
+  function renderBases(bases) {
+    var section = document.getElementById("bases");
+    clear(section);
+    if (bases.length === 0) {
+      return;
+    }
+    section.appendChild(textEl("h2", "bases"));
+    bases.forEach(function (entry) {
+      var line = el("p");
+      line.appendChild(classedText("span", entry.text, "pill res-" + (entry.warn ? "warn" : "ok")));
+      section.appendChild(line);
+    });
+  }
+
   function render(data, onlyIfChanged) {
     rememberFocus();
     document.getElementById("generated-at").textContent = "generated at " + data.generated_at;
@@ -3723,6 +3731,7 @@ realmDoctorLines: [],
     if (view.kind === "party") {
       filtered.merge_queues = partyViewQueues(data, view.name);
     }
+    renderSection("bases", [data.bases], renderBases, onlyIfChanged);
     renderSection("sidebar", [sidebarModel(data), view.hash], renderSidebar, onlyIfChanged);
     renderSection("asks", [filtered.asks, filtered.blocked, filtered.parties], renderAsks, onlyIfChanged);
     renderSection("ready", [filtered.ready_for_you], renderReadyForYou, onlyIfChanged);

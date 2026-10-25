@@ -373,7 +373,6 @@ _COLUMN_MIGRATIONS = (
     ("prs", "mergeable", "TEXT"),
     ("prs", "review_decision", "TEXT"),
     ("prs", "merge_state", "TEXT"),
-    ("prs", "behind_by", "INTEGER"),
     ("prs", "base_branch", "TEXT"),
     ("prs", "unresolved_threads", "INTEGER"),
     ("prs", "review_comment_count", "INTEGER"),
@@ -511,6 +510,23 @@ def _drop_fix_requested_at(conn):
     conn.execute("COMMIT")
 
 
+def _prs_has_behind_by(conn):
+    return any(row["name"] == "behind_by" for row in conn.execute("PRAGMA table_info(prs)"))
+
+
+def _drop_behind_by(conn):
+    if not _prs_has_behind_by(conn):
+        return
+    conn.execute("BEGIN IMMEDIATE")
+    try:
+        if _prs_has_behind_by(conn):
+            conn.execute("ALTER TABLE prs DROP COLUMN behind_by")
+    except Exception:
+        conn.execute("ROLLBACK")
+        raise
+    conn.execute("COMMIT")
+
+
 def _raid_members_has_lead(conn):
     return any(row["name"] == "lead" for row in conn.execute("PRAGMA table_info(raid_members)"))
 
@@ -558,6 +574,7 @@ def create_all(conn):
     _drop_keeper(conn)
     _drop_raid_lead(conn)
     _drop_fix_requested_at(conn)
+    _drop_behind_by(conn)
     _split_needs_human(conn)
     _default_fix_marks(conn)
 

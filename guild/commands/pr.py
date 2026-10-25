@@ -325,8 +325,6 @@ def ready_check(ctx, ref, refresh_failed):
     lines.extend("- {}".format(text) for text in entry["human_missing"])
     lines.extend("- wait: {}".format(wait) for wait in entry["waits"])
     lines.extend("- gate: {}".format(gate) for gate in gates)
-    if entry["behind_by"]:
-        lines.append("- note: {} behind {}".format(entry["behind_by"], entry["base_branch"] or "base"))
     lines.extend("- note: {}".format(note) for note in merge_queue_commands.notes(ctx.projects_dir, entry, red_rows))
     if refresh_failed:
         lines.append("- note: state as of last sync")

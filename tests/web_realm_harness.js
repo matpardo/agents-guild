@@ -39,7 +39,7 @@ async function run({ src, realm, refresh, clicks, replies, guild_name }) {
   };
   const board = { generated_at: "now", parties: [], raids: [], asks: [], blocked: [], notices: [], projects: [],
     memory: [], merge_queues: [], drift: [], ready_for_you: [], ideas: [], adventurers: [], health_jobs: [],
-    project_names: [], quest_boards: [], new_notice_count: 0, realm, guild_name };
+    project_names: [], bases: [], quest_boards: [], new_notice_count: 0, realm, guild_name };
   function respond(body, ok) {
     return Promise.resolve({ ok, json: () => Promise.resolve(body) });
   }

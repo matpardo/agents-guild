@@ -2,7 +2,10 @@ import glob
 import os
 import re
 import subprocess
+from datetime import datetime, timezone
 from pathlib import Path
+
+from guild import timeutil
 
 _ORIGIN = "origin"
 _URL_SEPARATOR = re.compile(r"[/:]")
@@ -10,6 +13,8 @@ _GIT_SUFFIX = ".git"
 _BRANCH_PREFIX = "branch refs/heads/"
 _WORKTREE_PREFIX = "worktree "
 _PRUNABLE_PREFIX = "prunable"
+_NO_ORIGIN_HEAD = "no origin/HEAD (git remote set-head origin --auto)"
+_CANNOT_COMPARE = "cannot compare"
 
 
 def _git(path, args):
@@ -57,19 +62,29 @@ def _clone_repo(directory, repos):
     return slug
 
 
+def _checkout_candidates(match):
+    if is_main_checkout(match):
+        return [match]
+    if not os.path.isdir(match):
+        return []
+    children = sorted(os.path.join(match, name) for name in os.listdir(match))
+    return [child for child in children if is_main_checkout(child)]
+
+
 def locate_clones(project):
     repos = project["github"]["repos"]
     clones = []
     seen = set()
     for pattern in project["paths"]:
         for match in sorted(glob.glob(str(Path(pattern).expanduser()))):
-            if match in seen or not is_main_checkout(match):
-                continue
-            seen.add(match)
-            repo = _clone_repo(match, repos)
-            if repo is None:
-                continue
-            clones.append({"repo": repo, "path": match})
+            for candidate in _checkout_candidates(match):
+                if candidate in seen:
+                    continue
+                seen.add(candidate)
+                repo = _clone_repo(candidate, repos)
+                if repo is None:
+                    continue
+                clones.append({"repo": repo, "path": candidate})
     return clones
 
 
@@ -95,17 +110,52 @@ def _commits_ahead(clone_path, base):
     return _count(clone_path, "{}/{}..{}".format(_ORIGIN, base, base))
 
 
+def _fetched_at(clone_path):
+    code, out, _ = _git(clone_path, ["rev-parse", "--git-path", "FETCH_HEAD"])
+    if code != 0:
+        return None
+    try:
+        mtime = (Path(clone_path) / out).stat().st_mtime
+    except OSError:
+        return None
+    return timeutil.to_iso(datetime.fromtimestamp(mtime, timezone.utc))
+
+
+def _drift_entry(repo, base, behind, ahead, fetched_at, error):
+    return {"repo": repo, "base": base, "behind": behind, "ahead": ahead, "fetched_at": fetched_at, "error": error}
+
+
+def _clone_drift(clone):
+    base = base_branch(clone["path"])
+    if base is None:
+        return _drift_entry(clone["repo"], None, None, None, None, _NO_ORIGIN_HEAD)
+    fetched_at = _fetched_at(clone["path"])
+    behind = _commits_behind(clone["path"], base)
+    ahead = _commits_ahead(clone["path"], base)
+    if behind is None or ahead is None:
+        return _drift_entry(clone["repo"], base, None, None, fetched_at, _CANNOT_COMPARE)
+    return _drift_entry(clone["repo"], base, behind, ahead, fetched_at, None)
+
+
+def base_drift(project):
+    return [_clone_drift(clone) for clone in locate_clones(project)]
+
+
+def fetch_base_mutating_git(clone_path, base):
+    code, _, error = _git(clone_path, ["fetch", _ORIGIN, base])
+    if code != 0:
+        return error
+    return None
+
+
 def behind_warning_lines(project):
-    lines = []
-    for clone in locate_clones(project):
-        base = base_branch(clone["path"])
-        if base is None:
-            continue
-        behind = _commits_behind(clone["path"], base)
-        if not behind:
-            continue
-        lines.append("local {} of {} is {} commits behind {}/{}".format(base, clone["repo"], behind, _ORIGIN, base))
-    return lines
+    return [
+        "local {} of {} is {} commits behind {}/{}".format(
+            entry["base"], entry["repo"], entry["behind"], _ORIGIN, entry["base"]
+        )
+        for entry in base_drift(project)
+        if entry["error"] is None and entry["behind"]
+    ]
 
 
 def _checked_out_worktree(clone_path, base):

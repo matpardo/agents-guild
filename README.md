@@ -519,6 +519,15 @@ a clone. `guild doctor` and `guild brief` warn when a located local base is
 behind its `origin/<base>` ref regardless of the flag (they never fetch, so
 the comparison uses the last fetched state).
 
+Base drift: every `sync --source gh` run also runs `git fetch origin <base>` in
+each located clone of every project, regardless of `fast_forward_base`. It only
+updates `origin/<base>`; local branches and worktrees are never touched. A failed
+fetch is a sync failure (`<repo>: base fetch failed: <error>`). `guild board` and
+the web header read the result live with `git rev-list`: one line per clone,
+`<repo> <base>: N behind` (`, M ahead` when above 0) or `<repo> <base>: up to
+date`, followed by `(fetched Xm ago)` or `(never fetched)` from the mtime of the
+clone's `FETCH_HEAD`. A clone without `origin/HEAD` shows `<repo>: no origin/HEAD (git remote set-head origin --auto)` and one whose comparison fails shows `<repo> <base>: cannot compare`, both as warnings. A `paths` entry that is not itself a clone also yields its direct child directories that are clones. Nothing is stored.
+
 `guild` has no daemon, so this only fires when someone runs the sync. Someone
 in the raid should keep a watcher running for the duration of the raid, e.g.
 `watch -n 300 guild sync --source gh` from a terminal, or `/loop 5m guild
@@ -1023,9 +1032,7 @@ PR never clears the red mark.
   blocked (`waits on <ref>`). Every reason that applies is listed: `needs ask answer`,
   `checks failing (N)`, `merge conflict`, `changes requested`,
   `N unresolved threads`, `behind base`, `waits on task Txx`, `waits on <ref>`.
-  Missing review data counts as no signal. `guild board` and `guild pr ready-check`
-  also show `N behind <base>` (commits the PR branch is behind its base branch)
-  when it is above 0; it is informational and changes no reason, order or exit code.
+  Missing review data counts as no signal.
 - `waiting`: not blocked, but checks are still running (`checks pending (N)`)
   or a PR that must come before it is itself waiting or ready but still draft
   (`waits on <ref>`).
@@ -1451,9 +1458,11 @@ notices the same way `guild board --raid` does) narrow what is shown; the
 page re-fetches `/api/board` every 10 seconds and repaints only the sections whose
 data changed, so a form you are typing in (an idea, a notice, an answer) keeps its
 text and focus; it also keeps the current filters and which blocks are collapsed. PR links open
-`https://github.com/<repo>/pull/<n>` in a new tab; PR cards also show an `N behind <base>` pill when the branch is behind its base, and review pills (`N unresolved threads`, `changes requested`, `behind base`, `merge conflict`, the same reasons as the merge queue) and `on <base>` when the PR targets a branch other than `main` or `master`. A task also links to its
+`https://github.com/<repo>/pull/<n>` in a new tab; PR cards also show review pills (`N unresolved threads`, `changes requested`, `behind base`, `merge conflict`, the same reasons as the merge queue) and `on <base>` when the PR targets a branch other than `main` or `master`. A task also links to its
 tracker card when the project configures `tracker.browse_url` (see
-"Project config"). A collapsible "resources" section at the bottom shows the
+"Project config"). A "bases" section in the header, left of "resources" (model key `bases`),
+shows the same local base drift lines as `guild board`: a warning pill when the clone is behind
+`origin/<base>`, an ok pill when it is up to date; read only. A collapsible "resources" section at the bottom shows the
 `guild resources` report from `GET /api/resources` (see "`guild resources`").
 
 **Colors**: the page uses the terminal board's meanings, with CSS classes
@@ -2239,9 +2248,7 @@ and resets it when another party takes the area.
 
 `guild sync --source gh` also stores, per tracked PR, `prs.review_decision`
 (`reviewDecision`), `prs.merge_state` (`mergeStateStatus`) and
-`prs.base_branch` (`baseRefName`). `prs.behind_by` comes from one compare API
-call per open PR (`behind_by` of base against the head commit); a failed call keeps the
-previous value and is reported. A `mergeStateStatus` of `UNKNOWN` carries no
+`prs.base_branch` (`baseRefName`). A `mergeStateStatus` of `UNKNOWN` carries no
 signal: the previous `merge_state` is kept. Events recorded before these fields
 existed replay with them empty.
 
