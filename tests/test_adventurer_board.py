@@ -35,14 +35,14 @@ class AdventurerBoardTests(AdventurerTestCase):
         self.assertFalse(entry["live"])
 
     def test_live_session_is_not_flagged(self):
-        self.start("adv-1", "x")
+        self.start("adv-1", "x", "--task", "demo-epic/T90")
         self.write_session(os.getpid(), "adv-1", "adv")
         entry = self._model()["adventurers"][0]
         self.assertTrue(entry["live"])
         self.assertFalse(entry["stopped_without_report"])
 
     def test_done_stays_listed_until_dismissed(self):
-        self.start("adv-1", "x")
+        self.start("adv-1", "x", "--task", "demo-epic/T90")
         self.cli(["adventurer", "done", "--pending", "left the tests"], "adv-1")
         entry = self._model()["adventurers"][0]
         self.assertEqual((entry["state"], entry["pending"], entry["stopped_without_report"]), ("done", "left the tests", False))
@@ -52,7 +52,7 @@ class AdventurerBoardTests(AdventurerTestCase):
         self.assertNotIn("adventurer 1", self._board_text())
 
     def test_dismiss_refusals(self):
-        self.start("adv-1", "x")
+        self.start("adv-1", "x", "--task", "demo-epic/T90")
         code, out, err = self.cli(["adventurer", "dismiss", "1"], None)
         self.assertEqual(code, 1)
         self.assertIn("not done", err)
@@ -62,7 +62,7 @@ class AdventurerBoardTests(AdventurerTestCase):
         self.assertEqual(self.cli(["adventurer", "dismiss", "1"], None)[0], 1)
 
     def test_dismiss_survives_rebuild(self):
-        self.start("adv-1", "x")
+        self.start("adv-1", "x", "--task", "demo-epic/T90")
         self.cli(["adventurer", "done", "--pending", "none"], "adv-1")
         self.cli(["adventurer", "dismiss", "1"], None)
         self.assertEqual(self.cli(["rebuild"], None)[0], 0)

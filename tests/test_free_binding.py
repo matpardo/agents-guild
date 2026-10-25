@@ -14,13 +14,13 @@ class ReasonOnStartTests(AdventurerTestCase):
     def test_empty_or_sensitive_reason_is_refused(self):
         self.assertEqual(self.cli(["party", "start", "alpha", "--reason", "  "], "sess-1")[0], 1)
         self.assertEqual(self.cli(["party", "start", "alpha", "--reason", "mail me@x.com"], "sess-1")[0], 1)
-        self.assertEqual(self.cli(["adventurer", "start", "x", "--reason", "  "], "adv-1")[0], 1)
+        self.assertEqual(self.cli(["adventurer", "start", "x", "--task", "demo-epic/T90", "--reason", "  "], "adv-1")[0], 1)
         self.assertEqual(self.rows("SELECT * FROM parties"), [])
         self.assertEqual(self.rows("SELECT * FROM adventurers"), [])
 
     def test_reason_is_stored_for_party_and_adventurer(self):
         self.cli(["party", "start", "alpha", "--reason", "several PRs"], "sess-1")
-        self.cli(["adventurer", "start", "fix typo", "--reason", "one PR job"], "adv-1")
+        self.cli(["adventurer", "start", "fix typo", "--task", "demo-epic/T90", "--reason", "one PR job"], "adv-1")
         party = self.rows("SELECT reason, from_adventurer FROM parties")[0]
         self.assertEqual((party["reason"], party["from_adventurer"]), ("several PRs", None))
         self.assertEqual(self.rows("SELECT reason FROM adventurers")[0]["reason"], "one PR job")
@@ -62,7 +62,7 @@ class PromoteTests(AdventurerTestCase):
 
     def test_promote_without_task_prints_no_task_hint(self):
         self.cli(["adventurer", "done", "--pending", "none"], "adv-1")
-        self.start("adv-2", "free job")
+        self.start_health_job("adv-2")
         code, out, err = self.cli(["adventurer", "promote", "beta", "--reason", "grew"], "adv-2")
         self.assertEqual(code, 0, err)
         self.assertNotIn("add task", out)
@@ -97,7 +97,7 @@ class PromoteTests(AdventurerTestCase):
 
 class AdventurerBoardReasonTests(AdventurerTestCase):
     def test_active_adventurer_shows_reason_and_start(self):
-        self.start("adv-1", "fix typo")
+        self.start("adv-1", "fix typo", "--task", "demo-epic/T90")
         conn = db.connect(paths.db_path())
         self.addCleanup(conn.close)
         ctx = context.RunContext(

@@ -1098,7 +1098,7 @@ def _add_pr_parser(subparsers):
     parser = subparsers.add_parser("pr", help="track PRs and set their state")
     actions = parser.add_subparsers(dest="pr_action", required=True, metavar="<subcommand>")
 
-    track = actions.add_parser("track", help="start tracking a PR against a task (party) or a card (adventurer, optional)")
+    track = actions.add_parser("track", help="start tracking a PR against a task (party, adventurer: its own; health job: none), optionally with a card")
     track.add_argument("ref")
     track.add_argument("--task", help="task as <quest>/<tid>")
     track.add_argument("--card", help="tracker card key")
@@ -1208,7 +1208,7 @@ def _add_adventurer_parser(subparsers):
 
     start = actions.add_parser("start", help="register this session as an adventurer")
     start.add_argument("job", nargs="?", help="what this session does; omit with --job")
-    start.add_argument("--task", help="synced SDD task as <epic>/<tid>")
+    start.add_argument("--task", help="required without --job: <epic>/<tid> (synced, or new in a synced epic) or <quest>/<tid> of a no-epic open quest")
     start.add_argument("--job", dest="health_job", help="health job of the project config, instead of a job text")
     start.add_argument("--reason", required=True, help="why this work is an adventurer")
     start.set_defaults(handler=_handle_adventurer_start)

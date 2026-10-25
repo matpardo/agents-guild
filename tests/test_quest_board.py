@@ -83,7 +83,7 @@ class OpenQuestAddTests(QuestBoardTestCase):
     def test_party_and_adventurer_add_open_quests(self):
         self.start_party("alpha", "sess-1")
         self.open_quest("by-party", "T02", "sess-1")
-        self.ok(["adventurer", "start", "plan", "--reason", "test reason"], "adv-1")
+        self.ok(["adventurer", "start", "plan", "--task", "demo-epic/T90", "--reason", "test reason"], "adv-1")
         self.open_quest("by-adv", "T03", "adv-1")
         self.assertEqual(
             [r["slug"] for r in self.rows("SELECT slug FROM quests WHERE party IS NULL ORDER BY slug")],
@@ -162,7 +162,7 @@ class TakeReleaseTests(QuestBoardTestCase):
     def test_take_refusals(self):
         self.open_quest("pre", "T02", None)
         self.assertEqual(self.cli(["quest", "take", "pre"], None)[0], 1)
-        self.ok(["adventurer", "start", "job", "--reason", "test reason"], "adv-1")
+        self.ok(["adventurer", "start", "job", "--task", "demo-epic/T90", "--reason", "test reason"], "adv-1")
         code, out, err = self.cli(["quest", "take", "pre"], "adv-1")
         self.assertEqual(code, 1)
         self.start_party("alpha", "sess-1")

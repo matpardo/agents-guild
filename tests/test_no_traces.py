@@ -34,16 +34,28 @@ class PublishableTextTests(GuildTestCase):
         self.assertIsNone(_TRACE_RE.search(set_out))
 
     def test_adventurer_pr_track_output_has_no_traces(self):
-        self.run_cli(["adventurer", "start", "fix typo", "--reason", "test reason"], "adv-1", self.repo_dir)
+        self.run_cli(
+            ["quest", "add", "chore", "--open", "--no-epic", "--title", "chore", "--tasks", "T01", "--titles", "one"],
+            None, self.repo_dir,
+        )
+        self.run_cli(
+            ["adventurer", "start", "fix typo", "--task", "chore/T01", "--reason", "test reason"], "adv-1", self.repo_dir
+        )
         code, track_out, err = self.run_cli(
-            ["pr", "track", "acme/app#1", "--card", "ABC-1", "--what", "x", "--waits", "y"],
+            ["pr", "track", "acme/app#1", "--task", "chore/T01", "--card", "ABC-1", "--what", "x", "--waits", "y"],
             "adv-1", self.repo_dir,
         )
         self.assertEqual(code, 0, err)
         self.assertIsNone(_TRACE_RE.search(track_out))
 
     def test_pending_reports_are_rejected_when_they_carry_a_secret_or_email(self):
-        self.run_cli(["adventurer", "start", "fix typo", "--reason", "test reason"], "adv-1", self.repo_dir)
+        self.run_cli(
+            ["quest", "add", "chore", "--open", "--no-epic", "--title", "chore", "--tasks", "T01", "--titles", "one"],
+            None, self.repo_dir,
+        )
+        self.run_cli(
+            ["adventurer", "start", "fix typo", "--task", "chore/T01", "--reason", "test reason"], "adv-1", self.repo_dir
+        )
         for pending in ("mail me@x.com", " "):
             code, out, err = self.run_cli(["adventurer", "done", "--pending", pending], "adv-1", self.repo_dir)
             self.assertEqual(code, 1, pending)

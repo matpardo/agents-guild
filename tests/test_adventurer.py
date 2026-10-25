@@ -1,3 +1,4 @@
+import json
 import sqlite3
 
 from guild import paths
@@ -17,6 +18,13 @@ class AdventurerTestCase(GuildTestCase):
 
     def start(self, session_id, job, *extra):
         return self.cli(["adventurer", "start", job, "--reason", "test reason"] + list(extra), session_id)
+
+    def start_health_job(self, session_id):
+        config_path = self.config_home / "guild" / "projects" / "acme.json"
+        data = json.loads(config_path.read_text())
+        data["health_jobs"] = [{"name": "red-main", "command": "/check-main", "every": "1d"}]
+        config_path.write_text(json.dumps(data))
+        return self.cli(["adventurer", "start", "--job", "red-main", "--reason", "test reason"], session_id)
 
     def rows(self, sql):
         conn = sqlite3.connect(str(paths.db_path()))
@@ -40,9 +48,9 @@ class AdventurerCommandTests(AdventurerTestCase):
         self.assertIn("demo-epic/T02", out)
 
     def test_start_requires_a_session_and_a_job(self):
-        self.assertEqual(self.start(None, "x")[0], 1)
-        self.assertEqual(self.start("adv-1", "  ")[0], 1)
-        self.assertEqual(self.start("adv-1", "mail me@x.com")[0], 1)
+        self.assertEqual(self.start(None, "x", "--task", "demo-epic/T90")[0], 1)
+        self.assertEqual(self.start("adv-1", "  ", "--task", "demo-epic/T90")[0], 1)
+        self.assertEqual(self.start("adv-1", "mail me@x.com", "--task", "demo-epic/T90")[0], 1)
 
     def test_start_refuses_unregistered_project(self):
         code, out, err = self.run_cli(["adventurer", "start", "x", "--reason", "test reason"], "adv-1", self.root)
@@ -50,24 +58,47 @@ class AdventurerCommandTests(AdventurerTestCase):
 
     def test_start_refuses_party_leader_and_second_start(self):
         self.cli(["party", "start", "alpha", "--reason", "test reason"], "sess-1")
-        code, out, err = self.start("sess-1", "x")
+        code, out, err = self.start("sess-1", "x", "--task", "demo-epic/T90")
         self.assertEqual(code, 1)
         self.assertIn("leads party", err)
-        self.assertEqual(self.start("adv-1", "x")[0], 0)
-        code, out, err = self.start("adv-1", "y")
+        self.assertEqual(self.start("adv-1", "x", "--task", "demo-epic/T90")[0], 0)
+        code, out, err = self.start("adv-1", "y", "--task", "demo-epic/T91")
         self.assertEqual(code, 1)
         self.assertIn("already an adventurer", err)
 
     def test_party_start_and_resume_refuse_an_adventurer(self):
         self.cli(["party", "start", "alpha", "--reason", "test reason"], "sess-1")
-        self.start("adv-1", "x")
+        self.start("adv-1", "x", "--task", "demo-epic/T90")
         for argv in (["party", "start", "beta", "--reason", "test reason"], ["party", "resume", "alpha"]):
             code, out, err = self.cli(argv, "adv-1")
             self.assertEqual(code, 1, argv)
             self.assertIn("adventurer", err)
 
+    def test_start_requires_a_task(self):
+        code, out, err = self.start("adv-1", "x")
+        self.assertEqual(code, 1)
+        self.assertIn("--task", err)
+        self.assertIn("quest add", err)
+
+    def test_start_accepts_a_new_task_of_a_synced_epic(self):
+        code, out, err = self.start("adv-1", "x", "--task", "demo-epic/T99")
+        self.assertEqual(code, 0, err)
+
+    def test_start_refuses_a_task_of_an_unknown_epic(self):
+        code, out, err = self.start("adv-1", "x", "--task", "nope/T01")
+        self.assertEqual(code, 1)
+        self.assertIn("guild sync --source sdd", err)
+
+    def test_start_on_an_open_quest_outside_any_epic(self):
+        code, out, err = self.cli(
+            ["quest", "add", "chore", "--open", "--no-epic", "--title", "chore", "--tasks", "T01", "--titles", "one"],
+            None,
+        )
+        self.assertEqual(code, 0, err)
+        code, out, err = self.start("adv-1", "x", "--task", "chore/T01")
+        self.assertEqual(code, 0, err)
+
     def test_start_task_refusals(self):
-        self.assertEqual(self.start("adv-1", "x", "--task", "demo-epic/T99")[0], 1)
         self.assertEqual(self.start("adv-1", "x", "--task", "bad")[0], 1)
         self.cli(["party", "start", "alpha", "--reason", "test reason"], "sess-1")
         self.cli(["quest", "add", "qa", "--title", "qa", "--epic", "demo-epic", "--tasks", "T01"], "sess-1")
@@ -84,13 +115,13 @@ class AdventurerCommandTests(AdventurerTestCase):
         self.assertIn("held by adventurer 1", err)
 
     def test_done_requires_pending(self):
-        self.start("adv-1", "x")
+        self.start("adv-1", "x", "--task", "demo-epic/T90")
         code, out, err = self.cli(["adventurer", "done"], "adv-1")
         self.assertEqual(code, 2)
         self.assertEqual(self.rows("SELECT state FROM adventurers")[0]["state"], "active")
 
     def test_done_none_is_accepted_and_ends_the_adventurer(self):
-        self.start("adv-1", "x")
+        self.start("adv-1", "x", "--task", "demo-epic/T90")
         code, out, err = self.cli(["adventurer", "done", "--pending", "none"], "adv-1")
         self.assertEqual(code, 0, err)
         row = self.rows("SELECT state, pending, done_at FROM adventurers")[0]
@@ -101,7 +132,7 @@ class AdventurerCommandTests(AdventurerTestCase):
         self.assertIn("done", out)
 
     def test_done_validates_pending_text(self):
-        self.start("adv-1", "x")
+        self.start("adv-1", "x", "--task", "demo-epic/T90")
         self.assertEqual(self.cli(["adventurer", "done", "--pending", " "], "adv-1")[0], 1)
         self.assertEqual(self.cli(["adventurer", "done", "--pending", "ping me@x.com"], "adv-1")[0], 1)
         self.assertEqual(self.cli(["adventurer", "done", "--pending", "x"], "other")[0], 1)
@@ -110,17 +141,17 @@ class AdventurerCommandTests(AdventurerTestCase):
         self.start("adv-1", "x", "--task", "demo-epic/T02")
         self.cli(["adventurer", "done", "--pending", "left the tests"], "adv-1")
         self.assertEqual(self.start("adv-2", "y", "--task", "demo-epic/T02")[0], 0)
-        self.assertEqual(self.start("adv-1", "z")[0], 0)
+        self.assertEqual(self.start("adv-1", "z", "--task", "demo-epic/T90")[0], 0)
 
     def test_state_survives_rebuild(self):
         self.start("adv-1", "x", "--task", "demo-epic/T02")
-        self.start("adv-2", "y")
+        self.start("adv-2", "y", "--task", "demo-epic/T90")
         self.cli(["adventurer", "done", "--pending", "none"], "adv-2")
         code, out, err = self.cli(["rebuild"], None)
         self.assertEqual(code, 0, err)
         rows = self.rows("SELECT id, session_id, task, state, pending FROM adventurers ORDER BY id")
         self.assertEqual([(r["id"], r["task"], r["state"], r["pending"]) for r in rows],
-                         [(1, "demo-epic/T02", "active", None), (2, None, "done", "none")])
+                         [(1, "demo-epic/T02", "active", None), (2, "demo-epic/T90", "done", "none")])
 
 
 class AdventurerHoldsTaskTests(AdventurerTestCase):
@@ -218,18 +249,13 @@ class AdventurerPermissionTests(AdventurerTestCase):
         self.assertIn("acme/app#2 | fixes typo | open", out)
         self.assertIn("(PR state as of last sync)", out)
 
-    def test_pr_track_on_a_free_job_refuses_a_task(self):
+    def test_health_job_tracks_a_pr_without_a_task(self):
         self.cli(["adventurer", "done", "--pending", "none"], "adv-1")
-        self.start("adv-2", "free job")
+        code, out, err = self.start_health_job("adv-2")
+        self.assertEqual(code, 0, err)
         code, out, err = self.cli(["pr", "track", "acme/app#1", "--task", "demo-epic/T02", "--what", "w", "--waits", "r"], "adv-2")
         self.assertEqual(code, 1)
-        self.assertIn("without --task", err)
-        code, out, err = self.cli(["pr", "track", "acme/app#1", "--card", "ABC-1", "--what", "w", "--waits", "r"], "adv-2")
-        self.assertEqual(code, 0, err)
-
-    def test_pr_track_on_a_free_job_needs_no_card(self):
-        self.cli(["adventurer", "done", "--pending", "none"], "adv-1")
-        self.start("adv-2", "free job")
+        self.assertIn("health-job adventurer tracks PRs without --task", err)
         code, out, err = self.cli(["pr", "track", "acme/app#1", "--what", "fixes typo", "--waits", "r"], "adv-2")
         self.assertEqual(code, 0, err)
         code, out, err = self.cli(["adventurer", "done", "--pending", "none"], "adv-2")
@@ -239,8 +265,8 @@ class AdventurerPermissionTests(AdventurerTestCase):
     def test_adventurer_prs_do_not_break_party_views(self):
         self.cli(["pr", "track", "acme/app#2", "--task", "demo-epic/T02", "--what", "w", "--waits", "r"], "adv-1")
         self.cli(["adventurer", "done", "--pending", "none"], "adv-1")
-        self.start("adv-2", "free job")
-        self.cli(["pr", "track", "acme/app#1", "--card", "ABC-1", "--what", "w", "--waits", "r"], "adv-2")
+        self.start("adv-2", "free job", "--task", "demo-epic/T90")
+        self.cli(["pr", "track", "acme/app#1", "--task", "demo-epic/T90", "--card", "ABC-1", "--what", "w", "--waits", "r"], "adv-2")
         self.cli(["party", "start", "alpha", "--reason", "test reason"], "sess-1")
         code, out, err = self.cli(["sync", "--source", "gh"], None)
         self.assertEqual(code, 0, err)
@@ -282,7 +308,7 @@ class AdventurerHookTests(AdventurerTestCase):
         return None if not rows else (rows[0]["status"], rows[0]["party"])
 
     def test_stop_records_once_for_an_adventurer(self):
-        self.start("adv-1", "x")
+        self.start("adv-1", "x", "--task", "demo-epic/T90")
         code, out, err = self.run_hook("stop", self.payload("adv-1"))
         self.assertEqual((code, out), (0, ""))
         self.assertEqual(self.status("adv-1"), ("stopped", ""))
@@ -290,13 +316,13 @@ class AdventurerHookTests(AdventurerTestCase):
         self.assertEqual(self.rows("SELECT COUNT(*) AS n FROM events WHERE kind = 'session.stopped'")[0]["n"], 1)
 
     def test_stop_ignores_an_ended_adventurer(self):
-        self.start("adv-1", "x")
+        self.start("adv-1", "x", "--task", "demo-epic/T90")
         self.cli(["adventurer", "done", "--pending", "none"], "adv-1")
         self.run_hook("stop", self.payload("adv-1"))
         self.assertIsNone(self.status("adv-1"))
 
     def test_prompt_after_stop_marks_working_and_no_unbound_hint(self):
-        self.start("adv-1", "x")
+        self.start("adv-1", "x", "--task", "demo-epic/T90")
         self.run_hook("stop", self.payload("adv-1"))
         code, out, err = self.run_hook("prompt-submit", self.payload("adv-1"))
         self.assertNotIn("session not bound", out)

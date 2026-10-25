@@ -46,9 +46,15 @@ class CardPrBoardTests(CardPrViewsTestCase):
 
     def test_adventurer_pr_is_not_listed_under_the_party(self):
         self.write_gh_fixture("view_acme-app_3", _OPEN_VIEW)
-        self.run_cli(["adventurer", "start", "fix typo", "--reason", "test reason"], "adv-1", self.repo_dir)
+        self.run_cli(
+            ["quest", "add", "chore", "--open", "--no-epic", "--title", "chore", "--tasks", "T01", "--titles", "one"],
+            None, self.repo_dir,
+        )
+        self.run_cli(
+            ["adventurer", "start", "fix typo", "--task", "chore/T01", "--reason", "test reason"], "adv-1", self.repo_dir
+        )
         code, out, err = self.run_cli(
-            ["pr", "track", "acme/app#3", "--card", "ABC-9", "--what", "typo fix", "--waits", "review"],
+            ["pr", "track", "acme/app#3", "--task", "chore/T01", "--card", "ABC-9", "--what", "typo fix", "--waits", "review"],
             "adv-1", self.repo_dir,
         )
         self.assertEqual(code, 0, err)
