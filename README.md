@@ -2874,6 +2874,8 @@ disk-backed `/tmp`. A single module still runs with
 CI (`.github/workflows/tests.yml`) runs the same command on Python 3.10
 for every pull request and every push to `main`. The suite needs no global
 git identity: each test that commits configures its own.
+Every action in a workflow is pinned by its full commit SHA, with the
+release tag beside it; `tests/test_ci_pins.py` fails on a tag or branch ref.
 
 Lint (dev-only, not a runtime dependency): ruff, pinned by version and
 sha256 in `requirements-lint.txt`, configured in `ruff.toml`. CI runs it
