@@ -170,3 +170,15 @@ updated: 2026-10-24
 **Acceptance:**
 - [x] Both reports list the generated asks, created ideas, open quests and notices; an idea already listed as linked is not repeated.
 - [x] `adventurer done` prints `warning: left open: ...` only when an ask or a PR is still open.
+
+## T16 — Close an adventurer's no-epic quest on done
+
+**Depends on:** T15
+**Status:** [x] done
+
+**What:** `adventurer done` marks the adventurer's task done when it belongs to a no-epic quest no party owns, and closes that quest when its last task is done. Replaying `adventurer.done` (`guild rebuild`) closes orphans from before. Tasks of SDD epics and quests owned by a party are untouched.
+
+**Acceptance:**
+- [x] The task and the quest are done after `adventurer done`; `quest board` no longer lists the quest and the final report says `quest <slug> done`.
+- [x] A quest with other open tasks stays active.
+- [x] SDD tasks and party-owned quests do not change.

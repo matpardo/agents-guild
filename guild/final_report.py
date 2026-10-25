@@ -38,16 +38,21 @@ def _created_idea_lines(ctx, label, linked_ids):
 def _open_quest_lines(ctx, session_ids):
     placeholders = ", ".join("?" for _ in session_ids)
     rows = ctx.conn.execute(
-        "SELECT quests.slug AS slug, quests.party AS party FROM events"
+        "SELECT quests.slug AS slug, quests.party AS party, quests.state AS state FROM events"
         " JOIN quests ON quests.slug = json_extract(events.payload, '$.slug')"
         " WHERE events.kind = 'quest.added' AND json_extract(events.payload, '$.party') IS NULL"
         " AND events.session_id IN ({}) ORDER BY quests.slug".format(placeholders),
         tuple(session_ids),
     ).fetchall()
-    return [
-        "open quest {}: {}".format(row["slug"], "no party yet" if row["party"] is None else "taken by " + row["party"])
-        for row in rows
-    ]
+    return [_open_quest_line(row) for row in rows]
+
+
+def _open_quest_line(row):
+    if row["state"] == "done":
+        return "quest {} done".format(row["slug"])
+    return "open quest {}: {}".format(
+        row["slug"], "no party yet" if row["party"] is None else "taken by " + row["party"]
+    )
 
 
 def _notice_lines(ctx, label):
@@ -118,6 +123,19 @@ def party_report(ctx, party, pending):
     return "\n".join(lines)
 
 
+def _closed_task_quest_line(ctx, adventurer, generated):
+    if adventurer["task"] is None:
+        return []
+    slug = adventurer["task"].split("/", 1)[0]
+    line = "quest {} done".format(slug)
+    row = ctx.conn.execute(
+        "SELECT 1 FROM quests WHERE slug = ? AND epic IS NULL AND party IS NULL AND state = 'done'", (slug,)
+    ).fetchone()
+    if row is None or line in generated:
+        return []
+    return [line]
+
+
 def adventurer_report(ctx, adventurer, pending):
     prs = ctx.conn.execute(
         "SELECT repo, number, what, lifecycle FROM prs WHERE adventurer = ? ORDER BY repo ASC, number ASC",
@@ -128,7 +146,9 @@ def adventurer_report(ctx, adventurer, pending):
         lines.append("task: {}".format(adventurer["task"]))
     lines.extend(_pr_section(prs))
     label = identity.adventurer_label(adventurer["id"])
-    lines.extend(_generated_lines(ctx, label, [ctx.session_id], set()))
+    generated = _generated_lines(ctx, label, [ctx.session_id], set())
+    lines.extend(generated)
+    lines.extend(_closed_task_quest_line(ctx, adventurer, generated))
     lines.extend(_open_work_warning(ctx, label, prs))
     lines.append("pending: {}".format(pending))
     return "\n".join(lines)

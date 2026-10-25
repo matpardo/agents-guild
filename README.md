@@ -388,7 +388,7 @@ state: each PR the party tracked (`<repo>#<n> | what | state`, state `merged`,
 the party, then what the party generated: its asks with their state
 (`ask #<n> (<state>): <question>`), the ideas it created and did not link
 (`idea #<n> created: <title>`), the open quests its leaders added
-(`open quest <slug>: no party yet | taken by <party>`) and its notices still in
+(`open quest <slug>: no party yet | taken by <party>`, or `quest <slug> done`) and its notices still in
 force (`notice #<n> (until <time>): <text>`), and last the pending text. The tracked PRs are refreshed from GitHub first;
 if that fails the report keeps the last synced states and says so. The session ends with a report to the human
 built from it.
@@ -1990,7 +1990,8 @@ and claim.
   adds to an epic already synced (`guild drift` reports `adventurer task not in
   SDD` if it is still missing after the PR merged), or `<quest>/<tid>` of a no-epic open quest
   (`guild quest add <slug> --open --no-epic --tasks T01 --titles "..."` when the
-  project has no SDD).
+  project has no SDD). `adventurer done` marks that task done and closes the
+  quest with its last task; the final report then prints `quest <slug> done`.
 
 `guild board` prints a `QUEST BOARD` block per such project: each open quest with
 its task count and dates and the number of free tasks per epic.
