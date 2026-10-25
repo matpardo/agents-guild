@@ -8,7 +8,6 @@ from unittest import mock
 
 from guild import config, paths, timeutil
 from guild.errors import GuildError
-from tests.mq_fixtures import OPEN_VIEW
 from tests.test_revive import FakeTmux
 from tests.testutil import GuildTestCase
 
@@ -47,15 +46,6 @@ class HealthJobsConfigTests(GuildTestCase):
         for jobs in bad:
             with self.assertRaises(GuildError, msg=jobs) as raised:
                 config.validate_project_config(_with_jobs(jobs))
-            self.assertIn("health_jobs", raised.exception.message)
-
-    def test_hero_is_accepted(self):
-        config.validate_project_config(_with_jobs([dict(_JOB, hero="Kahziel the Paladin")]))
-
-    def test_invalid_hero_fails(self):
-        for hero in ("", "  ", 3, None, "a\x1b[31mb", "a\nb"):
-            with self.assertRaises(GuildError, msg=repr(hero)) as raised:
-                config.validate_project_config(_with_jobs([dict(_JOB, hero=hero)]))
             self.assertIn("health_jobs", raised.exception.message)
 
     def test_readme_config_example_loads(self):
@@ -159,75 +149,21 @@ class HealthJobDueTests(HealthJobsTestCase):
         self.cli(["adventurer", "dismiss", "1"], None)
         self.assertEqual(self.board_jobs()["red-main"]["state"], "ok")
 
-    def test_text_board_lists_every_job_with_its_state(self):
+    def test_text_board_lists_due_and_running_not_ok(self):
         self.cli(["adventurer", "start", "--job", "red-main", "--reason", "test reason"], "adv-1")
         self.cli(["adventurer", "done", "--pending", "none"], "adv-1")
         self.cli(["adventurer", "dismiss", "1"], None)
         code, out, err = self.cli(["board"], None)
         self.assertEqual(code, 0, err)
-        self.assertIn("SOLO PLAYERS \u00b7 2", out)
-        self.assertNotIn("HEALTH JOBS", out)
-        self.assertIn("red-main \u2014 ok (acme, every 1d)", out)
-        self.assertIn("drift \u2014 due (acme, every 3d) -> guild adventurer launch drift", out)
+        self.assertIn("HEALTH JOBS", out)
+        self.assertIn("drift", out)
+        self.assertIn("guild adventurer launch drift", out)
         self.assertNotIn("guild adventurer launch red-main", out)
-        self.assertIn("pending: none", out)
-
-    def test_text_board_shows_the_hero_for_due_running_and_ok(self):
-        self.set_jobs(
-            [
-                dict(_JOB, hero="Kahziel the Paladin"),
-                {"name": "drift", "command": "/c", "every": "3d", "hero": "Mira the Ranger"},
-                {"name": "lint", "command": "/c", "every": "3d", "hero": "Orn the Monk"},
-            ]
-        )
-        self.cli(["adventurer", "start", "--job", "red-main", "--reason", "test reason"], "adv-1")
-        self.cli(["adventurer", "start", "--job", "lint", "--reason", "test reason"], "adv-2")
-        self.cli(["adventurer", "done", "--pending", "all clear"], "adv-2")
-        code, out, err = self.cli(["board"], None)
-        self.assertEqual(code, 0, err)
-        self.assertIn("Kahziel the Paladin (red-main) \u2014 running", out)
-        self.assertIn("Mira the Ranger (drift) \u2014 due", out)
-        self.assertIn("Orn the Monk (lint) \u2014 ok", out)
-        self.assertIn("pending: all clear", out)
-        self.assertIn("adventurer 1 Kahziel the Paladin (red-main)", out)
-
-    def test_hero_labels_the_adventurer_in_show_brief_and_final_report(self):
-        self.set_jobs([dict(_JOB, hero="Kahziel the Paladin")])
-        self.cli(["adventurer", "start", "--job", "red-main", "--reason", "test reason"], "adv-1")
-        self.assertIn("Kahziel the Paladin (red-main)", self.cli(["adventurers", "1"], None)[1])
-        self.assertIn("Kahziel the Paladin (red-main)", self.cli(["adventurers"], None)[1])
-        self.assertIn("Kahziel the Paladin (red-main)", self.cli(["brief"], "adv-1")[1])
-        code, out, err = self.cli(["adventurer", "done", "--pending", "none"], "adv-1")
-        self.assertIn("job: Kahziel the Paladin (red-main)", out)
-
-    def test_open_ask_of_the_job_adventurer_shows_under_its_row_not_when_answered(self):
-        self.cli(["adventurer", "start", "--job", "red-main", "--reason", "test reason"], "adv-1")
-        self.write_gh_fixture("view_acme-app_5", dict(OPEN_VIEW))
-        code, out, err = self.cli(["pr", "track", "acme/app#5", "--what", "fix", "--waits", "review"], "adv-1")
-        self.assertEqual(code, 0, err)
-        code, out, err = self.cli(["ask", "Merge the fix?", "--context", "c", "--ref", "pr:acme/app#5"], "adv-1")
-        self.assertEqual(code, 0, err)
-        self.assertEqual(self.board_jobs()["red-main"]["asks"], [{"id": 1, "question": "Merge the fix?"}])
-        self.assertEqual(self.board_jobs()["drift"]["asks"], [])
-        out = self.cli(["board"], None)[1]
-        self.assertIn("    ask #1: Merge the fix?", out.split("SOLO PLAYERS", 1)[1])
-        self.cli(["answer", "1", "yes"], None)
-        self.assertEqual(self.board_jobs()["red-main"]["asks"], [])
-        self.assertNotIn("ask #1:", self.cli(["board"], None)[1].split("SOLO PLAYERS", 1)[1])
-
-    def test_model_carries_hero_and_latest_pending(self):
-        self.set_jobs([dict(_JOB, hero="Kahziel the Paladin")])
-        self.assertIsNone(self.board_jobs()["red-main"]["pending"])
-        self.cli(["adventurer", "start", "--job", "red-main", "--reason", "test reason"], "adv-1")
-        self.cli(["adventurer", "done", "--pending", "two open PRs"], "adv-1")
-        job = self.board_jobs()["red-main"]
-        self.assertEqual(job["hero"], "Kahziel the Paladin")
-        self.assertEqual(job["pending"], "two open PRs")
 
     def test_text_board_without_jobs_has_no_section(self):
         self.set_jobs([])
         code, out, err = self.cli(["board"], None)
-        self.assertNotIn("SOLO PLAYERS", out)
+        self.assertNotIn("HEALTH JOBS", out)
 
 
 class HealthJobLaunchTests(HealthJobsTestCase):

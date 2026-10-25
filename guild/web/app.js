@@ -1735,7 +1735,7 @@ realmDoctorLines: [],
   function renderAdventurer(adventurer) {
     var article = el("article");
     article.className = "card adventurer";
-    article.appendChild(textEl("h3", "adventurer " + adventurer.id + " " + (adventurer.hero === null ? adventurer.job : adventurer.hero)));
+    article.appendChild(textEl("h3", "adventurer " + adventurer.id + " " + adventurer.job));
     article.appendChild(classedText("p", adventurerMeta(adventurer), "muted"));
     if (adventurer.reason !== null) {
       article.appendChild(explain(textEl("p", "reason: " + adventurer.reason), "ui", "bindingReason"));
@@ -1764,10 +1764,6 @@ realmDoctorLines: [],
     appendAll(section, adventurers.map(renderAdventurer));
   }
 
-  function soloPlayerTitle(job) {
-    return job.hero === null ? job.name : job.hero + " (" + job.name + ")";
-  }
-
   function healthJobMeta(job) {
     var parts = [job.project, job.state, "every " + job.every];
     parts.push("last done " + (job.last_done === null ? "never" : job.last_done));
@@ -1777,28 +1773,25 @@ realmDoctorLines: [],
   function renderHealthJob(job) {
     var article = el("article");
     article.className = "card health-job";
-    article.appendChild(textEl("h3", soloPlayerTitle(job) + " \u2014 " + job.state));
+    article.appendChild(textEl("h3", job.name));
     article.appendChild(classedText("p", healthJobMeta(job), "muted"));
     if (job.state === "due") {
       article.appendChild(classedText("code", job.launch, "launch-command"));
     }
-    if (job.pending !== null) {
-      article.appendChild(classedText("p", "pending: " + job.pending, "muted"));
-    }
-    job.asks.forEach(function (ask) {
-      article.appendChild(textEl("p", "ask #" + ask.id + ": " + ask.question));
-    });
     return article;
   }
 
   function renderHealthJobs(jobs) {
     var section = document.getElementById("health-jobs");
     clear(section);
-    if (jobs.length === 0) {
+    var pending = jobs.filter(function (job) {
+      return job.state !== "ok";
+    });
+    if (pending.length === 0) {
       return;
     }
-    section.appendChild(textEl("h2", "solo players (" + jobs.length + ")"));
-    appendAll(section, jobs.map(renderHealthJob));
+    section.appendChild(textEl("h2", "health jobs (" + pending.length + ")"));
+    appendAll(section, pending.map(renderHealthJob));
   }
 
   function renderMemoryItem(item) {

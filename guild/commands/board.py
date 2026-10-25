@@ -903,7 +903,7 @@ def _adventurer_stopped(row, live_ids):
     return row["state"] == "active" and row["session_id"] not in live_ids
 
 
-def _adventurer_lines(ctx, repo_clones, painter, projects_by_name):
+def _adventurer_lines(ctx, repo_clones, painter):
     rows = _adventurer_rows(ctx.conn)
     if not rows:
         return []
@@ -914,8 +914,7 @@ def _adventurer_lines(ctx, repo_clones, painter, projects_by_name):
         lines.append(
             "  adventurer {} {} ({})".format(
                 row["id"],
-                health_jobs.hero_label(projects_by_name.get(row["project"]), row["health_job"])
-                or sanitize.strip_control_sequences(row["job"]),
+                sanitize.strip_control_sequences(row["job"]),
                 ", ".join(part for part in parts if part),
             )
         )
@@ -933,11 +932,10 @@ def _adventurer_lines(ctx, repo_clones, painter, projects_by_name):
 
 
 def _health_job_lines(painter, projects_by_name, ctx):
-    models = health_jobs.models(ctx, projects_by_name)
-    if not models:
+    pending = health_jobs.pending_lines(health_jobs.models(ctx, projects_by_name))
+    if not pending:
         return []
-    rows = health_jobs.board_lines(models, lambda text: painter.paint(text, "dim"), painter.wrap)
-    return [painter.paint("SOLO PLAYERS · {}".format(len(models)), "bold"), *rows, ""]
+    return [painter.paint("HEALTH JOBS · {}".format(len(pending)), "bold"), *pending, ""]
 
 
 def _party_rows_for_names(conn, party_names):
@@ -1009,7 +1007,7 @@ def render_board(ctx, party_filter, raid_filter, color, width):
     projects_by_name = {project["name"]: project for project in config.load_all_projects(ctx.projects_dir)}
     repo_clones = localbase.repo_clones(projects_by_name.values())
     if party_filter is None and raid_filter is None:
-        lines.extend(_adventurer_lines(ctx, repo_clones, painter, projects_by_name))
+        lines.extend(_adventurer_lines(ctx, repo_clones, painter))
         lines.extend(_health_job_lines(painter, projects_by_name, ctx))
     lines.extend(_bases_lines(ctx, _bases_projects(projects_by_name, party_rows, party_filter, raid_filter)))
     lines.extend(_project_lines(ctx, painter, party_rows, projects_by_name))
@@ -1126,7 +1124,6 @@ def _adventurer_model(ctx, repo_clones, row, live_ids, projects_by_name):
         "id": row["id"],
         "project": row["project"],
         "job": sanitize.strip_control_sequences(row["job"]),
-        "hero": health_jobs.hero_label(project_config, row["health_job"]),
         "task": row["task"],
         "state": row["state"],
         "pending": _optional_text(row["pending"]),

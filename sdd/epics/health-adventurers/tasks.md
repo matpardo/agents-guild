@@ -68,3 +68,14 @@ updated: 2026-10-23
 **Acceptance:**
 - [x] A config with `hero` loads; an empty or non-string `hero` fails.
 - [x] The node harness covers the solo players rows.
+
+## T07 — Remove heroes and solo players section
+
+**Depends on:** T06
+**Status:** [x] done
+
+**What:** T06 is removed: no project used it. Health jobs go back to the T05 behavior: no `hero` key, the `HEALTH JOBS` section lists due and running jobs only, and no asks show under a job.
+
+**Acceptance:**
+- [x] A config with `hero` fails to load again.
+- [x] The board and the web show the `HEALTH JOBS` section as before T06.
