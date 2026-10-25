@@ -17,7 +17,7 @@ def _validate_deadline(deadline):
     try:
         datetime.date.fromisoformat(deadline)
     except ValueError:
-        raise GuildError("deadline must be a date like 2026-12-31", 1)
+        raise GuildError("deadline must be a date like 2026-12-31", 1) from None
 
 
 def _validate_project(ctx, project):

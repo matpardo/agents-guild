@@ -1,8 +1,8 @@
 import unittest
 from datetime import datetime, timedelta, timezone
 
-from guild.errors import GuildError
 from guild import timeutil
+from guild.errors import GuildError
 
 
 class DurationParsingTests(unittest.TestCase):

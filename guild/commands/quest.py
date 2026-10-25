@@ -268,7 +268,7 @@ def _free_tasks(tasks_csv, titles_csv):
     titles = _split_csv(titles_csv)
     if len(titles) != len(tids):
         raise GuildError("--titles must have the same number of items as --tasks", 1)
-    return [{"tid": tid, "title": task_title} for tid, task_title in zip(tids, titles)]
+    return [{"tid": tid, "title": task_title} for tid, task_title in zip(tids, titles, strict=True)]
 
 
 def _require_followup_source(ctx, binding, source):

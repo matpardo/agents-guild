@@ -86,12 +86,12 @@ def _format_table(by, entries):
         for index, header in enumerate(_HEADERS)
     ]
     header_line = by.ljust(key_width) + "".join(
-        "  " + header.rjust(width) for header, width in zip(_HEADERS, widths)
+        "  " + header.rjust(width) for header, width in zip(_HEADERS, widths, strict=True)
     )
     lines = [header_line]
     for label, cells in body:
         lines.append(
-            label.ljust(key_width) + "".join("  " + cell.rjust(width) for cell, width in zip(cells, widths))
+            label.ljust(key_width) + "".join("  " + cell.rjust(width) for cell, width in zip(cells, widths, strict=True))
         )
     return lines
 

@@ -16,10 +16,10 @@ from guild.commands import compact as compact_commands
 from guild.commands import handoff as handoff_commands
 from guild.commands import history as history_commands
 from guild.commands import idea as idea_commands
-from guild.commands import quest as quest_commands
 from guild.commands import memory as memory_commands
 from guild.commands import notice as notice_commands
 from guild.commands import pr as pr_commands
+from guild.commands import quest as quest_commands
 from guild.commands import raid_pause as raid_pause_commands
 from guild.commands import realm as realm_commands
 from guild.commands import resources as resources_commands
@@ -407,7 +407,7 @@ class BoardRequestHandler(http_server.BaseHTTPRequestHandler):
         try:
             payload = json.loads(raw.decode("utf-8"))
         except (UnicodeDecodeError, ValueError):
-            raise _RequestRejected(400, "body must be valid JSON")
+            raise _RequestRejected(400, "body must be valid JSON") from None
         if not isinstance(payload, dict):
             raise _RequestRejected(400, "body must be a JSON object")
         return payload

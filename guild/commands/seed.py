@@ -146,7 +146,7 @@ def run(ctx, file_path):
     try:
         data = json.loads(path.read_text())
     except json.JSONDecodeError as error:
-        raise GuildError("invalid JSON in '{}': {}".format(file_path, error), 1)
+        raise GuildError("invalid JSON in '{}': {}".format(file_path, error), 1) from error
     with db.writing(ctx.conn):
         for party in data.get("parties", []):
             _seed_party(ctx, party)

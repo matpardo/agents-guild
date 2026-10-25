@@ -30,7 +30,7 @@ def _parse_item_id(item_id):
     try:
         names.validate_name(party, "party name")
     except GuildError:
-        raise GuildError(_MALFORMED_ID.format(item_id), 1)
+        raise GuildError(_MALFORMED_ID.format(item_id), 1) from None
     return party, int(seq_text)
 
 

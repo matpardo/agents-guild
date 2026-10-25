@@ -57,7 +57,7 @@ def load_settings(settings_path):
     try:
         return json.loads(settings_path.read_text())
     except json.JSONDecodeError as error:
-        raise GuildError("invalid JSON in {}: {}".format(settings_path, error), 1)
+        raise GuildError("invalid JSON in {}: {}".format(settings_path, error), 1) from error
 
 
 def configured_commands(settings):

@@ -1,4 +1,3 @@
-from guild import db, paths
 from tests.test_drift import DriftTestCase
 
 

@@ -657,11 +657,11 @@ def _git_epic_source(sdd_config):
     try:
         sdd.git_fetch(repo)
     except sdd.GitSddError as error:
-        raise GuildError("git fetch failed for {}: {}".format(repo, error), 1)
+        raise GuildError("git fetch failed for {}: {}".format(repo, error), 1) from error
     try:
         files = sdd.git_tasks_files(repo, ref, epics_dir)
     except sdd.GitSddError as error:
-        raise GuildError("git ls-tree failed for {} at {}: {}".format(repo, ref, error), 1)
+        raise GuildError("git ls-tree failed for {} at {}: {}".format(repo, ref, error), 1) from error
     if not files:
         raise GuildError(
             "no tasks.md files found under {} at {}:{}: check sdd.git_ref".format(repo, ref, epics_dir),
@@ -671,7 +671,7 @@ def _git_epic_source(sdd_config):
         try:
             text = sdd.git_show(repo, ref, path)
         except sdd.GitSddError as error:
-            raise GuildError("git show failed for {}:{}: {}".format(ref, path, error), 1)
+            raise GuildError("git show failed for {}:{}: {}".format(ref, path, error), 1) from error
         yield epic, text, "git:{}:{}".format(ref, path)
 
 

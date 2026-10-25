@@ -1,7 +1,6 @@
 import sqlite3
 
 from guild import locking, paths
-
 from tests.testutil import GuildTestCase
 
 

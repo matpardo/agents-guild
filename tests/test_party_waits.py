@@ -5,7 +5,7 @@ import time
 
 from guild import party_waits
 from guild.cli import _build_context
-from tests.mq_fixtures import MergeQueueTestCase, TASKS_MD
+from tests.mq_fixtures import TASKS_MD, MergeQueueTestCase
 from tests.transcript_fixtures import write_transcript
 
 

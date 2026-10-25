@@ -179,7 +179,9 @@ class DoctorTests(GuildTestCase):
     def _clipboard_doctor_out(self, tools):
         self._write_settings(_ALL_HOOKS)
         self._link_rules()
-        which = lambda name: "/bin/" + name if name in tools else None
+        def which(name):
+            return "/bin/" + name if name in tools else None
+
         with mock.patch.dict(os.environ, {"DISPLAY": ":0"}), mock.patch(
             "guild.tmux_windows.shutil.which", side_effect=which
         ):

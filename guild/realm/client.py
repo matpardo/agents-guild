@@ -19,7 +19,7 @@ def parse_url(url):
     try:
         port = parts.port
     except ValueError:
-        raise GuildError("invalid realm url: bad port", 1)
+        raise GuildError("invalid realm url: bad port", 1) from None
     if parts.scheme != "https" or not parts.hostname:
         raise GuildError("invalid realm url: use https://host[:port]", 1)
     if parts.path not in ("", "/") or parts.query or parts.fragment or parts.username or parts.password:
@@ -43,10 +43,10 @@ def _connect_pinned(config):
         got = pin.fingerprint(connection.sock.getpeercert(binary_form=True))
     except ssl.SSLError:
         connection.close()
-        raise GuildError("realm hub refused the TLS 1.3 handshake (downgrade or not a realm hub)", 1)
+        raise GuildError("realm hub refused the TLS 1.3 handshake (downgrade or not a realm hub)", 1) from None
     except (OSError, http.client.HTTPException) as error:
         connection.close()
-        raise GuildError("realm hub unreachable: {}".format(type(error).__name__), 1)
+        raise GuildError("realm hub unreachable: {}".format(type(error).__name__), 1) from error
     if not hmac.compare_digest(got.encode("ascii"), config["fingerprint"].encode("ascii")):
         connection.close()
         raise GuildError(
@@ -62,7 +62,7 @@ def _read_json(response):
     try:
         payload = json.loads(raw.decode("utf-8"))
     except (UnicodeDecodeError, ValueError, RecursionError):
-        raise GuildError("realm hub sent an invalid response", 1)
+        raise GuildError("realm hub sent an invalid response", 1) from None
     if not isinstance(payload, dict):
         raise GuildError("realm hub sent an invalid response", 1)
     return payload
@@ -81,7 +81,7 @@ def exchange(config, method, path, body):
         payload = _read_json(response)
         return response.status, payload, response.getheader("Date")
     except (OSError, http.client.HTTPException) as error:
-        raise GuildError("realm hub request failed: {}".format(type(error).__name__), 1)
+        raise GuildError("realm hub request failed: {}".format(type(error).__name__), 1) from error
     finally:
         connection.close()
 

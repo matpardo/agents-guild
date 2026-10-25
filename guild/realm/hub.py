@@ -1,7 +1,6 @@
 import hashlib
 import hmac
 import json
-import os
 import re
 import secrets
 import ssl
@@ -114,7 +113,7 @@ class HubRequestHandler(http_server.BaseHTTPRequestHandler):
         try:
             payload = json.loads(raw.decode("utf-8"))
         except (UnicodeDecodeError, ValueError, RecursionError):
-            raise _Rejected(400, "body must be valid JSON")
+            raise _Rejected(400, "body must be valid JSON") from None
         if not isinstance(payload, dict):
             raise _Rejected(400, "body must be a JSON object")
         return payload
@@ -124,7 +123,7 @@ class HubRequestHandler(http_server.BaseHTTPRequestHandler):
         try:
             status.validate(payload, False)
         except GuildError:
-            raise _Rejected(400, "invalid status")
+            raise _Rejected(400, "invalid status") from None
         if payload["guild"] != member:
             raise _Rejected(403, "status guild must be the token's member")
         stored = dict(payload)
@@ -156,7 +155,7 @@ class HubRequestHandler(http_server.BaseHTTPRequestHandler):
         try:
             data = content.encode("utf-8")
         except UnicodeEncodeError:
-            raise _Rejected(400, "content must be UTF-8")
+            raise _Rejected(400, "content must be UTF-8") from None
         if len(data) > CONTENT_MAX_BYTES:
             raise _Rejected(413, "content too large")
         with self.server.inbox_lock:

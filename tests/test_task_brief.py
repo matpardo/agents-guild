@@ -1,4 +1,3 @@
-import json
 import re
 
 from guild import db, paths
@@ -291,7 +290,7 @@ class BudgetTests(TaskBriefBase):
         self.sql("UPDATE prs SET what = ?", ("w" * 500,))
         for index in range(8):
             self.ask("q" * 290 + str(index), "task:demo/T01")
-        for index in range(7):
+        for _ in range(7):
             self.cli(["notice", "create", "n" * 400, "--to", "guild", "--ttl", "2h"])
         code, out, err = self.cli(
             ["handoff", "--in-flight", "in flight", "--learned", "the system prompt change broke onboarding"]
@@ -322,7 +321,7 @@ class BudgetTests(TaskBriefBase):
         self.sql("UPDATE prs SET what = ?", ("w" * 500,))
         for index in range(8):
             self.ask("q" * 290 + str(index), "task:demo/T01")
-        for index in range(7):
+        for _ in range(7):
             self.cli(["notice", "create", "n" * 400, "--to", "guild", "--ttl", "2h"])
         self.handoff_sections("handoff line 0", "y")
         out = self.brief()

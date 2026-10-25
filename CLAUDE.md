@@ -17,6 +17,7 @@ Guild is a Python 3.10 stdlib-only CLI (`guild/`) with a browser board (`guild/w
 ## Tests
 
 - Run all: `TMPDIR=/dev/shm python3 tests/run_parallel.py`. One module: `python3 -m unittest tests.test_<name>`.
+- Lint: `ruff check .` must pass (CI runs it). Ruff installs only from `requirements-lint.txt`, pinned by sha256; a version bump updates every hash and `required-version` in `ruff.toml`. Fix findings in code, never with `noqa` or ignores.
 - `tests/__init__.py` turns commit signing off for test repos.
 - A change to a web filter or a render needs a behavior test in the node harness (`tests/web_drift_harness.js`, driven by `tests/test_web_drift.py`) when `node` exists. Without node those tests skip: say so in the PR.
 

@@ -134,7 +134,7 @@ def _cert_end(cert_path):
     try:
         return datetime.strptime(result.stdout.strip(), _OPENSSL_END_FORMAT).replace(tzinfo=timezone.utc)
     except ValueError:
-        raise GuildError("openssl printed an unreadable certificate end date", 1)
+        raise GuildError("openssl printed an unreadable certificate end date", 1) from None
 
 
 def _cert_lines(cert_path, now):

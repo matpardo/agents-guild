@@ -6,7 +6,6 @@ from tempfile import TemporaryDirectory
 from guild import config
 from guild.errors import GuildError
 
-
 _BASE_CONFIG = {"name": "acme", "paths": ["/tmp/acme/*"], "github": {"repos": ["acme/app"]}}
 
 

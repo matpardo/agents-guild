@@ -124,7 +124,7 @@ def _write_backup(conn):
         target.chmod(0o600)
         return target
     except (sqlite3.Error, OSError) as error:
-        raise GuildError("compact aborted, backup to {} failed: {}".format(target, error), 1)
+        raise GuildError("compact aborted, backup to {} failed: {}".format(target, error), 1) from error
 
 
 def _delete_seqs(conn, seqs):
@@ -154,7 +154,7 @@ def _vacuum(conn):
         conn.execute("VACUUM")
         conn.execute("PRAGMA wal_checkpoint(TRUNCATE)")
     except sqlite3.OperationalError as error:
-        raise GuildError("compact deleted rows but VACUUM failed (database locked?): {}".format(error), 1)
+        raise GuildError("compact deleted rows but VACUUM failed (database locked?): {}".format(error), 1) from error
 
 
 def apply(ctx, compact_plan):

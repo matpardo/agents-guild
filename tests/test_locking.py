@@ -1,7 +1,7 @@
 import fcntl
+import tempfile
 import unittest
 from pathlib import Path
-import tempfile
 
 from guild import locking
 from guild.errors import GuildError

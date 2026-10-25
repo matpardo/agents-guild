@@ -3,7 +3,6 @@ import io
 import os
 
 from guild.cli import main
-
 from tests.testutil import GuildTestCase
 
 

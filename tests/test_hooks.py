@@ -6,10 +6,7 @@ import subprocess
 import time
 from unittest import mock
 
-from guild import ctx_pressure, db, events, timeutil
-from guild import paths
-from guild import pii
-from guild import notify
+from guild import ctx_pressure, db, events, notify, paths, pii, timeutil
 from guild.commands import memory as memory_commands
 from guild.commands import statusline as statusline_commands
 from tests.testutil import GuildTestCase

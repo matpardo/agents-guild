@@ -2875,6 +2875,16 @@ CI (`.github/workflows/tests.yml`) runs the same command on Python 3.10
 for every pull request and every push to `main`. The suite needs no global
 git identity: each test that commits configures its own.
 
+Lint (dev-only, not a runtime dependency): ruff, pinned by version and
+sha256 in `requirements-lint.txt`, configured in `ruff.toml`. CI runs it
+before the tests.
+
+```
+python3 -m venv .venv
+.venv/bin/pip install --require-hashes -r requirements-lint.txt
+.venv/bin/ruff check .
+```
+
 Coverage (dev-only, not a runtime dependency):
 
 ```
