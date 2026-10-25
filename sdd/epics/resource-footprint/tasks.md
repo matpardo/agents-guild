@@ -146,3 +146,14 @@ updated: 2026-10-04
 **Acceptance:**
 - [x] `db.connect` and a read succeed while another connection holds the write lock.
 - [x] The compact button shows the result or the error even when the refresh fails.
+
+## T13 — Collect from the web
+
+**Depends on:** T12
+**Status:** [x] done
+
+**What:** A "Collect now" button next to "Compact db" posts to `POST /api/resources/collect` and runs the same function as `guild resources collect`, so a sample can be forced without waiting for the timer.
+
+**Acceptance:**
+- [x] The endpoint records the samples and returns the summary line.
+- [x] The button shows the summary or the error and leaves its busy state.

@@ -631,7 +631,8 @@ writes to the database for about a minute, so run it when idle; readers keep
 working.
 
 Web: the "resources" section has a "Compact db" button, which posts to
-`POST /api/compact` and runs the same function.
+`POST /api/compact` and runs the same function. Next to it, a "Collect now"
+button posts to `POST /api/resources/collect` and runs `guild resources collect`.
 
 ### `guild resources`
 

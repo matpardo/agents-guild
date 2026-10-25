@@ -6,6 +6,7 @@
   var SESSION_URL = "/api/session";
   var RESOURCES_URL = "/api/resources";
   var COMPACT_URL = "/api/compact";
+  var COLLECT_URL = "/api/resources/collect";
   var REALM_REFRESH_URL = "/api/realm/refresh";
 var REALM_DOCTOR_URL = "/api/realm/doctor";
 var REALM_INBOX_REFRESH_URL = "/api/realm/inbox/refresh";
@@ -85,6 +86,8 @@ realmDoctorLines: [],
     partyHandoffBusy: {},
     compactStatus: "",
     compactBusy: false,
+    collectStatus: "",
+    collectBusy: false,
     taskMoveStatuses: {},
     focusedAskId: null,
     focusStart: 0,
@@ -495,6 +498,23 @@ realmDoctorLines: [],
     sendPost(COMPACT_URL, {}).then(function (result) {
       state.compactBusy = false;
       state.compactStatus = result.ok ? compactResultText(result.body) : errorMessage(result.body);
+      showResources();
+      fetchResources();
+    });
+  }
+
+  function postCollect() {
+    if (sessionToken === null) {
+      state.collectStatus = NO_SESSION_MESSAGE;
+      showResources();
+      return;
+    }
+    state.collectBusy = true;
+    state.collectStatus = "sampling...";
+    showResources();
+    sendPost(COLLECT_URL, {}).then(function (result) {
+      state.collectBusy = false;
+      state.collectStatus = result.ok ? result.body.message : errorMessage(result.body);
       showResources();
       fetchResources();
     });
@@ -3145,6 +3165,12 @@ realmDoctorLines: [],
     button.addEventListener("click", postCompact);
     controls.appendChild(button);
     controls.appendChild(classedText("span", state.compactStatus, "ask-status"));
+    var collect = textEl("button", "Collect now");
+    collect.type = "button";
+    collect.disabled = state.collectBusy;
+    collect.addEventListener("click", postCollect);
+    controls.appendChild(collect);
+    controls.appendChild(classedText("span", state.collectStatus, "ask-status"));
     return controls;
   }
 

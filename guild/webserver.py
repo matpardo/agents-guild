@@ -22,6 +22,7 @@ from guild.commands import notice as notice_commands
 from guild.commands import pr as pr_commands
 from guild.commands import raid_pause as raid_pause_commands
 from guild.commands import realm as realm_commands
+from guild.commands import resources as resources_commands
 from guild.commands import task as task_commands
 from guild.errors import GuildError
 from guild.realm import hub as realm_hub
@@ -52,6 +53,7 @@ _QUEST_ACTION_RE = re.compile(r"^/api/quests/([^/]+)/(take|release)$")
 _QUEST_CREATE_PATH = "/api/quests/create-open"
 _ADVENTURER_DISMISS_RE = re.compile(r"^/api/adventurers/([^/]+)/dismiss$")
 _COMPACT_PATH = "/api/compact"
+_RESOURCES_COLLECT_PATH = "/api/resources/collect"
 _REALM_REFRESH_PATH = "/api/realm/refresh"
 _REALM_DOCTOR_PATH = "/api/realm/doctor"
 _REALM_INBOX_REFRESH_PATH = "/api/realm/inbox/refresh"
@@ -262,6 +264,14 @@ def _run_compact():
     ctx = _action_context()
     try:
         return compact_commands.run(ctx, False)
+    finally:
+        ctx.conn.close()
+
+
+def _run_resources_collect():
+    ctx = _action_context()
+    try:
+        return resources_commands.run_collect(ctx)
     finally:
         ctx.conn.close()
 
@@ -508,6 +518,8 @@ class BoardRequestHandler(http_server.BaseHTTPRequestHandler):
             )
         if path == _COMPACT_PATH:
             return self._post_action("compact", lambda payload: _run_compact())
+        if path == _RESOURCES_COLLECT_PATH:
+            return self._post_action("resources-collect", lambda payload: _run_resources_collect())
         if path == _REALM_REFRESH_PATH:
             return self._post_payload("realm-refresh", lambda payload: dict(_run_realm_refresh(), ok=True))
         if path == _REALM_DOCTOR_PATH:
