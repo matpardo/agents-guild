@@ -105,3 +105,10 @@ updated: 2026-10-25
 **Status:** [x] done
 
 **What:** `ruff check .` passes on the whole repo with the rules in `ruff.toml` (pyflakes, import order, bugbear and the default error set), and CI runs it before the tests. Ruff installs only from `requirements-lint.txt`, pinned by version and the sha256 of every published wheel, so a swapped package fails the install. Findings are fixed in code: unused imports removed, exceptions raised inside `except` chained with `from`, and `zip` over same-length lists marked `strict=True`.
+
+## T15 — Pin the CI actions by commit SHA
+
+**Depends on:** T14
+**Status:** [x] done
+
+**What:** every `uses:` in `.github/workflows/` names an action by its full commit SHA with the release tag beside it, so a moved or hijacked tag cannot change what CI runs; `tests/test_ci_pins.py` fails on any tag or branch ref.
