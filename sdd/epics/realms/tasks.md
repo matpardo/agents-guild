@@ -64,9 +64,13 @@ updated: 2026-10-24
 
 **What:** `guild realm doctor` checks the link from a guild to its hub and the hub itself, in the CLI and the web.
 
-## T08 — Realm doctor
+## T09 — Duplicate task ids fail the sync clearly
 
-**Depends on:** T07
+**Depends on:** T08
 **Status:** [x] done
 
-**What:** `guild realm doctor` checks the link from a guild to its hub and the hub itself, in the CLI and the web.
+**What:** A `tasks.md` with a repeated task id fails its epic with `duplicate task ids: <tids>` and the other epics still sync; the SDD docs test refuses duplicate ids. The repeated T08 entry is removed.
+
+**Acceptance:**
+- [x] Sync reports the duplicate ids for that epic, without a traceback, and syncs the rest.
+- [x] `tests/test_sdd_docs.py` fails on a repeated task id.

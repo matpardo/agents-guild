@@ -679,6 +679,10 @@ def _sync_epic_file(ctx, project, epic, text, sdd_path, patterns, epic_key_field
     tasks = sdd.parse_tasks_text(text, patterns)
     if tasks is None:
         raise GuildError("no matching task headings", 1)
+    tids = [task["tid"] for task in tasks]
+    duplicates = sorted({tid for tid in tids if tids.count(tid) > 1})
+    if duplicates:
+        raise GuildError("duplicate task ids: {}".format(", ".join(duplicates)), 1)
     jira_key = sdd.parse_epic_key(text, epic_key_field)
     sdd_status = sdd.parse_epic_status(text, epic_status_field)
     with db.writing(ctx.conn):
