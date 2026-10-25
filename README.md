@@ -2876,6 +2876,9 @@ for every pull request and every push to `main`. The suite needs no global
 git identity: each test that commits configures its own.
 Every action in a workflow is pinned by its full commit SHA, with the
 release tag beside it; `tests/test_ci_pins.py` fails on a tag or branch ref.
+Dependabot (`.github/dependabot.yml`) opens a monthly pull request for a
+newer action or ruff, waiting 14 days after each release; a ruff bump also
+needs `required-version` in `ruff.toml` raised by hand before CI passes.
 
 Lint (dev-only, not a runtime dependency): ruff, pinned by version and
 sha256 in `requirements-lint.txt`, configured in `ruff.toml`. CI runs the
