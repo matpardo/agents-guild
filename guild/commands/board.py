@@ -22,6 +22,7 @@ from guild import (
     session_status,
     timeutil,
 )
+from guild.commands import base_pause as base_pause_commands
 from guild.commands import brief as brief_commands
 from guild.commands import claim as claim_commands
 from guild.commands import drift as drift_commands
@@ -759,7 +760,9 @@ def _drift_text(entry):
     return ", ".join(parts)
 
 
-def _drift_line(ctx, entry):
+def _drift_line(ctx, entry, paused):
+    if paused:
+        return "{}: paused".format(entry["repo"])
     if entry["base"] is None:
         return "{}: {}".format(entry["repo"], entry["error"])
     if entry["error"] is not None:
@@ -770,14 +773,16 @@ def _drift_line(ctx, entry):
 
 
 def _bases_model(ctx, projects):
+    paused = base_pause_commands.paused_repos(ctx.conn)
     return [
         {
             "repo": entry["repo"],
             "base": entry["base"],
             "behind": entry["behind"],
             "ahead": entry["ahead"],
-            "warn": entry["error"] is not None or entry["behind"] > 0,
-            "text": _drift_line(ctx, entry),
+            "paused": entry["repo"] in paused,
+            "warn": entry["repo"] not in paused and (entry["error"] is not None or entry["behind"] > 0),
+            "text": _drift_line(ctx, entry, entry["repo"] in paused),
         }
         for project in projects
         for entry in localbase.base_drift(project)

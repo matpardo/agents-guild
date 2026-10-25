@@ -689,6 +689,20 @@ def _handle_raid_leave(ctx, args):
     return 0
 
 
+def _handle_base_pause(ctx, args):
+    from guild.commands import base_pause as base_pause_commands
+
+    _print(base_pause_commands.pause(ctx, args.repo))
+    return 0
+
+
+def _handle_base_resume(ctx, args):
+    from guild.commands import base_pause as base_pause_commands
+
+    _print(base_pause_commands.resume(ctx, args.repo))
+    return 0
+
+
 def _handle_raid_pause(ctx, args):
     from guild.commands import raid_pause as raid_pause_commands
 
@@ -1350,6 +1364,19 @@ def _add_raid_parser(subparsers):
     resume.set_defaults(handler=_handle_raid_resume)
 
 
+def _add_base_parser(subparsers):
+    parser = subparsers.add_parser("base", help="pause or resume the bases fetch of a repo")
+    actions = parser.add_subparsers(dest="base_action", required=True, metavar="<subcommand>")
+
+    pause = actions.add_parser("pause", help="stop fetching the base of a repo")
+    pause.add_argument("repo", help="owner/repo")
+    pause.set_defaults(handler=_handle_base_pause)
+
+    resume = actions.add_parser("resume", help="fetch the base of a repo again")
+    resume.add_argument("repo", help="owner/repo")
+    resume.set_defaults(handler=_handle_base_resume)
+
+
 def _add_merge_queue_parser(subparsers):
     parser = subparsers.add_parser("merge-queue", help="read-only: PRs in the order to merge by hand")
     scope = parser.add_mutually_exclusive_group()
@@ -1503,6 +1530,7 @@ def build_parser():
     _add_realm_parser(subparsers)
 
     _add_raid_parser(subparsers)
+    _add_base_parser(subparsers)
 
     raids = subparsers.add_parser("raids", help="list raids")
     raids.set_defaults(handler=_handle_raids)

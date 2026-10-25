@@ -614,6 +614,17 @@ def _raid_resumed(conn, event):
     conn.execute("DELETE FROM raid_pauses WHERE raid = ?", (event["payload"]["raid"],))
 
 
+def _base_paused(conn, event):
+    conn.execute(
+        "INSERT OR REPLACE INTO base_pauses (repo, paused_at) VALUES (?, ?)",
+        (event["payload"]["repo"], event["ts"]),
+    )
+
+
+def _base_resumed(conn, event):
+    conn.execute("DELETE FROM base_pauses WHERE repo = ?", (event["payload"]["repo"],))
+
+
 def _merge_queue_pinned(conn, event):
     payload = event["payload"]
     conn.execute(
@@ -868,6 +879,8 @@ _REDUCERS = {
     "raid.joined": _raid_joined,
     "raid.left": _raid_left,
     "raid.paused": _raid_paused,
+    "base.paused": _base_paused,
+    "base.resumed": _base_resumed,
     "raid.resumed": _raid_resumed,
     "merge_queue.pinned": _merge_queue_pinned,
     "merge_queue.unpinned": _merge_queue_unpinned,

@@ -6,6 +6,7 @@ from pathlib import Path
 
 from guild import config, db, events, handoff_prune, human_ready, localbase, paths, timeutil, trace_validator
 from guild.adapters import github, jira_acli, sdd
+from guild.commands import base_pause as base_pause_commands
 from guild.commands import claim as claim_commands
 from guild.commands import drift as drift_commands
 from guild.commands import lifecycle as lifecycle_commands
@@ -386,18 +387,22 @@ def _fast_forward_clone_mutating_git(ctx, project, clone):
 
 
 def _fast_forward_merged_bases_mutating_git(ctx, projects, merged_repos):
+    paused = base_pause_commands.paused_repos(ctx.conn)
     for project in projects:
         if not project.get("fast_forward_base"):
             continue
         for clone in localbase.locate_clones(project):
-            if clone["repo"] in merged_repos:
+            if clone["repo"] in merged_repos and clone["repo"] not in paused:
                 _fast_forward_clone_mutating_git(ctx, project, clone)
 
 
 def _sync_bases_mutating_git(ctx):
     failures = []
+    paused = base_pause_commands.paused_repos(ctx.conn)
     for project in config.load_all_projects(ctx.projects_dir):
         for clone in localbase.locate_clones(project):
+            if clone["repo"] in paused:
+                continue
             base = localbase.base_branch(clone["path"])
             if base is None:
                 continue

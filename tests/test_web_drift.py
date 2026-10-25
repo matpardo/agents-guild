@@ -444,6 +444,33 @@ class WebBasesBehaviorTests(unittest.TestCase):
             ],
         )
 
+    def test_each_base_has_a_pause_or_resume_button(self):
+        bases = [
+            {
+                "repo": "o/a",
+                "base": "main",
+                "behind": 0,
+                "ahead": 0,
+                "paused": False,
+                "warn": False,
+                "text": "o/a main: up to date",
+            },
+            {
+                "repo": "o/b",
+                "base": None,
+                "behind": None,
+                "ahead": None,
+                "paused": True,
+                "warn": False,
+                "text": "o/b: paused",
+            },
+        ]
+        lines = self._tree(bases)["children"][1:]
+        self.assertEqual(
+            [(line["children"][0]["className"], line["children"][1]["text"]) for line in lines],
+            [("pill res-ok", "pause"), ("pill lifecycle-blocked-external", "resume")],
+        )
+
     def test_no_bases_renders_nothing(self):
         self.assertEqual(self._tree([])["children"], [])
 

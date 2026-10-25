@@ -75,3 +75,15 @@ updated: 2026-10-25
 - [x] `sync --source bases` fetches every clone, makes no GitHub call, and reports a failed fetch as a failure with a non-zero exit; `sync --source gh` leaves `origin/<base>` unchanged.
 - [x] `sync-bases-timer print --every 1m` renders units that run `guild sync --source bases`, and `timers.sh` and `guild doctor` cover them.
 - [x] The board text, the board model `behind` field and the web pill show the count only above 0; no stored data is added.
+
+## T07 — Pause a base
+
+**Depends on:** T06
+**Status:** [x] done
+
+**What:** `guild base pause <owner/repo>` and `guild base resume <owner/repo>` (and a pause or resume button per base in the web header) stop and restart the fetch of a repo's clones. `guild sync --source bases` and the post-merge fast-forward skip a paused repo. The board text and the board model `bases` entries carry `paused`, and a paused base raises no warning.
+
+**Acceptance:**
+- [x] A paused repo's `origin/<base>` does not move on `sync --source bases` and moves again after resume; double pause, resume when not paused and an unknown repo fail.
+- [x] The pause is stored in `base_pauses` and replays in `guild rebuild`.
+- [x] The web header renders a pause or resume button per base and the route calls the same function as the CLI.
