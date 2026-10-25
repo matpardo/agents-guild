@@ -662,7 +662,7 @@ def _main_marked(conn, event):
 
 _WAIT_STATUS = {
     "permission": "waiting-permission",
-    "elicitation": "waiting-input",
+    "elicitation": "waiting-permission",
     "idle": "waiting-input",
 }
 

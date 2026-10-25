@@ -1190,6 +1190,15 @@ class SubagentHookTests(GuildTestCase):
         self.run_hook("subagent-stop", self._payload(agent_id="a1"))
         self.assertFalse(self.marker.exists())
 
+    def test_start_stores_meta_path_from_transcript_path(self):
+        transcript = "/t/proj/sess-1.jsonl"
+        self.run_hook("subagent-start", self._payload(agent_id="a1", transcript_path=transcript))
+        self.assertEqual(self.marker.read_text(), "/t/proj/sess-1/subagents/agent-a1.meta.json")
+
+    def test_start_without_transcript_path_stores_empty(self):
+        self.run_hook("subagent-start", self._payload(agent_id="a1"))
+        self.assertEqual(self.marker.read_text(), "")
+
     def test_unbound_session_writes_nothing(self):
         payload = {"session_id": "sess-9", "cwd": str(self.repo_dir), "agent_id": "a1"}
         self.run_hook("subagent-start", payload)
@@ -1250,7 +1259,7 @@ class SessionLivenessHookTests(GuildTestCase):
         self._notify(repo_dir, "permission_prompt", "Claude needs permission to run ls")
         self.assertEqual(self._count("session.waiting"), 1)
 
-    def test_idle_and_elicitation_map_to_waiting_input(self):
+    def test_idle_maps_to_waiting_input_and_elicitation_to_waiting_permission(self):
         repo_dir = self._bound()
         self._notify(repo_dir, "idle_prompt", "Claude is waiting for your input")
         self.assertEqual(self._status()[0], "waiting-input")
@@ -1258,7 +1267,13 @@ class SessionLivenessHookTests(GuildTestCase):
         self.assertEqual(json.loads(events_row["payload"])["wait"], "idle")
         self.run_hook("post-tool-use", self._payload(repo_dir))
         self._notify(repo_dir, "elicitation_dialog", "pick one")
-        self.assertEqual(self._status(), ("waiting-input", "pick one"))
+        self.assertEqual(self._status(), ("waiting-permission", "pick one"))
+
+    def test_idle_prompt_keeps_a_pending_elicitation_wait(self):
+        repo_dir = self._bound()
+        self._notify(repo_dir, "elicitation_dialog", "pick one")
+        self._notify(repo_dir, "idle_prompt", "Claude is waiting for your input")
+        self.assertEqual(self._status(), ("waiting-permission", "pick one"))
 
     def test_idle_prompt_keeps_a_pending_permission_wait(self):
         repo_dir = self._bound()

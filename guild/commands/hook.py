@@ -176,7 +176,7 @@ def _pause_lines(ctx, binding):
 
 _NOTIFICATION_WAITS = {
     "permission_prompt": ("permission", "waiting-permission"),
-    "elicitation_dialog": ("elicitation", "waiting-input"),
+    "elicitation_dialog": ("elicitation", "waiting-permission"),
     "idle_prompt": ("idle", "waiting-input"),
 }
 
@@ -209,10 +209,17 @@ def stop(ctx):
         session_status.record_change(ctx, binding, "session.stopped", {})
 
 
-def subagent_start(ctx, agent_id):
+def _subagent_meta_path(transcript_path, agent_id):
+    if not transcript_path:
+        return ""
+    return str(Path(transcript_path).with_suffix("") / "subagents" / "agent-{}.meta.json".format(agent_id))
+
+
+def subagent_start(ctx, agent_id, transcript_path):
     if agent_id is None or _session_actor(ctx) is None:
         return
-    background.mark(ctx.state_dir, ctx.session_id, background.subagent_key(agent_id), agent_id)
+    meta_path = _subagent_meta_path(transcript_path, agent_id)
+    background.mark(ctx.state_dir, ctx.session_id, background.subagent_key(agent_id), meta_path)
 
 
 def subagent_stop(ctx, agent_id):

@@ -2622,7 +2622,7 @@ Without a hooks manager, add the same call to the repository's
 Every bound session has a status, kept in the `session_status` projection from
 local `session.waiting`, `session.stopped` and `session.working` events (replayed
 by `guild rebuild`). `Notification` maps `notification_type`
-`permission_prompt` to `waiting-permission`, and `elicitation_dialog` and
+`permission_prompt` and `elicitation_dialog` to `waiting-permission`, and
 `idle_prompt` to `waiting-input`; any other type is ignored. `Stop` records
 `stopped`. `session-start` (bound leader), `prompt-submit` and `post-tool-use`
 record `working`, and only when the status changes, so a hundred tool calls
@@ -2640,10 +2640,10 @@ status is ignored.
 | 2 | no live leader and an open ask | `waiting-ask` (age from the oldest open ask) |
 | 3 | no live leader and `guild next` would return work (never when a raid pause is on) | `queued` |
 | 4 | no live leader otherwise | `idle` |
-| 5 | live leader blocked on a permission prompt | `waiting-permission` |
+| 5 | live leader blocked on a permission prompt or an elicitation dialog | `waiting-permission` |
 | 6 | live leader, open ask and session not working | `waiting-ask` |
 | 7 | live leader idle or stopped while it has background work: a running `guild pr wait` or a live subagent | `waiting-background` (detail `pr <ref>`, `N subagents`) |
-| 8 | live leader waiting on an idle prompt or an elicitation | `waiting-input` |
+| 8 | live leader waiting on an idle prompt | `waiting-input` |
 | 9 | live leader stopped | `stopped-with-work` when `guild next` would still return work, otherwise `done` |
 | 10 | live leader that never reported a status (for example a session started before the `Notification`/`Stop` hooks were wired) | `unknown` |
 | 11 | live leader otherwise | `working` |

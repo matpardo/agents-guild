@@ -1,3 +1,6 @@
+import json
+from pathlib import Path
+
 from guild import session_info
 
 _SUBAGENT_TTL_SECONDS = 2 * 60 * 60
@@ -35,11 +38,21 @@ def subagent_key(agent_id):
     return "{}{}".format(_SUBAGENT_PREFIX, agent_id)
 
 
+def _subagent_finished(entry):
+    try:
+        meta = json.loads(Path(entry.read_text()).read_text())
+    except (json.JSONDecodeError, OSError):
+        return False
+    return isinstance(meta, dict) and meta.get("finished") is True
+
+
 def _is_live(entry, now):
     if entry.name.startswith(_PR_PREFIX):
         pid = entry.name[len(_PR_PREFIX):]
         return pid.isdigit() and session_info.pid_alive(int(pid))
-    return now.timestamp() - entry.stat().st_mtime < _SUBAGENT_TTL_SECONDS
+    if now.timestamp() - entry.stat().st_mtime >= _SUBAGENT_TTL_SECONDS:
+        return False
+    return not _subagent_finished(entry)
 
 
 def labels(state_dir, session_id, now):

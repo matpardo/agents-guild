@@ -24,9 +24,9 @@ class SessionStatusTests(GuildTestCase):
         self.assertEqual(row["detail"], "run ls")
         self.assertEqual(row["party"], "alpha")
 
-    def test_waiting_input_for_elicitation_and_idle(self):
+    def test_elicitation_is_waiting_permission_and_idle_is_waiting_input(self):
         self._record("session.waiting", session_status.waiting_payload("elicitation", "pick"))
-        self.assertEqual(session_status.current(self.ctx.conn, "sess-1")["status"], "waiting-input")
+        self.assertEqual(session_status.current(self.ctx.conn, "sess-1")["status"], "waiting-permission")
         self._record("session.waiting", session_status.waiting_payload("idle", ""))
         self.assertEqual(session_status.current(self.ctx.conn, "sess-1")["status"], "waiting-input")
 
