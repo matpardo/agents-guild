@@ -37,9 +37,7 @@ _NO_SAMPLES_LINE = "no samples yet; run guild resources collect"
 
 
 def _bound(conn, table, aggregate, scope, params):
-    row = conn.execute(
-        "SELECT {}(ts) AS ts FROM {} WHERE {}".format(aggregate, table, scope), params
-    ).fetchone()
+    row = conn.execute("SELECT {}(ts) AS ts FROM {} WHERE {}".format(aggregate, table, scope), params).fetchone()
     return row["ts"]
 
 

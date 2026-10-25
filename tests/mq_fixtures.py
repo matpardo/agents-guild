@@ -30,8 +30,12 @@ updated: 2026-09-29
 """
 
 OPEN_VIEW = {
-    "state": "OPEN", "isDraft": False, "headRefName": "feature/x", "title": "t",
-    "statusCheckRollup": [{"conclusion": "SUCCESS"}], "mergeable": "MERGEABLE",
+    "state": "OPEN",
+    "isDraft": False,
+    "headRefName": "feature/x",
+    "title": "t",
+    "statusCheckRollup": [{"conclusion": "SUCCESS"}],
+    "mergeable": "MERGEABLE",
 }
 
 
@@ -57,7 +61,9 @@ class MergeQueueTestCase(GuildTestCase):
     def setUp(self):
         super().setUp()
         self.repo_dir = self.register_project("acme", ["acme/app"])
-        self._set_project_config({"shared_areas": ["config/locales/es.yml", "shared/**"], "shared_area_claim_ttl": "2h"})
+        self._set_project_config(
+            {"shared_areas": ["config/locales/es.yml", "shared/**"], "shared_area_claim_ttl": "2h"}
+        )
 
     def _set_project_config(self, extra):
         config_file = self.config_home / "guild" / "projects" / "acme.json"
@@ -71,18 +77,27 @@ class MergeQueueTestCase(GuildTestCase):
     def add_quest(self, session_id, slug, epic, tasks):
         code, out, err = self.run_cli(
             ["quest", "add", slug, "--title", slug, "--epic", epic, "--tasks", tasks],
-            session_id, self.repo_dir,
+            session_id,
+            self.repo_dir,
         )
         self.assertEqual(code, 0, err)
 
     def track(self, session_id, number, task, lifecycle):
-        self.write_gh_fixture(
-            "view_acme-app_{}".format(number), dict(OPEN_VIEW, isDraft=lifecycle != "ready")
-        )
+        self.write_gh_fixture("view_acme-app_{}".format(number), dict(OPEN_VIEW, isDraft=lifecycle != "ready"))
         code, out, err = self.run_cli(
-            ["pr", "track", "acme/app#{}".format(number), "--task", task, "--what", "pr {}".format(number),
-             "--waits", "review"],
-            session_id, self.repo_dir,
+            [
+                "pr",
+                "track",
+                "acme/app#{}".format(number),
+                "--task",
+                task,
+                "--what",
+                "pr {}".format(number),
+                "--waits",
+                "review",
+            ],
+            session_id,
+            self.repo_dir,
         )
         self.assertEqual(code, 0, err)
         code, out, err = self.run_cli(

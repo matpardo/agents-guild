@@ -26,23 +26,17 @@ class HandoffTests(GuildTestCase):
     def _leader_row(self):
         conn = sqlite3.connect(str(self.data_home / "guild" / "guild.db"))
         conn.row_factory = sqlite3.Row
-        row = conn.execute(
-            "SELECT * FROM leaders WHERE party = 'alpha' ORDER BY generation DESC LIMIT 1"
-        ).fetchone()
+        row = conn.execute("SELECT * FROM leaders WHERE party = 'alpha' ORDER BY generation DESC LIMIT 1").fetchone()
         conn.close()
         return row
 
     def test_rejects_empty_in_flight(self):
-        code, out, err = self.run_cli(
-            ["handoff", "--in-flight", "  ", "--learned", "x"], "sess-1", self.repo_dir
-        )
+        code, out, err = self.run_cli(["handoff", "--in-flight", "  ", "--learned", "x"], "sess-1", self.repo_dir)
         self.assertEqual(code, 1)
         self.assertIn("--in-flight", err)
 
     def test_rejects_empty_learned(self):
-        code, out, err = self.run_cli(
-            ["handoff", "--in-flight", "x", "--learned", ""], "sess-1", self.repo_dir
-        )
+        code, out, err = self.run_cli(["handoff", "--in-flight", "x", "--learned", ""], "sess-1", self.repo_dir)
         self.assertEqual(code, 1)
         self.assertIn("--learned", err)
 
@@ -55,30 +49,25 @@ class HandoffTests(GuildTestCase):
         self.assertNotIn("## Role", self._handoff_content())
 
     def test_prints_broadcast_reminder(self):
-        code, out, err = self.run_cli(
-            ["handoff", "--in-flight", "x", "--learned", "y"], "sess-1", self.repo_dir
-        )
+        code, out, err = self.run_cli(["handoff", "--in-flight", "x", "--learned", "y"], "sess-1", self.repo_dir)
         self.assertEqual(code, 0)
         self.assertIn("note: this text is broadcast to every session", out)
 
     def test_rejects_in_flight_over_max_length(self):
-        code, out, err = self.run_cli(
-            ["handoff", "--in-flight", "x" * 4001, "--learned", "y"], "sess-1", self.repo_dir
-        )
+        code, out, err = self.run_cli(["handoff", "--in-flight", "x" * 4001, "--learned", "y"], "sess-1", self.repo_dir)
         self.assertEqual(code, 1)
         self.assertIn("exceeds the maximum length", err)
 
     def test_rejects_learned_over_max_length(self):
-        code, out, err = self.run_cli(
-            ["handoff", "--in-flight", "x", "--learned", "y" * 4001], "sess-1", self.repo_dir
-        )
+        code, out, err = self.run_cli(["handoff", "--in-flight", "x", "--learned", "y" * 4001], "sess-1", self.repo_dir)
         self.assertEqual(code, 1)
         self.assertIn("exceeds the maximum length", err)
 
     def test_rejects_email_in_in_flight(self):
         code, out, err = self.run_cli(
             ["handoff", "--in-flight", "ping jane.doe@example.com", "--learned", "y"],
-            "sess-1", self.repo_dir,
+            "sess-1",
+            self.repo_dir,
         )
         self.assertEqual(code, 1)
         self.assertIn("must not contain an email address", err)
@@ -86,7 +75,8 @@ class HandoffTests(GuildTestCase):
     def test_writes_handoff_file_and_prints_resume_command(self):
         code, out, err = self.run_cli(
             ["handoff", "--in-flight", "shipping T01", "--learned", "ci flakes on retries"],
-            "sess-1", self.repo_dir,
+            "sess-1",
+            self.repo_dir,
         )
         self.assertEqual(code, 0)
         self.assertIn("GUILD_RESUME=alpha claude -n alpha-g2", out)
@@ -99,16 +89,12 @@ class HandoffTests(GuildTestCase):
         self.assertIn("ci flakes on retries", content)
 
     def test_party_state_becomes_awaiting_leader(self):
-        self.run_cli(
-            ["handoff", "--in-flight", "x", "--learned", "y"], "sess-1", self.repo_dir
-        )
+        self.run_cli(["handoff", "--in-flight", "x", "--learned", "y"], "sess-1", self.repo_dir)
         code, out, err = self.run_cli(["board"], None, None)
         self.assertIn("awaiting-leader", out)
 
     def test_leader_handoff_path_recorded(self):
-        self.run_cli(
-            ["handoff", "--in-flight", "x", "--learned", "y"], "sess-1", self.repo_dir
-        )
+        self.run_cli(["handoff", "--in-flight", "x", "--learned", "y"], "sess-1", self.repo_dir)
         row = self._leader_row()
         self.assertTrue(row["handoff_path"].endswith("alpha-g1.md"))
 
@@ -116,25 +102,25 @@ class HandoffTests(GuildTestCase):
         self.write_gh_fixture(
             "view_acme-app_1",
             {
-                "state": "OPEN", "isDraft": True, "headRefName": "feature/x", "title": "t",
+                "state": "OPEN",
+                "isDraft": True,
+                "headRefName": "feature/x",
+                "title": "t",
                 "statusCheckRollup": [{"conclusion": "FAILURE"}],
             },
         )
         self.run_cli(
             ["pr", "track", "acme/app#1", "--task", "demo/T01", "--what", "x", "--waits", "y"],
-            "sess-1", self.repo_dir,
+            "sess-1",
+            self.repo_dir,
         )
         self.run_cli(["sync", "--source", "gh"], "sess-1", self.repo_dir)
-        self.run_cli(
-            ["handoff", "--in-flight", "x", "--learned", "y"], "sess-1", self.repo_dir
-        )
+        self.run_cli(["handoff", "--in-flight", "x", "--learned", "y"], "sess-1", self.repo_dir)
         content = (self.data_home / "guild" / "handoffs" / "alpha-g1.md").read_text()
         self.assertIn("failing checks", content)
 
     def test_learned_text_joins_party_memory(self):
-        self.run_cli(
-            ["handoff", "--in-flight", "x", "--learned", "something new"], "sess-1", self.repo_dir
-        )
+        self.run_cli(["handoff", "--in-flight", "x", "--learned", "something new"], "sess-1", self.repo_dir)
         items = memory_commands.list_items("alpha")
         self.assertEqual(len(items), 1)
         self.assertEqual(items[0]["text"], "something new")
@@ -165,7 +151,8 @@ class HandoffTests(GuildTestCase):
     def test_rejects_email_in_learned_before_writing_handoff_or_memory(self):
         code, out, err = self.run_cli(
             ["handoff", "--in-flight", "x", "--learned", "ping jane.doe@example.com"],
-            "sess-1", self.repo_dir,
+            "sess-1",
+            self.repo_dir,
         )
         self.assertEqual(code, 1)
         self.assertIn("must not contain an email address", err)
@@ -175,9 +162,7 @@ class HandoffTests(GuildTestCase):
     def test_defense_in_depth_rejects_handoff_path_escaping_handoffs_dir(self):
         malicious_binding = {"party": "../../tmp/evil", "generation": 1, "project": "acme"}
         with mock.patch("guild.identity.require_binding", return_value=malicious_binding):
-            code, out, err = self.run_cli(
-                ["handoff", "--in-flight", "x", "--learned", "y"], "sess-1", self.repo_dir
-            )
+            code, out, err = self.run_cli(["handoff", "--in-flight", "x", "--learned", "y"], "sess-1", self.repo_dir)
         self.assertEqual(code, 1)
         self.assertIn("invalid party name", err)
         escaped_path = self.data_home / "tmp" / "evil-g1.md"
@@ -198,9 +183,7 @@ class ResumeCommandShellTests(GuildTestCase):
         self.run_cli(["party", "start", "alpha", "--reason", "test reason"], "sess-1", self.repo_dir)
 
     def test_printed_command_runs_nothing_and_passes_prompt_intact(self):
-        code, out, err = self.run_cli(
-            ["handoff", "--in-flight", "x", "--learned", "y"], "sess-1", self.repo_dir
-        )
+        code, out, err = self.run_cli(["handoff", "--in-flight", "x", "--learned", "y"], "sess-1", self.repo_dir)
         command = out.splitlines()[0]
         marker = self.root / "executed"
         script = 'guild() {{ touch "{}"; }}; claude() {{ printf "%s\\n" "$GUILD_RESUME" "$@"; }}; {}'.format(
@@ -223,15 +206,14 @@ class ResumeModelFlagTests(GuildTestCase):
     def test_model_flag_is_appended_to_resume_command(self):
         code, out, err = self.run_cli(
             ["handoff", "--in-flight", "x", "--learned", "y", "--model", "opus"],
-            "sess-1", self.repo_dir,
+            "sess-1",
+            self.repo_dir,
         )
         self.assertEqual(code, 0)
         self.assertIn("claude -n alpha-g2 --model opus 'Continue", out.splitlines()[0])
 
     def test_resume_command_has_no_model_without_flag(self):
-        code, out, err = self.run_cli(
-            ["handoff", "--in-flight", "x", "--learned", "y"], "sess-1", self.repo_dir
-        )
+        code, out, err = self.run_cli(["handoff", "--in-flight", "x", "--learned", "y"], "sess-1", self.repo_dir)
         self.assertNotIn("--model", out)
 
 

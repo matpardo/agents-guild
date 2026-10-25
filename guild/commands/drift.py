@@ -36,9 +36,7 @@ def _party_params(party_scope):
 
 def _active_quest_epics(conn, project):
     rows = conn.execute(
-        "SELECT DISTINCT epic FROM quests"
-        " WHERE project = ? AND state = 'active' AND epic IS NOT NULL"
-        " ORDER BY epic",
+        "SELECT DISTINCT epic FROM quests WHERE project = ? AND state = 'active' AND epic IS NOT NULL ORDER BY epic",
         (project,),
     ).fetchall()
     return [row["epic"] for row in rows]
@@ -53,7 +51,8 @@ def _rule_merged_pr_task_not_done(conn, project, epics, party_scope):
         " JOIN quest_tasks ON quest_tasks.quest = prs.task_quest AND quest_tasks.tid = prs.task_tid"
         " JOIN parties ON parties.name = prs.party"
         " WHERE quests.project = ? AND prs.lifecycle = 'merged' AND quest_tasks.state != 'done'"
-        + _epic_clause("quests", epics) + _party_clause(party_scope),
+        + _epic_clause("quests", epics)
+        + _party_clause(party_scope),
         _epic_params(project, epics) + _party_params(party_scope),
     ).fetchall()
     return [
@@ -103,9 +102,7 @@ def _rule_sdd_task_without_card(conn, project, epics):
         _epic_params(project, epics),
     ).fetchall()
     return [
-        "task:{}/{}: no tracker key (epic {} is keyed {})".format(
-            row["epic"], row["tid"], row["epic"], row["epic_key"]
-        )
+        "task:{}/{}: no tracker key (epic {} is keyed {})".format(row["epic"], row["tid"], row["epic"], row["epic_key"])
         for row in rows
     ]
 
@@ -144,28 +141,31 @@ def _card_link_scope_clause(epics, party_scope):
 
 def _pr_card_findings(conn, project, epics, party_scope, lifecycle_condition, card_condition, render):
     task_link = (
-        _PR_CARD_COLUMNS
-        + " FROM prs"
+        _PR_CARD_COLUMNS + " FROM prs"
         " JOIN quests ON quests.slug = prs.task_quest"
         " JOIN tasks ON tasks.project = quests.project AND tasks.epic = quests.epic"
         " AND tasks.tid = prs.task_tid"
         " JOIN cards ON cards.project = tasks.project AND cards.key = tasks.jira_key"
         " JOIN parties ON parties.name = prs.party"
-        " WHERE quests.project = ? AND " + lifecycle_condition + " AND " + card_condition
-        + _epic_clause("quests", epics) + _party_clause(party_scope)
+        " WHERE quests.project = ? AND "
+        + lifecycle_condition
+        + " AND "
+        + card_condition
+        + _epic_clause("quests", epics)
+        + _party_clause(party_scope)
     )
     card_link = (
-        _PR_CARD_COLUMNS.replace("quests.epic", "NULL")
-        + " FROM prs"
+        _PR_CARD_COLUMNS.replace("quests.epic", "NULL") + " FROM prs"
         " JOIN parties ON parties.name = prs.party"
         " JOIN cards ON cards.project = parties.project AND cards.key = prs.card"
-        " WHERE parties.project = ? AND " + lifecycle_condition + " AND " + card_condition
-        + _card_link_scope_clause(epics, party_scope) + _party_clause(party_scope)
+        " WHERE parties.project = ? AND "
+        + lifecycle_condition
+        + " AND "
+        + card_condition
+        + _card_link_scope_clause(epics, party_scope)
+        + _party_clause(party_scope)
     )
-    params = (
-        _epic_params(project, epics) + _party_params(party_scope)
-        + (project,) + _party_params(party_scope)
-    )
+    params = _epic_params(project, epics) + _party_params(party_scope) + (project,) + _party_params(party_scope)
     rows = conn.execute(task_link + " UNION ALL " + card_link, params).fetchall()
     return [render(row) for row in rows]
 
@@ -178,19 +178,32 @@ def _pr_task_ref(row):
 
 def _rule_pr_open_card_not_started(conn, project, epics, party_scope):
     return _pr_card_findings(
-        conn, project, epics, party_scope,
-        "prs.lifecycle NOT IN ('merged', 'closed')", "cards.status_category = 'new'",
+        conn,
+        project,
+        epics,
+        party_scope,
+        "prs.lifecycle NOT IN ('merged', 'closed')",
+        "cards.status_category = 'new'",
         lambda row: "pr:{}#{} ({}): {}card {} not started ({}): move {} to In Progress".format(
-            row["repo"], row["number"], row["lifecycle"], _pr_task_ref(row),
-            row["card_key"], row["status"], row["card_key"],
+            row["repo"],
+            row["number"],
+            row["lifecycle"],
+            _pr_task_ref(row),
+            row["card_key"],
+            row["status"],
+            row["card_key"],
         ),
     )
 
 
 def _rule_pr_merged_card_not_done(conn, project, epics, party_scope):
     rows = _pr_card_findings(
-        conn, project, epics, party_scope,
-        "prs.lifecycle = 'merged'", "cards.status_category != 'done'",
+        conn,
+        project,
+        epics,
+        party_scope,
+        "prs.lifecycle = 'merged'",
+        "cards.status_category != 'done'",
         lambda row: row,
     )
     by_card = {}
@@ -198,11 +211,10 @@ def _rule_pr_merged_card_not_done(conn, project, epics, party_scope):
         by_card.setdefault(row["card_key"], []).append(row)
     return [
         "card {} not done ({}): move {} to Done; merged {}".format(
-            key, card_rows[0]["status"], key,
-            ", ".join(
-                "pr:{}#{} {}".format(row["repo"], row["number"], _pr_task_ref(row)).strip()
-                for row in card_rows
-            ),
+            key,
+            card_rows[0]["status"],
+            key,
+            ", ".join("pr:{}#{} {}".format(row["repo"], row["number"], _pr_task_ref(row)).strip() for row in card_rows),
         )
         for key, card_rows in by_card.items()
     ]
@@ -219,7 +231,8 @@ def _rule_task_started_card_not_started(conn, project, epics, party_scope):
         " JOIN cards ON cards.project = tasks.project AND cards.key = tasks.jira_key"
         " JOIN parties ON parties.name = quests.party"
         " WHERE quests.project = ? AND quest_tasks.state = 'active' AND cards.status_category = 'new'"
-        + _epic_clause("quests", epics) + _party_clause(party_scope)
+        + _epic_clause("quests", epics)
+        + _party_clause(party_scope)
         + " ORDER BY quests.epic, quest_tasks.quest, quest_tasks.tid",
         _epic_params(project, epics) + _party_params(party_scope),
     ).fetchall()
@@ -239,7 +252,8 @@ def _rule_pr_closed_unmerged(conn, project, epics, party_scope):
         " JOIN quests ON quests.slug = prs.task_quest"
         " JOIN parties ON parties.name = prs.party"
         " WHERE quests.project = ? AND prs.lifecycle = 'closed'"
-        + _epic_clause("quests", epics) + _party_clause(party_scope),
+        + _epic_clause("quests", epics)
+        + _party_clause(party_scope),
         _epic_params(project, epics) + _party_params(party_scope),
     ).fetchall()
     return [
@@ -311,14 +325,12 @@ def _rule_quest_task_not_in_sdd(conn, project, epics, party_scope):
         " WHERE quests.project = ? AND quests.epic IS NOT NULL"
         " AND NOT EXISTS (SELECT 1 FROM tasks WHERE tasks.project = quests.project"
         " AND tasks.epic = quests.epic AND tasks.tid = quest_tasks.tid)"
-        + _epic_clause("quests", epics) + _party_clause(party_scope)
+        + _epic_clause("quests", epics)
+        + _party_clause(party_scope)
         + " ORDER BY quests.epic, quest_tasks.quest, quest_tasks.tid",
         _epic_params(project, epics) + _party_params(party_scope),
     ).fetchall()
-    return [
-        "task:{}/{}: not in epic {} tasks.md, add it".format(row["quest"], row["tid"], row["epic"])
-        for row in rows
-    ]
+    return ["task:{}/{}: not in epic {} tasks.md, add it".format(row["quest"], row["tid"], row["epic"]) for row in rows]
 
 
 def _rule_task_done_sdd_not_done(conn, project, epics, party_scope):
@@ -331,14 +343,13 @@ def _rule_task_done_sdd_not_done(conn, project, epics, party_scope):
         " AND tasks.tid = quest_tasks.tid"
         " JOIN parties ON parties.name = quests.party"
         " WHERE quests.project = ? AND quest_tasks.state = 'done' AND tasks.sdd_status != 'done'"
-        + _epic_clause("quests", epics) + _party_clause(party_scope)
+        + _epic_clause("quests", epics)
+        + _party_clause(party_scope)
         + " ORDER BY quests.epic, quest_tasks.quest, quest_tasks.tid",
         _epic_params(project, epics) + _party_params(party_scope),
     ).fetchall()
     return [
-        "task:{}/{} done, epic {} tasks.md says {}".format(
-            row["quest"], row["tid"], row["epic"], row["sdd_status"]
-        )
+        "task:{}/{} done, epic {} tasks.md says {}".format(row["quest"], row["tid"], row["epic"], row["sdd_status"])
         for row in rows
     ]
 
@@ -352,8 +363,7 @@ def _rule_adventurer_task_not_in_sdd(conn, project, epics):
         " WHERE EXISTS (SELECT 1 FROM epics WHERE epics.project = held.project AND epics.epic = held.epic)"
         " AND EXISTS (SELECT 1 FROM prs WHERE prs.adventurer = held.id AND prs.lifecycle = 'merged')"
         " AND NOT EXISTS (SELECT 1 FROM tasks WHERE tasks.project = held.project"
-        " AND tasks.epic = held.epic AND tasks.tid = held.tid)"
-        + _epic_clause("held", epics) + " ORDER BY held.id",
+        " AND tasks.epic = held.epic AND tasks.tid = held.tid)" + _epic_clause("held", epics) + " ORDER BY held.id",
         _epic_params(project, epics),
     ).fetchall()
     return [
@@ -391,7 +401,10 @@ def _collect(conn, project, epics, party_scope, sessions_dir):
     groups.insert(8, ("party has no running leader", _rule_party_without_leader(conn, project, sessions_dir)))
     groups.insert(9, ("session leads several parties", identity.double_bindings(conn, project)))
     groups.append(
-        ("adventurer task not in SDD", _rule_adventurer_task_not_in_sdd(conn, project, _adventurer_epics(epics, party_scope)))
+        (
+            "adventurer task not in SDD",
+            _rule_adventurer_task_not_in_sdd(conn, project, _adventurer_epics(epics, party_scope)),
+        )
     )
     return groups
 
@@ -470,11 +483,14 @@ def _merged_task_link(conn, pr):
 
 
 def _card_open(conn, party, key):
-    return conn.execute(
-        "SELECT 1 FROM cards JOIN parties ON parties.project = cards.project"
-        " WHERE parties.name = ? AND cards.key = ? AND cards.status_category != 'done'",
-        (party, key),
-    ).fetchone() is not None
+    return (
+        conn.execute(
+            "SELECT 1 FROM cards JOIN parties ON parties.project = cards.project"
+            " WHERE parties.name = ? AND cards.key = ? AND cards.status_category != 'done'",
+            (party, key),
+        ).fetchone()
+        is not None
+    )
 
 
 def merged_pr_moves(conn, pr):
@@ -487,15 +503,17 @@ def merged_pr_moves(conn, pr):
     return moves
 
 
-_PARTY_OWNED_RULES = frozenset((
-    "merged PR, task not done",
-    "PR open, card not started",
-    "PR merged, card not done",
-    "task started, card not started",
-    "PR closed unmerged",
-    "quest task not in SDD",
-    "task done, SDD not done",
-))
+_PARTY_OWNED_RULES = frozenset(
+    (
+        "merged PR, task not done",
+        "PR open, card not started",
+        "PR merged, card not done",
+        "task started, card not started",
+        "PR closed unmerged",
+        "quest task not in SDD",
+        "task done, SDD not done",
+    )
+)
 _PR_REF = re.compile(r"pr:(\S+)#(\d+)")
 _TASK_REF = re.compile(r"task:([^/\s]+)/")
 

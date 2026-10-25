@@ -78,7 +78,8 @@ class PartyStartResumeCloseTests(GuildTestCase):
         self.run_cli(["task", "add", "demo/T01", "--title", "First"], "sess-1", repo_dir)
         self.run_cli(
             ["handoff", "--in-flight", "shipping T01", "--learned", "watch ci flakes"],
-            "sess-1", repo_dir,
+            "sess-1",
+            repo_dir,
         )
         code, out, err = self.run_cli(["party", "resume", "alpha"], "sess-2", repo_dir)
         self.assertEqual(code, 0)
@@ -98,9 +99,7 @@ class PartyStartResumeCloseTests(GuildTestCase):
         repo_dir = self.register_project("acme", ["acme/app"])
         self.run_cli(["party", "start", "alpha", "--reason", "test reason"], "sess-1", repo_dir)
         self.write_session(4242, "sess-2", "alpha-g2")
-        code, out, err = self.run_cli(
-            ["party", "resume", "alpha", "--session", "alpha-g2"], None, repo_dir
-        )
+        code, out, err = self.run_cli(["party", "resume", "alpha", "--session", "alpha-g2"], None, repo_dir)
         self.assertEqual(code, 0)
         self.assertIn("generation 2", out)
         code, out, err = self.run_cli(["whoami"], "sess-2", None)
@@ -109,18 +108,14 @@ class PartyStartResumeCloseTests(GuildTestCase):
 
     def test_resume_by_session_name_unknown_name_fails(self):
         self.run_cli(["party", "start", "alpha", "--reason", "test reason"], "sess-1", None)
-        code, out, err = self.run_cli(
-            ["party", "resume", "alpha", "--session", "ghost-session"], None, None
-        )
+        code, out, err = self.run_cli(["party", "resume", "alpha", "--session", "ghost-session"], None, None)
         self.assertEqual(code, 1)
         self.assertIn("no session named 'ghost-session'", err)
 
     def test_resume_by_session_name_inside_claude_session_fails(self):
         self.run_cli(["party", "start", "alpha", "--reason", "test reason"], "sess-1", None)
         self.write_session(4242, "sess-2", "alpha-g2")
-        code, out, err = self.run_cli(
-            ["party", "resume", "alpha", "--session", "alpha-g2"], "sess-3", None
-        )
+        code, out, err = self.run_cli(["party", "resume", "alpha", "--session", "alpha-g2"], "sess-3", None)
         self.assertEqual(code, 1)
         self.assertIn("cannot be used from inside a Claude Code session", err)
 
@@ -199,16 +194,12 @@ class PartyNameValidationTests(GuildTestCase):
 
 class WriteRefusalTests(GuildTestCase):
     def test_unbound_write_is_refused_with_hint(self):
-        code, out, err = self.run_cli(
-            ["claim", "ci.yml", "--ttl", "30m"], "sess-unbound", None
-        )
+        code, out, err = self.run_cli(["claim", "ci.yml", "--ttl", "30m"], "sess-unbound", None)
         self.assertEqual(code, 1)
         self.assertIn("session not bound", err)
 
     def test_human_terminal_can_create_notice(self):
-        code, out, err = self.run_cli(
-            ["notice", "create", "pipeline down", "--to", "guild", "--ttl", "2h"], None, None
-        )
+        code, out, err = self.run_cli(["notice", "create", "pipeline down", "--to", "guild", "--ttl", "2h"], None, None)
         self.assertEqual(code, 0)
         self.assertIn("notice #1 created", out)
 
@@ -235,8 +226,15 @@ class DoubleBindingTests(GuildTestCase):
         self.conn = db.connect(paths.db_path())
         with db.writing(self.conn):
             events.record(
-                self.conn, timeutil.utcnow(), "test@host", "beta", "sess-1", "acme",
-                "party.resumed", "local", {"party": "beta", "generation": 2, "session_name": None},
+                self.conn,
+                timeutil.utcnow(),
+                "test@host",
+                "beta",
+                "sess-1",
+                "acme",
+                "party.resumed",
+                "local",
+                {"party": "beta", "generation": 2, "session_name": None},
             )
 
     def test_binding_is_the_most_recent_leadership(self):

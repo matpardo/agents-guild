@@ -14,10 +14,12 @@ class QuestDoneRefreshTests(QuestDoneTestCase):
         super().setUp()
         self._write_epic("wave4", "jira: DEMO-20\nstatus: active\n", _PENDING_EPIC)
         self._sync_sdd()
-        self._record_cards([
-            self._card("DEMO-21", "done", parent_key="DEMO-20"),
-            self._card("DEMO-22", "new", parent_key="DEMO-20"),
-        ])
+        self._record_cards(
+            [
+                self._card("DEMO-21", "done", parent_key="DEMO-20"),
+                self._card("DEMO-22", "new", parent_key="DEMO-20"),
+            ]
+        )
         self._add_quest("wave4-q", "wave4", "T01")
         self.run_cli(["task", "done", "wave4-q/T01", "--summary", "shipped"], "sess-1", self.repo_dir)
 

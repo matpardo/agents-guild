@@ -166,7 +166,14 @@ def apply(ctx, compact_plan):
             _delete_seqs(ctx.conn, seqs)
         _delete_resources(ctx.conn, compact_plan.resources)
         events.record(
-            ctx.conn, ctx.now, ctx.origin, None, None, None, "db.compacted", "local",
+            ctx.conn,
+            ctx.now,
+            ctx.origin,
+            None,
+            None,
+            None,
+            "db.compacted",
+            "local",
             {"deleted": counts, "bytes_before": bytes_before},
         )
     _vacuum(ctx.conn)

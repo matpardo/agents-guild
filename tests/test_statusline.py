@@ -14,9 +14,7 @@ class RecordAndReadCtxTests(GuildTestCase):
 
 class StatuslineTests(GuildTestCase):
     def test_ctx_flag_persists_pct_and_leaves_render_unchanged(self):
-        code, out, err = self.run_cli(
-            ["statusline", "--session", "sess-1", "--ctx", "81"], None, None
-        )
+        code, out, err = self.run_cli(["statusline", "--session", "sess-1", "--ctx", "81"], None, None)
         self.assertEqual(code, 0)
         self.assertEqual(out, "")
         ctx_file = paths.state_dir() / "ctx" / "sess-1"
@@ -37,9 +35,7 @@ class StatuslineTests(GuildTestCase):
         self.run_cli(["party", "start", "alpha", "--reason", "test reason"], "sess-1", repo_dir)
         self.run_cli(["quest", "add", "demo", "--title", "Demo", "--no-epic"], "sess-1", repo_dir)
         self.run_cli(["task", "add", "demo/T01", "--title", "First"], "sess-1", repo_dir)
-        self.run_cli(
-            ["ask", "ready?", "--context", "x", "--ref", "task:demo/T01"], "sess-1", repo_dir
-        )
+        self.run_cli(["ask", "ready?", "--context", "x", "--ref", "task:demo/T01"], "sess-1", repo_dir)
         self.run_cli(["notice", "create", "pipeline down", "--to", "guild", "--ttl", "2h"], None, None)
 
         code, out, err = self.run_cli(["statusline", "--session", "sess-1"], None, None)

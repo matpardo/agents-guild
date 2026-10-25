@@ -11,7 +11,10 @@ _DISCUSSION = {"comments": [{"body": "c"}], "reviews": [{"body": "r"}]}
 
 
 def _project(command, timeout_seconds, pii_patterns=None):
-    project = {"name": "acme", "human_ready": {"trace_validator": {"command": command, "timeout_seconds": timeout_seconds}}}
+    project = {
+        "name": "acme",
+        "human_ready": {"trace_validator": {"command": command, "timeout_seconds": timeout_seconds}},
+    }
     if pii_patterns is not None:
         project["pii_patterns"] = pii_patterns
     return project

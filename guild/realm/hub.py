@@ -88,7 +88,7 @@ class HubRequestHandler(http_server.BaseHTTPRequestHandler):
         header = self.headers.get("Authorization")
         if header is None or not header.startswith("Bearer "):
             return None
-        supplied = token_hash(header[len("Bearer "):].strip()).encode("ascii")
+        supplied = token_hash(header[len("Bearer ") :].strip()).encode("ascii")
         found = None
         for name, stored_hash in hubconfig.load()["members"].items():
             if hmac.compare_digest(supplied, str(stored_hash).encode("ascii", "replace")):

@@ -216,7 +216,7 @@ def _size_fields(text):
 
 def _strip_id_prefix(identifier):
     if identifier.startswith(_ID_PREFIX):
-        return identifier[len(_ID_PREFIX):]
+        return identifier[len(_ID_PREFIX) :]
     return identifier
 
 

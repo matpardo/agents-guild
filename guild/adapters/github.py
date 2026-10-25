@@ -36,7 +36,13 @@ def pr_ready(cwd, repo, number):
 def pr_diff(cwd, repo, number):
     result = _run(
         [
-            "gh", "pr", "view", str(number), "--repo", repo, "--json",
+            "gh",
+            "pr",
+            "view",
+            str(number),
+            "--repo",
+            repo,
+            "--json",
             "files,additions,deletions,createdAt",
         ],
         cwd=str(cwd),
@@ -122,11 +128,17 @@ def unresolved_thread_count(cwd, repo, number):
     owner, name = repo.split("/", 1)
     result = _run(
         [
-            "gh", "api", "graphql",
-            "-f", "query={}".format(_UNRESOLVED_THREADS_QUERY),
-            "-F", "owner={}".format(owner),
-            "-F", "name={}".format(name),
-            "-F", "number={}".format(number),
+            "gh",
+            "api",
+            "graphql",
+            "-f",
+            "query={}".format(_UNRESOLVED_THREADS_QUERY),
+            "-F",
+            "owner={}".format(owner),
+            "-F",
+            "name={}".format(name),
+            "-F",
+            "number={}".format(number),
         ],
         cwd=str(cwd),
         capture_output=True,

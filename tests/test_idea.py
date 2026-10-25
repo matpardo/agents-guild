@@ -82,7 +82,9 @@ class IdeaTests(GuildTestCase):
         self.assertEqual(self.run_cli(["idea", "edit", "1", "--deadline", "nope"], None, None)[0], 1)
         self.assertEqual(self.run_cli(["idea", "edit", "1", "--project", "ghost"], None, None)[0], 1)
         self.assertEqual(self.run_cli(["idea", "edit", "1", "--title", " "], None, None)[0], 1)
-        self.assertEqual(self.run_cli(["idea", "edit", "1", "--deadline", "2099-01-01", "--no-deadline"], None, None)[0], 2)
+        self.assertEqual(
+            self.run_cli(["idea", "edit", "1", "--deadline", "2099-01-01", "--no-deadline"], None, None)[0], 2
+        )
 
     def test_delete(self):
         self._add("t")
@@ -194,7 +196,8 @@ class IdeaLinkTests(GuildTestCase):
         self.run_cli(["task", "add", "demo/T01", "--title", "First"], "sess-1", self.repo_dir)
         code, out, err = self.run_cli(
             ["pr", "track", "acme/app#{}".format(number), "--task", "demo/T01", "--what", "x", "--waits", "y"],
-            "sess-1", self.repo_dir,
+            "sess-1",
+            self.repo_dir,
         )
         self.assertEqual(code, 0, err)
 
@@ -210,7 +213,10 @@ class IdeaLinkTests(GuildTestCase):
         model = board_commands.board_model(self._ctx())
         self.assertEqual(
             model["ideas"][0]["parties"],
-            [{"name": "alpha", "state": "active", "has_prs": True}, {"name": "beta", "state": "active", "has_prs": False}],
+            [
+                {"name": "alpha", "state": "active", "has_prs": True},
+                {"name": "beta", "state": "active", "has_prs": False},
+            ],
         )
         self.assertEqual(self.run_cli(["idea", "unlink", "1", "--party", "beta"], None, None)[0], 0)
 
@@ -224,8 +230,14 @@ class IdeaLinkTests(GuildTestCase):
 
     def _ctx(self):
         return context.RunContext(
-            db.connect(paths.db_path()), None, self.repo_dir, timeutil.utcnow(), origin.current_origin(),
-            self.sessions_dir, self.config_home / "guild" / "projects", None,
+            db.connect(paths.db_path()),
+            None,
+            self.repo_dir,
+            timeutil.utcnow(),
+            origin.current_origin(),
+            self.sessions_dir,
+            self.config_home / "guild" / "projects",
+            None,
         )
 
     def test_delete_removes_links_and_rebuild_keeps_them(self):

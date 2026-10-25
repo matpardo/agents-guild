@@ -170,9 +170,7 @@ def discover_epic_files(root, epics_dir):
 
 
 def _run_git(repo, args):
-    result = subprocess.run(
-        ["git", "-C", str(Path(repo).expanduser())] + args, capture_output=True, text=True
-    )
+    result = subprocess.run(["git", "-C", str(Path(repo).expanduser())] + args, capture_output=True, text=True)
     if result.returncode != 0:
         raise GitSddError(result.stderr.strip() or "git {} failed".format(" ".join(args)))
     return result.stdout

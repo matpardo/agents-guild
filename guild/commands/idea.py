@@ -47,9 +47,7 @@ def _record(ctx, kind, payload):
     actor_party, _ = identity.resolve_actor(ctx.conn, ctx.session_id)
     project = config.resolve_project(ctx.cwd, config.load_all_projects(ctx.projects_dir))
     with db.writing(ctx.conn):
-        events.record(
-            ctx.conn, ctx.now, ctx.origin, actor_party, ctx.session_id, project, kind, "local", payload
-        )
+        events.record(ctx.conn, ctx.now, ctx.origin, actor_party, ctx.session_id, project, kind, "local", payload)
 
 
 def _require_idea(ctx, idea_id):
@@ -97,9 +95,7 @@ def _require_open_party(ctx, party):
 
 
 def _is_linked(ctx, idea_id, party):
-    row = ctx.conn.execute(
-        "SELECT 1 FROM idea_links WHERE idea_id = ? AND party = ?", (idea_id, party)
-    ).fetchone()
+    row = ctx.conn.execute("SELECT 1 FROM idea_links WHERE idea_id = ? AND party = ?", (idea_id, party)).fetchone()
     return row is not None
 
 
@@ -118,9 +114,7 @@ def unlink_for_party(ctx, idea_id, party):
     if link_row is None:
         raise GuildError("idea #{} is not linked to party '{}'".format(idea_id, party), 1)
     if link_row["has_prs"]:
-        raise GuildError(
-            "idea #{} stays linked to party '{}': the party already tracks a PR".format(idea_id, party), 1
-        )
+        raise GuildError("idea #{} stays linked to party '{}': the party already tracks a PR".format(idea_id, party), 1)
     _record(ctx, "idea.unlinked", {"id": idea_id, "party": party})
     return "idea #{} unlinked from party '{}'".format(idea_id, party)
 

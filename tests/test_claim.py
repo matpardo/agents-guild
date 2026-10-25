@@ -106,9 +106,7 @@ class ClaimTests(GuildTestCase):
         self.assertEqual(out, "")
 
     def test_claim_by_area_prefixed_string_accepted(self):
-        code, out, err = self.run_cli(
-            ["claim", "area:config/routes.rb", "--ttl", "2h"], "sess-1", self.repo_dir
-        )
+        code, out, err = self.run_cli(["claim", "area:config/routes.rb", "--ttl", "2h"], "sess-1", self.repo_dir)
         self.assertEqual(code, 0)
         code, out, err = self.run_cli(["claims"], "sess-1", self.repo_dir)
         self.assertIn("area:config/routes.rb — alpha", out)
@@ -165,9 +163,7 @@ class ClaimCheckTests(GuildTestCase):
         self.assertIn("held by party alpha until", out)
 
     def test_check_rejects_ttl(self):
-        code, out, err = self.run_cli(
-            ["claim", "check", "ci.yml", "--ttl", "30m"], "sess-1", self.repo_dir
-        )
+        code, out, err = self.run_cli(["claim", "check", "ci.yml", "--ttl", "30m"], "sess-1", self.repo_dir)
         self.assertEqual(code, 1)
         self.assertIn("check", err)
         self.assertIn("--ttl", err)

@@ -10,9 +10,7 @@ class WebTaskMoveTests(WebWriteTestCase):
         self.run_cli(["quest", "add", "other", "--title", "Other", "--no-epic"], "sess-2", self.repo_dir)
 
     def _move(self, tid, data, headers=None):
-        return self._post_json(
-            "/api/quests/demo/tasks/{}/move".format(tid), headers or self._good_headers(), data
-        )
+        return self._post_json("/api/quests/demo/tasks/{}/move".format(tid), headers or self._good_headers(), data)
 
     def _quest(self, party, slug):
         board = json.loads(self._get("/api/board", self._host())[1])

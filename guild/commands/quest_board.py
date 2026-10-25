@@ -22,22 +22,24 @@ def _open_quest_models(conn, project):
         tasks = conn.execute(
             "SELECT tid, title FROM quest_tasks WHERE quest = ? ORDER BY tid", (quest_row["slug"],)
         ).fetchall()
-        models.append({
-            "slug": quest_row["slug"],
-            "epic": quest_row["epic"],
-            "title": quest_row["title"],
-            "dates": timeutil.dates_label(quest_row["created_at"], quest_row["updated_at"]),
-            "tasks": [
-                {
-                    "tid": task_row["tid"],
-                    "title": task_row["title"],
-                    "adventurer": quest_commands.adventurer_holder(
-                        conn, project, quest_row["epic"] or quest_row["slug"], task_row["tid"]
-                    ),
-                }
-                for task_row in tasks
-            ],
-        })
+        models.append(
+            {
+                "slug": quest_row["slug"],
+                "epic": quest_row["epic"],
+                "title": quest_row["title"],
+                "dates": timeutil.dates_label(quest_row["created_at"], quest_row["updated_at"]),
+                "tasks": [
+                    {
+                        "tid": task_row["tid"],
+                        "title": task_row["title"],
+                        "adventurer": quest_commands.adventurer_holder(
+                            conn, project, quest_row["epic"] or quest_row["slug"], task_row["tid"]
+                        ),
+                    }
+                    for task_row in tasks
+                ],
+            }
+        )
     return models
 
 
@@ -54,7 +56,7 @@ def _claimed_tids(conn, now, project, epic):
     prefix = "task:{}/".format(epic)
     rows = conn.execute("SELECT area, expires_at FROM claims WHERE project = ?", (project,)).fetchall()
     return {
-        row["area"][len(prefix):]
+        row["area"][len(prefix) :]
         for row in rows
         if row["area"].startswith(prefix) and not timeutil.is_expired(now, row["expires_at"])
     }
@@ -88,10 +90,12 @@ def _free_task_models(ctx, project):
     for epic_row in epics:
         free = _free_task_rows(ctx, project, epic_row["epic"])
         if free:
-            models.append({
-                "epic": epic_row["epic"],
-                "tasks": [{"tid": row["tid"], "title": row["title"]} for row in free],
-            })
+            models.append(
+                {
+                    "epic": epic_row["epic"],
+                    "tasks": [{"tid": row["tid"], "title": row["title"]} for row in free],
+                }
+            )
     return models
 
 
@@ -120,11 +124,7 @@ def _has_work(conn, project):
 
 
 def models(ctx, project_names):
-    return [
-        dict(data(ctx, name), name=name)
-        for name in sorted(project_names)
-        if _has_work(ctx.conn, name)
-    ]
+    return [dict(data(ctx, name), name=name) for name in sorted(project_names) if _has_work(ctx.conn, name)]
 
 
 def _task_line(task):
@@ -162,9 +162,7 @@ def _free_task_lines(epics):
 def summary_lines(model):
     lines = ["{} QUEST BOARD".format(model["name"])]
     for quest in model["open_quests"]:
-        lines.append(
-            "  open quest {} ({} tasks{})".format(quest["slug"], len(quest["tasks"]), _dates_suffix(quest))
-        )
+        lines.append("  open quest {} ({} tasks{})".format(quest["slug"], len(quest["tasks"]), _dates_suffix(quest)))
     for entry in model["free_tasks"]:
         lines.append("  free tasks {}: {}".format(entry["epic"], len(entry["tasks"])))
     if len(lines) == 1:

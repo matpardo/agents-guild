@@ -20,11 +20,21 @@ class AskTests(GuildTestCase):
         moment = timeutil.utcnow() + timedelta(seconds=seconds_offset)
         with db.writing(self.conn):
             events.record(
-                self.conn, moment, "test@host", party, None, "acme",
-                "ask.created", "local",
+                self.conn,
+                moment,
+                "test@host",
+                party,
+                None,
+                "acme",
+                "ask.created",
+                "local",
                 {
-                    "id": ask_id, "party": party, "question": question, "context": "x",
-                    "refs": ref_list, "options": [],
+                    "id": ask_id,
+                    "party": party,
+                    "question": question,
+                    "context": "x",
+                    "refs": ref_list,
+                    "options": [],
                 },
             )
         return ask_id
@@ -36,29 +46,48 @@ class AskTests(GuildTestCase):
         )
         code, out, err = self.run_cli(
             [
-                "pr", "track", "acme/app#{}".format(number), "--task", "{}/{}".format(quest, tid),
-                "--what", "x", "--waits", "y",
+                "pr",
+                "track",
+                "acme/app#{}".format(number),
+                "--task",
+                "{}/{}".format(quest, tid),
+                "--what",
+                "x",
+                "--waits",
+                "y",
             ],
-            "sess-1", self.repo_dir,
+            "sess-1",
+            self.repo_dir,
         )
         self.assertEqual(code, 0, err)
 
     def _set_pr_lifecycle(self, number, lifecycle):
         with db.writing(self.conn):
             events.record(
-                self.conn, timeutil.utcnow(), "test@host", None, None, None,
-                "pr.synced", "guild",
+                self.conn,
+                timeutil.utcnow(),
+                "test@host",
+                None,
+                None,
+                None,
+                "pr.synced",
+                "guild",
                 {
-                    "repo": "acme/app", "number": number, "gh_state": None, "gh_draft": False,
-                    "branch": None, "title": None, "checks_failing": 0, "checks_passing": 0,
-                    "lifecycle": lifecycle, "synced_at": timeutil.to_iso(timeutil.utcnow()),
+                    "repo": "acme/app",
+                    "number": number,
+                    "gh_state": None,
+                    "gh_draft": False,
+                    "branch": None,
+                    "title": None,
+                    "checks_failing": 0,
+                    "checks_passing": 0,
+                    "lifecycle": lifecycle,
+                    "synced_at": timeutil.to_iso(timeutil.utcnow()),
                 },
             )
 
     def test_create_requires_at_least_one_ref(self):
-        code, out, err = self.run_cli(
-            ["ask", "ready?", "--context", "x"], "sess-1", self.repo_dir
-        )
+        code, out, err = self.run_cli(["ask", "ready?", "--context", "x"], "sess-1", self.repo_dir)
         self.assertEqual(code, 1)
         self.assertIn("at least one --ref", err)
 
@@ -124,7 +153,8 @@ class AskTests(GuildTestCase):
         self._insert_card("PROJ-12")
         self.run_cli(
             ["ask", "ready?", "--context", "x", "--ref", "card:PROJ-12", "--ref", "task:demo/T01"],
-            "sess-1", self.repo_dir,
+            "sess-1",
+            self.repo_dir,
         )
         code, out, err = self.run_cli(["asks"], None, None)
         self.assertIn("blocks: 1 of 2 refs still open", out)
@@ -135,10 +165,19 @@ class AskTests(GuildTestCase):
     def test_create_and_list(self):
         code, out, err = self.run_cli(
             [
-                "ask", "ready to merge?", "--context", "checks green",
-                "--ref", "task:demo/T01", "--option", "yes", "--option", "no",
+                "ask",
+                "ready to merge?",
+                "--context",
+                "checks green",
+                "--ref",
+                "task:demo/T01",
+                "--option",
+                "yes",
+                "--option",
+                "no",
             ],
-            "sess-1", self.repo_dir,
+            "sess-1",
+            self.repo_dir,
         )
         self.assertEqual(code, 0)
         self.assertIn("ask #1 created", out)
@@ -148,27 +187,21 @@ class AskTests(GuildTestCase):
         self.assertIn('guild answer 1 "..."', out)
 
     def test_answer_by_human(self):
-        self.run_cli(
-            ["ask", "ready?", "--context", "x", "--ref", "task:demo/T01"], "sess-1", self.repo_dir
-        )
+        self.run_cli(["ask", "ready?", "--context", "x", "--ref", "task:demo/T01"], "sess-1", self.repo_dir)
         code, out, err = self.run_cli(["answer", "1", "yes, go ahead"], None, None)
         self.assertEqual(code, 0)
         code, out, err = self.run_cli(["asks"], None, None)
         self.assertIn("NEEDS YOU · nothing", out)
 
     def test_cannot_answer_twice(self):
-        self.run_cli(
-            ["ask", "ready?", "--context", "x", "--ref", "task:demo/T01"], "sess-1", self.repo_dir
-        )
+        self.run_cli(["ask", "ready?", "--context", "x", "--ref", "task:demo/T01"], "sess-1", self.repo_dir)
         self.run_cli(["answer", "1", "yes"], None, None)
         code, out, err = self.run_cli(["answer", "1", "again"], None, None)
         self.assertEqual(code, 1)
         self.assertIn("not open", err)
 
     def test_dismiss(self):
-        self.run_cli(
-            ["ask", "ready?", "--context", "x", "--ref", "task:demo/T01"], "sess-1", self.repo_dir
-        )
+        self.run_cli(["ask", "ready?", "--context", "x", "--ref", "task:demo/T01"], "sess-1", self.repo_dir)
         code, out, err = self.run_cli(["dismiss", "1"], None, None)
         self.assertEqual(code, 0)
         code, out, err = self.run_cli(["asks"], None, None)
@@ -176,15 +209,20 @@ class AskTests(GuildTestCase):
 
     def test_asks_listed_in_ascending_id_regardless_of_blocked_count(self):
         self.run_cli(["task", "add", "demo/T02", "--title", "Second"], "sess-1", self.repo_dir)
-        self.run_cli(
-            ["ask", "single ref?", "--context", "x", "--ref", "task:demo/T01"], "sess-1", self.repo_dir
-        )
+        self.run_cli(["ask", "single ref?", "--context", "x", "--ref", "task:demo/T01"], "sess-1", self.repo_dir)
         self.run_cli(
             [
-                "ask", "two refs?", "--context", "x",
-                "--ref", "task:demo/T01", "--ref", "task:demo/T02",
+                "ask",
+                "two refs?",
+                "--context",
+                "x",
+                "--ref",
+                "task:demo/T01",
+                "--ref",
+                "task:demo/T02",
             ],
-            "sess-1", self.repo_dir,
+            "sess-1",
+            self.repo_dir,
         )
         code, out, err = self.run_cli(["asks"], None, None)
         self.assertLess(out.index("single ref?"), out.index("two refs?"))
@@ -197,15 +235,20 @@ class AskTests(GuildTestCase):
 
     def test_board_summary_lists_asks_in_ascending_id(self):
         self.run_cli(["task", "add", "demo/T02", "--title", "Second"], "sess-1", self.repo_dir)
-        self.run_cli(
-            ["ask", "single ref?", "--context", "x", "--ref", "task:demo/T01"], "sess-1", self.repo_dir
-        )
+        self.run_cli(["ask", "single ref?", "--context", "x", "--ref", "task:demo/T01"], "sess-1", self.repo_dir)
         self.run_cli(
             [
-                "ask", "two refs?", "--context", "x",
-                "--ref", "task:demo/T01", "--ref", "task:demo/T02",
+                "ask",
+                "two refs?",
+                "--context",
+                "x",
+                "--ref",
+                "task:demo/T01",
+                "--ref",
+                "task:demo/T02",
             ],
-            "sess-1", self.repo_dir,
+            "sess-1",
+            self.repo_dir,
         )
         code, out, err = self.run_cli(["board"], None, None)
         self.assertLess(out.index("single ref?"), out.index("two refs?"))
@@ -214,16 +257,15 @@ class AskTests(GuildTestCase):
         self._track_pr(1, "demo", "T01")
         self.run_cli(
             ["ask", "ready?", "--context", "x", "--ref", "pr:acme/app#1", "--ref", "task:demo/T01"],
-            "sess-1", self.repo_dir,
+            "sess-1",
+            self.repo_dir,
         )
         self._set_pr_lifecycle(1, "merged")
         code, out, err = self.run_cli(["asks"], None, None)
         self.assertIn("blocks: 1 of 2 refs still open", out)
 
     def test_done_task_ref_no_longer_counts_as_blocked(self):
-        self.run_cli(
-            ["ask", "ready?", "--context", "x", "--ref", "task:demo/T01"], "sess-1", self.repo_dir
-        )
+        self.run_cli(["ask", "ready?", "--context", "x", "--ref", "task:demo/T01"], "sess-1", self.repo_dir)
         self.run_cli(["task", "done", "demo/T01"], "sess-1", self.repo_dir)
         code, out, err = self.run_cli(["asks"], None, None)
         self.assertIn("blocks: 0 of 1 refs still open (may be stale)", out)
@@ -243,11 +285,21 @@ class AskTests(GuildTestCase):
         with db.writing(self.conn):
             for question, ask_id in (("first?", 1), ("second?", 2)):
                 events.record(
-                    self.conn, moment, "test@host", "alpha", None, "acme",
-                    "ask.created", "local",
+                    self.conn,
+                    moment,
+                    "test@host",
+                    "alpha",
+                    None,
+                    "acme",
+                    "ask.created",
+                    "local",
                     {
-                        "id": ask_id, "party": "alpha", "question": question, "context": "x",
-                        "refs": ["task:demo/T01"], "options": [],
+                        "id": ask_id,
+                        "party": "alpha",
+                        "question": question,
+                        "context": "x",
+                        "refs": ["task:demo/T01"],
+                        "options": [],
                     },
                 )
         code, out, err = self.run_cli(["asks"], None, None)
@@ -257,18 +309,23 @@ class AskTests(GuildTestCase):
         self.run_cli(["task", "add", "demo/T02", "--title", "Second"], "sess-1", self.repo_dir)
         self.run_cli(
             [
-                "ask", "two refs?", "--context", "x",
-                "--ref", "task:demo/T01", "--ref", "task:demo/T02",
+                "ask",
+                "two refs?",
+                "--context",
+                "x",
+                "--ref",
+                "task:demo/T01",
+                "--ref",
+                "task:demo/T02",
             ],
-            "sess-1", self.repo_dir,
+            "sess-1",
+            self.repo_dir,
         )
         code, out, err = self.run_cli(["board"], None, None)
         self.assertIn("· blocks 2", out)
 
     def test_board_summary_omits_blocks_when_zero(self):
-        self.run_cli(
-            ["ask", "ready?", "--context", "x", "--ref", "task:demo/T01"], "sess-1", self.repo_dir
-        )
+        self.run_cli(["ask", "ready?", "--context", "x", "--ref", "task:demo/T01"], "sess-1", self.repo_dir)
         self.run_cli(["task", "done", "demo/T01"], "sess-1", self.repo_dir)
         code, out, err = self.run_cli(["board"], None, None)
         self.assertNotIn("blocks", out)
@@ -302,23 +359,20 @@ class AskTests(GuildTestCase):
     def test_create_rejects_email_in_question(self):
         code, out, err = self.run_cli(
             ["ask", "reach jane.doe@example.com?", "--context", "x", "--ref", "task:demo/T01"],
-            "sess-1", self.repo_dir,
+            "sess-1",
+            self.repo_dir,
         )
         self.assertEqual(code, 1)
         self.assertIn("must not contain an email address", err)
 
     def test_answer_rejects_text_over_max_length(self):
-        self.run_cli(
-            ["ask", "ready?", "--context", "x", "--ref", "task:demo/T01"], "sess-1", self.repo_dir
-        )
+        self.run_cli(["ask", "ready?", "--context", "x", "--ref", "task:demo/T01"], "sess-1", self.repo_dir)
         code, out, err = self.run_cli(["answer", "1", "x" * 1001], None, None)
         self.assertEqual(code, 1)
         self.assertIn("exceeds the maximum length", err)
 
     def test_answer_rejects_email(self):
-        self.run_cli(
-            ["ask", "ready?", "--context", "x", "--ref", "task:demo/T01"], "sess-1", self.repo_dir
-        )
+        self.run_cli(["ask", "ready?", "--context", "x", "--ref", "task:demo/T01"], "sess-1", self.repo_dir)
         code, out, err = self.run_cli(["answer", "1", "ping jane.doe@example.com"], None, None)
         self.assertEqual(code, 1)
         self.assertIn("must not contain an email address", err)

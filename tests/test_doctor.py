@@ -126,7 +126,7 @@ class DoctorTests(GuildTestCase):
         self.assertEqual(out.count("ok      allow rule"), len(_ALLOW_RULES))
 
     def test_wait_commands_match_an_expected_allow_rule(self):
-        prefixes = [rule[len("Bash("):-len(":*)")] for rule in claude_settings.EXPECTED_ALLOW_RULES]
+        prefixes = [rule[len("Bash(") : -len(":*)")] for rule in claude_settings.EXPECTED_ALLOW_RULES]
         for command in ("guild ask wait 1", "guild pr wait o/r#1"):
             self.assertTrue(any(command.startswith(prefix) for prefix in prefixes), command)
 
@@ -135,9 +135,7 @@ class DoctorTests(GuildTestCase):
         self._link_rules()
         code, out, err = self.run_cli(["doctor"], None, None)
         self.assertEqual(code, 0, out)
-        self.assertIn(
-            "warn    allow rule missing Bash(guild pr:*) (a permission prompt can stall the session)", out
-        )
+        self.assertIn("warn    allow rule missing Bash(guild pr:*) (a permission prompt can stall the session)", out)
         self.assertIn("ok      allow rule Bash(guild task:*)", out)
 
     def test_settings_without_allow_list_warns_for_every_rule(self):
@@ -179,11 +177,13 @@ class DoctorTests(GuildTestCase):
     def _clipboard_doctor_out(self, tools):
         self._write_settings(_ALL_HOOKS)
         self._link_rules()
+
         def which(name):
             return "/bin/" + name if name in tools else None
 
-        with mock.patch.dict(os.environ, {"DISPLAY": ":0"}), mock.patch(
-            "guild.tmux_windows.shutil.which", side_effect=which
+        with (
+            mock.patch.dict(os.environ, {"DISPLAY": ":0"}),
+            mock.patch("guild.tmux_windows.shutil.which", side_effect=which),
         ):
             _, out, _ = self.run_cli(["doctor"], None, None)
         return out
@@ -234,8 +234,9 @@ class DoctorTests(GuildTestCase):
         def which(name):
             return {"guild": "/usr/bin/guild", "systemctl": systemctl}.get(name)
 
-        with mock.patch("guild.commands.doctor.shutil.which", side_effect=which), mock.patch(
-            "guild.commands.doctor.sys.platform", platform
+        with (
+            mock.patch("guild.commands.doctor.shutil.which", side_effect=which),
+            mock.patch("guild.commands.doctor.sys.platform", platform),
         ):
             return self._doctor_out_for_clean_setup()
 
@@ -346,7 +347,10 @@ class DoctorTests(GuildTestCase):
         self._link_rules()
         code, out, err = self.run_cli(["doctor"], None, None)
         self.assertIn(
-            'warn    guild has no name: set "name" in {} (suggested: '.format(self.config_home / "guild" / "guild.json"), out
+            'warn    guild has no name: set "name" in {} (suggested: '.format(
+                self.config_home / "guild" / "guild.json"
+            ),
+            out,
         )
         self.assertNotIn("see README", out)
 

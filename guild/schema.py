@@ -430,8 +430,7 @@ def _rebuild_raid_members(conn):
     conn.execute("ALTER TABLE raid_members RENAME TO raid_members_legacy")
     conn.execute(_RAID_MEMBERS_TABLE)
     conn.execute(
-        "INSERT INTO raid_members (raid, party, expires_at)"
-        " SELECT raid, party, expires_at FROM raid_members_legacy"
+        "INSERT INTO raid_members (raid, party, expires_at) SELECT raid, party, expires_at FROM raid_members_legacy"
     )
     conn.execute("DROP TABLE raid_members_legacy")
 

@@ -11,16 +11,12 @@ class NoticeTests(GuildTestCase):
         self.repo_dir = self.register_project("acme", ["acme/app"])
 
     def test_create_requires_valid_to(self):
-        code, out, err = self.run_cli(
-            ["notice", "create", "hi", "--to", "weird", "--ttl", "1h"], None, None
-        )
+        code, out, err = self.run_cli(["notice", "create", "hi", "--to", "weird", "--ttl", "1h"], None, None)
         self.assertEqual(code, 1)
         self.assertIn("invalid --to", err)
 
     def test_create_rejects_unknown_project_scope(self):
-        code, out, err = self.run_cli(
-            ["notice", "create", "hi", "--to", "project:ghost", "--ttl", "1h"], None, None
-        )
+        code, out, err = self.run_cli(["notice", "create", "hi", "--to", "project:ghost", "--ttl", "1h"], None, None)
         self.assertEqual(code, 1)
 
     def test_create_rejects_path_traversal_project_scope(self):
@@ -31,16 +27,12 @@ class NoticeTests(GuildTestCase):
         self.assertIn("invalid", err)
 
     def test_create_prints_broadcast_reminder(self):
-        code, out, err = self.run_cli(
-            ["notice", "create", "pipeline down", "--to", "guild", "--ttl", "2h"], None, None
-        )
+        code, out, err = self.run_cli(["notice", "create", "pipeline down", "--to", "guild", "--ttl", "2h"], None, None)
         self.assertEqual(code, 0)
         self.assertIn("note: this text is broadcast to every session", out)
 
     def test_success_reminder_does_not_look_like_an_error(self):
-        code, out, err = self.run_cli(
-            ["notice", "create", "ci down", "--to", "guild", "--ttl", "1h"], None, None
-        )
+        code, out, err = self.run_cli(["notice", "create", "ci down", "--to", "guild", "--ttl", "1h"], None, None)
         self.assertEqual(code, 0)
         self.assertEqual(err, "")
         for line in out.splitlines():
@@ -49,9 +41,7 @@ class NoticeTests(GuildTestCase):
 
     def test_duplicate_active_notice_from_same_actor_is_rejected(self):
         self.run_cli(["notice", "create", "ci down", "--to", "guild", "--ttl", "1h"], None, None)
-        code, out, err = self.run_cli(
-            ["notice", "create", "ci down", "--to", "guild", "--ttl", "1h"], None, None
-        )
+        code, out, err = self.run_cli(["notice", "create", "ci down", "--to", "guild", "--ttl", "1h"], None, None)
         self.assertEqual(code, 1)
         self.assertIn("already active as notice #1", err)
         code, out, err = self.run_cli(["notices"], None, None)
@@ -60,22 +50,19 @@ class NoticeTests(GuildTestCase):
     def test_same_text_allowed_after_previous_notice_closed(self):
         self.run_cli(["notice", "create", "ci down", "--to", "guild", "--ttl", "1h"], None, None)
         self.run_cli(["notice", "close", "1"], None, None)
-        code, out, err = self.run_cli(
-            ["notice", "create", "ci down", "--to", "guild", "--ttl", "1h"], None, None
-        )
+        code, out, err = self.run_cli(["notice", "create", "ci down", "--to", "guild", "--ttl", "1h"], None, None)
         self.assertEqual(code, 0)
 
     def test_create_rejects_text_over_max_length(self):
-        code, out, err = self.run_cli(
-            ["notice", "create", "x" * 501, "--to", "guild", "--ttl", "2h"], None, None
-        )
+        code, out, err = self.run_cli(["notice", "create", "x" * 501, "--to", "guild", "--ttl", "2h"], None, None)
         self.assertEqual(code, 1)
         self.assertIn("exceeds the maximum length", err)
 
     def test_create_rejects_email_address(self):
         code, out, err = self.run_cli(
             ["notice", "create", "contact jane.doe@example.com", "--to", "guild", "--ttl", "2h"],
-            None, None,
+            None,
+            None,
         )
         self.assertEqual(code, 1)
         self.assertIn("must not contain an email address", err)
@@ -89,7 +76,8 @@ class NoticeTests(GuildTestCase):
         config_file.write_text(json.dumps(data))
         code, out, err = self.run_cli(
             ["notice", "create", "student Jane Doe missed class", "--to", "project:acme", "--ttl", "2h"],
-            None, self.repo_dir,
+            None,
+            self.repo_dir,
         )
         self.assertEqual(code, 1)
         self.assertIn("forbidden", err)
@@ -105,9 +93,7 @@ class NoticeTests(GuildTestCase):
         self.assertNotIn("\x1b", out)
 
     def test_create_and_list_guild_scope(self):
-        code, out, err = self.run_cli(
-            ["notice", "create", "pipeline down", "--to", "guild", "--ttl", "2h"], None, None
-        )
+        code, out, err = self.run_cli(["notice", "create", "pipeline down", "--to", "guild", "--ttl", "2h"], None, None)
         self.assertEqual(code, 0)
         code, out, err = self.run_cli(["notices"], None, None)
         self.assertIn("pipeline down", out)
@@ -125,9 +111,7 @@ class NoticeTests(GuildTestCase):
         self.assertIn("unknown notice", err)
 
     def test_expired_notice_not_listed(self):
-        code, out, err = self.run_cli(
-            ["notice", "create", "short lived", "--to", "guild", "--ttl", "30m"], None, None
-        )
+        code, out, err = self.run_cli(["notice", "create", "short lived", "--to", "guild", "--ttl", "30m"], None, None)
         self.assertEqual(code, 0)
         code, out, err = self.run_cli(["notices"], None, None)
         self.assertIn("short lived", out)

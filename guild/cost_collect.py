@@ -22,8 +22,7 @@ def _transcripts(projects_dir):
 
 def _task_windows(conn):
     rows = conn.execute(
-        "SELECT kind, ts, party, payload FROM events WHERE kind IN (?, ?, ?) AND party IS NOT NULL"
-        " ORDER BY seq ASC",
+        "SELECT kind, ts, party, payload FROM events WHERE kind IN (?, ?, ?) AND party IS NOT NULL ORDER BY seq ASC",
         _TASK_KINDS,
     ).fetchall()
     open_starts = {}
@@ -58,8 +57,7 @@ def _task_for(windows, party, moment):
 
 def _binding_of(conn, session_id):
     row = conn.execute(
-        "SELECT party, project FROM events WHERE session_id = ? AND party IS NOT NULL"
-        " ORDER BY seq DESC LIMIT 1",
+        "SELECT party, project FROM events WHERE session_id = ? AND party IS NOT NULL ORDER BY seq DESC LIMIT 1",
         (session_id,),
     ).fetchone()
     if row is None:

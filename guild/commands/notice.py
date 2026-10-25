@@ -13,16 +13,14 @@ def _validate_scope(ctx, to):
     if to == "guild":
         return
     if to.startswith(_PROJECT_SCOPE_PREFIX):
-        config.load_project(ctx.projects_dir, to[len(_PROJECT_SCOPE_PREFIX):])
+        config.load_project(ctx.projects_dir, to[len(_PROJECT_SCOPE_PREFIX) :])
         return
     if to.startswith(_RAID_SCOPE_PREFIX):
-        raid_name = to[len(_RAID_SCOPE_PREFIX):]
+        raid_name = to[len(_RAID_SCOPE_PREFIX) :]
         names.validate_name(raid_name, "raid name")
         raid_commands.require_active_raid(ctx.conn, ctx.now, raid_name)
         return
-    raise GuildError(
-        "invalid --to '{}': expected project:<name>, raid:<name> or guild".format(to), 1
-    )
+    raise GuildError("invalid --to '{}': expected project:<name>, raid:<name> or guild".format(to), 1)
 
 
 def _reject_duplicate(ctx, actor_party, to, text):
@@ -181,9 +179,7 @@ def active_notices(conn, now):
 def format_notice_line(notice_id, party, issued_at, text, unbound):
     author = identity.actor_label(party, unbound)
     clean_text = sanitize.escape_quotes(sanitize.collapse_to_single_line(text))
-    line = '- notice #{} from {} at {}: "{}"'.format(
-        notice_id, author, timeutil.issued_label(issued_at), clean_text
-    )
+    line = '- notice #{} from {} at {}: "{}"'.format(notice_id, author, timeutil.issued_label(issued_at), clean_text)
     if author != identity.HUMAN_LABEL and pii.looks_instruction_like(text):
         return "{} {}".format(line, pii.INSTRUCTION_LIKE_FLAG)
     return line
@@ -196,7 +192,7 @@ def targeting(rows, project, scope_guild_always, raid_member_of):
             matched.append(row)
         elif project is not None and row["scope"] == "project:{}".format(project):
             matched.append(row)
-        elif row["scope"].startswith(_RAID_SCOPE_PREFIX) and row["scope"][len(_RAID_SCOPE_PREFIX):] in raid_member_of:
+        elif row["scope"].startswith(_RAID_SCOPE_PREFIX) and row["scope"][len(_RAID_SCOPE_PREFIX) :] in raid_member_of:
             matched.append(row)
     return matched
 

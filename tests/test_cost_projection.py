@@ -52,7 +52,12 @@ class CostProjectionTests(GuildTestCase):
         rows = self._rows()
         self.assertEqual(len(rows), 1)
         self.assertEqual(
-            (rows[0]["input_tokens"], rows[0]["cache_creation_tokens"], rows[0]["cache_read_tokens"], rows[0]["output_tokens"]),
+            (
+                rows[0]["input_tokens"],
+                rows[0]["cache_creation_tokens"],
+                rows[0]["cache_read_tokens"],
+                rows[0]["output_tokens"],
+            ),
             (11, 22, 33, 44),
         )
 

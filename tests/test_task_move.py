@@ -16,9 +16,7 @@ class TaskMoveTestCase(GuildTestCase):
         self.sync_sdd(self.repo_dir, "sess-1", "acme", "wave", _TASKS_MD)
         self.run_cli(["party", "start", "alpha", "--reason", "test reason"], "sess-1", self.repo_dir)
         self.run_cli(["party", "start", "beta", "--reason", "test reason"], "sess-2", self.repo_dir)
-        self._cli(
-            "sess-1", ["quest", "add", "src", "--title", "Src", "--epic", "wave", "--tasks", "T01,T02,T03"]
-        )
+        self._cli("sess-1", ["quest", "add", "src", "--title", "Src", "--epic", "wave", "--tasks", "T01,T02,T03"])
         self._cli("sess-2", ["quest", "add", "dst", "--title", "Dst", "--epic", "wave"])
 
     def _cli(self, session, argv):
@@ -39,8 +37,12 @@ class TaskMoveTestCase(GuildTestCase):
         self.write_gh_fixture(
             "view_acme-app_1",
             {
-                "state": gh_state, "isDraft": False, "headRefName": "feature/x", "title": "t",
-                "mergedAt": "2026-01-01T00:00:00Z", "statusCheckRollup": [],
+                "state": gh_state,
+                "isDraft": False,
+                "headRefName": "feature/x",
+                "title": "t",
+                "mergedAt": "2026-01-01T00:00:00Z",
+                "statusCheckRollup": [],
             },
         )
         code, out, err = self._cli(

@@ -46,9 +46,7 @@ def fix_reasons(pr):
     reasons = []
     if pr["checks_failing"] and not pr["checks_billing"]:
         reasons.append("checks failing ({})".format(pr["checks_failing"]))
-    reasons.extend(
-        review_reasons(pr["mergeable"], pr["review_decision"], pr["unresolved_threads"], pr["merge_state"])
-    )
+    reasons.extend(review_reasons(pr["mergeable"], pr["review_decision"], pr["unresolved_threads"], pr["merge_state"]))
     return reasons
 
 
@@ -269,16 +267,13 @@ def _glob_sharers(pr, open_prs):
 
 def _unblock_counts(open_prs, edges):
     successors = _successors(edges)
-    return {
-        pr["ref"]: len(_dependents(successors, pr["ref"]) | _glob_sharers(pr, open_prs)) for pr in open_prs
-    }
+    return {pr["ref"]: len(_dependents(successors, pr["ref"]) | _glob_sharers(pr, open_prs)) for pr in open_prs}
 
 
 def _topological_order(open_prs, edges, unblocks):
     tie_keys = {pr["ref"]: (pr["number"], pr["repo"]) for pr in open_prs}
     sort_keys = {
-        pr["ref"]: (0 if unblocks_everyone(pr) else 1, -unblocks[pr["ref"]]) + tie_keys[pr["ref"]]
-        for pr in open_prs
+        pr["ref"]: (0 if unblocks_everyone(pr) else 1, -unblocks[pr["ref"]]) + tie_keys[pr["ref"]] for pr in open_prs
     }
     blockers = {pr["ref"]: 0 for pr in open_prs}
     successors = _successors(edges)
@@ -425,7 +420,12 @@ def _ordered_entries(by_ref, order, edges, unblocks, billing_repos):
         if state == _WAITING_STATE or (state == _READY_STATE and _is_draft(pr)):
             pending_refs.add(ref)
         entry = _queue_entry(
-            pr, unblocks[ref], reasons, waits, _why(pr, state, position, ordered_edges), external,
+            pr,
+            unblocks[ref],
+            reasons,
+            waits,
+            _why(pr, state, position, ordered_edges),
+            external,
             pr["repo"] in billing_repos,
         )
         _hold_behind_unready(entry, before, unready_refs, reasons + waits)
@@ -455,7 +455,12 @@ def _stuck_entries(by_ref, stuck, unblocks, billing_repos):
     cycle = "ordering cycle between pins and task dependencies: {}".format(", ".join(stuck))
     return [
         _queue_entry(
-            by_ref[ref], unblocks[ref], _blocked_reasons(by_ref[ref]) + [cycle], [], "", _own_external(by_ref[ref]),
+            by_ref[ref],
+            unblocks[ref],
+            _blocked_reasons(by_ref[ref]) + [cycle],
+            [],
+            "",
+            _own_external(by_ref[ref]),
             by_ref[ref]["repo"] in billing_repos,
         )
         for ref in stuck
@@ -466,15 +471,13 @@ def _flag_next_action(entries):
     for index, entry in enumerate(entries):
         if entry["state"] != _BLOCKED_STATE or entry["external"] is not None:
             continue
-        if any(later["action"] == _MERGE_ACTION for later in entries[index + 1:]):
+        if any(later["action"] == _MERGE_ACTION for later in entries[index + 1 :]):
             entry["next_action"] = True
         return
 
 
 def _main_entries(main_status):
-    return sorted(
-        (dict(row) for row in main_status), key=lambda row: (row["repo"], row["source"])
-    )
+    return sorted((dict(row) for row in main_status), key=lambda row: (row["repo"], row["source"]))
 
 
 def compute(prs, pins, main_status):

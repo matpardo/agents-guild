@@ -117,10 +117,20 @@ def _handle_quest_incomplete(ctx, args):
 def _handle_quest_add(ctx, args):
     from guild.commands import quest as quest_commands
 
-    _print(quest_commands.add(
-        ctx, args.slug, args.title, args.epic, args.tasks, args.titles, args.no_epic, args.followups_of,
-        args.open, args.reason
-    ))
+    _print(
+        quest_commands.add(
+            ctx,
+            args.slug,
+            args.title,
+            args.epic,
+            args.tasks,
+            args.titles,
+            args.no_epic,
+            args.followups_of,
+            args.open,
+            args.reason,
+        )
+    )
     return 0
 
 
@@ -351,11 +361,7 @@ def _handle_asks(ctx, args):
             )
         )
         return 0
-    _print_lines(
-        board_commands.render_all_asks(
-            ctx, args.party, since_cutoff, _stdout_is_colored(), _terminal_width()
-        )
-    )
+    _print_lines(board_commands.render_all_asks(ctx, args.party, since_cutoff, _stdout_is_colored(), _terminal_width()))
     return 0
 
 
@@ -541,9 +547,7 @@ def _handle_claims(ctx, args):
     from guild.commands import claim as claim_commands
 
     rows = claim_commands.list_claims(ctx.conn, ctx.now)
-    _print_lines(
-        [_claim_line(row) for row in rows]
-    )
+    _print_lines([_claim_line(row) for row in rows])
     return 0
 
 
@@ -562,7 +566,9 @@ def _handle_memory_list(ctx, args):
     _print_lines(
         [
             "{}: {}{}".format(
-                item["id"], item["text"], "  " + pii.INSTRUCTION_LIKE_FLAG if memory_commands.flagged(item["text"]) else ""
+                item["id"],
+                item["text"],
+                "  " + pii.INSTRUCTION_LIKE_FLAG if memory_commands.flagged(item["text"]) else "",
             )
             for item in items
         ]
@@ -766,11 +772,7 @@ def _handle_cost(ctx, args):
 def _handle_board(ctx, args):
     from guild.commands import board as board_commands
 
-    _print_lines(
-        board_commands.render_board(
-            ctx, args.party, args.raid, _stdout_is_colored(), _terminal_width()
-        )
-    )
+    _print_lines(board_commands.render_board(ctx, args.party, args.raid, _stdout_is_colored(), _terminal_width()))
     return 0
 
 
@@ -990,7 +992,9 @@ def _add_party_parser(subparsers):
     resume.add_argument("--session", help="session name; from a human terminal only")
     resume.set_defaults(handler=_handle_party_resume)
 
-    close = actions.add_parser("close", help="close a party; refuses while quests are unfinished or asks or PRs are open unless --force")
+    close = actions.add_parser(
+        "close", help="close a party; refuses while quests are unfinished or asks or PRs are open unless --force"
+    )
     close.add_argument("name", nargs="?")
     close.add_argument("--force", action="store_true", help="close despite unfinished quests, open asks or open PRs")
     close.add_argument("--pending", required=True, help="what is left pending; 'none' if nothing")
@@ -1105,7 +1109,10 @@ def _add_pr_parser(subparsers):
     parser = subparsers.add_parser("pr", help="track PRs and set their state")
     actions = parser.add_subparsers(dest="pr_action", required=True, metavar="<subcommand>")
 
-    track = actions.add_parser("track", help="start tracking a PR against a task (party, adventurer: its own; health job: none), optionally with a card")
+    track = actions.add_parser(
+        "track",
+        help="start tracking a PR against a task (party, adventurer: its own; health job: none), optionally with a card",
+    )
     track.add_argument("ref")
     track.add_argument("--task", help="task as <quest>/<tid>")
     track.add_argument("--card", help="tracker card key")
@@ -1215,7 +1222,10 @@ def _add_adventurer_parser(subparsers):
 
     start = actions.add_parser("start", help="register this session as an adventurer")
     start.add_argument("job", nargs="?", help="what this session does; omit with --job")
-    start.add_argument("--task", help="required without --job: <epic>/<tid> (synced, or new in a synced epic) or <quest>/<tid> of a no-epic open quest")
+    start.add_argument(
+        "--task",
+        help="required without --job: <epic>/<tid> (synced, or new in a synced epic) or <quest>/<tid> of a no-epic open quest",
+    )
     start.add_argument("--job", dest="health_job", help="health job of the project config, instead of a job text")
     start.add_argument("--reason", required=True, help="why this work is an adventurer")
     start.set_defaults(handler=_handle_adventurer_start)
@@ -1404,11 +1414,15 @@ def build_parser():
     whoami = subparsers.add_parser("whoami", help="show the session, party and project you are bound to")
     whoami.set_defaults(handler=_handle_whoami)
 
-    doctor = subparsers.add_parser("doctor", help="read-only checks of hooks, permission rules, GUILD.md and project configs")
+    doctor = subparsers.add_parser(
+        "doctor", help="read-only checks of hooks, permission rules, GUILD.md and project configs"
+    )
     doctor.add_argument("--scan-prs", action="store_true", help="scan open PRs for guild traces through gh")
     doctor.set_defaults(handler=_handle_doctor)
 
-    wire_settings = subparsers.add_parser("wire-settings", help="merge guild hooks and permission rules into ~/.claude/settings.json")
+    wire_settings = subparsers.add_parser(
+        "wire-settings", help="merge guild hooks and permission rules into ~/.claude/settings.json"
+    )
     wire_settings.set_defaults(handler=_handle_wire_settings)
 
     init_project = subparsers.add_parser("init-project", help="create a project config from a JSON file")
@@ -1423,9 +1437,13 @@ def build_parser():
     _add_finding_parser(subparsers)
 
     ask = subparsers.add_parser("ask", help="ask the human a decision")
-    ask.add_argument("question", help="at most {} characters; put details in --context".format(pii.ASK_QUESTION_MAX_LENGTH))
+    ask.add_argument(
+        "question", help="at most {} characters; put details in --context".format(pii.ASK_QUESTION_MAX_LENGTH)
+    )
     ask.add_argument("wait_id", nargs="?", help="ask id, with `guild ask wait <id>`")
-    ask.add_argument("--context", help="short context for the human, at most {} characters".format(pii.ASK_CONTEXT_MAX_LENGTH))
+    ask.add_argument(
+        "--context", help="short context for the human, at most {} characters".format(pii.ASK_CONTEXT_MAX_LENGTH)
+    )
     ask.add_argument("--timeout", help="with ask wait: give up after this long (default 2h)")
     ask.add_argument("--ref", action="append", help="pr:<owner/repo>#<n>, task:<quest>/<tid> or card:<KEY>; repeatable")
     ask.add_argument("--option", action="append", help="an answer option; repeatable")
@@ -1507,7 +1525,12 @@ def build_parser():
 
     cost = subparsers.add_parser("cost", help="token usage from Claude Code transcripts")
     cost.add_argument("--since", default=None, help="only usage within this duration, e.g. 3d")
-    cost.add_argument("--by", choices=("session", "party", "model", "quest", "task"), default="session", help="group usage by this field")
+    cost.add_argument(
+        "--by",
+        choices=("session", "party", "model", "quest", "task"),
+        default="session",
+        help="group usage by this field",
+    )
     cost.add_argument("--project", default=None, help="only this project")
     cost.set_defaults(handler=_handle_cost)
 
@@ -1552,7 +1575,9 @@ def build_parser():
     _add_timer_parser(subparsers, "resources-timer", "resources-collect")
     _add_timer_parser(subparsers, "compact-timer", "compact")
 
-    compact = subparsers.add_parser("compact", help="back up the database, then drop duplicate sync events and old resource samples")
+    compact = subparsers.add_parser(
+        "compact", help="back up the database, then drop duplicate sync events and old resource samples"
+    )
     compact.add_argument("--dry-run", action="store_true", help="list what would be deleted; no backup, no changes")
     compact.set_defaults(handler=_handle_compact)
 

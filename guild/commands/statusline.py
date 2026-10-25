@@ -83,9 +83,7 @@ def render(ctx, session_id):
     binding = identity.resolve_binding(ctx.conn, session_id)
     project = binding["project"] if binding is not None else None
     party = binding["party"] if binding is not None else None
-    total_open_asks = ctx.conn.execute(
-        "SELECT COUNT(*) AS n FROM asks WHERE state = 'open'"
-    ).fetchone()["n"]
+    total_open_asks = ctx.conn.execute("SELECT COUNT(*) AS n FROM asks WHERE state = 'open'").fetchone()["n"]
     active = notice_commands.active_notices(ctx.conn, ctx.now)
     raid_member_of = raid_commands.member_raid_names(ctx.conn, ctx.now, party)
     targeting = notice_commands.targeting(active, project, True, raid_member_of)

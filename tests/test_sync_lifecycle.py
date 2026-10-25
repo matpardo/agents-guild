@@ -11,8 +11,12 @@ from tests.lifecycle_fixtures import (
 
 _OPEN_DRAFT = {"state": "OPEN", "isDraft": True, "headRefName": "feature/x", "title": "t"}
 _MERGED = {
-    "state": "MERGED", "isDraft": False, "headRefName": "feature/x", "title": "t",
-    "mergedAt": "2026-01-01T00:00:00Z", "statusCheckRollup": [],
+    "state": "MERGED",
+    "isDraft": False,
+    "headRefName": "feature/x",
+    "title": "t",
+    "mergedAt": "2026-01-01T00:00:00Z",
+    "statusCheckRollup": [],
 }
 _CLOSED = {"state": "CLOSED", "isDraft": False, "headRefName": "feature/x", "title": "t", "statusCheckRollup": []}
 
@@ -28,7 +32,8 @@ class SyncLifecycleTests(LifecycleFixture):
         self.write_gh_fixture("view_acme-app_{}".format(number), view)
         code, out, err = self.run_cli(
             ["pr", "track", "acme/app#{}".format(number), "--task", "demo/T01", "--what", "x", "--waits", "y"],
-            "sess-1", self.repo_dir,
+            "sess-1",
+            self.repo_dir,
         )
         self.assertEqual(code, 0, err)
 

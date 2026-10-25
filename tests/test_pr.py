@@ -14,10 +14,18 @@ class PrTrackTests(GuildTestCase):
     def test_track_rejects_repo_outside_project_config(self):
         code, out, err = self.run_cli(
             [
-                "pr", "track", "other/repo#1", "--task", "demo/T01",
-                "--what", "x", "--waits", "y",
+                "pr",
+                "track",
+                "other/repo#1",
+                "--task",
+                "demo/T01",
+                "--what",
+                "x",
+                "--waits",
+                "y",
             ],
-            "sess-1", self.repo_dir,
+            "sess-1",
+            self.repo_dir,
         )
         self.assertEqual(code, 1)
         self.assertIn("not in project", err)
@@ -25,10 +33,18 @@ class PrTrackTests(GuildTestCase):
     def test_track_rejects_unknown_task(self):
         code, out, err = self.run_cli(
             [
-                "pr", "track", "acme/app#1", "--task", "demo/T99",
-                "--what", "x", "--waits", "y",
+                "pr",
+                "track",
+                "acme/app#1",
+                "--task",
+                "demo/T99",
+                "--what",
+                "x",
+                "--waits",
+                "y",
             ],
-            "sess-1", self.repo_dir,
+            "sess-1",
+            self.repo_dir,
         )
         self.assertEqual(code, 1)
         self.assertIn("unknown task", err)
@@ -40,10 +56,18 @@ class PrTrackTests(GuildTestCase):
         )
         code, out, err = self.run_cli(
             [
-                "pr", "track", "acme/app#1", "--task", "demo/T01",
-                "--what", "adds flag", "--waits", "review",
+                "pr",
+                "track",
+                "acme/app#1",
+                "--task",
+                "demo/T01",
+                "--what",
+                "adds flag",
+                "--waits",
+                "review",
             ],
-            "sess-1", self.repo_dir,
+            "sess-1",
+            self.repo_dir,
         )
         self.assertEqual(code, 0)
         code, out, err = self.run_cli(["board"], "sess-1", self.repo_dir)
@@ -57,7 +81,8 @@ class PrTrackTests(GuildTestCase):
         )
         code, out, err = self.run_cli(
             ["pr", "track", "acme/app#1", "--task", "demo/T01", "--what", "x", "--waits", "y"] + extra,
-            "sess-1", self.repo_dir,
+            "sess-1",
+            self.repo_dir,
         )
         self.assertEqual(code, 0, err)
         conn = sqlite3.connect(str(self.data_home / "guild" / "guild.db"))
@@ -97,10 +122,20 @@ class PrTrackTests(GuildTestCase):
     def test_track_rejects_the_removed_type_option(self):
         code, out, err = self.run_cli(
             [
-                "pr", "track", "acme/app#1", "--task", "demo/T01",
-                "--what", "x", "--waits", "y", "--type", "hotfix",
+                "pr",
+                "track",
+                "acme/app#1",
+                "--task",
+                "demo/T01",
+                "--what",
+                "x",
+                "--waits",
+                "y",
+                "--type",
+                "hotfix",
             ],
-            "sess-1", self.repo_dir,
+            "sess-1",
+            self.repo_dir,
         )
         self.assertEqual(code, 2)
         self.assertIn("--type", err)
@@ -127,11 +162,13 @@ class PrTrackTests(GuildTestCase):
         )
         self.run_cli(
             ["pr", "track", "acme/app#1", "--task", "demo/T01", "--what", "x", "--waits", "y"],
-            "sess-1", self.repo_dir,
+            "sess-1",
+            self.repo_dir,
         )
         code, out, err = self.run_cli(
             ["pr", "track", "acme/app#1", "--task", "demo/T01", "--what", "x", "--waits", "y"],
-            "sess-1", self.repo_dir,
+            "sess-1",
+            self.repo_dir,
         )
         self.assertEqual(code, 1)
         self.assertIn("already tracked", err)
@@ -140,7 +177,8 @@ class PrTrackTests(GuildTestCase):
         self.write_gh_error("view_acme-app_1", "not found")
         code, out, err = self.run_cli(
             ["pr", "track", "acme/app#1", "--task", "demo/T01", "--what", "x", "--waits", "y"],
-            "sess-1", self.repo_dir,
+            "sess-1",
+            self.repo_dir,
         )
         self.assertEqual(code, 1)
         self.assertIn("gh pr view failed", err)
@@ -158,12 +196,15 @@ class PrTrackCardTests(GuildTestCase):
     def _track(self, session_id, extra):
         return self.run_cli(
             ["pr", "track", "acme/app#1", "--what", "x", "--waits", "y"] + extra,
-            session_id, self.repo_dir,
+            session_id,
+            self.repo_dir,
         )
 
     def _start_party_with_task(self):
         self.run_cli(["party", "start", "alpha", "--reason", "test reason"], "sess-1", self.repo_dir)
-        self.run_cli(["quest", "add", "demo", "--title", "Demo", "--no-epic", "--tasks", "T01"], "sess-1", self.repo_dir)
+        self.run_cli(
+            ["quest", "add", "demo", "--title", "Demo", "--no-epic", "--tasks", "T01"], "sess-1", self.repo_dir
+        )
 
     def test_card_without_task_is_rejected_for_a_party(self):
         self._start_party_with_task()
@@ -211,7 +252,8 @@ class PrSetTests(GuildTestCase):
         )
         self.run_cli(
             ["pr", "track", "acme/app#1", "--task", "demo/T01", "--what", "x", "--waits", "y"],
-            "sess-1", self.repo_dir,
+            "sess-1",
+            self.repo_dir,
         )
 
     def row(self):
@@ -265,7 +307,8 @@ class PrSetTests(GuildTestCase):
     def test_set_rejects_both_polarities_of_one_flag(self):
         code, out, err = self.run_cli(
             ["pr", "set", "acme/app#1", "--needs-ask-answer", "--no-needs-ask-answer"],
-            "sess-1", self.repo_dir,
+            "sess-1",
+            self.repo_dir,
         )
         self.assertNotEqual(code, 0)
 
@@ -277,9 +320,7 @@ class PrSetTests(GuildTestCase):
         self.assertIn("invalid choice", err)
 
     def test_set_updates_lifecycle(self):
-        code, out, err = self.run_cli(
-            ["pr", "set", "acme/app#1", "--lifecycle", "ready"], "sess-1", self.repo_dir
-        )
+        code, out, err = self.run_cli(["pr", "set", "acme/app#1", "--lifecycle", "ready"], "sess-1", self.repo_dir)
         self.assertEqual(code, 0)
         code, out, err = self.run_cli(["board"], "sess-1", self.repo_dir)
         self.assertIn("app#1  ready", out)
@@ -302,16 +343,12 @@ class PrSetTests(GuildTestCase):
         self.assertEqual(self.marks(), (1, 1))
 
     def test_set_rejects_the_removed_type_option(self):
-        code, out, err = self.run_cli(
-            ["pr", "set", "acme/app#1", "--type", "docs"], "sess-1", self.repo_dir
-        )
+        code, out, err = self.run_cli(["pr", "set", "acme/app#1", "--type", "docs"], "sess-1", self.repo_dir)
         self.assertEqual(code, 2)
         self.assertIn("--type", err)
 
     def test_set_unknown_pr_fails(self):
-        code, out, err = self.run_cli(
-            ["pr", "set", "acme/app#99", "--lifecycle", "ready"], "sess-1", self.repo_dir
-        )
+        code, out, err = self.run_cli(["pr", "set", "acme/app#99", "--lifecycle", "ready"], "sess-1", self.repo_dir)
         self.assertEqual(code, 1)
         self.assertIn("is not tracked", err)
 
@@ -336,7 +373,8 @@ class PrRelinkTests(GuildTestCase):
         )
         code, out, err = self.run_cli(
             ["pr", "track", "acme/app#1", "--task", "demo/T01", "--what", "x", "--waits", "y"],
-            "sess-1", self.repo_dir,
+            "sess-1",
+            self.repo_dir,
         )
         self.assertEqual(code, 0, err)
 

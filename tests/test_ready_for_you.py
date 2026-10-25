@@ -12,8 +12,14 @@ class ReadyForYouTestCase(ReviewMdTestCase):
     def model(self):
         conn = db.connect(paths.db_path())
         ctx = context.RunContext(
-            conn, None, None, timeutil.utcnow(), None,
-            paths.claude_sessions_dir(), paths.projects_config_dir(), paths.state_dir(),
+            conn,
+            None,
+            None,
+            timeutil.utcnow(),
+            None,
+            paths.claude_sessions_dir(),
+            paths.projects_config_dir(),
+            paths.state_dir(),
         )
         try:
             return board_commands.board_model(ctx)
@@ -57,10 +63,22 @@ class ModelTests(ReadyForYouTestCase):
         self.track_ready("sess-1", 1, "qa/T01", title="Add\nthing")
         self.run_cli(["pr", "set", "acme/app#1", "--needs-human-pr-review"], "sess-1", self.repo_dir)
         self.sync_gh("sess-1")
-        self.assertEqual(self.model()["ready_for_you"], [{
-            "ref": "acme/app#1", "title": "Add thing", "url": "https://github.com/acme/app/pull/1",
-            "party": "alpha", "scope": "party:alpha", "scopes": ["party:alpha"], "review_first": True, "checks": "1 passing", "notes": [],
-        }])
+        self.assertEqual(
+            self.model()["ready_for_you"],
+            [
+                {
+                    "ref": "acme/app#1",
+                    "title": "Add thing",
+                    "url": "https://github.com/acme/app/pull/1",
+                    "party": "alpha",
+                    "scope": "party:alpha",
+                    "scopes": ["party:alpha"],
+                    "review_first": True,
+                    "checks": "1 passing",
+                    "notes": [],
+                }
+            ],
+        )
 
     def test_pr_in_two_raids_appears_once(self):
         self.track_ready("sess-1", 1, "qa/T01")

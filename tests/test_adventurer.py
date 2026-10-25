@@ -150,8 +150,10 @@ class AdventurerCommandTests(AdventurerTestCase):
         code, out, err = self.cli(["rebuild"], None)
         self.assertEqual(code, 0, err)
         rows = self.rows("SELECT id, session_id, task, state, pending FROM adventurers ORDER BY id")
-        self.assertEqual([(r["id"], r["task"], r["state"], r["pending"]) for r in rows],
-                         [(1, "demo-epic/T02", "active", None), (2, "demo-epic/T90", "done", "none")])
+        self.assertEqual(
+            [(r["id"], r["task"], r["state"], r["pending"]) for r in rows],
+            [(1, "demo-epic/T02", "active", None), (2, "demo-epic/T90", "done", "none")],
+        )
 
 
 class AdventurerHoldsTaskTests(AdventurerTestCase):
@@ -209,19 +211,27 @@ class AdventurerPermissionTests(AdventurerTestCase):
             self.assertNotIn("session not bound", err, argv)
 
     def test_pr_track_on_a_task_accepts_only_its_own_task(self):
-        code, out, err = self.cli(["pr", "track", "acme/app#1", "--card", "ABC-1", "--what", "w", "--waits", "r"], "adv-1")
+        code, out, err = self.cli(
+            ["pr", "track", "acme/app#1", "--card", "ABC-1", "--what", "w", "--waits", "r"], "adv-1"
+        )
         self.assertEqual(code, 1)
         self.assertIn("--task equal to its own task", err)
-        code, out, err = self.cli(["pr", "track", "acme/app#3", "--task", "demo-epic/T01", "--what", "w", "--waits", "r"], "adv-1")
+        code, out, err = self.cli(
+            ["pr", "track", "acme/app#3", "--task", "demo-epic/T01", "--what", "w", "--waits", "r"], "adv-1"
+        )
         self.assertEqual(code, 1)
-        code, out, err = self.cli(["pr", "track", "acme/app#2", "--task", "demo-epic/T02", "--what", "w", "--waits", "r"], "adv-1")
+        code, out, err = self.cli(
+            ["pr", "track", "acme/app#2", "--task", "demo-epic/T02", "--what", "w", "--waits", "r"], "adv-1"
+        )
         self.assertEqual(code, 0, err)
         row = self.rows("SELECT party, adventurer, task_quest FROM prs WHERE number = 2")[0]
         self.assertEqual((row["party"], row["adventurer"], row["task_quest"]), ("", 1, None))
 
     def test_done_prints_final_report(self):
         self.start("adv-1", "fix typo", "--task", "demo-epic/T02")
-        self.cli(["pr", "track", "acme/app#2", "--task", "demo-epic/T02", "--what", "fixes typo", "--waits", "r"], "adv-1")
+        self.cli(
+            ["pr", "track", "acme/app#2", "--task", "demo-epic/T02", "--what", "fixes typo", "--waits", "r"], "adv-1"
+        )
         code, out, err = self.cli(["adventurer", "done", "--pending", "none"], "adv-1")
         self.assertEqual(code, 0, err)
         self.assertIn("adventurer 1 done", out)
@@ -234,9 +244,14 @@ class AdventurerPermissionTests(AdventurerTestCase):
     def test_done_reports_what_the_adventurer_generated_and_warns_on_open_work(self):
         self.cli(["ask", "Ship it?", "--context", "c", "--ref", "task:demo-epic/T02"], "adv-1")
         self.cli(["idea", "add", "An idea", "--description", "d"], "adv-1")
-        self.cli(["quest", "add", "chore", "--open", "--no-epic", "--title", "c", "--tasks", "T01", "--titles", "one"], "adv-1")
+        self.cli(
+            ["quest", "add", "chore", "--open", "--no-epic", "--title", "c", "--tasks", "T01", "--titles", "one"],
+            "adv-1",
+        )
         self.cli(["notice", "create", "heads up", "--to", "project:acme", "--ttl", "1h"], "adv-1")
-        self.cli(["pr", "track", "acme/app#2", "--task", "demo-epic/T02", "--what", "fixes typo", "--waits", "r"], "adv-1")
+        self.cli(
+            ["pr", "track", "acme/app#2", "--task", "demo-epic/T02", "--what", "fixes typo", "--waits", "r"], "adv-1"
+        )
         code, out, err = self.cli(["adventurer", "done", "--pending", "none"], "adv-1")
         self.assertEqual(code, 0, err)
         self.assertIn("ask #1 (open): Ship it?", out)
@@ -253,7 +268,9 @@ class AdventurerPermissionTests(AdventurerTestCase):
 
     def test_done_refreshes_a_stale_pr_to_merged(self):
         self.start("adv-1", "fix typo", "--task", "demo-epic/T02")
-        self.cli(["pr", "track", "acme/app#2", "--task", "demo-epic/T02", "--what", "fixes typo", "--waits", "r"], "adv-1")
+        self.cli(
+            ["pr", "track", "acme/app#2", "--task", "demo-epic/T02", "--what", "fixes typo", "--waits", "r"], "adv-1"
+        )
         self.write_gh_fixture("view_acme-app_2", dict(OPEN_VIEW, state="MERGED", mergedAt="2026-01-01T00:00:00Z"))
         code, out, err = self.cli(["adventurer", "done", "--pending", "none"], "adv-1")
         self.assertEqual(code, 0, err)
@@ -262,7 +279,9 @@ class AdventurerPermissionTests(AdventurerTestCase):
 
     def test_done_notes_the_last_sync_when_gh_fails(self):
         self.start("adv-1", "fix typo", "--task", "demo-epic/T02")
-        self.cli(["pr", "track", "acme/app#2", "--task", "demo-epic/T02", "--what", "fixes typo", "--waits", "r"], "adv-1")
+        self.cli(
+            ["pr", "track", "acme/app#2", "--task", "demo-epic/T02", "--what", "fixes typo", "--waits", "r"], "adv-1"
+        )
         self.write_gh_error("view_acme-app_2", "boom")
         code, out, err = self.cli(["adventurer", "done", "--pending", "none"], "adv-1")
         self.assertEqual(code, 0, err)
@@ -273,7 +292,9 @@ class AdventurerPermissionTests(AdventurerTestCase):
         self.cli(["adventurer", "done", "--pending", "none"], "adv-1")
         code, out, err = self.start_health_job("adv-2")
         self.assertEqual(code, 0, err)
-        code, out, err = self.cli(["pr", "track", "acme/app#1", "--task", "demo-epic/T02", "--what", "w", "--waits", "r"], "adv-2")
+        code, out, err = self.cli(
+            ["pr", "track", "acme/app#1", "--task", "demo-epic/T02", "--what", "w", "--waits", "r"], "adv-2"
+        )
         self.assertEqual(code, 1)
         self.assertIn("health-job adventurer tracks PRs without --task", err)
         code, out, err = self.cli(["pr", "track", "acme/app#1", "--what", "fixes typo", "--waits", "r"], "adv-2")
@@ -286,7 +307,10 @@ class AdventurerPermissionTests(AdventurerTestCase):
         self.cli(["pr", "track", "acme/app#2", "--task", "demo-epic/T02", "--what", "w", "--waits", "r"], "adv-1")
         self.cli(["adventurer", "done", "--pending", "none"], "adv-1")
         self.start("adv-2", "free job", "--task", "demo-epic/T90")
-        self.cli(["pr", "track", "acme/app#1", "--task", "demo-epic/T90", "--card", "ABC-1", "--what", "w", "--waits", "r"], "adv-2")
+        self.cli(
+            ["pr", "track", "acme/app#1", "--task", "demo-epic/T90", "--card", "ABC-1", "--what", "w", "--waits", "r"],
+            "adv-2",
+        )
         self.cli(["party", "start", "alpha", "--reason", "test reason"], "sess-1")
         code, out, err = self.cli(["sync", "--source", "gh"], None)
         self.assertEqual(code, 0, err)
@@ -396,7 +420,9 @@ class AdventurerTaskDriftTests(AdventurerTestCase):
         self.assertNotIn("adventurer task not in SDD", self.drift("--all"))
 
     def test_open_quest_task_outside_any_epic_is_not_drift(self):
-        self.cli(["quest", "add", "chore", "--open", "--no-epic", "--title", "c", "--tasks", "T01", "--titles", "one"], None)
+        self.cli(
+            ["quest", "add", "chore", "--open", "--no-epic", "--title", "c", "--tasks", "T01", "--titles", "one"], None
+        )
         self.ship("chore/T01", 1)
         self.merge(1)
         self.assertNotIn("adventurer task not in SDD", self.drift("--all"))

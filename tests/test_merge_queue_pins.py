@@ -27,19 +27,19 @@ class PinTestCase(MergeQueueTestCase):
     def pin(self, session_id, first, second):
         return self.run_cli(
             ["merge-queue", "pin", "acme/app#{}".format(first), "--before", "acme/app#{}".format(second)],
-            session_id, self.repo_dir,
+            session_id,
+            self.repo_dir,
         )
 
     def unpin(self, session_id, first, second):
         return self.run_cli(
             ["merge-queue", "unpin", "acme/app#{}".format(first), "--before", "acme/app#{}".format(second)],
-            session_id, self.repo_dir,
+            session_id,
+            self.repo_dir,
         )
 
     def pins(self):
-        rows = self.query(
-            "SELECT first_number, second_number, party FROM merge_queue_pins ORDER BY first_number"
-        )
+        rows = self.query("SELECT first_number, second_number, party FROM merge_queue_pins ORDER BY first_number")
         return [(row["first_number"], row["second_number"], row["party"]) for row in rows]
 
 
@@ -127,8 +127,12 @@ class PinValidationTests(PinTestCase):
         self.write_gh_fixture(
             "view_acme-app_3",
             {
-                "state": "MERGED", "isDraft": False, "headRefName": "f", "title": "t",
-                "mergedAt": "2026-01-01T00:00:00Z", "statusCheckRollup": [],
+                "state": "MERGED",
+                "isDraft": False,
+                "headRefName": "f",
+                "title": "t",
+                "mergedAt": "2026-01-01T00:00:00Z",
+                "statusCheckRollup": [],
             },
         )
         self.sync_gh("sess-1")
@@ -142,9 +146,7 @@ class PinValidationTests(PinTestCase):
         self.assertIn("cannot pin", err)
 
     def test_invalid_ref_is_rejected(self):
-        code, out, err = self.run_cli(
-            ["merge-queue", "pin", "nope", "--before", "acme/app#1"], None, self.repo_dir
-        )
+        code, out, err = self.run_cli(["merge-queue", "pin", "nope", "--before", "acme/app#1"], None, self.repo_dir)
         self.assertEqual(code, 1)
         self.assertIn("invalid PR ref", err)
 
@@ -197,8 +199,12 @@ class PinValidationTests(PinTestCase):
         self.write_gh_fixture(
             "view_acme-app_3",
             {
-                "state": "MERGED", "isDraft": False, "headRefName": "f", "title": "t",
-                "mergedAt": "2026-01-01T00:00:00Z", "statusCheckRollup": [],
+                "state": "MERGED",
+                "isDraft": False,
+                "headRefName": "f",
+                "title": "t",
+                "mergedAt": "2026-01-01T00:00:00Z",
+                "statusCheckRollup": [],
             },
         )
         self.sync_gh("sess-1")
@@ -220,9 +226,7 @@ class PinEventTests(PinTestCase):
         self.pin("sess-1", 2, 3)
         self.unpin("sess-1", 2, 3)
         self.pin(None, 3, 2)
-        rows = self.query(
-            "SELECT kind, party, payload FROM events WHERE kind LIKE 'merge_queue.%' ORDER BY seq"
-        )
+        rows = self.query("SELECT kind, party, payload FROM events WHERE kind LIKE 'merge_queue.%' ORDER BY seq")
         self.assertEqual(
             [(row["kind"], row["party"]) for row in rows],
             [("merge_queue.pinned", "alpha"), ("merge_queue.unpinned", "alpha"), ("merge_queue.pinned", None)],

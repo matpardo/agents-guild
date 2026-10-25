@@ -9,8 +9,12 @@ from guild.errors import GuildError
 from tests.testutil import GuildTestCase
 
 _MERGED_VIEW = {
-    "state": "MERGED", "isDraft": False, "headRefName": "feature/x", "title": "t",
-    "mergedAt": "2026-01-01T00:00:00Z", "statusCheckRollup": [],
+    "state": "MERGED",
+    "isDraft": False,
+    "headRefName": "feature/x",
+    "title": "t",
+    "mergedAt": "2026-01-01T00:00:00Z",
+    "statusCheckRollup": [],
 }
 _OPEN_DRAFT_VIEW = {"state": "OPEN", "isDraft": True, "headRefName": "feature/x", "title": "t"}
 
@@ -63,7 +67,8 @@ class _CloneFixture(GuildTestCase):
         self.write_gh_fixture(name, _OPEN_DRAFT_VIEW)
         self.run_cli(
             ["pr", "track", "acme/app#{}".format(number), "--task", "demo/T01", "--what", "x", "--waits", "y"],
-            "sess-1", self.repo_dir,
+            "sess-1",
+            self.repo_dir,
         )
 
     def _merge_upstream(self, filename):
@@ -87,6 +92,7 @@ class _CloneFixture(GuildTestCase):
 
     def _head(self, ref):
         return _git(self.repo_dir, "rev-parse", ref)
+
 
 class FastForwardBaseTests(_CloneFixture):
     def test_base_not_checked_out_is_fast_forwarded(self):

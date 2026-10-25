@@ -27,7 +27,13 @@ class WebNoticeCreateTests(WebWriteTestCase):
         self.assertEqual(response.status, 200, payload)
 
     def test_invalid_input_is_422(self):
-        for overrides in ({"text": "  "}, {"to": "project:nope"}, {"to": "bogus"}, {"ttl": "soon"}, {"text": "x" * 5000}):
+        for overrides in (
+            {"text": "  "},
+            {"to": "project:nope"},
+            {"to": "bogus"},
+            {"ttl": "soon"},
+            {"text": "x" * 5000},
+        ):
             response, payload = self._create(**overrides)
             self.assertEqual(response.status, 422, overrides)
         self.assertEqual(self._notices(), [])

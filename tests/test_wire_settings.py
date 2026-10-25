@@ -43,9 +43,7 @@ class WireSettingsTests(GuildTestCase):
                 "hooks": [{"type": "command", "command": "guild hook pre-edit"}],
             },
         )
-        self.assertEqual(
-            settings["hooks"]["Stop"], [{"hooks": [{"type": "command", "command": "guild hook stop"}]}]
-        )
+        self.assertEqual(settings["hooks"]["Stop"], [{"hooks": [{"type": "command", "command": "guild hook stop"}]}])
         self.assertTrue(self.settings_path.read_text().endswith("}\n"))
         self.assertFalse(self.settings_path.with_name("settings.json.bak").exists())
 

@@ -83,7 +83,13 @@ class MigrationTests(GuildTestCase):
         self.assertIn("handoff_path", {row["name"] for row in leaders_columns})
 
         prs_columns = {row["name"] for row in conn.execute("PRAGMA table_info(prs)").fetchall()}
-        for column in ("mergeable", "review_comment_count", "last_notified_comment_count", "last_activity_at", "checks_pending"):
+        for column in (
+            "mergeable",
+            "review_comment_count",
+            "last_notified_comment_count",
+            "last_activity_at",
+            "checks_pending",
+        ):
             self.assertIn(column, prs_columns)
 
         leader_row = conn.execute("SELECT * FROM leaders WHERE party = 'alpha'").fetchone()
@@ -176,11 +182,27 @@ class MigrationTests(GuildTestCase):
     def test_rebuild_replays_a_pr_tracked_event_without_card(self):
         conn = db.connect(paths.db_path())
         events.record(
-            conn, timeutil.utcnow(), "tester@host", "alpha", None, "acme", "pr.tracked", "guild",
+            conn,
+            timeutil.utcnow(),
+            "tester@host",
+            "alpha",
+            None,
+            "acme",
+            "pr.tracked",
+            "guild",
             {
-                "repo": "acme/app", "number": 1, "party": "alpha", "task_quest": "demo",
-                "task_tid": "T01", "what": "x", "waits": "y", "lifecycle": "draft",
-                "branch": "feature/x", "title": "t", "gh_state": "OPEN", "gh_draft": True,
+                "repo": "acme/app",
+                "number": 1,
+                "party": "alpha",
+                "task_quest": "demo",
+                "task_tid": "T01",
+                "what": "x",
+                "waits": "y",
+                "lifecycle": "draft",
+                "branch": "feature/x",
+                "title": "t",
+                "gh_state": "OPEN",
+                "gh_draft": True,
                 "seeded": 0,
             },
         )
@@ -196,7 +218,14 @@ class MigrationTests(GuildTestCase):
     def test_rebuild_replays_a_keeper_party_started_event_and_drops_the_column(self):
         conn = db.connect(paths.db_path())
         events.record(
-            conn, timeutil.utcnow(), "tester@host", "alpha", "sess-1", "acme", "party.started", "local",
+            conn,
+            timeutil.utcnow(),
+            "tester@host",
+            "alpha",
+            "sess-1",
+            "acme",
+            "party.started",
+            "local",
             {"party": "alpha", "session_name": "s", "keeper": True},
         )
         conn.commit()
@@ -231,7 +260,14 @@ class MigrationTests(GuildTestCase):
     def test_rebuild_replays_an_old_fix_requested_event_as_a_no_op(self):
         conn = db.connect(paths.db_path())
         events.record(
-            conn, timeutil.utcnow(), "tester@host", None, "sess-1", "acme", "pr.fix_requested", "guild",
+            conn,
+            timeutil.utcnow(),
+            "tester@host",
+            None,
+            "sess-1",
+            "acme",
+            "pr.fix_requested",
+            "guild",
             {"repo": "acme/app", "number": 1, "party": "alpha", "reasons": ["checks failing (1)"]},
         )
         conn.commit()
@@ -301,9 +337,7 @@ class MigrationTests(GuildTestCase):
 
         conn = db.connect(db_path)
 
-        raid_members_columns = {
-            row["name"] for row in conn.execute("PRAGMA table_info(raid_members)").fetchall()
-        }
+        raid_members_columns = {row["name"] for row in conn.execute("PRAGMA table_info(raid_members)").fetchall()}
         self.assertEqual(raid_members_columns, {"raid", "party", "expires_at"})
         self.assertEqual(conn.execute("SELECT COUNT(*) AS n FROM raid_members").fetchone()["n"], 0)
 
@@ -320,9 +354,7 @@ class MigrationTests(GuildTestCase):
 
         conn = db.connect(db_path)
 
-        raid_members_columns = {
-            row["name"] for row in conn.execute("PRAGMA table_info(raid_members)").fetchall()
-        }
+        raid_members_columns = {row["name"] for row in conn.execute("PRAGMA table_info(raid_members)").fetchall()}
         self.assertEqual(raid_members_columns, {"raid", "party", "expires_at"})
         row = conn.execute("SELECT * FROM raid_members WHERE raid = 'ci' AND party = 'alpha'").fetchone()
         self.assertIsNotNone(row)
@@ -341,8 +373,7 @@ class MigrationTests(GuildTestCase):
         conn = db.connect(db_path)
 
         expiry = next(
-            row for row in conn.execute("PRAGMA table_info(raid_members)").fetchall()
-            if row["name"] == "expires_at"
+            row for row in conn.execute("PRAGMA table_info(raid_members)").fetchall() if row["name"] == "expires_at"
         )
         self.assertEqual(expiry["notnull"], 0)
         rows = conn.execute("SELECT raid, party, expires_at FROM raid_members").fetchall()

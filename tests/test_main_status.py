@@ -11,7 +11,9 @@ _FAILED_RUNS = {
         {"name": "deploy", "conclusion": None},
     ]
 }
-_BILLING_TEXT = "The job was not started because recent account payments have failed or your spending limit needs to be increased."
+_BILLING_TEXT = (
+    "The job was not started because recent account payments have failed or your spending limit needs to be increased."
+)
 _BILLING_RUNS = {
     "check_runs": [
         {"id": 11, "name": "lint", "conclusion": "failure", "output": {"annotations_count": 1}},
@@ -193,8 +195,14 @@ class GhSyncTests(_CloneFixture, _MainStatusCase):
         conn = sqlite3.connect(str(self.data_home / "guild" / "guild.db"))
         conn.execute(
             "INSERT INTO events (id, ts, origin, kind, visibility, payload) VALUES (?, ?, ?, ?, ?, ?)",
-            ("old-1", "2026-01-01T00:00:00Z", "t", "main.status_synced", "guild",
-             '{"repo": "acme/app", "red": true, "reason": "checks failing: lint"}'),
+            (
+                "old-1",
+                "2026-01-01T00:00:00Z",
+                "t",
+                "main.status_synced",
+                "guild",
+                '{"repo": "acme/app", "red": true, "reason": "checks failing: lint"}',
+            ),
         )
         conn.commit()
         conn.close()
@@ -230,9 +238,7 @@ class GhSyncTests(_CloneFixture, _MainStatusCase):
         self.write_gh_fixture("branch_checks_acme-app_main", _FAILED_RUNS)
         self._sync()
         code, out, err = self.run_cli(["merge-queue", "--party", "alpha"], None, self.repo_dir)
-        self.assertIn(
-            "0. MAIN RED acme/app — checks failing: e2e, lint (gh) → fix before anything", out
-        )
+        self.assertIn("0. MAIN RED acme/app — checks failing: e2e, lint (gh) → fix before anything", out)
 
 
 if __name__ == "__main__":

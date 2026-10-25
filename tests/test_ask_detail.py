@@ -22,12 +22,16 @@ class AskDetailBase(GuildTestCase):
 
     def make_epic_quest(self):
         self.sync_sdd(
-            self.repo_dir, "sess-1", "acme", "widget",
+            self.repo_dir,
+            "sess-1",
+            "acme",
+            "widget",
             "## T01 — First (PROJ-12)\n\n**Deps:** —\n\n**Status:** [ ] pending\n",
         )
         self.run_cli(
             ["quest", "add", "wq", "--title", "W", "--epic", "widget", "--tasks", "T01"],
-            "sess-1", self.repo_dir,
+            "sess-1",
+            self.repo_dir,
         )
 
     def insert_card(self, key, status):
@@ -122,9 +126,7 @@ class MissingTargetTests(AskDetailBase):
     def test_missing_pr_is_marked_with_url(self):
         self.ask("task:demo/T01")
         with db.writing(self.conn):
-            self.conn.execute(
-                "UPDATE asks SET refs = ? WHERE id = 1", (json.dumps(["pr:acme/app#99"]),)
-            )
+            self.conn.execute("UPDATE asks SET refs = ? WHERE id = 1", (json.dumps(["pr:acme/app#99"]),))
         pr = self.model(1)["refs"][0]
         self.assertTrue(pr["missing"])
         self.assertEqual(pr["url"], "https://github.com/acme/app/pull/99")
@@ -138,20 +140,24 @@ class PrRefTests(AskDetailBase):
         )
         self.run_cli(
             ["pr", "track", "acme/app#41", "--task", "demo/T01", "--what", "x", "--waits", "review"],
-            "sess-1", self.repo_dir,
+            "sess-1",
+            self.repo_dir,
         )
         with db.writing(self.conn):
-            self.conn.execute(
-                "UPDATE prs SET checks_passing = 2, checks_failing = 1, checks_pending = 0"
-            )
+            self.conn.execute("UPDATE prs SET checks_passing = 2, checks_failing = 1, checks_pending = 0")
         self.ask("pr:acme/app#41")
         pr = self.model(1)["refs"][0]
         self.assertEqual(
             pr,
             {
-                "kind": "pr", "ref": "pr:acme/app#41", "url": "https://github.com/acme/app/pull/41",
-                "lifecycle": "draft", "checks_failing": 1, "checks_passing": 2,
-                "checks_pending": 0, "waits": "review",
+                "kind": "pr",
+                "ref": "pr:acme/app#41",
+                "url": "https://github.com/acme/app/pull/41",
+                "lifecycle": "draft",
+                "checks_failing": 1,
+                "checks_passing": 2,
+                "checks_pending": 0,
+                "waits": "review",
             },
         )
 
@@ -197,13 +203,23 @@ class RecentEventsTests(AskDetailBase):
         self.assertEqual(len(events_list), 10)
         self.assertEqual(events_list[0]["kind"], "ask.created")
         self.assertEqual(events_list[0]["summary"], "#1")
-        self.assertEqual(events_list[1], {"ts": events_list[1]["ts"], "time": events_list[1]["time"], "kind": "task.added", "summary": "demo/X11"})
+        self.assertEqual(
+            events_list[1],
+            {"ts": events_list[1]["ts"], "time": events_list[1]["time"], "kind": "task.added", "summary": "demo/X11"},
+        )
 
     def test_other_party_and_other_kinds_are_excluded(self):
         with db.writing(self.conn):
             events.record(
-                self.conn, timeutil.utcnow(), "test@host", "beta", None, "acme",
-                "task.added", "local", {"quest": "other", "tid": "T09", "title": "t"},
+                self.conn,
+                timeutil.utcnow(),
+                "test@host",
+                "beta",
+                None,
+                "acme",
+                "task.added",
+                "local",
+                {"quest": "other", "tid": "T09", "title": "t"},
             )
         self.ask("task:demo/T01")
         kinds = [event["kind"] for event in self.model(1)["events"]]
@@ -218,15 +234,22 @@ class RecentEventsTests(AskDetailBase):
         )
         self.run_cli(
             ["pr", "track", "acme/app#41", "--task", "demo/T01", "--what", "x", "--waits", "y"],
-            "sess-1", self.repo_dir,
+            "sess-1",
+            self.repo_dir,
         )
         self.run_cli(["pr", "set", "acme/app#41", "--waits", "z"], "sess-1", self.repo_dir)
         self.run_cli(["pr", "untrack", "acme/app#41"], "sess-1", self.repo_dir)
         self.ask("task:demo/T01")
         with db.writing(self.conn):
             events.record(
-                self.conn, timeutil.utcnow(), "test@host", "alpha", None, "acme",
-                "party.handed_off", "local",
+                self.conn,
+                timeutil.utcnow(),
+                "test@host",
+                "alpha",
+                None,
+                "acme",
+                "party.handed_off",
+                "local",
                 {"party": "alpha", "generation": 1, "handoff_path": "/p/alpha-g1.md"},
             )
         summary_by_kind = {event["kind"]: event["summary"] for event in self.model(1)["events"]}
@@ -250,12 +273,15 @@ class CliTests(AskDetailBase):
         sdd_root = self.root / "sdd-acme"
         lines = out.splitlines()
         self.assertEqual(lines[0].split(" · created")[0], "ask #1 · alpha · open")
-        self.assertEqual(lines[1:5], [
-            "  Should the retry cap be 3 or 5?",
-            "  context: Both pass CI.",
-            "  options: 3 | 5",
-            "task    wq/T01  First (PROJ-12)  [queued]  epic: widget",
-        ])
+        self.assertEqual(
+            lines[1:5],
+            [
+                "  Should the retry cap be 3 or 5?",
+                "  context: Both pass CI.",
+                "  options: 3 | 5",
+                "task    wq/T01  First (PROJ-12)  [queued]  epic: widget",
+            ],
+        )
         self.assertEqual(lines[5], "  spec:  {}".format(sdd_root / "epics" / "widget" / "spec.md"))
         self.assertEqual(lines[6], "  tasks: {}".format(sdd_root / "epics" / "widget" / "tasks.md"))
         self.assertEqual(lines[7], "card    PROJ-12  In Progress  https://tracker.example.com/browse/PROJ-12")

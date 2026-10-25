@@ -42,9 +42,7 @@ def _done_tids(conn, slug):
 def _epic_progress(conn, project, epic):
     if epic is None:
         return None
-    rows = conn.execute(
-        "SELECT sdd_status FROM tasks WHERE project = ? AND epic = ?", (project, epic)
-    ).fetchall()
+    rows = conn.execute("SELECT sdd_status FROM tasks WHERE project = ? AND epic = ?", (project, epic)).fetchall()
     done = sum(1 for row in rows if row["sdd_status"] == "done")
     return {"done": done, "total": len(rows), "percent": _percent(done, len(rows))}
 
@@ -52,14 +50,11 @@ def _epic_progress(conn, project, epic):
 def _jira_cards_done(conn, project, epic):
     if epic is None:
         return []
-    epic_row = conn.execute(
-        "SELECT jira_key FROM epics WHERE project = ? AND epic = ?", (project, epic)
-    ).fetchone()
+    epic_row = conn.execute("SELECT jira_key FROM epics WHERE project = ? AND epic = ?", (project, epic)).fetchone()
     if epic_row is None or epic_row["jira_key"] is None:
         return []
     rows = conn.execute(
-        "SELECT key FROM cards WHERE project = ? AND parent_key = ? AND status_category = 'done'"
-        " ORDER BY key",
+        "SELECT key FROM cards WHERE project = ? AND parent_key = ? AND status_category = 'done' ORDER BY key",
         (project, epic_row["jira_key"]),
     ).fetchall()
     return [row["key"] for row in rows]
@@ -74,16 +69,12 @@ def _prs_merged(conn, slug):
 
 
 def _handoffs(conn, party, started_at, done_at):
-    rows = conn.execute(
-        "SELECT ts FROM events WHERE kind = 'party.handed_off' AND party = ?", (party,)
-    ).fetchall()
+    rows = conn.execute("SELECT ts FROM events WHERE kind = 'party.handed_off' AND party = ?", (party,)).fetchall()
     return sum(1 for row in rows if _in_window(row["ts"], started_at, done_at))
 
 
 def _sessions(conn, party, started_at, done_at):
-    rows = conn.execute(
-        "SELECT started_at, ended_at FROM leaders WHERE party = ?", (party,)
-    ).fetchall()
+    rows = conn.execute("SELECT started_at, ended_at FROM leaders WHERE party = ?", (party,)).fetchall()
     count = 0
     for row in rows:
         if timeutil.from_iso(row["started_at"]) > done_at:
@@ -122,9 +113,7 @@ def _ask_metrics(conn, party, started_at, done_at):
 
 
 def build(conn, slug, done_at, drift_findings):
-    quest = conn.execute(
-        "SELECT project, party, epic, title FROM quests WHERE slug = ?", (slug,)
-    ).fetchone()
+    quest = conn.execute("SELECT project, party, epic, title FROM quests WHERE slug = ?", (slug,)).fetchone()
     started_iso = _quest_started_at(conn, slug)
     started_at = timeutil.from_iso(started_iso)
     done_tids = _done_tids(conn, slug)

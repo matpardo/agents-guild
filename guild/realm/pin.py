@@ -5,7 +5,7 @@ from pathlib import Path
 
 def fingerprint(der_bytes):
     digest = hashlib.sha256(der_bytes).hexdigest().upper()
-    return ":".join(digest[index:index + 2] for index in range(0, len(digest), 2))
+    return ":".join(digest[index : index + 2] for index in range(0, len(digest), 2))
 
 
 def cert_fingerprint(cert_path):

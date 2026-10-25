@@ -31,9 +31,22 @@ def _generate_cert(cert_path, key_path):
         raise GuildError("openssl not found on PATH: install it to create the hub certificate", 1)
     result = subprocess.run(
         [
-            openssl, "req", "-x509", "-newkey", "ec", "-pkeyopt", "ec_paramgen_curve:prime256v1",
-            "-nodes", "-days", "3650", "-subj", "/CN=guild-realm",
-            "-keyout", str(key_path), "-out", str(cert_path),
+            openssl,
+            "req",
+            "-x509",
+            "-newkey",
+            "ec",
+            "-pkeyopt",
+            "ec_paramgen_curve:prime256v1",
+            "-nodes",
+            "-days",
+            "3650",
+            "-subj",
+            "/CN=guild-realm",
+            "-keyout",
+            str(key_path),
+            "-out",
+            str(cert_path),
         ],
         capture_output=True,
         text=True,
@@ -192,7 +205,8 @@ def realm_status_model(ctx):
         raise GuildError("realm hub sent an invalid response", 1)
     if realm != joined["realm"]:
         raise GuildError(
-            "the hub now calls its realm {}, this guild joined {}: re-run join --force".format(realm, joined["realm"]), 1
+            "the hub now calls its realm {}, this guild joined {}: re-run join --force".format(realm, joined["realm"]),
+            1,
         )
     valid = _valid_entries(entries)
     model = {"fetched_at": timeutil.to_iso(ctx.now), "realm": realm, "guilds": valid}
@@ -231,7 +245,9 @@ def render_status(model, now):
     if model["dropped"]:
         lines.append("dropped {} invalid entr{}".format(model["dropped"], "y" if model["dropped"] == 1 else "ies"))
     for guild_entry in model["guilds"]:
-        lines.append("{} (last seen {} ago)".format(guild_entry["guild"], timeutil.age_label(now, guild_entry["received_at"])))
+        lines.append(
+            "{} (last seen {} ago)".format(guild_entry["guild"], timeutil.age_label(now, guild_entry["received_at"]))
+        )
         lines.extend(_project_line(project) for project in guild_entry["projects"])
     return "\n".join(lines)
 
@@ -310,9 +326,7 @@ def send(target_guild, file_path, claudecode):
     _require_human(claudecode)
     names.validate_name(target_guild, "guild name")
     name, content = _read_local_markdown(file_path)
-    payload = client.request(
-        clientconfig.load(), "POST", "/inbox/" + target_guild, {"name": name, "content": content}
-    )
+    payload = client.request(clientconfig.load(), "POST", "/inbox/" + target_guild, {"name": name, "content": content})
     file_id = payload.get("id")
     if not isinstance(file_id, str) or not hub.is_file_id(file_id):
         raise GuildError("realm hub sent an invalid response", 1)

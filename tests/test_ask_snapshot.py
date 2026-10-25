@@ -20,9 +20,7 @@ class AskSnapshotBase(GuildTestCase):
         self.run_cli(["task", "add", "demo/T02", "--title", "Second"], "sess-1", self.repo_dir)
 
     def ask(self, *extra):
-        return self.run_cli(
-            ["ask", "which?", "--context", "x", *extra], "sess-1", self.repo_dir
-        )
+        return self.run_cli(["ask", "which?", "--context", "x", *extra], "sess-1", self.repo_dir)
 
     def row(self):
         conn = db.connect(paths.db_path())
@@ -52,13 +50,12 @@ class AutoRefTests(AskSnapshotBase):
         )
         self.run_cli(
             ["pr", "track", "acme/app#1", "--task", "demo/T02", "--what", "x", "--waits", "y"],
-            "sess-1", self.repo_dir,
+            "sess-1",
+            self.repo_dir,
         )
         code, out, err = self.ask("--ref", "pr:acme/app#1")
         self.assertEqual(code, 0, err)
-        self.assertEqual(
-            json.loads(self.row()["refs"]), ["pr:acme/app#1", "task:demo/T01"]
-        )
+        self.assertEqual(json.loads(self.row()["refs"]), ["pr:acme/app#1", "task:demo/T01"])
 
     def test_two_active_tasks_with_only_pr_refs_keep_refs_as_given(self):
         self.run_cli(["task", "start", "demo/T01"], "sess-1", self.repo_dir)
@@ -69,7 +66,8 @@ class AutoRefTests(AskSnapshotBase):
         )
         self.run_cli(
             ["pr", "track", "acme/app#1", "--task", "demo/T02", "--what", "x", "--waits", "y"],
-            "sess-1", self.repo_dir,
+            "sess-1",
+            self.repo_dir,
         )
         code, out, err = self.ask("--ref", "pr:acme/app#1")
         self.assertEqual(code, 0, err)
@@ -103,9 +101,7 @@ class SnapshotContentTests(AskSnapshotBase):
         snapshot = json.loads(self.row()["snapshot"])
         self.assertEqual(snapshot["session_id"], "sess-1")
         self.assertEqual(snapshot["session_name"], "alpha-g1")
-        self.assertEqual(
-            snapshot["in_progress"], [{"quest": "demo", "tid": "T01", "title": "First"}]
-        )
+        self.assertEqual(snapshot["in_progress"], [{"quest": "demo", "tid": "T01", "title": "First"}])
         self.assertEqual(snapshot["epics"], [])
         self.assertEqual(snapshot["cards"], [])
         self.assertIsNone(snapshot["handoff_path"])
@@ -114,7 +110,8 @@ class SnapshotContentTests(AskSnapshotBase):
         self.sync_sdd(self.repo_dir, "sess-1", "acme", "widget", _EPIC_TASKS)
         self.run_cli(
             ["quest", "add", "wq", "--title", "W", "--epic", "widget", "--tasks", "T01"],
-            "sess-1", self.repo_dir,
+            "sess-1",
+            self.repo_dir,
         )
         self.run_cli(["task", "start", "wq/T01"], "sess-1", self.repo_dir)
         self.write_gh_fixture(
@@ -124,9 +121,7 @@ class SnapshotContentTests(AskSnapshotBase):
         self.track_legacy_card_pr("alpha", "acme/app", 2, "PROJ-99", "x", "y", "feature/2")
         conn = db.connect(paths.db_path())
         with db.writing(conn):
-            conn.execute(
-                "UPDATE leaders SET handoff_path = '/tmp/alpha-g1.md' WHERE party = 'alpha'"
-            )
+            conn.execute("UPDATE leaders SET handoff_path = '/tmp/alpha-g1.md' WHERE party = 'alpha'")
         self.ask("--ref", "task:wq/T01")
         snapshot = json.loads(self.row()["snapshot"])
         self.assertEqual(snapshot["epics"], ["widget"])
@@ -138,14 +133,25 @@ class SnapshotReducerTests(AskSnapshotBase):
     def _created(self, ask_id, extra):
         conn = db.connect(paths.db_path())
         payload = {
-            "id": ask_id, "party": "alpha", "question": "q", "context": "x",
-            "refs": ["task:demo/T01"], "options": [],
+            "id": ask_id,
+            "party": "alpha",
+            "question": "q",
+            "context": "x",
+            "refs": ["task:demo/T01"],
+            "options": [],
         }
         payload.update(extra)
         with db.writing(conn):
             events.record(
-                conn, timeutil.utcnow(), "test@host", "alpha", None, "acme",
-                "ask.created", "local", payload,
+                conn,
+                timeutil.utcnow(),
+                "test@host",
+                "alpha",
+                None,
+                "acme",
+                "ask.created",
+                "local",
+                payload,
             )
         return conn
 

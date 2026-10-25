@@ -110,7 +110,9 @@ class HealthJobStartTests(HealthJobsTestCase):
         self.assertEqual(self.rows("SELECT * FROM adventurers"), [])
 
     def test_plain_start_has_no_health_job(self):
-        self.cli(["quest", "add", "chore", "--open", "--no-epic", "--title", "c", "--tasks", "T01", "--titles", "one"], None)
+        self.cli(
+            ["quest", "add", "chore", "--open", "--no-epic", "--title", "c", "--tasks", "T01", "--titles", "one"], None
+        )
         self.cli(["adventurer", "start", "fix typo", "--task", "chore/T01", "--reason", "test reason"], "adv-1")
         self.assertIsNone(self.rows("SELECT health_job FROM adventurers")[0]["health_job"])
 

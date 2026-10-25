@@ -33,9 +33,7 @@ class DoctorScanPrsTests(GuildTestCase):
         self.write_gh_fixture(
             "open_acme-app",
             [
-                self._open_pr(
-                    3, "fix: thing", "per Ask #43 answer", ["see notice #7"], ["chore: guild sync"]
-                ),
+                self._open_pr(3, "fix: thing", "per Ask #43 answer", ["see notice #7"], ["chore: guild sync"]),
                 self._open_pr(4, "feat: clean", "all good", ["lgtm"], ["feat: clean"]),
             ],
         )
@@ -64,9 +62,7 @@ class DoctorScanPrsTests(GuildTestCase):
         self.assertNotIn("acme/app#6", out)
 
     def test_scan_is_off_by_default(self):
-        self.write_gh_fixture(
-            "open_acme-app", [self._open_pr(3, "guild", "guild", ["guild"], ["guild"])]
-        )
+        self.write_gh_fixture("open_acme-app", [self._open_pr(3, "guild", "guild", ["guild"], ["guild"])])
         code, out, err = self.run_cli(["doctor"], None, None)
         self.assertEqual(code, 0)
         self.assertNotIn("acme/app#3", out)

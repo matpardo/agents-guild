@@ -68,7 +68,9 @@ class OpenQuestSchemaTests(GuildTestCase):
         self.assertEqual(party_column["notnull"], 0)
         self.assertEqual(conn.execute("SELECT party FROM quests WHERE slug = 'old'").fetchone()["party"], "alpha")
         schema.create_all(conn)
-        conn.execute("INSERT INTO quests (slug, project, party, epic, title, state) VALUES ('open', 'acme', NULL, NULL, 'Open', 'active')")
+        conn.execute(
+            "INSERT INTO quests (slug, project, party, epic, title, state) VALUES ('open', 'acme', NULL, NULL, 'Open', 'active')"
+        )
 
 
 class OpenQuestAddTests(QuestBoardTestCase):
@@ -197,10 +199,14 @@ class TakeReleaseTests(QuestBoardTestCase):
             None,
         )
         self.ok(["adventurer", "start", "job", "--task", "free/a", "--reason", "test reason"], "adv-1")
-        code, out, err = self.cli(["adventurer", "start", "job2", "--task", "free/a", "--reason", "test reason"], "adv-2")
+        code, out, err = self.cli(
+            ["adventurer", "start", "job2", "--task", "free/a", "--reason", "test reason"], "adv-2"
+        )
         self.assertEqual(code, 1)
         self.assertIn("held by adventurer 1", err)
-        self.assertEqual(self.cli(["adventurer", "start", "job2", "--task", "free/zz", "--reason", "test reason"], "adv-2")[0], 1)
+        self.assertEqual(
+            self.cli(["adventurer", "start", "job2", "--task", "free/zz", "--reason", "test reason"], "adv-2")[0], 1
+        )
 
     def test_release_returns_untouched_quest(self):
         self.open_quest("pre", "T02", None)

@@ -25,7 +25,10 @@ def threshold(state_dir, global_config, project_config):
 def floor_above_baseline(resolved, baseline):
     if baseline is None or resolved["value"] >= baseline + BASELINE_HEADROOM:
         return resolved
-    return {"value": baseline + BASELINE_HEADROOM, "source": "session start {}% + {}".format(baseline, BASELINE_HEADROOM)}
+    return {
+        "value": baseline + BASELINE_HEADROOM,
+        "source": "session start {}% + {}".format(baseline, BASELINE_HEADROOM),
+    }
 
 
 def reading(state_dir, session_id, global_config, project_config):

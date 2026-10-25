@@ -7,23 +7,57 @@ from tests.test_web_drift import _APP_JS_PATH, _BOARD, _HARNESS_NAME
 
 
 def _render(board, hash_value, out_id, mode):
-    return node_harness.request(_HARNESS_NAME, {
-        "src": str(_APP_JS_PATH), "data": board, "hash": hash_value, "outId": out_id, "mode": mode,
-    })
+    return node_harness.request(
+        _HARNESS_NAME,
+        {
+            "src": str(_APP_JS_PATH),
+            "data": board,
+            "hash": hash_value,
+            "outId": out_id,
+            "mode": mode,
+        },
+    )
 
 
 def _entry(number, party):
     return {
-        "ref": "o/r#" + str(number), "repo": "o/r", "number": number, "party": party, "task": "q/T1", "lifecycle": "ready",
-        "branch": "b" + str(number), "checks_failing": 0, "checks_passing": 1, "checks_pending": 0, "labels": [],
-        "url": "https://example.test/" + str(number), "position": number, "unblocks": 0, "state": "ready", "next_action": False,
-        "action": "merge", "why": "ready", "reasons": [], "blockers": [], "waits": [], "gates": [],
-        "human_state": "ready", "human_missing": [], "notes": [],
+        "ref": "o/r#" + str(number),
+        "repo": "o/r",
+        "number": number,
+        "party": party,
+        "task": "q/T1",
+        "lifecycle": "ready",
+        "branch": "b" + str(number),
+        "checks_failing": 0,
+        "checks_passing": 1,
+        "checks_pending": 0,
+        "labels": [],
+        "url": "https://example.test/" + str(number),
+        "position": number,
+        "unblocks": 0,
+        "state": "ready",
+        "next_action": False,
+        "action": "merge",
+        "why": "ready",
+        "reasons": [],
+        "blockers": [],
+        "waits": [],
+        "gates": [],
+        "human_state": "ready",
+        "human_missing": [],
+        "notes": [],
     }
 
 
 def _queue(scope, entries):
-    return {"head": None, "scope": scope, "synced_at": "now", "synced_label": "synced now", "main": [], "queue": entries}
+    return {
+        "head": None,
+        "scope": scope,
+        "synced_at": "now",
+        "synced_label": "synced now",
+        "main": [],
+        "queue": entries,
+    }
 
 
 def _party(name, raids):
@@ -44,8 +78,21 @@ _VIEWS_BOARD = dict(
 )
 
 _PANE_IDS = {
-    "asks", "ready-for-you", "answered-asks", "notices", "ideas", "adventurers", "health-jobs",
-    "memory", "raids", "drift", "projects", "quest-board", "merge-queues", "parties", "realm",
+    "asks",
+    "ready-for-you",
+    "answered-asks",
+    "notices",
+    "ideas",
+    "adventurers",
+    "health-jobs",
+    "memory",
+    "raids",
+    "drift",
+    "projects",
+    "quest-board",
+    "merge-queues",
+    "parties",
+    "realm",
 }
 
 
@@ -105,7 +152,9 @@ class WebViewBehaviorTests(unittest.TestCase):
         self.assertEqual(links.count("d"), 1)
 
     def test_sidebar_counts(self):
-        board = dict(_VIEWS_BOARD, ideas=[{}, {}], adventurers=[{"state": "active"}, {"state": "done"}], new_notice_count=3)
+        board = dict(
+            _VIEWS_BOARD, ideas=[{}, {}], adventurers=[{"state": "active"}, {"state": "done"}], new_notice_count=3
+        )
         text = _render(board, "", "sidebar", "text")
         self.assertIn("ideas (2)", text)
         self.assertIn("adventurers (1)", text)
@@ -115,7 +164,12 @@ class WebViewBehaviorTests(unittest.TestCase):
         board = dict(_VIEWS_BOARD, asks=[{"party": "a"}], ready_for_you=[], blocked=[{}, {}])
         nodes = _walk(json.loads(_render(board, "", "sidebar", "tree")), [])
         pairs = [(node["text"], node["className"]) for node in nodes]
-        for pair in (("1 asks", "pill needs-asks"), ("2 blocked", "pill needs-blocked"), ("0 ready", "muted"), ("0 context high", "muted")):
+        for pair in (
+            ("1 asks", "pill needs-asks"),
+            ("2 blocked", "pill needs-blocked"),
+            ("0 ready", "muted"),
+            ("0 context high", "muted"),
+        ):
             with self.subTest(pair=pair):
                 self.assertIn(pair, pairs)
 
@@ -139,6 +193,7 @@ class WebViewBehaviorTests(unittest.TestCase):
         for hash_value, ids in shown.items():
             with self.subTest(hash=hash_value):
                 self.assertEqual(self._hidden(hash_value), _PANE_IDS - ids)
+
 
 def _state_party(name, raids, status, **extra):
     party = _party(name, raids)
@@ -205,7 +260,11 @@ class WebSidebarStateTests(unittest.TestCase):
         self.assertEqual(links, ["p", "h", "i"])
 
     def test_raid_header_shows_worst_member_state(self):
-        header = [node for node in self._nodes() if node["tag"] == "h3" and "raid r" in "".join(c["text"] for c in node["children"])]
+        header = [
+            node
+            for node in self._nodes()
+            if node["tag"] == "h3" and "raid r" in "".join(c["text"] for c in node["children"])
+        ]
         badges = [c for c in _walk(header[0], []) if c["className"].startswith("status-badge")]
         self.assertEqual([b["className"] for b in badges], ["status-badge status-waiting-ask"])
 

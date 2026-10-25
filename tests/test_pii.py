@@ -40,33 +40,23 @@ class ValidateFieldTests(unittest.TestCase):
 
     def test_rejects_github_personal_access_token(self):
         with self.assertRaises(GuildError):
-            pii.validate_field(
-                "the key is ghp_abc123XYZ in the log", "notice text", 500, []
-            )
+            pii.validate_field("the key is ghp_abc123XYZ in the log", "notice text", 500, [])
 
     def test_rejects_github_fine_grained_token(self):
         with self.assertRaises(GuildError):
-            pii.validate_field(
-                "the key is github_pat_abc123XYZ in the log", "notice text", 500, []
-            )
+            pii.validate_field("the key is github_pat_abc123XYZ in the log", "notice text", 500, [])
 
     def test_rejects_openai_style_secret_key(self):
         with self.assertRaises(GuildError):
-            pii.validate_field(
-                "the key is sk-abc123XYZ in the log", "notice text", 500, []
-            )
+            pii.validate_field("the key is sk-abc123XYZ in the log", "notice text", 500, [])
 
     def test_rejects_aws_access_key_id(self):
         with self.assertRaises(GuildError):
-            pii.validate_field(
-                "the key is AKIAABCDEFGHIJKLMNOP in the log", "notice text", 500, []
-            )
+            pii.validate_field("the key is AKIAABCDEFGHIJKLMNOP in the log", "notice text", 500, [])
 
     def test_rejects_slack_bot_token(self):
         with self.assertRaises(GuildError):
-            pii.validate_field(
-                "the key is xoxb-abc-123-XYZ in the log", "notice text", 500, []
-            )
+            pii.validate_field("the key is xoxb-abc-123-XYZ in the log", "notice text", 500, [])
 
     def test_rejects_private_key_header(self):
         with self.assertRaises(GuildError):

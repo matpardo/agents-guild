@@ -53,7 +53,14 @@ class SampleTests(GuildTestCase):
         ]
 
     def _entry(self, project, path):
-        return {"project": project, "path": path, "repo": "acme/app", "branch": "b", "is_main": False, "prunable": False}
+        return {
+            "project": project,
+            "path": path,
+            "repo": "acme/app",
+            "branch": "b",
+            "is_main": False,
+            "prunable": False,
+        }
 
     def _write(self, base, path, session, size):
         fixtures.write_bytes(base / paths.encode_cwd(path) / session / "file.bin", size)

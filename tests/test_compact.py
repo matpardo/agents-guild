@@ -9,17 +9,32 @@ from guild.errors import GuildError
 from tests.testutil import GuildTestCase
 
 _SNAPSHOT_TABLES = (
-    "epics", "tasks", "cards", "prs", "pr_shared_areas", "pr_files", "resource_samples", "resource_machine",
+    "epics",
+    "tasks",
+    "cards",
+    "prs",
+    "pr_shared_areas",
+    "pr_files",
+    "resource_samples",
+    "resource_machine",
 )
 _MACHINE = {
-    "disk_total": 1, "disk_used": 1, "mem_total": 1, "mem_available": 1, "guild_db_bytes": 1, "docker": None,
+    "disk_total": 1,
+    "disk_used": 1,
+    "mem_total": 1,
+    "mem_available": 1,
+    "guild_db_bytes": 1,
+    "docker": None,
 }
 _REPO = "acme/app"
 
 
 def _epic_payload(status):
     return {
-        "project": "acme", "epic": "e1", "sdd_path": "sdd/e1", "sdd_status": status,
+        "project": "acme",
+        "epic": "e1",
+        "sdd_path": "sdd/e1",
+        "sdd_status": status,
         "tasks": [{"tid": "T01", "title": "First", "jira_key": None, "deps": [], "order_idx": 0, "sdd_status": status}],
     }
 
@@ -33,8 +48,16 @@ def _tracker_payload(status):
 
 def _pr_synced_payload(synced_at, title):
     return {
-        "repo": _REPO, "number": 7, "lifecycle": "ready", "gh_state": "OPEN", "gh_draft": 0, "branch": "feat",
-        "title": title, "checks_failing": 0, "checks_passing": 1, "synced_at": synced_at,
+        "repo": _REPO,
+        "number": 7,
+        "lifecycle": "ready",
+        "gh_state": "OPEN",
+        "gh_draft": 0,
+        "branch": "feat",
+        "title": title,
+        "checks_failing": 0,
+        "checks_passing": 1,
+        "synced_at": synced_at,
     }
 
 
@@ -51,17 +74,34 @@ class CompactFixture(GuildTestCase):
         self.tick += 1
         with db.writing(self.ctx.conn):
             events.record(
-                self.ctx.conn, self.base + timedelta(minutes=self.tick), "tester@host", None, None, project,
-                kind, "local", payload,
+                self.ctx.conn,
+                self.base + timedelta(minutes=self.tick),
+                "tester@host",
+                None,
+                None,
+                project,
+                kind,
+                "local",
+                payload,
             )
 
     def _track_pr(self):
         self._record(
             "pr.tracked",
             {
-                "repo": _REPO, "number": 7, "party": "alpha", "task_quest": None, "task_tid": None, "what": "w",
-                "waits": "x", "lifecycle": "ready", "branch": "feat", "title": "t", "gh_state": "OPEN",
-                "gh_draft": 0, "seeded": 0,
+                "repo": _REPO,
+                "number": 7,
+                "party": "alpha",
+                "task_quest": None,
+                "task_tid": None,
+                "what": "w",
+                "waits": "x",
+                "lifecycle": "ready",
+                "branch": "feat",
+                "title": "t",
+                "gh_state": "OPEN",
+                "gh_draft": 0,
+                "seeded": 0,
             },
         )
 
@@ -94,7 +134,14 @@ class CompactFixture(GuildTestCase):
         when = timeutil.utcnow() - timedelta(days=days_ago)
         with db.writing(self.ctx.conn):
             events.record(
-                self.ctx.conn, when, "tester@host", None, None, "acme", "resources.sampled", "local",
+                self.ctx.conn,
+                when,
+                "tester@host",
+                None,
+                None,
+                "acme",
+                "resources.sampled",
+                "local",
                 {"items": [["worktree", "/p", 5, "ok", "", ""]], "machine": _MACHINE},
             )
 

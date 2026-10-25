@@ -54,17 +54,23 @@ class SyncSddTests(GuildTestCase):
         self.assertIn("no 'sdd' config block", err)
 
     def test_sync_parses_epic_and_populates_tasks(self):
-        self._write_project_config(
-            sdd_config=dict(_PATTERNS, root=str(self.sdd_root), epics_dir="epics")
-        )
+        self._write_project_config(sdd_config=dict(_PATTERNS, root=str(self.sdd_root), epics_dir="epics"))
         code, out, err = self.run_cli(["sync", "--source", "sdd"], "sess-1", self.repo_dir)
         self.assertEqual(code, 0)
         code, out, err = self.run_cli(
             [
-                "quest", "add", "wave1", "--title", "Wave 1", "--epic", "widget-rollout",
-                "--tasks", "T01,T02",
+                "quest",
+                "add",
+                "wave1",
+                "--title",
+                "Wave 1",
+                "--epic",
+                "widget-rollout",
+                "--tasks",
+                "T01,T02",
             ],
-            "sess-1", self.repo_dir,
+            "sess-1",
+            self.repo_dir,
         )
         self.assertEqual(code, 0)
         code, out, err = self.run_cli(["board"], "sess-1", self.repo_dir)
@@ -75,9 +81,7 @@ class SyncSddTests(GuildTestCase):
             "## T01 — Configure retries\n\n**JIRA:** DEMO-12\n**Deps:** —\n**Status:** [ ] pending\n"
         )
         self._write_project_config(
-            sdd_config=dict(
-                _PATTERNS, root=str(self.sdd_root), epics_dir="epics", key_line=r"^\*\*JIRA:\*\*\s*(.+)$"
-            )
+            sdd_config=dict(_PATTERNS, root=str(self.sdd_root), epics_dir="epics", key_line=r"^\*\*JIRA:\*\*\s*(.+)$")
         )
         code, out, err = self.run_cli(["sync", "--source", "sdd"], "sess-1", self.repo_dir)
         self.assertEqual(code, 0, err)
@@ -92,9 +96,7 @@ class SyncSddTests(GuildTestCase):
             "## T01 — Configure retries\n\n**Deps:** —\n**Status:** [ ] pending\n"
         )
         self._write_project_config(
-            sdd_config=dict(
-                _PATTERNS, root=str(self.sdd_root), epics_dir="epics", epic_key_field="jira"
-            )
+            sdd_config=dict(_PATTERNS, root=str(self.sdd_root), epics_dir="epics", epic_key_field="jira")
         )
         code, out, err = self.run_cli(["sync", "--source", "sdd"], "sess-1", self.repo_dir)
         self.assertEqual(code, 0, err)
@@ -104,9 +106,7 @@ class SyncSddTests(GuildTestCase):
         self.assertEqual(row[0], "DEMO-1")
 
     def test_sync_gives_no_epic_key_when_field_not_configured(self):
-        self._write_project_config(
-            sdd_config=dict(_PATTERNS, root=str(self.sdd_root), epics_dir="epics")
-        )
+        self._write_project_config(sdd_config=dict(_PATTERNS, root=str(self.sdd_root), epics_dir="epics"))
         code, out, err = self.run_cli(["sync", "--source", "sdd"], "sess-1", self.repo_dir)
         self.assertEqual(code, 0, err)
         conn = sqlite3.connect(str(self.data_home / "guild" / "guild.db"))
@@ -120,9 +120,7 @@ class SyncSddTests(GuildTestCase):
             "## T01 — Configure retries\n\n**Deps:** —\n**Status:** [ ] pending\n"
         )
         self._write_project_config(
-            sdd_config=dict(
-                _PATTERNS, root=str(self.sdd_root), epics_dir="epics", epic_status_field="status"
-            )
+            sdd_config=dict(_PATTERNS, root=str(self.sdd_root), epics_dir="epics", epic_status_field="status")
         )
         code, out, err = self.run_cli(["sync", "--source", "sdd"], "sess-1", self.repo_dir)
         self.assertEqual(code, 0, err)
@@ -132,9 +130,7 @@ class SyncSddTests(GuildTestCase):
         self.assertEqual(row[0], "done")
 
     def test_sync_gives_no_epic_status_when_field_not_configured(self):
-        self._write_project_config(
-            sdd_config=dict(_PATTERNS, root=str(self.sdd_root), epics_dir="epics")
-        )
+        self._write_project_config(sdd_config=dict(_PATTERNS, root=str(self.sdd_root), epics_dir="epics"))
         code, out, err = self.run_cli(["sync", "--source", "sdd"], "sess-1", self.repo_dir)
         self.assertEqual(code, 0, err)
         conn = sqlite3.connect(str(self.data_home / "guild" / "guild.db"))
@@ -150,17 +146,13 @@ class SyncSddTests(GuildTestCase):
         }
         conn = db.connect(paths.db_path())
         reducers.apply(conn, dict(legacy_event, kind="epic.synced"))
-        row = conn.execute(
-            "SELECT jira_key, sdd_status FROM epics WHERE epic = 'widget-rollout'"
-        ).fetchone()
+        row = conn.execute("SELECT jira_key, sdd_status FROM epics WHERE epic = 'widget-rollout'").fetchone()
         conn.close()
         self.assertIsNone(row["jira_key"])
         self.assertIsNone(row["sdd_status"])
 
     def test_missing_sdd_root_fails_instead_of_syncing_nothing(self):
-        self._write_project_config(
-            sdd_config=dict(_PATTERNS, root=str(self.project_root / "gone"), epics_dir="epics")
-        )
+        self._write_project_config(sdd_config=dict(_PATTERNS, root=str(self.project_root / "gone"), epics_dir="epics"))
         code, out, err = self.run_cli(["sync", "--source", "sdd"], "sess-1", self.repo_dir)
         self.assertEqual(code, 1)
         self.assertIn("does not exist", err)
@@ -168,9 +160,7 @@ class SyncSddTests(GuildTestCase):
     def test_sync_reports_unparseable_file_and_exits_nonzero(self):
         (self.sdd_root / "epics" / "letters").mkdir(parents=True)
         (self.sdd_root / "epics" / "letters" / "tasks.md").write_text("## A1 — no match\n")
-        self._write_project_config(
-            sdd_config=dict(_PATTERNS, root=str(self.sdd_root), epics_dir="epics")
-        )
+        self._write_project_config(sdd_config=dict(_PATTERNS, root=str(self.sdd_root), epics_dir="epics"))
         code, out, err = self.run_cli(["sync", "--source", "sdd"], "sess-1", self.repo_dir)
         self.assertEqual(code, 1)
         self.assertIn("letters", err)
@@ -179,25 +169,29 @@ class SyncSddTests(GuildTestCase):
     def test_sync_continues_other_epics_after_one_failure(self):
         (self.sdd_root / "epics" / "letters").mkdir(parents=True)
         (self.sdd_root / "epics" / "letters" / "tasks.md").write_text("## A1 — no match\n")
-        self._write_project_config(
-            sdd_config=dict(_PATTERNS, root=str(self.sdd_root), epics_dir="epics")
-        )
+        self._write_project_config(sdd_config=dict(_PATTERNS, root=str(self.sdd_root), epics_dir="epics"))
         self.run_cli(["sync", "--source", "sdd"], "sess-1", self.repo_dir)
         code, out, err = self.run_cli(
             [
-                "quest", "add", "wave1", "--title", "Wave 1", "--epic", "widget-rollout",
-                "--tasks", "T01",
+                "quest",
+                "add",
+                "wave1",
+                "--title",
+                "Wave 1",
+                "--epic",
+                "widget-rollout",
+                "--tasks",
+                "T01",
             ],
-            "sess-1", self.repo_dir,
+            "sess-1",
+            self.repo_dir,
         )
         self.assertEqual(code, 0)
 
     def test_duplicate_task_ids_fail_the_epic_and_the_others_still_sync(self):
         (self.sdd_root / "epics" / "dupes").mkdir(parents=True)
         (self.sdd_root / "epics" / "dupes" / "tasks.md").write_text("## T01 — one\n\n## T01 — one again\n")
-        self._write_project_config(
-            sdd_config=dict(_PATTERNS, root=str(self.sdd_root), epics_dir="epics")
-        )
+        self._write_project_config(sdd_config=dict(_PATTERNS, root=str(self.sdd_root), epics_dir="epics"))
         code, out, err = self.run_cli(["sync", "--source", "sdd"], "sess-1", self.repo_dir)
         self.assertEqual(code, 1)
         self.assertIn("dupes", err)
@@ -205,14 +199,13 @@ class SyncSddTests(GuildTestCase):
         self.assertNotIn("Traceback", err)
         code, out, err = self.run_cli(
             ["quest", "add", "wave1", "--title", "Wave 1", "--epic", "widget-rollout", "--tasks", "T01"],
-            "sess-1", self.repo_dir,
+            "sess-1",
+            self.repo_dir,
         )
         self.assertEqual(code, 0, err)
 
     def test_rebuild_is_idempotent_for_epic_tasks(self):
-        self._write_project_config(
-            sdd_config=dict(_PATTERNS, root=str(self.sdd_root), epics_dir="epics")
-        )
+        self._write_project_config(sdd_config=dict(_PATTERNS, root=str(self.sdd_root), epics_dir="epics"))
         self.run_cli(["sync", "--source", "sdd"], "sess-1", self.repo_dir)
         self.run_cli(["sync", "--source", "sdd"], "sess-1", self.repo_dir)
         code, out, err = self.run_cli(["rebuild"], None, self.root)
@@ -221,8 +214,11 @@ class SyncSddTests(GuildTestCase):
     def test_sdd_config_cannot_combine_root_and_git(self):
         self._write_project_config(
             sdd_config=dict(
-                _PATTERNS, root=str(self.sdd_root), epics_dir="epics",
-                git_repo=str(self.sdd_root), git_ref="origin/main",
+                _PATTERNS,
+                root=str(self.sdd_root),
+                epics_dir="epics",
+                git_repo=str(self.sdd_root),
+                git_ref="origin/main",
             )
         )
         code, out, err = self.run_cli(["sync", "--source", "sdd"], "sess-1", self.repo_dir)
@@ -231,9 +227,7 @@ class SyncSddTests(GuildTestCase):
         self.assertIn("git_repo", err)
 
     def test_sdd_config_git_repo_requires_git_ref(self):
-        self._write_project_config(
-            sdd_config=dict(_PATTERNS, epics_dir="epics", git_repo=str(self.sdd_root))
-        )
+        self._write_project_config(sdd_config=dict(_PATTERNS, epics_dir="epics", git_repo=str(self.sdd_root)))
         code, out, err = self.run_cli(["sync", "--source", "sdd"], "sess-1", self.repo_dir)
         self.assertEqual(code, 1)
         self.assertIn("git_repo", err)
@@ -262,7 +256,8 @@ class SyncSddGitTests(GuildTestCase):
         self.git_repo_dir.mkdir()
         self._init_git_repo(self.git_repo_dir)
         self._write_task_file(
-            self.git_repo_dir, "widget-rollout",
+            self.git_repo_dir,
+            "widget-rollout",
             "## T01 — Configure retries\n\n**Deps:** —\n\n**Status:** [x] done\n",
         )
         (self.git_repo_dir / "epics" / "widget-rollout" / "discovery.md").write_text("not a task file\n")
@@ -311,9 +306,7 @@ class SyncSddGitTests(GuildTestCase):
         code, out, err = self._sync()
         self.assertEqual(code, 0, err)
         conn = sqlite3.connect(str(self.data_home / "guild" / "guild.db"))
-        epic_row = conn.execute(
-            "SELECT sdd_path FROM epics WHERE epic = 'widget-rollout'"
-        ).fetchone()
+        epic_row = conn.execute("SELECT sdd_path FROM epics WHERE epic = 'widget-rollout'").fetchone()
         task_row = conn.execute("SELECT sdd_status FROM tasks WHERE tid = 'T01'").fetchone()
         epics = [row[0] for row in conn.execute("SELECT epic FROM epics").fetchall()]
         conn.close()
@@ -330,7 +323,9 @@ class SyncSddGitTests(GuildTestCase):
     def test_zero_tasks_md_under_epics_dir_is_a_clear_error(self):
         self._write_project_config(
             sdd_config=dict(
-                _PATTERNS, git_repo=str(self.git_repo_dir), git_ref="origin/main",
+                _PATTERNS,
+                git_repo=str(self.git_repo_dir),
+                git_ref="origin/main",
                 epics_dir="no-such-dir",
             )
         )
@@ -364,9 +359,7 @@ class SyncSddGitTests(GuildTestCase):
         _git(["clone", str(self.origin_dir), str(editor_dir)], self.root)
         self._init_git_repo(editor_dir)
         _git(["checkout", "-B", "main", "origin/main"], editor_dir)
-        self._write_task_file(
-            editor_dir, "second-epic", "## T01 — First\n\n**Deps:** —\n\n**Status:** [ ] pending\n"
-        )
+        self._write_task_file(editor_dir, "second-epic", "## T01 — First\n\n**Deps:** —\n\n**Status:** [ ] pending\n")
         _git(["add", "."], editor_dir)
         _git(["commit", "-m", "add second-epic"], editor_dir)
         _git(["push", "origin", "HEAD:main"], editor_dir)
@@ -380,9 +373,7 @@ class SyncSddGitTests(GuildTestCase):
         self.assertEqual(head_before, head_after)
 
         conn = sqlite3.connect(str(self.data_home / "guild" / "guild.db"))
-        row = conn.execute(
-            "SELECT sdd_path FROM epics WHERE epic = 'second-epic'"
-        ).fetchone()
+        row = conn.execute("SELECT sdd_path FROM epics WHERE epic = 'second-epic'").fetchone()
         conn.close()
         self.assertEqual(row[0], "git:origin/main:epics/second-epic/tasks.md")
 

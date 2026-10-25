@@ -5,8 +5,12 @@ import subprocess
 SESSION = "guild"
 HYPERLINK_FEATURE_SLOT = "terminal-features[10]"
 OPEN_LINK_ON_CTRL_CLICK = [
-    "bind-key", "-n", "C-MouseDown1Pane",
-    "if-shell", "-F", "#{mouse_hyperlink}",
+    "bind-key",
+    "-n",
+    "C-MouseDown1Pane",
+    "if-shell",
+    "-F",
+    "#{mouse_hyperlink}",
     "run-shell -b 'xdg-open -- #{q:mouse_hyperlink}'",
     "send-keys -M",
 ]

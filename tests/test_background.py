@@ -32,7 +32,7 @@ class BackgroundTests(unittest.TestCase):
         background.clear(self.state_dir, "sess-1", background.pr_key(1))
 
     def test_dead_pr_marker_is_dropped_and_deleted(self):
-        key = background.pr_key(2 ** 22 + 12345)
+        key = background.pr_key(2**22 + 12345)
         background.mark(self.state_dir, "sess-1", key, "pr acme/app#7")
         self.assertEqual(self._labels(), [])
         self.assertFalse((self.state_dir / "background" / "sess-1" / key).exists())

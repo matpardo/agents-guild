@@ -15,9 +15,7 @@ def _item(key, status_name, status_category, issue_type):
 
 class ChildrenOfTests(GuildTestCase):
     def test_returns_parsed_cards_for_valid_epic_key(self):
-        self.write_acli_fixture(
-            "parent = DEMO-1", [_item("DEMO-2", "In Progress", "indeterminate", "Task")]
-        )
+        self.write_acli_fixture("parent = DEMO-1", [_item("DEMO-2", "In Progress", "indeterminate", "Task")])
         cards, invalid_keys = jira_acli.children_of("DEMO-1")
         self.assertEqual(invalid_keys, [])
         self.assertEqual(

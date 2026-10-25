@@ -39,9 +39,7 @@ _FAST_FORWARD_NOTICE_TTL = "12h"
 _FAST_FORWARD_NOTICE_TEMPLATE = "local {} of {} {} commits behind origin, not updated: {}"
 
 _MIGRATION_NOTICE_TTL = "12h"
-_MIGRATION_NOTICE_TEMPLATE = (
-    "Migration version {} is claimed by more than one open PR: {}. Renumber before merging."
-)
+_MIGRATION_NOTICE_TEMPLATE = "Migration version {} is claimed by more than one open PR: {}. Renumber before merging."
 _MIGRATION_VERSION_PATTERN = re.compile(r"^(\d+)")
 
 
@@ -141,9 +139,23 @@ def _sync_pr(ctx, projects, row, failures, lifecycle_runner):
         row["repo"],
         row["number"],
         [
-            "state", "isDraft", "mergedAt", "headRefName", "title", "statusCheckRollup",
-            "reviewDecision", "mergeable", "mergeStateStatus", "baseRefName", "comments", "reviews", "headRefOid",
-            "isCrossRepository", "commits", "labels", "author",
+            "state",
+            "isDraft",
+            "mergedAt",
+            "headRefName",
+            "title",
+            "statusCheckRollup",
+            "reviewDecision",
+            "mergeable",
+            "mergeStateStatus",
+            "baseRefName",
+            "comments",
+            "reviews",
+            "headRefOid",
+            "isCrossRepository",
+            "commits",
+            "labels",
+            "author",
         ],
     )
     failing, passing, pending = _count_checks(gh_data.get("statusCheckRollup"))
@@ -244,9 +256,7 @@ def _fetch_changed_files(ctx, row, failures):
     try:
         return github.pr_diff(ctx.cwd, row["repo"], row["number"])["paths"]
     except github.GhCommandError as error:
-        failures.append(
-            "{}#{}: shared areas check failed: {}".format(row["repo"], row["number"], error)
-        )
+        failures.append("{}#{}: shared areas check failed: {}".format(row["repo"], row["number"], error))
         return None
 
 
@@ -339,9 +349,7 @@ def _handle_merge(ctx, projects, row, failures):
     raids = raid_commands.member_raids(ctx.conn, ctx.now, row["party"])
     project = _project_for_repo(projects, row["repo"])
     shared_areas = project.get("shared_areas") if project is not None else None
-    holds_areas = bool(shared_areas) and bool(
-        claim_commands.held_areas(ctx, project["name"], row["party"])
-    )
+    holds_areas = bool(shared_areas) and bool(claim_commands.held_areas(ctx, project["name"], row["party"]))
     touched = []
     released = []
     if shared_areas and (raids or holds_areas):
@@ -361,9 +369,7 @@ def _post_fast_forward_notice(ctx, project, clone, base, outcome):
     announces = "ffbase:{}:{}:{}".format(project["name"], clone["repo"], tip)
     if notice_commands.announced(ctx.conn, announces):
         return
-    text = _FAST_FORWARD_NOTICE_TEMPLATE.format(
-        base, clone["repo"], outcome["behind"], outcome["reason"]
-    )
+    text = _FAST_FORWARD_NOTICE_TEMPLATE.format(base, clone["repo"], outcome["behind"], outcome["reason"])
     notice_commands.create_announcing(
         ctx, None, text, "project:{}".format(project["name"]), _FAST_FORWARD_NOTICE_TTL, announces
     )
@@ -407,9 +413,7 @@ def _versions_by_pr(ctx, project, rows, failures):
         try:
             paths = github.pr_diff(ctx.cwd, row["repo"], row["number"])["paths"]
         except github.GhCommandError as error:
-            failures.append(
-                "{}#{}: migration clash check failed: {}".format(row["repo"], row["number"], error)
-            )
+            failures.append("{}#{}: migration clash check failed: {}".format(row["repo"], row["number"], error))
             continue
         by_pr[(row["repo"], row["number"])] = (row, _migration_versions(project["migration_paths"], paths))
     return by_pr
@@ -590,9 +594,7 @@ def refresh_prs(ctx, rows, lifecycle_runner):
 
 
 def _sync_gh(ctx, lifecycle_runner):
-    rows = ctx.conn.execute(
-        "SELECT * FROM prs WHERE lifecycle NOT IN ('merged', 'closed')"
-    ).fetchall()
+    rows = ctx.conn.execute("SELECT * FROM prs WHERE lifecycle NOT IN ('merged', 'closed')").fetchall()
     failures = []
     projects = config.load_all_projects(ctx.projects_dir)
     merged_repos = set()
@@ -627,19 +629,13 @@ def _validate_sdd_source(sdd_config, project):
     has_git = has_git_repo or has_git_ref
     if has_root and has_git:
         raise GuildError(
-            "project '{}' sdd config must set either 'root' or 'git_repo'+'git_ref', not both".format(
-                project
-            ),
+            "project '{}' sdd config must set either 'root' or 'git_repo'+'git_ref', not both".format(project),
             1,
         )
     if not has_root and not has_git:
-        raise GuildError(
-            "project '{}' sdd config needs 'root', or both 'git_repo' and 'git_ref'".format(project), 1
-        )
+        raise GuildError("project '{}' sdd config needs 'root', or both 'git_repo' and 'git_ref'".format(project), 1)
     if has_git and (not has_git_repo or not has_git_ref):
-        raise GuildError(
-            "project '{}' sdd config needs both 'git_repo' and 'git_ref'".format(project), 1
-        )
+        raise GuildError("project '{}' sdd config needs both 'git_repo' and 'git_ref'".format(project), 1)
 
 
 def _root_epic_source(sdd_config):
@@ -710,9 +706,7 @@ def sync_sdd(ctx, project):
     project_data = config.load_project(ctx.projects_dir, project)
     sdd_config = project_data.get("sdd")
     if sdd_config is None:
-        raise GuildError(
-            "project '{}' has no 'sdd' config block: add one to sync SDD tasks".format(project), 1
-        )
+        raise GuildError("project '{}' has no 'sdd' config block: add one to sync SDD tasks".format(project), 1)
     _validate_sdd_source(sdd_config, project)
     patterns = _sdd_patterns(sdd_config)
     epic_key_field = sdd_config.get("epic_key_field")
@@ -730,18 +724,14 @@ def sync_sdd(ctx, project):
 def _require_tracker_config(project_data, project):
     if project_data.get("tracker") is None:
         raise GuildError(
-            "project '{}' has no 'tracker' config block: add one to sync tracker cards".format(
-                project
-            ),
+            "project '{}' has no 'tracker' config block: add one to sync tracker cards".format(project),
             1,
         )
 
 
 def _distinct_keys(conn, table, project):
     rows = conn.execute(
-        "SELECT DISTINCT jira_key FROM {} WHERE project = ? AND jira_key IS NOT NULL".format(
-            table
-        ),
+        "SELECT DISTINCT jira_key FROM {} WHERE project = ? AND jira_key IS NOT NULL".format(table),
         (project,),
     ).fetchall()
     return [row["jira_key"] for row in rows]
@@ -839,9 +829,7 @@ def _sync_all_projects(ctx, source):
         if config_key not in project:
             continue
         try:
-            failures.extend(
-                "{}: {}".format(project["name"], failure) for failure in sync_project(ctx, project["name"])
-            )
+            failures.extend("{}: {}".format(project["name"], failure) for failure in sync_project(ctx, project["name"]))
         except GuildError as error:
             failures.append("{}: {}".format(project["name"], error.message))
     return failures

@@ -70,8 +70,15 @@ class RespawnBase(GuildTestCase):
     def _record_window(self, generation, window_id):
         with db.writing(self.ctx.conn):
             events.record(
-                self.ctx.conn, timeutil.utcnow(), "tester@host", "alpha", None, "acme", "leader.window_launched",
-                "local", {"party": "alpha", "generation": generation, "window_id": window_id},
+                self.ctx.conn,
+                timeutil.utcnow(),
+                "tester@host",
+                "alpha",
+                None,
+                "acme",
+                "leader.window_launched",
+                "local",
+                {"party": "alpha", "generation": generation, "window_id": window_id},
             )
 
     def _sleep(self, seconds):
@@ -282,9 +289,11 @@ class RespawnCliTests(RespawnBase):
         def fake_kill(tmux, pane):
             order.append(("kill", pane, sys.stdout.getvalue()))
 
-        with mock.patch("guild.commands.handoff.run", return_value=("respawned: ok", "%5")), mock.patch(
-            "guild.tmux_windows.kill_pane", side_effect=fake_kill
-        ), mock.patch.dict("os.environ", {"TMUX_PANE": "%5"}):
+        with (
+            mock.patch("guild.commands.handoff.run", return_value=("respawned: ok", "%5")),
+            mock.patch("guild.tmux_windows.kill_pane", side_effect=fake_kill),
+            mock.patch.dict("os.environ", {"TMUX_PANE": "%5"}),
+        ):
             code, out, err = self.run_cli(
                 ["handoff", "--respawn", "--in-flight", "x", "--learned", "y"], "sess-1", self.repo_dir
             )
@@ -295,8 +304,9 @@ class RespawnCliTests(RespawnBase):
 
     def test_handler_kills_only_the_pane_never_the_window(self):
         fake = self._fake()
-        with mock.patch("guild.commands.handoff.run", return_value=("respawned: ok", "%5")), mock.patch(
-            "guild.tmux_windows.Tmux", return_value=fake
+        with (
+            mock.patch("guild.commands.handoff.run", return_value=("respawned: ok", "%5")),
+            mock.patch("guild.tmux_windows.Tmux", return_value=fake),
         ):
             self.run_cli(["handoff", "--respawn", "--in-flight", "x", "--learned", "y"], "sess-1", self.repo_dir)
         verbs = [call[0] for call in fake.calls]
@@ -304,15 +314,17 @@ class RespawnCliTests(RespawnBase):
         self.assertNotIn("kill-window", verbs)
 
     def test_handler_does_not_kill_when_nothing_to_close(self):
-        with mock.patch("guild.commands.handoff.run", return_value=("respawn failed", None)), mock.patch(
-            "guild.tmux_windows.kill_pane"
-        ) as kill:
+        with (
+            mock.patch("guild.commands.handoff.run", return_value=("respawn failed", None)),
+            mock.patch("guild.tmux_windows.kill_pane") as kill,
+        ):
             self.run_cli(["handoff", "--respawn", "--in-flight", "x", "--learned", "y"], "sess-1", self.repo_dir)
         kill.assert_not_called()
 
     def test_handler_passes_tmux_pane_from_environment(self):
-        with mock.patch("guild.commands.handoff.run", return_value=("t", None)) as run, mock.patch.dict(
-            "os.environ", {"TMUX_PANE": "%9"}
+        with (
+            mock.patch("guild.commands.handoff.run", return_value=("t", None)) as run,
+            mock.patch.dict("os.environ", {"TMUX_PANE": "%9"}),
         ):
             self.run_cli(["handoff", "--respawn", "--in-flight", "x", "--learned", "y"], "sess-1", self.repo_dir)
         self.assertEqual(run.call_args[0][7], "%9")
@@ -345,9 +357,7 @@ class HandoffCloseTests(RespawnBase):
         self.assertIn("--respawn", str(raised.exception))
         self.assertIn("--close", str(raised.exception))
         self.assertFalse((paths.handoffs_dir() / "alpha-g1.md").is_file())
-        self.assertIsNone(
-            self.ctx.conn.execute("SELECT 1 FROM events WHERE kind = 'party.handed_off'").fetchone()
-        )
+        self.assertIsNone(self.ctx.conn.execute("SELECT 1 FROM events WHERE kind = 'party.handed_off'").fetchone())
 
     def test_close_matching_recorded_window_returns_the_pane(self):
         self._record_window(1, "@1")
@@ -377,9 +387,10 @@ class HandoffCloseTests(RespawnBase):
 
 class HandoffCloseCliTests(RespawnBase):
     def test_cli_invokes_kill_pane_when_run_returns_a_pane(self):
-        with mock.patch("guild.commands.handoff.run", return_value=("closing", "%5")), mock.patch(
-            "guild.tmux_windows.kill_pane"
-        ) as kill:
+        with (
+            mock.patch("guild.commands.handoff.run", return_value=("closing", "%5")),
+            mock.patch("guild.tmux_windows.kill_pane") as kill,
+        ):
             code, out, err = self.run_cli(
                 ["handoff", "--close", "--in-flight", "x", "--learned", "y"], "sess-1", self.repo_dir
             )
@@ -387,9 +398,10 @@ class HandoffCloseCliTests(RespawnBase):
         kill.assert_called_once_with(mock.ANY, "%5")
 
     def test_cli_does_not_kill_when_nothing_to_close(self):
-        with mock.patch("guild.commands.handoff.run", return_value=("close it yourself", None)), mock.patch(
-            "guild.tmux_windows.kill_pane"
-        ) as kill:
+        with (
+            mock.patch("guild.commands.handoff.run", return_value=("close it yourself", None)),
+            mock.patch("guild.tmux_windows.kill_pane") as kill,
+        ):
             self.run_cli(["handoff", "--close", "--in-flight", "x", "--learned", "y"], "sess-1", self.repo_dir)
         kill.assert_not_called()
 

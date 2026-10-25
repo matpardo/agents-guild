@@ -48,7 +48,7 @@ def _subagent_finished(entry):
 
 def _is_live(entry, now):
     if entry.name.startswith(_PR_PREFIX):
-        pid = entry.name[len(_PR_PREFIX):]
+        pid = entry.name[len(_PR_PREFIX) :]
         return pid.isdigit() and session_info.pid_alive(int(pid))
     if now.timestamp() - entry.stat().st_mtime >= _SUBAGENT_TTL_SECONDS:
         return False

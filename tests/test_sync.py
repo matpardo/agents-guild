@@ -24,7 +24,8 @@ class SyncTests(GuildTestCase):
         )
         self.run_cli(
             ["pr", "track", "acme/app#1", "--task", "demo/T01", "--what", "x", "--waits", "y"],
-            "sess-1", self.repo_dir,
+            "sess-1",
+            self.repo_dir,
         )
 
     def _two_generations(self):
@@ -59,7 +60,10 @@ class SyncTests(GuildTestCase):
         self.write_gh_fixture(
             "view_acme-app_1",
             {
-                "state": "MERGED", "isDraft": False, "headRefName": "feature/x", "title": "t",
+                "state": "MERGED",
+                "isDraft": False,
+                "headRefName": "feature/x",
+                "title": "t",
                 "mergedAt": "2026-01-01T00:00:00Z",
                 "statusCheckRollup": [{"conclusion": "SUCCESS"}, {"conclusion": "FAILURE"}],
             },
@@ -73,7 +77,10 @@ class SyncTests(GuildTestCase):
         self.write_gh_fixture(
             "view_acme-app_1",
             {
-                "state": "OPEN", "isDraft": False, "headRefName": "feature/x", "title": "t",
+                "state": "OPEN",
+                "isDraft": False,
+                "headRefName": "feature/x",
+                "title": "t",
                 "statusCheckRollup": rollup,
             },
         )
@@ -81,9 +88,7 @@ class SyncTests(GuildTestCase):
         self.assertEqual(code, 0)
         conn = db.connect(paths.db_path())
         conn.row_factory = sqlite3.Row
-        row = conn.execute(
-            "SELECT checks_failing, checks_passing, checks_pending FROM prs WHERE number = 1"
-        ).fetchone()
+        row = conn.execute("SELECT checks_failing, checks_passing, checks_pending FROM prs WHERE number = 1").fetchone()
         conn.close()
         return (row["checks_failing"], row["checks_passing"], row["checks_pending"])
 
@@ -116,7 +121,10 @@ class SyncTests(GuildTestCase):
         self.write_gh_fixture(
             "view_acme-app_1",
             {
-                "state": "OPEN", "isDraft": True, "headRefName": "feature/x", "title": "t",
+                "state": "OPEN",
+                "isDraft": True,
+                "headRefName": "feature/x",
+                "title": "t",
                 "headRefOid": "abc123def456",
             },
         )
@@ -133,7 +141,10 @@ class SyncTests(GuildTestCase):
         self.write_gh_fixture(
             "view_acme-app_1",
             {
-                "state": "OPEN", "isDraft": True, "headRefName": "feature/x", "title": "t",
+                "state": "OPEN",
+                "isDraft": True,
+                "headRefName": "feature/x",
+                "title": "t",
                 "isCrossRepository": True,
             },
         )
@@ -180,16 +191,28 @@ class SyncTests(GuildTestCase):
     def test_sync_closes_notice_when_until_met(self):
         self.run_cli(
             [
-                "notice", "create", "waiting on merge", "--to", "guild", "--ttl", "8h",
-                "--until", "pr:acme/app#1:merged",
+                "notice",
+                "create",
+                "waiting on merge",
+                "--to",
+                "guild",
+                "--ttl",
+                "8h",
+                "--until",
+                "pr:acme/app#1:merged",
             ],
-            None, None,
+            None,
+            None,
         )
         self.write_gh_fixture(
             "view_acme-app_1",
             {
-                "state": "MERGED", "isDraft": False, "headRefName": "feature/x", "title": "t",
-                "mergedAt": "2026-01-01T00:00:00Z", "statusCheckRollup": [],
+                "state": "MERGED",
+                "isDraft": False,
+                "headRefName": "feature/x",
+                "title": "t",
+                "mergedAt": "2026-01-01T00:00:00Z",
+                "statusCheckRollup": [],
             },
         )
         self.run_cli(["sync", "--source", "gh"], "sess-1", self.repo_dir)
@@ -204,9 +227,7 @@ class SyncTests(GuildTestCase):
 
     def test_unimplemented_source_rejected(self):
         conn = db.connect(paths.db_path())
-        ctx = RunContext(
-            conn, "sess-1", self.repo_dir, timeutil.utcnow(), origin.current_origin(), None, None, None
-        )
+        ctx = RunContext(conn, "sess-1", self.repo_dir, timeutil.utcnow(), origin.current_origin(), None, None, None)
         with self.assertRaises(GuildError) as raised:
             sync_commands.run(ctx, "bogus", False, None)
         conn.close()
@@ -227,15 +248,20 @@ class GhMergeNoticeTests(GuildTestCase):
         )
         self.run_cli(
             ["pr", "track", "acme/app#1", "--task", "demo/T01", "--what", "ship the thing", "--waits", "y"],
-            "sess-1", self.repo_dir,
+            "sess-1",
+            self.repo_dir,
         )
 
     def _merge_fixture(self):
         self.write_gh_fixture(
             "view_acme-app_1",
             {
-                "state": "MERGED", "isDraft": False, "headRefName": "feature/x", "title": "t",
-                "mergedAt": "2026-01-01T00:00:00Z", "statusCheckRollup": [],
+                "state": "MERGED",
+                "isDraft": False,
+                "headRefName": "feature/x",
+                "title": "t",
+                "mergedAt": "2026-01-01T00:00:00Z",
+                "statusCheckRollup": [],
             },
         )
 
@@ -272,8 +298,12 @@ class GhMergeNoticeTests(GuildTestCase):
         self.write_gh_fixture(
             "view_acme-app_{}".format(number),
             {
-                "state": "MERGED", "isDraft": False, "headRefName": "feature/y", "title": "t",
-                "mergedAt": "2026-01-01T00:00:00Z", "statusCheckRollup": [],
+                "state": "MERGED",
+                "isDraft": False,
+                "headRefName": "feature/y",
+                "title": "t",
+                "mergedAt": "2026-01-01T00:00:00Z",
+                "statusCheckRollup": [],
             },
         )
 
@@ -291,16 +321,18 @@ class GhMergeNoticeTests(GuildTestCase):
         self.run_cli(["raid", "join", "release", "--ttl", "1h"], "sess-2", self.repo_dir)
         seed_file = self.root / "seed.json"
         seed_file.write_text(
-            json.dumps(
-                {"prs": [{"repo": "acme/app", "number": 3, "party": "alpha", "what": "seeded work"}]}
-            )
+            json.dumps({"prs": [{"repo": "acme/app", "number": 3, "party": "alpha", "what": "seeded work"}]})
         )
         self.run_cli(["seed", str(seed_file)], None, None)
         self.write_gh_fixture(
             "view_acme-app_3",
             {
-                "state": "MERGED", "isDraft": False, "headRefName": "feature/z", "title": "t",
-                "mergedAt": "2026-01-01T00:00:00Z", "statusCheckRollup": [],
+                "state": "MERGED",
+                "isDraft": False,
+                "headRefName": "feature/z",
+                "title": "t",
+                "mergedAt": "2026-01-01T00:00:00Z",
+                "statusCheckRollup": [],
             },
         )
         self.run_cli(["sync", "--source", "gh"], "sess-1", self.repo_dir)
@@ -343,7 +375,15 @@ class GhMergeNoticeTests(GuildTestCase):
 
     def test_shared_areas_line_present_when_touched(self):
         self._set_shared_areas(["shared/**"])
-        self.write_gh_fixture("view_files_acme-app_1", {"files": [{"path": "shared/config.yml"}], "additions": 1, "deletions": 0, "createdAt": "2026-01-01T00:00:00Z"})
+        self.write_gh_fixture(
+            "view_files_acme-app_1",
+            {
+                "files": [{"path": "shared/config.yml"}],
+                "additions": 1,
+                "deletions": 0,
+                "createdAt": "2026-01-01T00:00:00Z",
+            },
+        )
         self.run_cli(["raid", "join", "release", "--ttl", "1h"], "sess-1", self.repo_dir)
         self._merge_fixture()
         self.run_cli(["sync", "--source", "gh"], "sess-1", self.repo_dir)
@@ -359,7 +399,10 @@ class GhMergeNoticeTests(GuildTestCase):
 
     def test_shared_areas_line_absent_when_no_files_match(self):
         self._set_shared_areas(["shared/**"])
-        self.write_gh_fixture("view_files_acme-app_1", {"files": [{"path": "src/app.py"}], "additions": 1, "deletions": 0, "createdAt": "2026-01-01T00:00:00Z"})
+        self.write_gh_fixture(
+            "view_files_acme-app_1",
+            {"files": [{"path": "src/app.py"}], "additions": 1, "deletions": 0, "createdAt": "2026-01-01T00:00:00Z"},
+        )
         self.run_cli(["raid", "join", "release", "--ttl", "1h"], "sess-1", self.repo_dir)
         self._merge_fixture()
         self.run_cli(["sync", "--source", "gh"], "sess-1", self.repo_dir)
@@ -385,14 +428,19 @@ class GhMergeNoticeTests(GuildTestCase):
         )
         self.run_cli(
             ["pr", "track", "acme/app#2", "--task", "demo/T01", "--what", "already merged", "--waits", "y"],
-            "sess-1", self.repo_dir,
+            "sess-1",
+            self.repo_dir,
         )
         self.run_cli(["raid", "join", "release", "--ttl", "1h"], "sess-1", self.repo_dir)
         self.write_gh_fixture(
             "view_acme-app_2",
             {
-                "state": "MERGED", "isDraft": False, "headRefName": "feature/y", "title": "t2",
-                "mergedAt": "2026-01-01T00:00:00Z", "statusCheckRollup": [],
+                "state": "MERGED",
+                "isDraft": False,
+                "headRefName": "feature/y",
+                "title": "t2",
+                "mergedAt": "2026-01-01T00:00:00Z",
+                "statusCheckRollup": [],
             },
         )
         code, out, err = self.run_cli(["sync", "--source", "gh"], "sess-1", self.repo_dir)
@@ -430,16 +478,29 @@ class GhMergeReleasesClaimsTests(GuildTestCase):
         )
         self.run_cli(
             ["pr", "track", "acme/app#1", "--task", "demo/T01", "--what", "ship", "--waits", "y"],
-            "sess-1", self.repo_dir,
+            "sess-1",
+            self.repo_dir,
         )
-        self.write_gh_fixture("view_files_acme-app_1", {"files": [{"path": "shared/config.yml"}], "additions": 1, "deletions": 0, "createdAt": "2026-01-01T00:00:00Z"})
+        self.write_gh_fixture(
+            "view_files_acme-app_1",
+            {
+                "files": [{"path": "shared/config.yml"}],
+                "additions": 1,
+                "deletions": 0,
+                "createdAt": "2026-01-01T00:00:00Z",
+            },
+        )
 
     def _merge_fixture(self):
         self.write_gh_fixture(
             "view_acme-app_1",
             {
-                "state": "MERGED", "isDraft": False, "headRefName": "feature/x", "title": "t",
-                "mergedAt": "2026-01-01T00:00:00Z", "statusCheckRollup": [],
+                "state": "MERGED",
+                "isDraft": False,
+                "headRefName": "feature/x",
+                "title": "t",
+                "mergedAt": "2026-01-01T00:00:00Z",
+                "statusCheckRollup": [],
             },
         )
 
@@ -509,7 +570,9 @@ class GhMergeReleasesClaimsTests(GuildTestCase):
         with mock.patch(
             "guild.adapters.github.pr_diff",
             return_value={
-                "paths": ["shared/config.yml"], "additions": 1, "deletions": 0,
+                "paths": ["shared/config.yml"],
+                "additions": 1,
+                "deletions": 0,
                 "created_at": "2026-01-01T00:00:00Z",
             },
         ) as pr_diff:

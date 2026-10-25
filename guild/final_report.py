@@ -103,14 +103,15 @@ def party_report(ctx, party, pending):
     lines = ["final report for party '{}':".format(party)]
     lines.extend(_pr_section(prs))
     lines.extend(
-        "quest {}: {}/{} tasks done ({})".format(row["slug"], row["done"], row["total"], row["state"])
-        for row in quests
+        "quest {}: {}/{} tasks done ({})".format(row["slug"], row["done"], row["total"], row["state"]) for row in quests
     )
     linked = idea_commands.linked_ideas(ctx, party)
     lines.extend("idea #{}: {}".format(row["id"], row["title"]) for row in linked)
     session_ids = [
         row["session_id"]
-        for row in ctx.conn.execute("SELECT session_id FROM leaders WHERE party = ? AND session_id IS NOT NULL", (party,))
+        for row in ctx.conn.execute(
+            "SELECT session_id FROM leaders WHERE party = ? AND session_id IS NOT NULL", (party,)
+        )
     ]
     lines.extend(_generated_lines(ctx, party, session_ids, {row["id"] for row in linked}))
     lines.append("pending: {}".format(pending))

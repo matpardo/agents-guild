@@ -69,26 +69,20 @@ def _refuse_other_party(conn, session_id, name):
     adventurer = identity.resolve_adventurer(conn, session_id)
     if adventurer is not None:
         raise GuildError(
-            "session is adventurer {}: a session is a leader or an adventurer, never both".format(
-                adventurer["id"]
-            ),
+            "session is adventurer {}: a session is a leader or an adventurer, never both".format(adventurer["id"]),
             1,
         )
     binding = identity.resolve_binding(conn, session_id)
     if binding is None or binding["party"] == name:
         return
-    raise GuildError(
-        "session already leads party '{}': a session never switches party".format(binding["party"]), 1
-    )
+    raise GuildError("session already leads party '{}': a session never switches party".format(binding["party"]), 1)
 
 
 def require_new_name(conn, name):
     names.validate_name(name, "party name")
     existing = conn.execute("SELECT name FROM parties WHERE name = ?", (name,)).fetchone()
     if existing is not None:
-        raise GuildError(
-            "party '{}' already exists: use `guild party resume {}`".format(name, name), 1
-        )
+        raise GuildError("party '{}' already exists: use `guild party resume {}`".format(name, name), 1)
 
 
 def record_started(ctx, name, project, reason, from_adventurer):
@@ -138,9 +132,7 @@ def resume(ctx, name, session_name, permission_mode):
     names.validate_name(name, "party name")
     session_id = _resolve_resume_session_id(ctx, session_name)
     _refuse_other_party(ctx.conn, session_id, name)
-    row = ctx.conn.execute(
-        "SELECT project, generation, state FROM parties WHERE name = ?", (name,)
-    ).fetchone()
+    row = ctx.conn.execute("SELECT project, generation, state FROM parties WHERE name = ?", (name,)).fetchone()
     if row is None:
         raise GuildError("unknown party '{}'".format(name), 1)
     if row["state"] == "closed":
@@ -192,9 +184,9 @@ def _cleanup_summary(ctx, party):
     quests = ctx.conn.execute(
         "SELECT COUNT(*) AS n FROM quests WHERE party = ? AND state = 'active'", (party,)
     ).fetchone()["n"]
-    asks = ctx.conn.execute(
-        "SELECT COUNT(*) AS n FROM asks WHERE party = ? AND state = 'open'", (party,)
-    ).fetchone()["n"]
+    asks = ctx.conn.execute("SELECT COUNT(*) AS n FROM asks WHERE party = ? AND state = 'open'", (party,)).fetchone()[
+        "n"
+    ]
     claims = len([row for row in claim_commands.list_claims(ctx.conn, ctx.now) if row["party"] == party])
     return "{} done, {} dismissed, {} released".format(
         _count(quests, "quest"), _count(asks, "ask"), _count(claims, "claim")
@@ -214,9 +206,7 @@ def _open_pr_refs(conn, party):
 
 
 def _open_work_problems(conn, party):
-    asks = conn.execute(
-        "SELECT id FROM asks WHERE party = ? AND state = 'open' ORDER BY id ASC", (party,)
-    ).fetchall()
+    asks = conn.execute("SELECT id FROM asks WHERE party = ? AND state = 'open' ORDER BY id ASC", (party,)).fetchall()
     prs = conn.execute(
         "SELECT repo, number, review_comment_count, last_notified_comment_count FROM prs"
         " WHERE party = ? AND lifecycle NOT IN ('merged', 'closed') ORDER BY repo ASC, number ASC",
@@ -235,9 +225,7 @@ def _quests_unfinished_work(ctx, party):
         "SELECT slug, project, epic FROM quests WHERE party = ? AND state = 'active' ORDER BY slug", (party,)
     ).fetchall()
     epic_projects = sorted({row["project"] for row in rows if row["epic"] is not None})
-    stale_notes = [
-        note for project in epic_projects for note in quest_commands.refresh_sdd_snapshot(ctx, project)
-    ]
+    stale_notes = [note for project in epic_projects for note in quest_commands.refresh_sdd_snapshot(ctx, project)]
     problems = [
         problem
         for row in rows
@@ -260,9 +248,7 @@ def _prune_lines(ctx):
 
 def close(ctx, name, force, pending, lifecycle_runner):
     party = _close_target(ctx, name)
-    row = ctx.conn.execute(
-        "SELECT project, generation, state FROM parties WHERE name = ?", (party,)
-    ).fetchone()
+    row = ctx.conn.execute("SELECT project, generation, state FROM parties WHERE name = ?", (party,)).fetchone()
     if row is None:
         raise GuildError("unknown party '{}'".format(party), 1)
     if row["state"] == "closed":

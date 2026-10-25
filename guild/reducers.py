@@ -25,8 +25,7 @@ def _party_started(conn, event):
 def _party_resumed(conn, event):
     payload = event["payload"]
     conn.execute(
-        "UPDATE leaders SET handoff_consumed_at = ? WHERE party = ? AND generation = ?"
-        " AND handoff_consumed_at IS NULL",
+        "UPDATE leaders SET handoff_consumed_at = ? WHERE party = ? AND generation = ? AND handoff_consumed_at IS NULL",
         (event["ts"], payload["party"], payload["generation"] - 1),
     )
     conn.execute(
@@ -56,9 +55,7 @@ def _party_resumed(conn, event):
 
 def _party_closed(conn, event):
     payload = event["payload"]
-    conn.execute(
-        "UPDATE parties SET state = 'closed', updated_at = ? WHERE name = ?", (event["ts"], payload["party"])
-    )
+    conn.execute("UPDATE parties SET state = 'closed', updated_at = ? WHERE name = ?", (event["ts"], payload["party"]))
     conn.execute(
         "UPDATE quests SET state = 'done', updated_at = ? WHERE party = ? AND state = 'active'",
         (event["ts"], payload["party"]),
@@ -352,7 +349,12 @@ def _pr_untracked(conn, event):
 
 
 _PR_SYNCED_CARRY_FORWARD_FIELDS = (
-    "mergeable", "review_comment_count", "checks_pending", "review_decision", "merge_state", "base_branch",
+    "mergeable",
+    "review_comment_count",
+    "checks_pending",
+    "review_decision",
+    "merge_state",
+    "base_branch",
     "unresolved_threads",
 )
 
@@ -367,10 +369,7 @@ def _pr_synced_changed(current, payload):
     fields = ("lifecycle", "gh_state", "gh_draft", "branch", "title", "checks_failing", "checks_passing")
     if any(current[field] != payload[field] for field in fields):
         return True
-    return any(
-        current[field] != _pr_synced_field(current, payload, field)
-        for field in _PR_SYNCED_CARRY_FORWARD_FIELDS
-    )
+    return any(current[field] != _pr_synced_field(current, payload, field) for field in _PR_SYNCED_CARRY_FORWARD_FIELDS)
 
 
 def _pr_synced(conn, event):
@@ -428,9 +427,7 @@ def _store_change_set(conn, repo, number, change_set):
     )
     conn.execute("DELETE FROM pr_shared_areas WHERE repo = ? AND number = ?", (repo, number))
     for glob in change_set["globs"]:
-        conn.execute(
-            "INSERT INTO pr_shared_areas (repo, number, glob) VALUES (?, ?, ?)", (repo, number, glob)
-        )
+        conn.execute("INSERT INTO pr_shared_areas (repo, number, glob) VALUES (?, ?, ?)", (repo, number, glob))
     if "paths" not in change_set:
         return
     conn.execute("DELETE FROM pr_files WHERE repo = ? AND number = ?", (repo, number))
@@ -711,8 +708,7 @@ def _adventurer_dismissed(conn, event):
 
 def _set_session_status(conn, event, status, detail):
     conn.execute(
-        "INSERT OR REPLACE INTO session_status (session_id, party, status, detail, since)"
-        " VALUES (?, ?, ?, ?, ?)",
+        "INSERT OR REPLACE INTO session_status (session_id, party, status, detail, since) VALUES (?, ?, ?, ?, ?)",
         (event["session_id"], event["party"] or "", status, detail, event["ts"]),
     )
 
@@ -801,8 +797,7 @@ def _dump(value):
 def _finding_recorded(conn, event):
     payload = event["payload"]
     conn.execute(
-        "INSERT OR IGNORE INTO findings (project, class, repo, number, party, recorded_at)"
-        " VALUES (?, ?, ?, ?, ?, ?)",
+        "INSERT OR IGNORE INTO findings (project, class, repo, number, party, recorded_at) VALUES (?, ?, ?, ?, ?, ?)",
         (payload["project"], payload["class"], payload["repo"], payload["number"], payload["party"], event["ts"]),
     )
 
@@ -874,7 +869,18 @@ def _retired(conn, event):
 
 
 _REDUCERS.update(
-    {kind: _retired for kind in ("dispatch.paused", "dispatch.resumed", "dispatch.decided", "dispatch.launched", "dispatch.launch_failed", "dispatch.bound", "pr.fix_requested")}
+    {
+        kind: _retired
+        for kind in (
+            "dispatch.paused",
+            "dispatch.resumed",
+            "dispatch.decided",
+            "dispatch.launched",
+            "dispatch.launch_failed",
+            "dispatch.bound",
+            "pr.fix_requested",
+        )
+    }
 )
 
 

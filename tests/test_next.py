@@ -40,14 +40,18 @@ class Tier1Tests(NextTestCase):
         )
         self.run_cli(
             ["pr", "track", "acme/app#1", "--task", "demo/T01", "--what", "x", "--waits", "y"],
-            "sess-1", self.repo_dir,
+            "sess-1",
+            self.repo_dir,
         )
 
     def test_failing_checks_reported(self):
         self.write_gh_fixture(
             "view_acme-app_1",
             {
-                "state": "OPEN", "isDraft": True, "headRefName": "feature/x", "title": "t",
+                "state": "OPEN",
+                "isDraft": True,
+                "headRefName": "feature/x",
+                "title": "t",
                 "statusCheckRollup": [{"conclusion": "FAILURE"}],
             },
         )
@@ -60,7 +64,10 @@ class Tier1Tests(NextTestCase):
         self.write_gh_fixture(
             "view_acme-app_1",
             {
-                "state": "OPEN", "isDraft": True, "headRefName": "feature/x", "title": "t",
+                "state": "OPEN",
+                "isDraft": True,
+                "headRefName": "feature/x",
+                "title": "t",
                 "statusCheckRollup": [{"conclusion": "FAILURE"}],
             },
         )
@@ -77,7 +84,10 @@ class Tier1Tests(NextTestCase):
         self.write_gh_fixture(
             "view_acme-app_1",
             {
-                "state": "OPEN", "isDraft": True, "headRefName": "feature/x", "title": "t",
+                "state": "OPEN",
+                "isDraft": True,
+                "headRefName": "feature/x",
+                "title": "t",
                 "statusCheckRollup": [{"conclusion": "FAILURE"}],
             },
         )
@@ -93,7 +103,10 @@ class Tier1Tests(NextTestCase):
         self.write_gh_fixture(
             "view_acme-app_1",
             {
-                "state": "OPEN", "isDraft": True, "headRefName": "feature/x", "title": "t",
+                "state": "OPEN",
+                "isDraft": True,
+                "headRefName": "feature/x",
+                "title": "t",
                 "mergeable": "CONFLICTING",
             },
         )
@@ -105,7 +118,10 @@ class Tier1Tests(NextTestCase):
         self.write_gh_fixture(
             "view_acme-app_1",
             {
-                "state": "OPEN", "isDraft": True, "headRefName": "feature/x", "title": "t",
+                "state": "OPEN",
+                "isDraft": True,
+                "headRefName": "feature/x",
+                "title": "t",
                 "comments": [{"id": 1}, {"id": 2}],
             },
         )
@@ -119,7 +135,10 @@ class Tier1Tests(NextTestCase):
         self.write_gh_fixture(
             "view_acme-app_1",
             {
-                "state": "OPEN", "isDraft": True, "headRefName": "feature/x", "title": "t",
+                "state": "OPEN",
+                "isDraft": True,
+                "headRefName": "feature/x",
+                "title": "t",
                 "comments": [{"id": 1}, {"id": 2}],
             },
         )
@@ -138,7 +157,10 @@ class Tier1Tests(NextTestCase):
         self.write_gh_fixture(
             "view_acme-app_1",
             {
-                "state": "OPEN", "isDraft": True, "headRefName": "feature/x", "title": "t",
+                "state": "OPEN",
+                "isDraft": True,
+                "headRefName": "feature/x",
+                "title": "t",
                 "comments": [{"id": 1}],
             },
         )
@@ -159,14 +181,13 @@ class Tier2Tests(NextTestCase):
         )
         self.run_cli(
             ["pr", "track", "acme/app#1", "--task", "demo/T01", "--what", "x", "--waits", "y"],
-            "sess-1", self.repo_dir,
+            "sess-1",
+            self.repo_dir,
         )
         self.run_cli(["pr", "set", "acme/app#1", "--needs-ask-answer"], "sess-1", self.repo_dir)
 
     def test_answered_ask_after_pr_set_is_reported(self):
-        self.run_cli(
-            ["ask", "one more round?", "--context", "ctx", "--ref", "pr:acme/app#1"], "sess-1", self.repo_dir
-        )
+        self.run_cli(["ask", "one more round?", "--context", "ctx", "--ref", "pr:acme/app#1"], "sess-1", self.repo_dir)
         code, out, err = self.run_cli(["answer", "1", "ship it"], None, None)
         self.assertEqual(code, 0)
         code, out, err = self.run_cli(["next"], "sess-1", self.repo_dir)
@@ -174,17 +195,13 @@ class Tier2Tests(NextTestCase):
 
     def test_answered_ask_is_not_reported_when_the_flag_is_off(self):
         self.run_cli(["pr", "set", "acme/app#1", "--no-needs-ask-answer"], "sess-1", self.repo_dir)
-        self.run_cli(
-            ["ask", "one more round?", "--context", "ctx", "--ref", "pr:acme/app#1"], "sess-1", self.repo_dir
-        )
+        self.run_cli(["ask", "one more round?", "--context", "ctx", "--ref", "pr:acme/app#1"], "sess-1", self.repo_dir)
         self.run_cli(["answer", "1", "ship it"], None, None)
         code, out, err = self.run_cli(["next"], "sess-1", self.repo_dir)
         self.assertNotIn("ask #1 answered", out)
 
     def test_answer_before_pr_set_is_not_reported(self):
-        self.run_cli(
-            ["ask", "one more round?", "--context", "ctx", "--ref", "pr:acme/app#1"], "sess-1", self.repo_dir
-        )
+        self.run_cli(["ask", "one more round?", "--context", "ctx", "--ref", "pr:acme/app#1"], "sess-1", self.repo_dir)
         self.run_cli(["answer", "1", "ship it"], None, None)
         self.run_cli(["pr", "set", "acme/app#1", "--waits", "z"], "sess-1", self.repo_dir)
         code, out, err = self.run_cli(["next"], "sess-1", self.repo_dir)
@@ -202,7 +219,8 @@ class Tier3Tests(NextTestCase):
         )
         self.run_cli(
             ["pr", "track", "acme/app#1", "--task", "demo/T01", "--what", "x", "--waits", "y"],
-            "sess-1", self.repo_dir,
+            "sess-1",
+            self.repo_dir,
         )
         self.run_cli(["pr", "set", "acme/app#1", "--lifecycle", "converging"], "sess-1", self.repo_dir)
 
@@ -239,10 +257,18 @@ class Tier4Tests(NextTestCase):
         )
         self.run_cli(
             [
-                "quest", "add", "wave1", "--title", "Wave 1", "--epic", "compliance",
-                "--tasks", "T02,T03",
+                "quest",
+                "add",
+                "wave1",
+                "--title",
+                "Wave 1",
+                "--epic",
+                "compliance",
+                "--tasks",
+                "T02,T03",
             ],
-            "sess-1", self.repo_dir,
+            "sess-1",
+            self.repo_dir,
         )
 
     def _sync_all_done(self):
@@ -266,9 +292,7 @@ class Tier4Tests(NextTestCase):
         self.run_cli(["task", "start", "wave1/T03"], "sess-1", self.repo_dir)
         self.run_cli(["task", "done", "wave1/T03"], "sess-1", self.repo_dir)
         self._sync_all_done()
-        code, out, err = self.run_cli(
-            ["task", "add", "wave1/T09", "--title", "Extra"], "sess-1", self.repo_dir
-        )
+        code, out, err = self.run_cli(["task", "add", "wave1/T09", "--title", "Extra"], "sess-1", self.repo_dir)
         self.assertEqual(code, 0, err)
         code, out, err = self.run_cli(["next"], "sess-1", self.repo_dir)
         self.assertIn('task wave1/T09: "Extra" — ready', out)
@@ -325,7 +349,8 @@ class Tier4Tests(NextTestCase):
         )
         self.run_cli(
             ["quest", "add", "wave0", "--title", "Wave 0", "--epic", "compliance", "--tasks", "T01"],
-            "sess-1", self.repo_dir,
+            "sess-1",
+            self.repo_dir,
         )
         self.run_cli(["task", "done", "wave0/T01"], "sess-1", self.repo_dir)
         self.sync_sdd(
@@ -352,18 +377,23 @@ class NextAllTests(NextTestCase):
         )
         self.run_cli(
             ["quest", "add", "wave1", "--title", "Wave 1", "--epic", "compliance", "--tasks", "T01"],
-            "sess-1", self.repo_dir,
+            "sess-1",
+            self.repo_dir,
         )
         self.write_gh_fixture(
             "view_acme-app_1",
             {
-                "state": "OPEN", "isDraft": True, "headRefName": "feature/x", "title": "t",
+                "state": "OPEN",
+                "isDraft": True,
+                "headRefName": "feature/x",
+                "title": "t",
                 "statusCheckRollup": [{"conclusion": "FAILURE"}],
             },
         )
         self.run_cli(
             ["pr", "track", "acme/app#1", "--task", "wave1/T01", "--what", "x", "--waits", "y"],
-            "sess-1", self.repo_dir,
+            "sess-1",
+            self.repo_dir,
         )
         self.run_cli(["sync", "--source", "gh"], "sess-1", self.repo_dir)
         code, out, err = self.run_cli(["next", "--all"], "sess-1", self.repo_dir)
@@ -385,8 +415,12 @@ class RaidMemberWorkTests(NextTestCase):
 
     def _view(self, conclusion):
         return {
-            "state": "OPEN", "isDraft": False, "headRefName": "feature/y", "title": "t",
-            "statusCheckRollup": [{"conclusion": conclusion}], "mergeable": "MERGEABLE",
+            "state": "OPEN",
+            "isDraft": False,
+            "headRefName": "feature/y",
+            "title": "t",
+            "statusCheckRollup": [{"conclusion": conclusion}],
+            "mergeable": "MERGEABLE",
         }
 
     def _beta_tracks_pr(self):
@@ -397,7 +431,8 @@ class RaidMemberWorkTests(NextTestCase):
         )
         self.run_cli(
             ["pr", "track", "acme/app#7", "--task", "bq/T01", "--what", "x", "--waits", "y"],
-            "sess-2", self.repo_dir,
+            "sess-2",
+            self.repo_dir,
         )
         self.run_cli(["pr", "set", "acme/app#7", "--lifecycle", "ready"], "sess-2", self.repo_dir)
         self.run_cli(["sync", "--source", "gh"], "sess-1", self.repo_dir)
@@ -434,13 +469,17 @@ class HasWorkTests(NextTestCase):
         self.write_gh_fixture(
             "view_acme-app_1",
             {
-                "state": "OPEN", "isDraft": True, "headRefName": "feature/x", "title": "t",
+                "state": "OPEN",
+                "isDraft": True,
+                "headRefName": "feature/x",
+                "title": "t",
                 "comments": [{"id": 1}, {"id": 2}],
             },
         )
         self.run_cli(
             ["pr", "track", "acme/app#1", "--task", "demo/T01", "--what", "x", "--waits", "y"],
-            "sess-1", self.repo_dir,
+            "sess-1",
+            self.repo_dir,
         )
         self.run_cli(["sync", "--source", "gh"], "sess-1", self.repo_dir)
 
@@ -510,10 +549,19 @@ class Tier0Tests(NextTestCase):
         )
         code, out, err = self.run_cli(
             [
-                "pr", "track", "acme/app#{}".format(number), "--task", "demo/T01",
-                "--what", "x", "--waits", "y",
-            ] + extra,
-            "sess-1", self.repo_dir,
+                "pr",
+                "track",
+                "acme/app#{}".format(number),
+                "--task",
+                "demo/T01",
+                "--what",
+                "x",
+                "--waits",
+                "y",
+            ]
+            + extra,
+            "sess-1",
+            self.repo_dir,
         )
         self.assertEqual(code, 0, err)
 
@@ -521,7 +569,10 @@ class Tier0Tests(NextTestCase):
         self.write_gh_fixture(
             "view_acme-app_{}".format(number),
             {
-                "state": "OPEN", "isDraft": True, "headRefName": "fix/x", "title": "t",
+                "state": "OPEN",
+                "isDraft": True,
+                "headRefName": "fix/x",
+                "title": "t",
                 "statusCheckRollup": [{"conclusion": "FAILURE"}],
             },
         )
@@ -588,9 +639,19 @@ class MaxOpenPrsTests(NextTestCase):
             {"state": "OPEN", "isDraft": True, "headRefName": "feature/{}".format(number), "title": "t"},
         )
         self.run_cli(
-            ["pr", "track", "acme/app#{}".format(number), "--task", "demo/{}".format(tid),
-             "--what", "x", "--waits", "y"],
-            "sess-1", self.repo_dir,
+            [
+                "pr",
+                "track",
+                "acme/app#{}".format(number),
+                "--task",
+                "demo/{}".format(tid),
+                "--what",
+                "x",
+                "--waits",
+                "y",
+            ],
+            "sess-1",
+            self.repo_dir,
         )
 
     def _set_cap(self, cap, key="max_open_prs_per_party"):
@@ -649,7 +710,13 @@ class MaxOpenPrsTests(NextTestCase):
         self._set_cap(2)
         self.write_gh_fixture(
             "view_acme-app_1",
-            {"state": "MERGED", "isDraft": False, "headRefName": "feature/1", "title": "t", "mergedAt": "2026-01-01T00:00:00Z"},
+            {
+                "state": "MERGED",
+                "isDraft": False,
+                "headRefName": "feature/1",
+                "title": "t",
+                "mergedAt": "2026-01-01T00:00:00Z",
+            },
         )
         self.run_cli(["sync", "--source", "gh"], "sess-1", self.repo_dir)
         code, out, err = self.run_cli(["next"], "sess-1", self.repo_dir)

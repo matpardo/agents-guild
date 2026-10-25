@@ -53,7 +53,9 @@ def _identity_lines(config, status_code, payload):
     else:
         lines.append(_ok("member matches this guild"))
     if payload.get("realm") != config["realm"]:
-        lines.append(_fail("hub calls its realm {}, this guild joined {}".format(payload.get("realm"), config["realm"])))
+        lines.append(
+            _fail("hub calls its realm {}, this guild joined {}".format(payload.get("realm"), config["realm"]))
+        )
     else:
         lines.append(_ok("realm matches {}".format(config["realm"])))
     return lines
@@ -80,7 +82,11 @@ def _push_lines(config, now):
     if status_code != 200:
         return [_fail("could not read status: " + client.refusal(status_code, payload))]
     entries = payload.get("guilds")
-    own = [entry for entry in entries if isinstance(entry, dict) and entry.get("guild") == config["guild"]] if isinstance(entries, list) else []
+    own = (
+        [entry for entry in entries if isinstance(entry, dict) and entry.get("guild") == config["guild"]]
+        if isinstance(entries, list)
+        else []
+    )
     if not own:
         return [_warn("this guild never pushed")]
     received_at = own[0].get("received_at")
@@ -147,7 +153,9 @@ def _cert_lines(cert_path, now):
     if end <= now:
         return [_fail("hub certificate expired {}".format(end.date()))]
     if end - now < _CERT_WARN:
-        return [_warn("hub certificate expires in {} days: re-create it and re-join every guild".format((end - now).days))]
+        return [
+            _warn("hub certificate expires in {} days: re-create it and re-join every guild".format((end - now).days))
+        ]
     return [_ok("hub certificate valid until {}".format(end.date()))]
 
 
@@ -176,7 +184,9 @@ def hub_lines(now):
     store = paths.realm_hub_store_dir()
     lines.append(_mode_line(Path(config["key"]), 0o600, "hub key"))
     lines.append(_mode_line(paths.realm_hub_pki_dir(), 0o700, "hub pki dir"))
-    lines.extend(_mode_line(path, 0o700, "hub store dir") for path in (store, store / "status", store / "inbox") if path.exists())
+    lines.extend(
+        _mode_line(path, 0o700, "hub store dir") for path in (store, store / "status", store / "inbox") if path.exists()
+    )
     lines.extend(_cert_lines(config["cert"], now))
     lines.extend(_member_line(name, now) for name in sorted(config["members"]))
     return lines

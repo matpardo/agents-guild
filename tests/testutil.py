@@ -45,10 +45,10 @@ class GuildTestCase(unittest.TestCase):
         ):
             directory.mkdir(parents=True, exist_ok=True)
         gh_wrapper = self.bin_dir / "gh"
-        gh_wrapper.write_text("#!/usr/bin/env bash\nexec python3 {} \"$@\"\n".format(_FAKE_GH_SCRIPT))
+        gh_wrapper.write_text('#!/usr/bin/env bash\nexec python3 {} "$@"\n'.format(_FAKE_GH_SCRIPT))
         gh_wrapper.chmod(0o755)
         acli_wrapper = self.bin_dir / "acli"
-        acli_wrapper.write_text("#!/usr/bin/env bash\nexec python3 {} \"$@\"\n".format(_FAKE_ACLI_SCRIPT))
+        acli_wrapper.write_text('#!/usr/bin/env bash\nexec python3 {} "$@"\n'.format(_FAKE_ACLI_SCRIPT))
         acli_wrapper.chmod(0o755)
 
         self._original_environ = dict(os.environ)
@@ -100,9 +100,7 @@ class GuildTestCase(unittest.TestCase):
 
     def write_project_config(self, name, paths_list, repos):
         config_file = self.root / "{}.json".format(name)
-        config_file.write_text(
-            json.dumps({"name": name, "paths": paths_list, "github": {"repos": repos}})
-        )
+        config_file.write_text(json.dumps({"name": name, "paths": paths_list, "github": {"repos": repos}}))
         return config_file
 
     def register_project(self, name, repos):
@@ -112,9 +110,7 @@ class GuildTestCase(unittest.TestCase):
         projects_dir = self.config_home / "guild" / "projects"
         projects_dir.mkdir(parents=True, exist_ok=True)
         (projects_dir / "{}.json".format(name)).write_text(
-            json.dumps(
-                {"name": name, "paths": [str(project_root) + "/*"], "github": {"repos": repos}}
-            )
+            json.dumps({"name": name, "paths": [str(project_root) + "/*"], "github": {"repos": repos}})
         )
         return repo_dir
 
@@ -144,13 +140,33 @@ class GuildTestCase(unittest.TestCase):
         try:
             with db.writing(conn):
                 events.record(
-                    conn, timeutil.utcnow(), "test@host", party, None, "acme", "pr.tracked", "guild",
+                    conn,
+                    timeutil.utcnow(),
+                    "test@host",
+                    party,
+                    None,
+                    "acme",
+                    "pr.tracked",
+                    "guild",
                     {
-                        "repo": repo, "number": number, "party": party, "adventurer": None,
-                        "task_quest": None, "task_tid": None, "card": card, "what": what,
-                        "waits": waits, "lifecycle": "draft", "needs_human_pr_review": 0,
-                        "fixes_main": 0, "fixes_flaky": 0, "branch": branch, "title": "t",
-                        "gh_state": "OPEN", "gh_draft": True, "seeded": 0,
+                        "repo": repo,
+                        "number": number,
+                        "party": party,
+                        "adventurer": None,
+                        "task_quest": None,
+                        "task_tid": None,
+                        "card": card,
+                        "what": what,
+                        "waits": waits,
+                        "lifecycle": "draft",
+                        "needs_human_pr_review": 0,
+                        "fixes_main": 0,
+                        "fixes_flaky": 0,
+                        "branch": branch,
+                        "title": "t",
+                        "gh_state": "OPEN",
+                        "gh_draft": True,
+                        "seeded": 0,
                     },
                 )
         finally:

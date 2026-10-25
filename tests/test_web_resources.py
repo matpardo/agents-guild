@@ -90,9 +90,7 @@ class ResourcesRouteTests(WebServerTestCase):
         self.assertEqual(project["name"], "acme")
         self.assertEqual(project["total_bytes"], 5 * _GB)
         self.assertEqual(project["delta_bytes"], 2 * _GB)
-        self.assertEqual(
-            set(project["categories"][0]), {"category", "bytes", "delta_bytes", "state", "detail"}
-        )
+        self.assertEqual(set(project["categories"][0]), {"category", "bytes", "delta_bytes", "state", "detail"})
         self.assertEqual(
             set(project["items"][0]),
             {"category", "item", "bytes", "delta_bytes", "new", "state", "flag", "detail"},
@@ -142,7 +140,7 @@ class ResourcesRouteTests(WebServerTestCase):
     def test_machine_lines_stay_visible_and_only_projects_collapse(self):
         response, body = self._get("/app.js", self._host())
         script = body.decode()
-        render = script[script.index("function renderResources(model)"):script.index("function fetchResources()")]
+        render = script[script.index("function renderResources(model)") : script.index("function fetchResources()")]
         self.assertNotIn('el("details")', render)
         self.assertIn("renderResourceProjects(model)", render)
         self.assertIn('textEl("summary", "projects")', script)

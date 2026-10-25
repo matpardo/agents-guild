@@ -19,7 +19,23 @@ class BoardLayoutTests(unittest.TestCase):
     def test_pane_holds_every_section_in_view_order(self):
         self.assertEqual(
             _pane_sections(self.html),
-            ["asks", "ready-for-you", "answered-asks", "merge-queues", "parties", "memory", "adventurers", "health-jobs", "ideas", "quest-board", "notices", "raids", "drift", "projects", "realm"],
+            [
+                "asks",
+                "ready-for-you",
+                "answered-asks",
+                "merge-queues",
+                "parties",
+                "memory",
+                "adventurers",
+                "health-jobs",
+                "ideas",
+                "quest-board",
+                "notices",
+                "raids",
+                "drift",
+                "projects",
+                "realm",
+            ],
         )
 
     def test_sidebar_sits_beside_the_pane(self):
@@ -51,7 +67,17 @@ class PrBlockUiTests(unittest.TestCase):
         self.js = (_WEB_DIR / "app.js").read_text()
 
     def test_pr_card_has_block_and_unblock_actions(self):
-        for token in ('"Block manually"', '"Unblock"', '"Relink"', '"Untrack"', '"relink"', '"untrack"', "/api/prs/", "pr.blocked_external", "BLOCKED_EXTERNAL_TEXT"):
+        for token in (
+            '"Block manually"',
+            '"Unblock"',
+            '"Relink"',
+            '"Untrack"',
+            '"relink"',
+            '"untrack"',
+            "/api/prs/",
+            "pr.blocked_external",
+            "BLOCKED_EXTERNAL_TEXT",
+        ):
             with self.subTest(token=token):
                 self.assertIn(token, self.js)
 

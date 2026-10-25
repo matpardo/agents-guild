@@ -80,16 +80,28 @@ _SECURITY_HEADERS = (
 def _board_context():
     conn = db.connect(paths.db_path())
     return context.RunContext(
-        conn, None, None, timeutil.utcnow(), None,
-        paths.claude_sessions_dir(), paths.projects_config_dir(), paths.state_dir(),
+        conn,
+        None,
+        None,
+        timeutil.utcnow(),
+        None,
+        paths.claude_sessions_dir(),
+        paths.projects_config_dir(),
+        paths.state_dir(),
     )
 
 
 def _action_context():
     conn = db.connect(paths.db_path())
     return context.RunContext(
-        conn, None, Path.cwd(), timeutil.utcnow(), origin.current_origin(),
-        paths.claude_sessions_dir(), paths.projects_config_dir(), paths.state_dir(),
+        conn,
+        None,
+        Path.cwd(),
+        timeutil.utcnow(),
+        origin.current_origin(),
+        paths.claude_sessions_dir(),
+        paths.projects_config_dir(),
+        paths.state_dir(),
     )
 
 
@@ -114,9 +126,7 @@ def _resources_model(query):
     since = _first_param(params, "since") or _RESOURCES_SINCE
 
     def build(ctx):
-        return resources_report.build_model(
-            ctx.conn, ctx.now, _first_param(params, "project"), since, ctx.projects_dir
-        )
+        return resources_report.build_model(ctx.conn, ctx.now, _first_param(params, "project"), since, ctx.projects_dir)
 
     return build
 
@@ -184,8 +194,12 @@ def _run_idea_create(payload):
     ctx = _action_context()
     try:
         return idea_commands.add(
-            ctx, payload["title"], payload["description"],
-            payload.get("requester"), payload.get("deadline"), payload.get("project"),
+            ctx,
+            payload["title"],
+            payload["description"],
+            payload.get("requester"),
+            payload.get("deadline"),
+            payload.get("project"),
         )
     finally:
         ctx.conn.close()
@@ -513,9 +527,7 @@ class BoardRequestHandler(http_server.BaseHTTPRequestHandler):
             adventurer_id = adventurer_match.group(1)
             if not _ASK_ID_RE.match(adventurer_id):
                 return self._not_found()
-            return self._post_action(
-                "dismiss-adventurer", lambda payload: _run_adventurer_dismiss(int(adventurer_id))
-            )
+            return self._post_action("dismiss-adventurer", lambda payload: _run_adventurer_dismiss(int(adventurer_id)))
         if path == _COMPACT_PATH:
             return self._post_action("compact", lambda payload: _run_compact())
         if path == _RESOURCES_COLLECT_PATH:

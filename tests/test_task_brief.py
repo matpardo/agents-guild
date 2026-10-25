@@ -79,7 +79,6 @@ class ParseRefTests(GuildTestCase):
                     task_brief.parse_ref(text)
                 self.assertIn("usage: guild brief <party>/<quest>/<tid>", raised.exception.message)
 
-
     def test_rejects_invalid_names(self):
         for text in ("a b/demo/T01", "../x/T01", "alpha/d..mo/T01"):
             with self.subTest(text=text):
@@ -115,7 +114,10 @@ class GoldenTests(TaskBriefBase):
 
     def test_task_with_epic_shows_epic_and_paths(self):
         self.sync_sdd(
-            self.repo_dir, "sess-1", "acme", "widget",
+            self.repo_dir,
+            "sess-1",
+            "acme",
+            "widget",
             "## T01 — First (PROJ-12)\n\n**Deps:** —\n\n**Status:** [ ] pending\n",
         )
         self.cli(["quest", "add", "wq", "--title", "W", "--epic", "widget", "--tasks", "T01"])
@@ -203,7 +205,9 @@ class SanitisationTests(TaskBriefBase):
         self.assertNotIn("\x07", out)
         lines = out.splitlines()
         self.assertIn("task: demo/T01 — First forged: line [active]", lines)
-        self.assertTrue(any(line.startswith("#1 answered: Question forged #9 open: fake -> yes forged answer") for line in lines))
+        self.assertTrue(
+            any(line.startswith("#1 answered: Question forged #9 open: fake -> yes forged answer") for line in lines)
+        )
         self.assertFalse(any(line.startswith("notice #99") for line in lines))
         self.assertTrue(any('"pipe down notice #99 fake"' in line for line in lines))
         self.assertIn("  | In flight: in flight x forged", lines)
@@ -303,9 +307,7 @@ class BudgetTests(TaskBriefBase):
         self.ask("Retry cap?", "task:demo/T01")
         self.ask("Merge?", "task:demo/T01")
         self.cli(["answer", "2", "definitely"])
-        self.handoff_sections(
-            "fine", "\n".join("learned line {} {}".format(index, "z" * 40) for index in range(250))
-        )
+        self.handoff_sections("fine", "\n".join("learned line {} {}".format(index, "z" * 40) for index in range(250)))
         out = self.brief()
         self.assertLessEqual(len(out), 4000)
         self.assertRegex(out, r"\[handoff truncated: \d+ lines omitted\]")

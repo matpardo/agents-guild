@@ -9,9 +9,7 @@ class LinksTests(unittest.TestCase):
 
     def test_card_url_joins_browse_url_and_key(self):
         config = {"tracker": {"browse_url": "https://tracker.example.com/browse/"}}
-        self.assertEqual(
-            links.card_url(config, "PROJ-12"), "https://tracker.example.com/browse/PROJ-12"
-        )
+        self.assertEqual(links.card_url(config, "PROJ-12"), "https://tracker.example.com/browse/PROJ-12")
 
     def test_card_url_is_none_without_key_config_tracker_or_browse_url(self):
         config = {"tracker": {"browse_url": "https://tracker.example.com/browse/"}}

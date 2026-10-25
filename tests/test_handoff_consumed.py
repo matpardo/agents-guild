@@ -18,9 +18,11 @@ class HandoffConsumedTests(GuildTestCase):
         return db.connect(paths.db_path())
 
     def _leader(self, generation):
-        return self._conn().execute(
-            "SELECT * FROM leaders WHERE party = 'alpha' AND generation = ?", (generation,)
-        ).fetchone()
+        return (
+            self._conn()
+            .execute("SELECT * FROM leaders WHERE party = 'alpha' AND generation = ?", (generation,))
+            .fetchone()
+        )
 
     def test_handed_off_generation_is_not_consumed_before_resume(self):
         self.assertIsNotNone(self._leader(1)["handoff_path"])
@@ -54,7 +56,14 @@ class HandoffConsumedTests(GuildTestCase):
         path = self._leader(1)["handoff_path"]
         with db.writing(conn):
             events.record(
-                conn, timeutil.utcnow(), "tester@host", "alpha", None, "acme", "handoff.pruned", "local",
+                conn,
+                timeutil.utcnow(),
+                "tester@host",
+                "alpha",
+                None,
+                "acme",
+                "handoff.pruned",
+                "local",
                 {"party": "alpha", "generation": 1, "path": path},
             )
         self.assertIsNone(self._leader(1)["handoff_path"])

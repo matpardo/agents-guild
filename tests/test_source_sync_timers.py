@@ -42,7 +42,9 @@ class SourceSyncUnitTests(unittest.TestCase):
             unit_dir = Path(directory)
             runner = _RecordingRunner()
             timer_commands.install(timer_commands.SYNC_SDD, unit_dir, "/opt/bin/guild", "10m", runner, "linux", True)
-            timer_commands.install(timer_commands.SYNC_TRACKER, unit_dir, "/opt/bin/guild", "10m", runner, "linux", True)
+            timer_commands.install(
+                timer_commands.SYNC_TRACKER, unit_dir, "/opt/bin/guild", "10m", runner, "linux", True
+            )
             self.assertEqual(
                 sorted(path.name for path in unit_dir.iterdir()),
                 [
@@ -89,13 +91,9 @@ class AllProjectsSyncTests(GuildTestCase):
         self.sdd_root = self.root / "sdd-docs"
         epic_dir = self.sdd_root / "epics" / "widget"
         epic_dir.mkdir(parents=True)
-        (epic_dir / "tasks.md").write_text(
-            "## T01 — One\n\n**Deps:** —\n**Status:** [ ] pending\n"
-        )
+        (epic_dir / "tasks.md").write_text("## T01 — One\n\n**Deps:** —\n**Status:** [ ] pending\n")
         self._write_project("bare", {})
-        self._write_project(
-            "withsdd", {"sdd": dict(_PATTERNS, root=str(self.sdd_root), epics_dir="epics")}
-        )
+        self._write_project("withsdd", {"sdd": dict(_PATTERNS, root=str(self.sdd_root), epics_dir="epics")})
 
     def _write_project(self, name, extra):
         data = {"name": name, "paths": [str(self.root / name) + "/*"], "github": {"repos": []}}

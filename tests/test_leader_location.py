@@ -11,9 +11,7 @@ def _located_events(conn):
 
 
 def _leader(conn, party, generation):
-    return conn.execute(
-        "SELECT * FROM leaders WHERE party = ? AND generation = ?", (party, generation)
-    ).fetchone()
+    return conn.execute("SELECT * FROM leaders WHERE party = ? AND generation = ?", (party, generation)).fetchone()
 
 
 class LeaderLocationHookTests(GuildTestCase):
@@ -99,9 +97,7 @@ class LeaderLocationHookTests(GuildTestCase):
     def test_human_resume_by_session_name_does_not_locate(self):
         self.run_cli(["handoff", "--in-flight", "x", "--learned", "y"], "sess-1", self.repo_dir)
         (self.sessions_dir / "1.json").write_text('{"sessionId": "sess-3", "name": "leader-three"}')
-        code, out, err = self.run_cli(
-            ["party", "resume", "alpha", "--session", "leader-three"], None, self.other_dir
-        )
+        code, out, err = self.run_cli(["party", "resume", "alpha", "--session", "leader-three"], None, self.other_dir)
         self.assertEqual(code, 0, err)
         self.assertIsNone(_leader(self._conn(), "alpha", 2)["cwd"])
 
@@ -121,9 +117,7 @@ class LeaderLocationProjectionTests(GuildTestCase):
     def test_rebuild_replays_location(self):
         repo_dir = self.register_project("acme", ["acme/app"])
         self.run_cli(["party", "start", "alpha", "--reason", "test reason"], "sess-1", repo_dir)
-        self.run_hook(
-            "session-start", {"session_id": "sess-1", "cwd": str(self.root), "permission_mode": "plan"}
-        )
+        self.run_hook("session-start", {"session_id": "sess-1", "cwd": str(self.root), "permission_mode": "plan"})
         before = dict(_leader(db.connect(paths.db_path()), "alpha", 1))
         code, out, err = self.run_cli(["rebuild"], None, None)
         self.assertEqual(code, 0, err)

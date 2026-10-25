@@ -8,10 +8,13 @@ class WebAdventurerDismissTests(WebWriteTestCase):
         super().setUp()
         self.run_cli(
             ["quest", "add", "chore", "--open", "--no-epic", "--title", "chore", "--tasks", "T01", "--titles", "one"],
-            None, self.repo_dir,
+            None,
+            self.repo_dir,
         )
         self.run_cli(
-            ["adventurer", "start", "fix typo", "--task", "chore/T01", "--reason", "test reason"], "adv-1", self.repo_dir
+            ["adventurer", "start", "fix typo", "--task", "chore/T01", "--reason", "test reason"],
+            "adv-1",
+            self.repo_dir,
         )
 
     def _adventurers(self):

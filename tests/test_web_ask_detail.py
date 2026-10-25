@@ -14,9 +14,7 @@ class AskDetailEndpointTests(WebServerTestCase):
         self.run_cli(["party", "start", "alpha", "--reason", "test reason"], "sess-1", repo_dir)
         self.run_cli(["quest", "add", "demo", "--title", "Demo", "--no-epic"], "sess-1", repo_dir)
         self.run_cli(["task", "add", "demo/T01", "--title", "First"], "sess-1", repo_dir)
-        self.run_cli(
-            ["ask", "Which?", "--context", "ctx", "--ref", "task:demo/T01"], "sess-1", repo_dir
-        )
+        self.run_cli(["ask", "Which?", "--context", "ctx", "--ref", "task:demo/T01"], "sess-1", repo_dir)
         self.host = "127.0.0.1:{}".format(self.port)
 
     def test_returns_detail_shape(self):
@@ -27,8 +25,21 @@ class AskDetailEndpointTests(WebServerTestCase):
         self.assertEqual(
             set(model),
             {
-                "id", "party", "state", "question", "context", "options", "created_at", "created",
-                "answer", "answered_at", "answered", "refs", "origin", "resume", "events",
+                "id",
+                "party",
+                "state",
+                "question",
+                "context",
+                "options",
+                "created_at",
+                "created",
+                "answer",
+                "answered_at",
+                "answered",
+                "refs",
+                "origin",
+                "resume",
+                "events",
             },
         )
         self.assertEqual((model["id"], model["party"], model["state"]), (1, "alpha", "open"))

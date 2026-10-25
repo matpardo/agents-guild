@@ -68,7 +68,15 @@ class RealmDoctorTests(GuildTestCase):
         self.assertTrue(all(passed for passed, _ in lines), lines)
         self.assertEqual(self._warnings(lines), [])
         joined = "\n".join(self._texts(lines))
-        for expected in ("realm config", "pinned fingerprint", "token accepted", "member matches", "realm matches test-realm", "clock agrees", "last push"):
+        for expected in (
+            "realm config",
+            "pinned fingerprint",
+            "token accepted",
+            "member matches",
+            "realm matches test-realm",
+            "clock agrees",
+            "last push",
+        ):
             self.assertIn(expected, joined)
 
     def test_open_config_mode_fails(self):
@@ -167,9 +175,15 @@ class RealmDoctorTests(GuildTestCase):
         self._join("alpha")
         config = clientconfig.load()
         with mock.patch.object(checks.client, "exchange", return_value=(500, {"error": "boom"}, None)):
-            self.assertIn("could not read status: realm hub refused (500): boom", checks._push_lines(config, self.now)[0][1])
-        with mock.patch.object(checks.client, "exchange", side_effect=checks.GuildError("realm hub request failed: URLError", 1)):
-            self.assertEqual(checks._push_lines(config, self.now), [(False, "fail    realm hub request failed: URLError")])
+            self.assertIn(
+                "could not read status: realm hub refused (500): boom", checks._push_lines(config, self.now)[0][1]
+            )
+        with mock.patch.object(
+            checks.client, "exchange", side_effect=checks.GuildError("realm hub request failed: URLError", 1)
+        ):
+            self.assertEqual(
+                checks._push_lines(config, self.now), [(False, "fail    realm hub request failed: URLError")]
+            )
 
     def _hub(self, now=None):
         return checks.hub_lines(self.now if now is None else now)
@@ -213,10 +227,25 @@ class RealmDoctorTests(GuildTestCase):
         cert = hubconfig.load()["cert"]
         subprocess.run(
             [
-                "openssl", "req", "-x509", "-newkey", "ec", "-pkeyopt", "ec_paramgen_curve:prime256v1",
-                "-nodes", "-days", "10", "-subj", "/CN=guild-realm", "-keyout", os.devnull, "-out", cert,
+                "openssl",
+                "req",
+                "-x509",
+                "-newkey",
+                "ec",
+                "-pkeyopt",
+                "ec_paramgen_curve:prime256v1",
+                "-nodes",
+                "-days",
+                "10",
+                "-subj",
+                "/CN=guild-realm",
+                "-keyout",
+                os.devnull,
+                "-out",
+                cert,
             ],
-            check=True, capture_output=True,
+            check=True,
+            capture_output=True,
         )
         warnings = self._warnings(self._hub())
         self.assertEqual(len([w for w in warnings if "hub certificate expires in" in w]), 1)

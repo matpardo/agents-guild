@@ -11,12 +11,42 @@ from tests.test_web_write import WebWriteTestCase
 
 _APP_JS = Path(__file__).resolve().parent.parent / "guild" / "web" / "app.js"
 _HARNESS_NAME = "web_realm_harness.js"
-_PROJECT = {"name": "app", "parties": 2, "open_quests": 3, "open_prs": 4, "ready_prs": 1, "open_asks": 5, "main_red": False}
-_GUILD = {"guild": "alpha", "generated_at": "2026-10-24T09:59:00+00:00", "received_at": "2026-10-24T10:00:00+00:00", "projects": [_PROJECT]}
-_RED_GUILD = {"guild": "beta", "generated_at": "2026-10-24T09:59:00+00:00", "received_at": "2026-10-24T10:00:00+00:00", "projects": [dict(_PROJECT, name="api", main_red=True)]}
-_FILE = {"id": "0123456789abcdef", "from": "alpha", "name": "req.md", "size": 12, "sent_at": "2026-10-24T09:00:00+00:00"}
+_PROJECT = {
+    "name": "app",
+    "parties": 2,
+    "open_quests": 3,
+    "open_prs": 4,
+    "ready_prs": 1,
+    "open_asks": 5,
+    "main_red": False,
+}
+_GUILD = {
+    "guild": "alpha",
+    "generated_at": "2026-10-24T09:59:00+00:00",
+    "received_at": "2026-10-24T10:00:00+00:00",
+    "projects": [_PROJECT],
+}
+_RED_GUILD = {
+    "guild": "beta",
+    "generated_at": "2026-10-24T09:59:00+00:00",
+    "received_at": "2026-10-24T10:00:00+00:00",
+    "projects": [dict(_PROJECT, name="api", main_red=True)],
+}
+_FILE = {
+    "id": "0123456789abcdef",
+    "from": "alpha",
+    "name": "req.md",
+    "size": 12,
+    "sent_at": "2026-10-24T09:00:00+00:00",
+}
 _FILE_TWO = dict(_FILE, id="fedcba9876543210", name="other.md")
-_MODEL = {"fetched_at": "2026-10-24T10:00:00+00:00", "realm": "hearth", "guilds": [_GUILD, _RED_GUILD], "dropped": 0, "inbox": []}
+_MODEL = {
+    "fetched_at": "2026-10-24T10:00:00+00:00",
+    "realm": "hearth",
+    "guilds": [_GUILD, _RED_GUILD],
+    "dropped": 0,
+    "inbox": [],
+}
 _FLAG_TEXT = "read it yourself before giving it to an agent"
 
 
@@ -42,7 +72,9 @@ class RealmBoardModelTests(_RealmFiles, WebWriteTestCase):
 
     def test_config_and_cache_give_the_cached_model(self):
         self._write_config()
-        self._write_cache(json.dumps({"fetched_at": _MODEL["fetched_at"], "realm": "hearth", "guilds": [_GUILD, _RED_GUILD]}))
+        self._write_cache(
+            json.dumps({"fetched_at": _MODEL["fetched_at"], "realm": "hearth", "guilds": [_GUILD, _RED_GUILD]})
+        )
         self.assertEqual(self._realm(), _MODEL)
 
     def test_cache_without_realm_is_empty(self):
@@ -125,9 +157,10 @@ class RealmInboxRouteTests(WebWriteTestCase):
         self.assertEqual(response.status, 422)
 
     def test_bad_ids_are_404_and_the_command_is_not_called(self):
-        with mock.patch("guild.webserver.realm_commands.fetch") as fetch, mock.patch(
-            "guild.webserver.realm_commands.drop"
-        ) as drop:
+        with (
+            mock.patch("guild.webserver.realm_commands.fetch") as fetch,
+            mock.patch("guild.webserver.realm_commands.drop") as drop,
+        ):
             for bad in ("zz", "0123456789ABCDEF", "0123456789abcde", "0123456789abcdef0", "..%2f.."):
                 for action in ("fetch", "drop"):
                     response, payload = self._call("/api/realm/inbox/{}/{}".format(bad, action))
@@ -139,9 +172,11 @@ class RealmInboxRouteTests(WebWriteTestCase):
         missing_token = self._good_headers()
         del missing_token["X-Guild-Token"]
         foreign = dict(self._good_headers(), Origin="http://evil.example")
-        with mock.patch("guild.webserver.realm_commands.fetch") as fetch, mock.patch(
-            "guild.webserver.realm_commands.drop"
-        ) as drop, mock.patch("guild.webserver.realm_commands.inbox_model") as refresh:
+        with (
+            mock.patch("guild.webserver.realm_commands.fetch") as fetch,
+            mock.patch("guild.webserver.realm_commands.drop") as drop,
+            mock.patch("guild.webserver.realm_commands.inbox_model") as refresh,
+        ):
             for headers in (missing_token, foreign):
                 for path in (
                     "/api/realm/inbox/refresh",
@@ -187,7 +222,11 @@ class RealmRefreshRouteTests(WebWriteTestCase):
 
 
 class RealmDoctorRouteTests(WebWriteTestCase):
-    _LINES = [(True, "ok      token accepted"), (True, "warn    this guild never pushed"), (False, "fail    realm hub unreachable: OSError")]
+    _LINES = [
+        (True, "ok      token accepted"),
+        (True, "warn    this guild never pushed"),
+        (False, "fail    realm hub unreachable: OSError"),
+    ]
 
     def test_returns_the_lines_and_overall_result(self):
         with mock.patch("guild.webserver.realm_commands.doctor_lines", return_value=self._LINES) as command:
@@ -214,7 +253,9 @@ class RealmDoctorRouteTests(WebWriteTestCase):
     def test_without_a_realm_it_still_answers(self):
         response, payload = self._post_json("/api/realm/doctor", self._good_headers(), {})
         self.assertEqual(response.status, 200, payload)
-        self.assertEqual(json.loads(payload), {"ok": True, "lines": [{"passed": True, "text": "ok      no realm joined"}]})
+        self.assertEqual(
+            json.loads(payload), {"ok": True, "lines": [{"passed": True, "text": "ok      no realm joined"}]}
+        )
 
     def test_guild_error_is_422_with_the_message(self):
         error = GuildError("boom", 1)
@@ -239,14 +280,24 @@ class RealmPanelBehaviorTests(unittest.TestCase):
         return node_harness.request(
             _HARNESS_NAME,
             {
-                "src": str(_APP_JS), "realm": realm, "refresh": refresh, "clicks": clicks or [],
-                "replies": replies or {}, "guild_name": guild_name,
+                "src": str(_APP_JS),
+                "realm": realm,
+                "refresh": refresh,
+                "clicks": clicks or [],
+                "replies": replies or {},
+                "guild_name": guild_name,
             },
         )
 
     def test_guilds_show_counts_and_red_marker(self):
         out = self._panel(_MODEL, None)
-        for expected in ("alpha", "beta", "app: parties 2, quests 3, PRs 4 (1 ready), asks 5", "api: parties", "main red"):
+        for expected in (
+            "alpha",
+            "beta",
+            "app: parties 2, quests 3, PRs 4 (1 ready), asks 5",
+            "api: parties",
+            "main red",
+        ):
             self.assertIn(expected, out["text"])
         self.assertTrue(out["red"])
 
@@ -298,19 +349,34 @@ class RealmPanelBehaviorTests(unittest.TestCase):
         self.assertIn("inbox empty", self._panel(_MODEL, None)["text"])
 
     def test_fetch_shows_the_path_without_a_flag(self):
-        replies = {"/api/realm/inbox/{}/fetch".format(_FILE["id"]): {"ok": True, "body": {"path": "/d/req.md", "from": "alpha", "flagged": False, "ok": True}}}
+        replies = {
+            "/api/realm/inbox/{}/fetch".format(_FILE["id"]): {
+                "ok": True,
+                "body": {"path": "/d/req.md", "from": "alpha", "flagged": False, "ok": True},
+            }
+        }
         out = self._panel(self._with_inbox(), None, [{"label": "Fetch", "index": 0}], replies)
         self.assertIn("saved /d/req.md from alpha", out["text"])
         self.assertNotIn(_FLAG_TEXT, out["text"])
 
     def test_fetch_shows_the_flag_when_flagged(self):
-        replies = {"/api/realm/inbox/{}/fetch".format(_FILE_TWO["id"]): {"ok": True, "body": {"path": "/d/other.md", "from": "alpha", "flagged": True, "ok": True}}}
+        replies = {
+            "/api/realm/inbox/{}/fetch".format(_FILE_TWO["id"]): {
+                "ok": True,
+                "body": {"path": "/d/other.md", "from": "alpha", "flagged": True, "ok": True},
+            }
+        }
         out = self._panel(self._with_inbox(), None, [{"label": "Fetch", "index": 1}], replies)
         self.assertIn("saved /d/other.md", out["text"])
         self.assertIn(_FLAG_TEXT, out["text"])
 
     def test_fetch_error_text_is_shown(self):
-        replies = {"/api/realm/inbox/{}/fetch".format(_FILE["id"]): {"ok": False, "body": {"error": "realm hub refused (404): not found"}}}
+        replies = {
+            "/api/realm/inbox/{}/fetch".format(_FILE["id"]): {
+                "ok": False,
+                "body": {"error": "realm hub refused (404): not found"},
+            }
+        }
         out = self._panel(self._with_inbox(), None, [{"label": "Fetch", "index": 0}], replies)
         self.assertIn("realm hub refused (404): not found", out["text"])
 
@@ -318,7 +384,10 @@ class RealmPanelBehaviorTests(unittest.TestCase):
         drop_url = "/api/realm/inbox/{}/drop".format(_FILE["id"])
         replies = {
             drop_url: {"ok": True, "body": {"message": "dropped", "ok": True}},
-            "/api/realm/inbox/refresh": {"ok": True, "body": {"fetched_at": _MODEL["fetched_at"], "files": [_FILE_TWO], "ok": True}},
+            "/api/realm/inbox/refresh": {
+                "ok": True,
+                "body": {"fetched_at": _MODEL["fetched_at"], "files": [_FILE_TWO], "ok": True},
+            },
         }
         out = self._panel(self._with_inbox(), None, [{"label": "Drop", "index": 0}], replies)
         self.assertEqual(out["posts"], [drop_url, "/api/realm/inbox/refresh"])
@@ -326,14 +395,24 @@ class RealmPanelBehaviorTests(unittest.TestCase):
         self.assertIn("other.md", out["text"])
 
     def test_refresh_inbox_button_replaces_the_rows(self):
-        replies = {"/api/realm/inbox/refresh": {"ok": True, "body": {"fetched_at": _MODEL["fetched_at"], "files": [_FILE_TWO], "ok": True}}}
+        replies = {
+            "/api/realm/inbox/refresh": {
+                "ok": True,
+                "body": {"fetched_at": _MODEL["fetched_at"], "files": [_FILE_TWO], "ok": True},
+            }
+        }
         out = self._panel(self._with_inbox(), None, [{"label": "Refresh inbox", "index": 0}], replies)
         self.assertNotIn("req.md", out["text"])
         self.assertIn("other.md", out["text"])
 
     def test_realm_refresh_also_refreshes_the_inbox(self):
         fresh = dict(_MODEL, ok=True)
-        replies = {"/api/realm/inbox/refresh": {"ok": True, "body": {"fetched_at": _MODEL["fetched_at"], "files": [_FILE_TWO], "ok": True}}}
+        replies = {
+            "/api/realm/inbox/refresh": {
+                "ok": True,
+                "body": {"fetched_at": _MODEL["fetched_at"], "files": [_FILE_TWO], "ok": True},
+            }
+        }
         out = self._panel(self._with_inbox(), {"ok": True, "body": fresh}, None, replies)
         self.assertEqual(out["posts"], ["/api/realm/inbox/refresh"])
         self.assertIn("other.md", out["text"])
@@ -358,7 +437,12 @@ class RealmPanelBehaviorTests(unittest.TestCase):
         self.assertTrue(out["red"])
 
     def test_check_with_only_passing_lines_has_no_bad_marker(self):
-        replies = {"/api/realm/doctor": {"ok": True, "body": {"ok": True, "lines": [{"passed": True, "text": "ok      token accepted"}]}}}
+        replies = {
+            "/api/realm/doctor": {
+                "ok": True,
+                "body": {"ok": True, "lines": [{"passed": True, "text": "ok      token accepted"}]},
+            }
+        }
         out = self._panel(dict(_MODEL, guilds=[_GUILD]), None, [{"label": "Check", "index": 0}], replies)
         self.assertIn("ok      token accepted", out["text"])
         self.assertFalse(out["red"])

@@ -12,10 +12,14 @@ from tests.testutil import GuildTestCase
 
 _DEADLINE_SECONDS = 1200
 _TOTALS_TEXT = (
-    json.dumps({"Type": "Images", "Size": "1GB", "Reclaimable": "500MB (50%)"}) + "\n"
-    + json.dumps({"Type": "Containers", "Size": "10MB", "Reclaimable": "0B"}) + "\n"
-    + json.dumps({"Type": "Local Volumes", "Size": "20MB", "Reclaimable": "0B"}) + "\n"
-    + json.dumps({"Type": "Build Cache", "Size": "5MB", "Reclaimable": "0B"}) + "\n"
+    json.dumps({"Type": "Images", "Size": "1GB", "Reclaimable": "500MB (50%)"})
+    + "\n"
+    + json.dumps({"Type": "Containers", "Size": "10MB", "Reclaimable": "0B"})
+    + "\n"
+    + json.dumps({"Type": "Local Volumes", "Size": "20MB", "Reclaimable": "0B"})
+    + "\n"
+    + json.dumps({"Type": "Build Cache", "Size": "5MB", "Reclaimable": "0B"})
+    + "\n"
 )
 
 
@@ -108,7 +112,9 @@ class CollectRecordTests(CollectFixture):
     def test_projection_rows_are_written(self):
         self.collect(self.healthy_runner({str(self.repo_dir): 4096}, {}))
         rows = self.ctx.conn.execute("SELECT project, category, bytes FROM resource_samples").fetchall()
-        self.assertEqual([(row["project"], row["category"], row["bytes"]) for row in rows], [("acme", "worktree", 4096)])
+        self.assertEqual(
+            [(row["project"], row["category"], row["bytes"]) for row in rows], [("acme", "worktree", 4096)]
+        )
         self.assertEqual(self.ctx.conn.execute("SELECT COUNT(*) FROM resource_machine").fetchone()[0], 1)
 
     def test_all_events_of_one_collect_share_a_timestamp(self):
@@ -139,9 +145,7 @@ class CollectRecordTests(CollectFixture):
             "Image": "app-web",
             "State": "running",
             "Size": "5MB",
-            "Labels": "com.docker.compose.project.working_dir={},com.docker.compose.project=app".format(
-                self.repo_dir
-            ),
+            "Labels": "com.docker.compose.project.working_dir={},com.docker.compose.project=app".format(self.repo_dir),
         }
         self.collect(self.healthy_runner({}, {"Containers": [container]}))
         categories = [row[0] for row in self.event_for("acme")["items"]]
@@ -205,9 +209,7 @@ class CollectFailureTests(CollectFixture):
         summary = self.collect(runner)
         events = self.sampled_events()
         self.assertEqual([name for name, _, _ in events], ["acme", None])
-        self.assertEqual(
-            self.event_for(None)["items"], [["docker", "-", None, "unavailable", "", "permission denied"]]
-        )
+        self.assertEqual(self.event_for(None)["items"], [["docker", "-", None, "unavailable", "", "permission denied"]])
         for _, _, payload in events:
             self.assertIsNone(payload["machine"]["docker"])
         self.assertIn("unavailable: docker (permission denied)", summary)
@@ -279,7 +281,11 @@ class CollectDedupeTests(CollectFixture):
     def test_shared_clone_is_measured_once_under_the_first_project(self):
         project_root = self.root / "projects" / "aaa"
         project_root.mkdir(parents=True)
-        config = {"name": "aaa", "paths": [str(self.root / "projects" / "acme") + "/*"], "github": {"repos": ["acme/app"]}}
+        config = {
+            "name": "aaa",
+            "paths": [str(self.root / "projects" / "acme") + "/*"],
+            "github": {"repos": ["acme/app"]},
+        }
         (self.config_home / "guild" / "projects" / "aaa.json").write_text(json.dumps(config))
         runner = self.healthy_runner({}, {})
         self.collect(runner)

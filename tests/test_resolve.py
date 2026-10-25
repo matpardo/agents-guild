@@ -17,7 +17,8 @@ class ResolveTaskDoneTests(GuildTestCase):
         )
         self.run_cli(
             ["quest", "add", "wave1", "--title", "Wave 1", "--epic", "compliance", "--tasks", "T01,T02"],
-            "sess-1", self.repo_dir,
+            "sess-1",
+            self.repo_dir,
         )
         self.conn = db.connect(paths.db_path())
 
@@ -83,16 +84,35 @@ class TrackerOpinionTests(GuildTestCase):
         self.conn = db.connect(paths.db_path())
         self._record_cards(
             [
-                {"key": "DEMO-1", "status": "Done", "status_category": "done", "issue_type": "Task", "parent_key": None},
-                {"key": "DEMO-2", "status": "In Progress", "status_category": "indeterminate", "issue_type": "Task", "parent_key": None},
+                {
+                    "key": "DEMO-1",
+                    "status": "Done",
+                    "status_category": "done",
+                    "issue_type": "Task",
+                    "parent_key": None,
+                },
+                {
+                    "key": "DEMO-2",
+                    "status": "In Progress",
+                    "status_category": "indeterminate",
+                    "issue_type": "Task",
+                    "parent_key": None,
+                },
             ]
         )
 
     def _record_cards(self, cards):
         with db.writing(self.conn):
             events.record(
-                self.conn, timeutil.utcnow(), "test@host", None, None, "acme",
-                "tracker.synced", "local", {"project": "acme", "cards": cards},
+                self.conn,
+                timeutil.utcnow(),
+                "test@host",
+                None,
+                None,
+                "acme",
+                "tracker.synced",
+                "local",
+                {"project": "acme", "cards": cards},
             )
 
     def test_tracker_done_overrides_sdd_pending(self):
@@ -120,7 +140,8 @@ class TrackerOpinionTests(GuildTestCase):
     def test_guild_overrides_tracker(self):
         self.run_cli(
             ["quest", "add", "wave1", "--title", "Wave 1", "--epic", "tracked", "--tasks", "T01"],
-            "sess-1", self.repo_dir,
+            "sess-1",
+            self.repo_dir,
         )
         is_done, source, disagreements = resolve.resolve_task_done(self.conn, "acme", "tracked", "T01")
         self.assertFalse(is_done)

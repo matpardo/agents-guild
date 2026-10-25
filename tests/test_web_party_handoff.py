@@ -14,9 +14,7 @@ class WebPartyHandoffTests(WebWriteTestCase):
         return next(party for party in self._board()["parties"] if party["name"] == name)
 
     def _hand_off(self, party):
-        return self._post_json(
-            "/api/parties/{}/hand-off".format(party), self._good_headers(), {}
-        )
+        return self._post_json("/api/parties/{}/hand-off".format(party), self._good_headers(), {})
 
     def test_hand_off_succeeds_when_no_live_leader(self):
         response, payload = self._hand_off("alpha")

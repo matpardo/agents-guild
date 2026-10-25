@@ -17,9 +17,7 @@ def _ref_text(repo, number):
 def _task_context(conn, row):
     if row["task_quest"] is None:
         return None
-    quest = conn.execute(
-        "SELECT project, epic FROM quests WHERE slug = ?", (row["task_quest"],)
-    ).fetchone()
+    quest = conn.execute("SELECT project, epic FROM quests WHERE slug = ?", (row["task_quest"],)).fetchone()
     if quest is None or quest["epic"] is None:
         return None
     return quest["project"], quest["epic"]
@@ -174,9 +172,7 @@ def _require_authority(ctx, actor, first, second):
         return
     if first["party"] == actor and second["party"] == actor:
         return
-    raise GuildError(
-        "party '{}' does not own both PRs: only the owning party or the human may pin".format(actor), 1
-    )
+    raise GuildError("party '{}' does not own both PRs: only the owning party or the human may pin".format(actor), 1)
 
 
 def _existing_pin(conn, first, second):
@@ -292,9 +288,7 @@ def scoped_queue(records, pins, main_rows, party_names):
 
 
 def load_scoped_queue(conn, party_names):
-    return scoped_queue(
-        open_pr_records(conn), load_pins(conn), main_status_commands.red_rows(conn), party_names
-    )
+    return scoped_queue(open_pr_records(conn), load_pins(conn), main_status_commands.red_rows(conn), party_names)
 
 
 def _resolve_scope(ctx, raid, party):
@@ -514,7 +508,9 @@ def gates(entry, red_rows):
         found.append("needs human review")
     if entry["unseen_comments"] > 0:
         noun = "comment" if entry["unseen_comments"] == 1 else "comments"
-        found.append("{} review {} since last read (guild pr ack {})".format(entry["unseen_comments"], noun, entry["ref"]))
+        found.append(
+            "{} review {} since last read (guild pr ack {})".format(entry["unseen_comments"], noun, entry["ref"])
+        )
     found.extend(
         "main red {}".format(main_label(row))
         for row in red_rows
@@ -577,7 +573,11 @@ def _head_model(scoped):
     entry = _first_to_merge(scoped)
     if entry is None:
         return None
-    return {"ref": entry["ref"], "party": entry["party"], "url": "https://github.com/{}/pull/{}".format(entry["repo"], entry["number"])}
+    return {
+        "ref": entry["ref"],
+        "party": entry["party"],
+        "url": "https://github.com/{}/pull/{}".format(entry["repo"], entry["number"]),
+    }
 
 
 def _scope_model(projects_dir, now, scope, scoped):
@@ -626,7 +626,9 @@ def _one_line(text):
 
 
 def _pr_title(conn, entry):
-    row = conn.execute("SELECT title FROM prs WHERE repo = ? AND number = ?", (entry["repo"], entry["number"])).fetchone()
+    row = conn.execute(
+        "SELECT title FROM prs WHERE repo = ? AND number = ?", (entry["repo"], entry["number"])
+    ).fetchone()
     return _one_line(row["title"] or "")
 
 

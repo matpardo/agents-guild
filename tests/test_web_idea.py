@@ -93,7 +93,8 @@ class WebIdeaLinkTests(WebWriteTestCase):
         )
         code, out, err = self.run_cli(
             ["pr", "track", "acme/app#7", "--task", "demo/T01", "--what", "x", "--waits", "y"],
-            "sess-1", self.repo_dir,
+            "sess-1",
+            self.repo_dir,
         )
         self.assertEqual(code, 0, err)
         response, payload = self._link("unlink", party="alpha")

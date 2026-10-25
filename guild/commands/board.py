@@ -192,20 +192,16 @@ def _pr_lines(ctx, painter, pr_row, indent):
 
 
 def _pr_ref_blocked(conn, ref):
-    repo, number = ref[len("pr:"):].rsplit("#", 1)
-    row = conn.execute(
-        "SELECT lifecycle FROM prs WHERE repo = ? AND number = ?", (repo, int(number))
-    ).fetchone()
+    repo, number = ref[len("pr:") :].rsplit("#", 1)
+    row = conn.execute("SELECT lifecycle FROM prs WHERE repo = ? AND number = ?", (repo, int(number))).fetchone()
     if row is None:
         return True
     return row["lifecycle"] not in ("merged", "closed")
 
 
 def _task_ref_blocked(conn, ref):
-    quest, tid = ref[len("task:"):].split("/", 1)
-    row = conn.execute(
-        "SELECT state FROM quest_tasks WHERE quest = ? AND tid = ?", (quest, tid)
-    ).fetchone()
+    quest, tid = ref[len("task:") :].split("/", 1)
+    row = conn.execute("SELECT state FROM quest_tasks WHERE quest = ? AND tid = ?", (quest, tid)).fetchone()
     if row is None:
         return True
     return row["state"] != "done"
@@ -258,9 +254,7 @@ def _ask_summary_lines(painter, conn, row):
     option_list = json.loads(row["options"])
     options_text = "  [{}]".format(" | ".join(option_list)) if option_list else ""
     blocks_text = "  · blocks {}".format(blocked_count) if blocked_count > 0 else ""
-    wrapped = painter.wrap(
-        "{} · {}{}{}".format(row["party"], row["question"], options_text, blocks_text), "      "
-    )
+    wrapped = painter.wrap("{} · {}{}{}".format(row["party"], row["question"], options_text, blocks_text), "      ")
     first = "  {} {}".format(painter.paint("#{}".format(row["id"]), "red"), wrapped[0].strip())
     return [first] + wrapped[1:] + [painter.paint("      " + _ask_dates(row), "dim")]
 
@@ -495,9 +489,7 @@ def _task_lines(ctx, painter, task_row, task_prs):
         return [
             _dated(
                 painter,
-                painter.paint(
-                    "    ■ blocked: {} — {}".format(task_row["tid"], task_row["blocked_reason"]), "red"
-                ),
+                painter.paint("    ■ blocked: {} — {}".format(task_row["tid"], task_row["blocked_reason"]), "red"),
                 dates,
             )
         ]
@@ -522,14 +514,10 @@ def _close_blockers(ctx, quest_row):
         return None
     if _open_task_rows(ctx.conn, quest_row["slug"]):
         return None
-    has_tasks = ctx.conn.execute(
-        "SELECT 1 FROM quest_tasks WHERE quest = ? LIMIT 1", (quest_row["slug"],)
-    ).fetchone()
+    has_tasks = ctx.conn.execute("SELECT 1 FROM quest_tasks WHERE quest = ? LIMIT 1", (quest_row["slug"],)).fetchone()
     if has_tasks is None:
         return None
-    split = drift_commands.epic_findings_by_owner(
-        ctx.conn, quest_row["project"], quest_row["epic"], quest_row["party"]
-    )
+    split = drift_commands.epic_findings_by_owner(ctx.conn, quest_row["project"], quest_row["epic"], quest_row["party"])
     if not split["own"] and not split["foreign"]:
         return None
     return split
@@ -542,15 +530,16 @@ def _close_blocker_lines(painter, blockers):
     lines = [painter.paint(summary, "red")]
     lines.extend("      yours: {}".format(text) for text in blockers["own"])
     lines.extend(
-        "      other parties: {} (party {})".format(item["text"], item["party"])
-        for item in blockers["foreign"]
+        "      other parties: {} (party {})".format(item["text"], item["party"]) for item in blockers["foreign"]
     )
     return lines
 
 
 def _quest_lines(ctx, painter, quest_row, prs_by_task):
     title = sanitize.strip_control_sequences(quest_row["title"])
-    lines = [_dated(painter, "  {} — {}".format(painter.paint(quest_row["slug"], "bold"), title), _row_dates(quest_row))]
+    lines = [
+        _dated(painter, "  {} — {}".format(painter.paint(quest_row["slug"], "bold"), title), _row_dates(quest_row))
+    ]
     task_rows = _open_task_rows(ctx.conn, quest_row["slug"])
     queued = []
     for task_row in task_rows:
@@ -609,12 +598,8 @@ def _party_dates(conn, party_row):
 
 def _leader_label(ctx, party_row):
     session_name = _leader_session_name(ctx.conn, party_row["name"]) or "no leader"
-    role = raid_commands.raid_role_label(
-        raid_commands.member_raids(ctx.conn, ctx.now, party_row["name"])
-    )
-    return "{} (gen {}, {}, {})".format(
-        session_name, party_row["generation"], party_row["state"], role
-    )
+    role = raid_commands.raid_role_label(raid_commands.member_raids(ctx.conn, ctx.now, party_row["name"]))
+    return "{} (gen {}, {}, {})".format(session_name, party_row["generation"], party_row["state"], role)
 
 
 def _party_pr_rows(conn, party_name):
@@ -641,8 +626,7 @@ def _orphan_pr_rows(ctx, quests, pr_rows):
     return [
         pr_row
         for pr_row in pr_rows
-        if (pr_row["task_quest"], pr_row["task_tid"]) not in visible_keys
-        and not _finished_with_task(ctx, pr_row)
+        if (pr_row["task_quest"], pr_row["task_tid"]) not in visible_keys and not _finished_with_task(ctx, pr_row)
     ]
 
 
@@ -805,9 +789,7 @@ def _party_section(ctx, painter, party_row, project_config):
             lines.extend(_pr_lines(ctx, painter, pr_row, "    "))
     claims = _party_claims(ctx, party_row["name"])
     if claims:
-        claim_text = ", ".join(
-            _claim_text(ctx, row) for row in claims
-        )
+        claim_text = ", ".join(_claim_text(ctx, row) for row in claims)
         lines.append(painter.paint("  claims: {}".format(claim_text), "dim"))
     for idea in idea_commands.linked_ideas(ctx, party_row["name"]):
         lines.append(
@@ -836,9 +818,7 @@ def _party_stopped_without_report(ctx, party_row):
 
 
 def _adventurer_rows(conn):
-    return conn.execute(
-        "SELECT * FROM adventurers WHERE state IN ('active', 'done') ORDER BY id ASC"
-    ).fetchall()
+    return conn.execute("SELECT * FROM adventurers WHERE state IN ('active', 'done') ORDER BY id ASC").fetchall()
 
 
 def _adventurer_pr_rows(conn, adventurer_id):
@@ -896,10 +876,7 @@ def _party_rows_for_names(conn, party_names):
 
 def _raid_next_to_merge_lines(ctx, painter, party_names):
     next_ref = merge_queue_commands.next_to_merge(ctx.conn, party_names)
-    lines = [
-        painter.paint(text, "red")
-        for text in merge_queue_commands.main_board_texts(ctx.conn, party_names)
-    ]
+    lines = [painter.paint(text, "red") for text in merge_queue_commands.main_board_texts(ctx.conn, party_names)]
     if next_ref is not None:
         lines.append(painter.paint("next to merge: {}".format(next_ref), "green"))
     if not lines:
@@ -945,9 +922,7 @@ def render_board(ctx, party_filter, raid_filter, color, width):
         notice_rows = _party_scoped_notices(ctx, party_filter)
     else:
         party_names = None
-        party_rows = ctx.conn.execute(
-            "SELECT * FROM parties WHERE state != 'closed' ORDER BY name ASC"
-        ).fetchall()
+        party_rows = ctx.conn.execute("SELECT * FROM parties WHERE state != 'closed' ORDER BY name ASC").fetchall()
         notice_rows = _party_scoped_notices(ctx, None)
     lines = []
     if raid_filter is not None and raid_commands.is_paused(ctx.conn, raid_filter):
@@ -964,9 +939,7 @@ def render_board(ctx, party_filter, raid_filter, color, width):
     lines.extend(_project_lines(ctx, painter, party_rows, projects_by_name))
     lines.extend(_quest_board_lines(ctx, painter, projects_by_name))
     for party_row in party_rows:
-        lines.extend(
-            _party_section(ctx, painter, party_row, projects_by_name.get(party_row["project"]))
-        )
+        lines.extend(_party_section(ctx, painter, party_row, projects_by_name.get(party_row["project"])))
     return lines
 
 
@@ -1168,7 +1141,7 @@ def _blocked_model(ctx, row):
 def _party_drift_model(ctx, party_row):
     findings = drift_commands.party_findings(ctx.conn, party_row["project"], party_row["name"])
     return {
-        "findings": findings[:brief_commands.DRIFT_BRIEF_CAP],
+        "findings": findings[: brief_commands.DRIFT_BRIEF_CAP],
         "more": max(0, len(findings) - brief_commands.DRIFT_BRIEF_CAP),
     }
 
@@ -1178,8 +1151,7 @@ def _party_model(ctx, party_row, project_config):
     prs_by_task = _prs_by_task(pr_rows)
     quests = _active_quests(ctx.conn, party_row["name"])
     quest_models = [
-        _quest_model(ctx, party_row["project"], quest_row, prs_by_task, project_config)
-        for quest_row in quests
+        _quest_model(ctx, party_row["project"], quest_row, prs_by_task, project_config) for quest_row in quests
     ]
     orphan_prs = _orphan_pr_rows(ctx, quests, pr_rows)
     claims = _party_claims(ctx, party_row["name"])
@@ -1215,9 +1187,7 @@ def _party_model(ctx, party_row, project_config):
             }
             for row in raids
         ],
-        "claims": [
-            {"area": row["area"], "expires_at": row["expires_at"], "dates": _row_dates(row)} for row in claims
-        ],
+        "claims": [{"area": row["area"], "expires_at": row["expires_at"], "dates": _row_dates(row)} for row in claims],
     }
 
 
@@ -1245,9 +1215,7 @@ def _realm_model():
 
 
 def board_model(ctx):
-    party_rows = ctx.conn.execute(
-        "SELECT * FROM parties WHERE state != 'closed' ORDER BY name ASC"
-    ).fetchall()
+    party_rows = ctx.conn.execute("SELECT * FROM parties WHERE state != 'closed' ORDER BY name ASC").fetchall()
     projects_by_name = {project["name"]: project for project in config.load_all_projects(ctx.projects_dir)}
     ask_rows = _sorted_open_asks(ctx.conn, None)
     notice_rows = notice_commands.active_notices(ctx.conn, ctx.now)
@@ -1261,18 +1229,13 @@ def board_model(ctx):
         "notices": [_notice_model(ctx, row) for row in notice_rows],
         "new_notice_count": notice_commands.count_new(notice_rows),
         "ideas": [_idea_model(ctx, row) for row in idea_commands.sorted_rows(ctx, None)],
-        "adventurers": [
-            _adventurer_model(ctx, row, live_ids, projects_by_name) for row in _adventurer_rows(ctx.conn)
-        ],
+        "adventurers": [_adventurer_model(ctx, row, live_ids, projects_by_name) for row in _adventurer_rows(ctx.conn)],
         "health_jobs": health_jobs.models(ctx, projects_by_name),
         "memory": [
-            _memory_item_model(item)
-            for item in memory_commands.all_items(None)
-            if item["party"] in live_party_names
+            _memory_item_model(item) for item in memory_commands.all_items(None) if item["party"] in live_party_names
         ],
         "parties": [
-            _party_model(ctx, party_row, projects_by_name.get(party_row["project"]))
-            for party_row in party_rows
+            _party_model(ctx, party_row, projects_by_name.get(party_row["project"])) for party_row in party_rows
         ],
         "blocked": [_blocked_model(ctx, row) for row in session_status.blocked_rows(ctx.conn, None)],
         "drift": [drift_commands.board_findings(ctx, project_name) for project_name in project_names],
@@ -1285,4 +1248,3 @@ def board_model(ctx):
         "realm": _realm_model(),
         "guild_name": config.load_global(paths.global_config_path()).get("name"),
     }
-

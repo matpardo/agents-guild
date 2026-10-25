@@ -23,15 +23,32 @@ class AnsweredAsksEndpointTests(WebServerTestCase):
     def _answered_ask(self, ask_id, answered_at):
         with db.writing(self.conn):
             events.record(
-                self.conn, _NOW - timedelta(days=30), "test@host", "alpha", None, "acme",
-                "ask.created", "local",
+                self.conn,
+                _NOW - timedelta(days=30),
+                "test@host",
+                "alpha",
+                None,
+                "acme",
+                "ask.created",
+                "local",
                 {
-                    "id": ask_id, "party": "alpha", "question": "q{}?".format(ask_id),
-                    "context": "x", "refs": ["task:demo/T01"], "options": [],
+                    "id": ask_id,
+                    "party": "alpha",
+                    "question": "q{}?".format(ask_id),
+                    "context": "x",
+                    "refs": ["task:demo/T01"],
+                    "options": [],
                 },
             )
             events.record(
-                self.conn, answered_at, "test@host", None, None, "acme", "ask.answered", "local",
+                self.conn,
+                answered_at,
+                "test@host",
+                None,
+                None,
+                "acme",
+                "ask.answered",
+                "local",
                 {"id": ask_id, "answer": "a{}".format(ask_id)},
             )
 
@@ -48,9 +65,7 @@ class AnsweredAsksEndpointTests(WebServerTestCase):
         self.assertEqual((model["page"], model["page_count"], model["total"]), (1, 2, 12))
         self.assertEqual([ask["id"] for ask in model["asks"]], list(range(12, 2, -1)))
         first = model["asks"][0]
-        self.assertEqual(
-            set(first), {"id", "party", "question", "answer", "answered_at", "dates"}
-        )
+        self.assertEqual(set(first), {"id", "party", "question", "answer", "answered_at", "dates"})
         self.assertEqual((first["party"], first["answer"]), ("alpha", "a12"))
         self.assertTrue(first["dates"].startswith("created "))
         self.assertIn(" · updated ", first["dates"])
@@ -63,9 +78,7 @@ class AnsweredAsksEndpointTests(WebServerTestCase):
 
     def test_nothing_answered_is_an_empty_model(self):
         response, body = self._get("/api/asks/answered", self.host)
-        self.assertEqual(
-            json.loads(body), {"page": 1, "page_count": 0, "total": 0, "asks": []}
-        )
+        self.assertEqual(json.loads(body), {"page": 1, "page_count": 0, "total": 0, "asks": []})
 
     def test_open_asks_are_not_listed(self):
         self.run_cli(["ask", "Which?", "--context", "ctx", "--ref", "task:demo/T01"], "sess-1", self.repo_dir)

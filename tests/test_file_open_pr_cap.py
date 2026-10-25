@@ -7,8 +7,12 @@ from guild.adapters import github
 from tests.testutil import GuildTestCase
 
 _OPEN_VIEW = {
-    "state": "OPEN", "isDraft": False, "headRefName": "feature/other", "title": "t",
-    "statusCheckRollup": [{"conclusion": "SUCCESS"}], "mergeable": "MERGEABLE",
+    "state": "OPEN",
+    "isDraft": False,
+    "headRefName": "feature/other",
+    "title": "t",
+    "statusCheckRollup": [{"conclusion": "SUCCESS"}],
+    "mergeable": "MERGEABLE",
 }
 
 
@@ -55,7 +59,9 @@ class FileOpenPrCapTestCase(GuildTestCase):
         slug = repo.replace("/", "-")
         view = dict(_OPEN_VIEW, headRefName=branch)
         self.write_gh_fixture("view_{}_{}".format(slug, number), dict(view, isDraft=True))
-        self.track_legacy_card_pr({"sess-1": "alpha", "sess-2": "beta"}[session_id], repo, number, "ACME-{}".format(number), "x", "y", branch)
+        self.track_legacy_card_pr(
+            {"sess-1": "alpha", "sess-2": "beta"}[session_id], repo, number, "ACME-{}".format(number), "x", "y", branch
+        )
         self.write_gh_fixture("view_{}_{}".format(slug, number), view)
         self.write_gh_fixture("view_files_{}_{}".format(slug, number), _diff(paths))
 
@@ -163,10 +169,17 @@ class PrePushFileCapTests(FileOpenPrCapTestCase):
         self.assertNotIn("merge or rebase", out)
 
     def test_merged_pr_drops_out(self):
-        self.write_gh_fixture("view_acme-app_3", {
-                "state": "MERGED", "isDraft": False, "headRefName": "feature/c", "title": "t",
-                "mergedAt": "2026-01-01T00:00:00Z", "statusCheckRollup": [],
-            })
+        self.write_gh_fixture(
+            "view_acme-app_3",
+            {
+                "state": "MERGED",
+                "isDraft": False,
+                "headRefName": "feature/c",
+                "title": "t",
+                "mergedAt": "2026-01-01T00:00:00Z",
+                "statusCheckRollup": [],
+            },
+        )
         self._sync()
         self._commit_file("a.yml")
         code, out, err = self._push()

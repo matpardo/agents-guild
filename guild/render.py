@@ -14,9 +14,7 @@ def pr_line(row):
 
 
 def quest_lanes(conn, quest_slug):
-    rows = conn.execute(
-        "SELECT * FROM quest_tasks WHERE quest = ? ORDER BY tid ASC", (quest_slug,)
-    ).fetchall()
+    rows = conn.execute("SELECT * FROM quest_tasks WHERE quest = ? ORDER BY tid ASC", (quest_slug,)).fetchall()
     lanes = {"active": [], "queued": [], "blocked": []}
     for row in rows:
         if row["state"] == "done":

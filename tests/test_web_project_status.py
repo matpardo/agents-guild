@@ -5,8 +5,12 @@ from guild.commands import board as board_commands
 from tests.test_web_board_model import _TASKS_MD, BoardModelTestCase
 
 _VIEW = {
-    "state": "OPEN", "isDraft": True, "headRefName": "feature/x", "title": "t",
-    "statusCheckRollup": [{"conclusion": "SUCCESS"}], "mergeable": "MERGEABLE",
+    "state": "OPEN",
+    "isDraft": True,
+    "headRefName": "feature/x",
+    "title": "t",
+    "statusCheckRollup": [{"conclusion": "SUCCESS"}],
+    "mergeable": "MERGEABLE",
 }
 _APP_JS = (Path(__file__).resolve().parent.parent / "guild" / "web" / "app.js").read_text()
 
@@ -53,9 +57,7 @@ class CapsTests(ProjectStatusTestCase):
         self.assertIn("open PRs: 1/1", self._board())
         self.assertIn("open PRs: 1/2", self._board())
         self._track(2)
-        self.assertEqual(
-            self._model()["projects"][0]["wait"], "wait: 2 open PRs in project, merge acme/app#1 first"
-        )
+        self.assertEqual(self._model()["projects"][0]["wait"], "wait: 2 open PRs in project, merge acme/app#1 first")
 
     def test_no_caps_configured(self):
         model = self._model()

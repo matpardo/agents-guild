@@ -125,7 +125,9 @@ def _limit_wait(ctx, party_row):
     if reset is None:
         return []
     if ctx.now.timestamp() < reset:
-        return [_wait("limit-reset", party_row["name"], "resets {}".format(datetime.fromtimestamp(reset).strftime("%H:%M")))]
+        return [
+            _wait("limit-reset", party_row["name"], "resets {}".format(datetime.fromtimestamp(reset).strftime("%H:%M")))
+        ]
     return [_wait("limit-reset", party_row["name"], "reset: resume by hand")]
 
 

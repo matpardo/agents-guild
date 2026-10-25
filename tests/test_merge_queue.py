@@ -90,9 +90,7 @@ class OrderingTests(unittest.TestCase):
         result = _compute(prs, [])
         self.assertEqual(_refs(result["queue"]), [_ref(2), _ref(1)])
         entries = _by_ref(result)
-        self.assertEqual(
-            entries[_ref(2)]["why"], "ready, checks \u27133; before acme/app#1 (task T01 depends on T02)"
-        )
+        self.assertEqual(entries[_ref(2)]["why"], "ready, checks \u27133; before acme/app#1 (task T01 depends on T02)")
         self.assertEqual(entries[_ref(1)]["why"], "ready, checks \u27133; after acme/app#2 (needs task T02)")
 
     def test_more_unblocks_goes_first(self):
@@ -178,9 +176,7 @@ class StateTests(unittest.TestCase):
 
     def test_labels_put_the_urgency_marks_after_the_lifecycle(self):
         entry = self._entry(lifecycle="converging", fixes_main=True, fixes_flaky=True, needs_ask_answer=True)
-        self.assertEqual(
-            entry["labels"], ["converging", "fixes-main", "fixes-flaky", "needs-ask-answer"]
-        )
+        self.assertEqual(entry["labels"], ["converging", "fixes-main", "fixes-flaky", "needs-ask-answer"])
 
     def test_the_entry_carries_the_branch(self):
         self.assertEqual(self._entry(branch="hotfix/main-red")["branch"], "hotfix/main-red")
@@ -251,9 +247,7 @@ class StateTests(unittest.TestCase):
         reasons = self._blocked_reasons(
             needs_ask_answer=True, checks_failing=1, mergeable="CONFLICTING", unmet_deps=["T09"]
         )
-        self.assertEqual(
-            reasons, ["needs ask answer", "checks failing (1)", "merge conflict", "waits on task T09"]
-        )
+        self.assertEqual(reasons, ["needs ask answer", "checks failing (1)", "merge conflict", "waits on task T09"])
 
     def test_blocked_action_names_the_reasons_and_the_party(self):
         entry = self._entry(checks_failing=1, mergeable="CONFLICTING", party="beta")
@@ -279,9 +273,7 @@ class StateTests(unittest.TestCase):
 
     def test_draft_with_a_conflict_is_blocked(self):
         entry = self._entry(lifecycle="draft", mergeable="CONFLICTING", party="beta")
-        self.assertEqual(
-            (entry["state"], entry["action"]), ("blocked", "fix: merge conflict \u2192 beta")
-        )
+        self.assertEqual((entry["state"], entry["action"]), ("blocked", "fix: merge conflict \u2192 beta"))
 
     def test_converging_with_pending_checks_waits(self):
         entry = self._entry(lifecycle="converging", checks_pending=1)
@@ -413,9 +405,7 @@ class WaitingPropagationTests(unittest.TestCase):
     def test_waiting_propagates_through_a_chain(self):
         prs = [_pr(1, checks_pending=1), _pr(3), _pr(5)]
         result = _compute(prs, [_pin(1, 3, "a"), _pin(3, 5, "a")])
-        self.assertEqual(
-            [entry["state"] for entry in result["queue"]], ["waiting", "waiting", "waiting"]
-        )
+        self.assertEqual([entry["state"] for entry in result["queue"]], ["waiting", "waiting", "waiting"])
 
     def test_blocked_beats_waiting(self):
         prs = [_pr(1, checks_failing=1), _pr(2, checks_pending=1), _pr(3)]
@@ -462,9 +452,7 @@ class HumanReadyTests(unittest.TestCase):
         self.assertEqual((entry["human_state"], entry["human_missing"]), ("waiting", ["no checks on head"]))
 
     def test_no_checks_with_label_present_waits(self):
-        self.assertEqual(
-            _human([_pr(1, checks_passing=0, ci_label=1)]), ("waiting", ["no checks on head"])
-        )
+        self.assertEqual(_human([_pr(1, checks_passing=0, ci_label=1)]), ("waiting", ["no checks on head"]))
 
     def test_no_checks_with_label_absent_is_ci_pending(self):
         self.assertEqual(_human([_pr(1, checks_passing=0, ci_label=0)]), (merge_queue.CI_PENDING_STATE, []))
@@ -528,13 +516,13 @@ class HumanReadyTests(unittest.TestCase):
     def test_invalid_trace_blocks_while_the_queue_state_stays_ready(self):
         entry = merge_queue.compute([_pr(1, trace_valid=0, trace_reason="no trace")], [], [])["queue"][0]
         self.assertEqual(entry["state"], "ready")
-        self.assertEqual((entry["human_state"], entry["human_missing"]), ("blocked", ["review trace invalid: no trace"]))
+        self.assertEqual(
+            (entry["human_state"], entry["human_missing"]), ("blocked", ["review trace invalid: no trace"])
+        )
 
     def test_unvalidated_trace_waits_with_its_reason(self):
         pr = _pr(1, trace_valid=None, trace_reason="validator timed out after 30s")
-        self.assertEqual(
-            _human([pr]), ("waiting", ["review trace not validated: validator timed out after 30s"])
-        )
+        self.assertEqual(_human([pr]), ("waiting", ["review trace not validated: validator timed out after 30s"]))
 
     def test_valid_and_unconfigured_traces_keep_ready(self):
         self.assertEqual(_human([_pr(1, trace_valid=1, trace_reason=None)]), ("ready", []))
@@ -633,9 +621,7 @@ if __name__ == "__main__":
 
 class ExternalBlockTests(unittest.TestCase):
     def test_flagged_pr_is_blocked_with_a_wait_action_and_keeps_its_place(self):
-        result = merge_queue.compute(
-            [_pr(1, blocked_external="team meeting"), _pr(2)], [], []
-        )["queue"]
+        result = merge_queue.compute([_pr(1, blocked_external="team meeting"), _pr(2)], [], [])["queue"]
         self.assertEqual(_refs(result), [_ref(1), _ref(2)])
         self.assertEqual(result[0]["state"], "blocked")
         self.assertEqual(result[0]["reasons"], ["manual block: team meeting"])
@@ -643,9 +629,9 @@ class ExternalBlockTests(unittest.TestCase):
         self.assertEqual(result[1]["action"], "merge")
 
     def test_pinned_dependent_is_blocked_and_waits_externally(self):
-        result = merge_queue.compute(
-            [_pr(1, blocked_external="team meeting"), _pr(2)], [_pin(1, 2, "alpha")], []
-        )["queue"]
+        result = merge_queue.compute([_pr(1, blocked_external="team meeting"), _pr(2)], [_pin(1, 2, "alpha")], [])[
+            "queue"
+        ]
         self.assertEqual(result[1]["state"], "blocked")
         self.assertEqual(result[1]["reasons"], ["waits on {}".format(_ref(1))])
         self.assertEqual(result[1]["action"], "waits on manually blocked {}: team meeting".format(_ref(1)))
@@ -658,9 +644,7 @@ class ExternalBlockTests(unittest.TestCase):
         self.assertEqual(result[1]["external"], "x")
 
     def test_external_entry_is_not_the_next_action_target(self):
-        result = merge_queue.compute(
-            [_pr(1, blocked_external="x"), _pr(2, checks_failing=1), _pr(3)], [], []
-        )["queue"]
+        result = merge_queue.compute([_pr(1, blocked_external="x"), _pr(2, checks_failing=1), _pr(3)], [], [])["queue"]
         self.assertEqual([entry["next_action"] for entry in result], [False, True, False])
 
 

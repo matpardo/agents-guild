@@ -81,7 +81,9 @@ class HandoffPruneRuleTests(PruneFixture):
         second = self._handoff("sess-2", 2)
         ctx, plan = self._plan()
         actions = plan.actions
-        self.assertEqual([(a.verb, a.label, a.reason) for a in actions], [("delete", "alpha-g1.md", "superseded and consumed")])
+        self.assertEqual(
+            [(a.verb, a.label, a.reason) for a in actions], [("delete", "alpha-g1.md", "superseded and consumed")]
+        )
         self.assertEqual(handoff_prune.apply(ctx, actions).deleted, 1)
         self.assertFalse(first.exists())
         self.assertTrue(second.exists())
@@ -166,7 +168,9 @@ class HandoffPruneSafetyTests(PruneFixture):
         self._sql("UPDATE leaders SET handoff_path = ? WHERE generation = 1", (str(outside),))
         ctx, plan = self._plan()
         actions = plan.actions
-        self.assertEqual([(a.verb, a.reason, a.label) for a in actions], [("skip", "outside handoffs dir", str(outside))])
+        self.assertEqual(
+            [(a.verb, a.reason, a.label) for a in actions], [("skip", "outside handoffs dir", str(outside))]
+        )
         handoff_prune.apply(ctx, actions)
         self.assertEqual(outside.read_text(), "keep")
 
@@ -232,9 +236,7 @@ class HandoffPruneRobustnessTests(PruneFixture):
         self._set_retention(30)
         self._sql("UPDATE events SET ts = 'garbage' WHERE kind = 'party.closed'", ())
         _, plan = self._plan(timeutil.utcnow() + timedelta(days=4000))
-        self.assertEqual(
-            [(a.verb, a.reason) for a in plan.actions], [("skip", "unreadable close timestamp")]
-        )
+        self.assertEqual([(a.verb, a.reason) for a in plan.actions], [("skip", "unreadable close timestamp")])
 
     def test_unlink_permission_error_does_not_stop_other_entries(self):
         self._two_superseded()

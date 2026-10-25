@@ -26,9 +26,7 @@ def from_iso(text):
 def parse_duration(text):
     match = _DURATION_RE.match(text)
     if not match:
-        raise GuildError(
-            "invalid duration '{}': use formats like 30m, 8h, 3d".format(text), 1
-        )
+        raise GuildError("invalid duration '{}': use formats like 30m, 8h, 3d".format(text), 1)
     amount, unit = match.groups()
     seconds = int(amount) * _UNIT_SECONDS[unit]
     if seconds > _MAX_DURATION.total_seconds():

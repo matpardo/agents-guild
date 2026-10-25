@@ -101,7 +101,8 @@ class WebResourceColourTests(unittest.TestCase):
 
     def test_no_machine_leaves_the_sidebar_empty(self):
         rendered = node_harness.request(
-            _HARNESS_NAME, {"src": str(_APP_JS), "model": {"since": "1d", "machine": None, "projects": [], "unattributed": None}}
+            _HARNESS_NAME,
+            {"src": str(_APP_JS), "model": {"since": "1d", "machine": None, "projects": [], "unattributed": None}},
         )
         self.assertEqual(rendered["sidebar"], [])
 

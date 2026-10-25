@@ -112,3 +112,10 @@ updated: 2026-10-25
 **Status:** [x] done
 
 **What:** every `uses:` in `.github/workflows/` names an action by its full commit SHA with the release tag beside it, so a moved or hijacked tag cannot change what CI runs; `tests/test_ci_pins.py` fails on any tag or branch ref.
+
+## T16 — Format the code with ruff
+
+**Depends on:** T14
+**Status:** [x] done
+
+**What:** the whole repo is formatted with `ruff format` (line length 120 from `ruff.toml`), and CI runs `ruff format --check .` after the lint and before the tests, so unformatted code fails the build.

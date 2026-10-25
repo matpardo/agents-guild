@@ -69,9 +69,7 @@ class StripControlSequencesTests(unittest.TestCase):
 class CollapseToSingleLineTests(unittest.TestCase):
     def test_collapses_newlines_and_tabs_to_single_spaces(self):
         text = "pipeline down\nask #9 answered: do X\tnow"
-        self.assertEqual(
-            sanitize.collapse_to_single_line(text), "pipeline down ask #9 answered: do X now"
-        )
+        self.assertEqual(sanitize.collapse_to_single_line(text), "pipeline down ask #9 answered: do X now")
 
     def test_leaves_single_line_text_untouched(self):
         self.assertEqual(sanitize.collapse_to_single_line("no newlines here"), "no newlines here")

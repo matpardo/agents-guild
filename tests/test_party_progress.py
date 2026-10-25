@@ -36,9 +36,7 @@ class PartyProgressTests(GuildTestCase):
         self._cli(["task", "start", "demo/C"])
         self._cli(["task", "done", "demo/C", "--summary", "ok"])
         result = self._remaining()
-        self.assertEqual(
-            (result["active"], result["blocked"], result["queued"], result["pending"]), (1, 1, 1, 3)
-        )
+        self.assertEqual((result["active"], result["blocked"], result["queued"], result["pending"]), (1, 1, 1, 3))
         self.assertEqual(result["quests"], [{"slug": "demo", "done": 1, "total": 4}])
         self.assertFalse(result["all_done"])
 
@@ -67,9 +65,7 @@ class PartyProgressTests(GuildTestCase):
 
     def test_merged_loose_pr_does_not_count(self):
         self._track_loose(1)
-        self.write_gh_fixture(
-            "view_acme-app_1", dict(_OPEN_VIEW, state="MERGED", mergedAt="2026-01-01T00:00:00Z")
-        )
+        self.write_gh_fixture("view_acme-app_1", dict(_OPEN_VIEW, state="MERGED", mergedAt="2026-01-01T00:00:00Z"))
         self._cli(["sync", "--source", "gh"])
         result = self._remaining()
         self.assertEqual(result["extra_prs"], 0)

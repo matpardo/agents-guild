@@ -17,8 +17,14 @@ class WebDriftModelTests(PartyDriftTestCase):
     def _model(self):
         conn = db.connect(paths.db_path())
         ctx = context.RunContext(
-            conn, None, None, timeutil.utcnow(), None,
-            paths.claude_sessions_dir(), paths.projects_config_dir(), paths.state_dir(),
+            conn,
+            None,
+            None,
+            timeutil.utcnow(),
+            None,
+            paths.claude_sessions_dir(),
+            paths.projects_config_dir(),
+            paths.state_dir(),
         )
         model = board_commands.board_model(ctx)
         conn.close()
@@ -81,31 +87,70 @@ def _view_hash(party_filter, raid_filter):
 
 
 def _render(board, party_filter, raid_filter, out_id, mode):
-    return node_harness.request(_HARNESS_NAME, {
-        "src": str(_APP_JS_PATH), "data": board, "hash": _view_hash(party_filter, raid_filter), "outId": out_id, "mode": mode,
-    })
+    return node_harness.request(
+        _HARNESS_NAME,
+        {
+            "src": str(_APP_JS_PATH),
+            "data": board,
+            "hash": _view_hash(party_filter, raid_filter),
+            "outId": out_id,
+            "mode": mode,
+        },
+    )
 
 
 _MISSING = object()
 _BOARD = {
-    "generated_at": "now", "asks": [], "notices": [], "ideas": [], "adventurers": [], "health_jobs": [], "project_names": [], "memory": [], "blocked": [], "merge_queues": [], "ready_for_you": [],
-    "projects": [], "quest_boards": [], "realm": None, "new_notice_count": 0, "raids": [{"name": "r", "members": ["c"]}],
+    "generated_at": "now",
+    "asks": [],
+    "notices": [],
+    "ideas": [],
+    "adventurers": [],
+    "health_jobs": [],
+    "project_names": [],
+    "memory": [],
+    "blocked": [],
+    "merge_queues": [],
+    "ready_for_you": [],
+    "projects": [],
+    "quest_boards": [],
+    "realm": None,
+    "new_notice_count": 0,
+    "raids": [{"name": "r", "members": ["c"]}],
     "parties": [
         {
-            "name": name, "raids": [], "quests": [], "prs": [], "claims": [], "state": "active", "generation": 1,
-            "reason": None, "from_adventurer": None, "dates": "created 2026-10-24 10:00",
-            "status": {"name": "idle", "label": "idle"}, "remaining": {"all_done": True}, "ctx": None,
-            "resume_command": None, "caps": None, "drift": {"findings": [], "more": 0}, "leader_session_name": None, "waits": [], "ideas": [],
+            "name": name,
+            "raids": [],
+            "quests": [],
+            "prs": [],
+            "claims": [],
+            "state": "active",
+            "generation": 1,
+            "reason": None,
+            "from_adventurer": None,
+            "dates": "created 2026-10-24 10:00",
+            "status": {"name": "idle", "label": "idle"},
+            "remaining": {"all_done": True},
+            "ctx": None,
+            "resume_command": None,
+            "caps": None,
+            "drift": {"findings": [], "more": 0},
+            "leader_session_name": None,
+            "waits": [],
+            "ideas": [],
         }
         for name in ("a", "c")
     ],
-    "drift": [{
-        "project": "p", "scope": "scope: x",
-        "findings": {
-            "rule1": [{"text": "FA", "party": "a"}, {"text": "FC", "party": "c"}, {"text": "FN", "party": None}],
-            "rule2": [{"text": "FC2", "party": "c"}],
-        },
-    }],
+    "drift": [
+        {
+            "project": "p",
+            "scope": "scope: x",
+            "findings": {
+                "rule1": [{"text": "FA", "party": "a"}, {"text": "FC", "party": "c"}, {"text": "FN", "party": None}],
+                "rule2": [{"text": "FC2", "party": "c"}],
+            },
+        }
+    ],
 }
 
 
@@ -125,19 +170,48 @@ class WebDriftBehaviorTests(unittest.TestCase):
         self.assertEqual(self._rendered("all", "r"), "drift p scope: x rule1 (1) FC rule2 (1) FC2")
 
     def test_party_without_findings_shows_no_drift(self):
-        board = dict(_BOARD, drift=[{"project": "p", "scope": "scope: x", "findings": {"rule1": [{"text": "FC", "party": "c"}]}}])
+        board = dict(
+            _BOARD, drift=[{"project": "p", "scope": "scope: x", "findings": {"rule1": [{"text": "FC", "party": "c"}]}}]
+        )
         out = _render(board, "a", "all", "drift", "text").strip()
         self.assertEqual(out, "drift p scope: x no drift")
 
     def test_party_filter_renders_a_board_with_a_merge_queue(self):
         entry = {
-            "ref": "o/r#1", "repo": "o/r", "number": 1, "party": "a", "task": "q/T1", "lifecycle": "ready",
-            "branch": "b", "checks_failing": 0, "checks_passing": 1, "checks_pending": 0, "labels": [],
-            "url": "https://example.test/1", "position": 1, "unblocks": 0, "state": "ready", "next_action": False,
-            "action": "merge", "why": "ready", "reasons": [], "blockers": [], "waits": [], "gates": [],
-            "human_state": "ready", "human_missing": [], "notes": [],
+            "ref": "o/r#1",
+            "repo": "o/r",
+            "number": 1,
+            "party": "a",
+            "task": "q/T1",
+            "lifecycle": "ready",
+            "branch": "b",
+            "checks_failing": 0,
+            "checks_passing": 1,
+            "checks_pending": 0,
+            "labels": [],
+            "url": "https://example.test/1",
+            "position": 1,
+            "unblocks": 0,
+            "state": "ready",
+            "next_action": False,
+            "action": "merge",
+            "why": "ready",
+            "reasons": [],
+            "blockers": [],
+            "waits": [],
+            "gates": [],
+            "human_state": "ready",
+            "human_missing": [],
+            "notes": [],
         }
-        queue = {"head": None, "scope": "party:a", "synced_at": "now", "synced_label": "synced now", "main": [], "queue": [entry]}
+        queue = {
+            "head": None,
+            "scope": "party:a",
+            "synced_at": "now",
+            "synced_label": "synced now",
+            "main": [],
+            "queue": [entry],
+        }
         board = dict(_BOARD, merge_queues=[queue])
         out = _render(board, "a", "all", "drift", "text").strip()
         self.assertEqual(out, "drift p scope: x rule1 (1) FA")
@@ -148,27 +222,82 @@ class WebQueueBlockBehaviorTests(unittest.TestCase):
     def _queue_text(self, blocked_external):
         labels = [] if blocked_external in (None, _MISSING) else ["blocked-external"]
         entry = {
-            "ref": "o/r#1", "repo": "o/r", "number": 1, "party": "a", "task": "q/T1", "lifecycle": "ready",
-            "branch": "b", "checks_failing": 0, "checks_passing": 1, "checks_pending": 0, "labels": labels,
-            "url": "https://example.test/1", "position": 1, "unblocks": 0,
-            "state": "ready", "next_action": False, "action": "merge", "why": "ready", "reasons": [], "blockers": [],
-            "waits": [], "gates": [], "human_state": "ready", "human_missing": [], "notes": [],
+            "ref": "o/r#1",
+            "repo": "o/r",
+            "number": 1,
+            "party": "a",
+            "task": "q/T1",
+            "lifecycle": "ready",
+            "branch": "b",
+            "checks_failing": 0,
+            "checks_passing": 1,
+            "checks_pending": 0,
+            "labels": labels,
+            "url": "https://example.test/1",
+            "position": 1,
+            "unblocks": 0,
+            "state": "ready",
+            "next_action": False,
+            "action": "merge",
+            "why": "ready",
+            "reasons": [],
+            "blockers": [],
+            "waits": [],
+            "gates": [],
+            "human_state": "ready",
+            "human_missing": [],
+            "notes": [],
         }
         if blocked_external is not _MISSING:
             entry["blocked_external"] = blocked_external
-        queue = {"head": None, "scope": "party:a", "synced_at": "now", "synced_label": "synced now", "main": [], "queue": [entry]}
+        queue = {
+            "head": None,
+            "scope": "party:a",
+            "synced_at": "now",
+            "synced_label": "synced now",
+            "main": [],
+            "queue": [entry],
+        }
         return _render(dict(_BOARD, merge_queues=[queue]), "all", "all", "merge-queues", "text")
 
     def _human_text(self, **overrides):
         entry = {
-            "ref": "o/r#1", "repo": "o/r", "number": 1, "party": "a", "task": "q/T1", "lifecycle": "ready",
-            "branch": "b", "checks_failing": 0, "checks_passing": 0, "checks_pending": 0, "labels": [],
-            "url": "https://example.test/1", "position": 1, "unblocks": 0, "blocked_external": None,
-            "state": "ready", "next_action": False, "action": "merge", "why": "ready", "reasons": [], "blockers": [],
-            "waits": [], "gates": [], "human_state": "ready", "human_missing": [], "notes": [],
+            "ref": "o/r#1",
+            "repo": "o/r",
+            "number": 1,
+            "party": "a",
+            "task": "q/T1",
+            "lifecycle": "ready",
+            "branch": "b",
+            "checks_failing": 0,
+            "checks_passing": 0,
+            "checks_pending": 0,
+            "labels": [],
+            "url": "https://example.test/1",
+            "position": 1,
+            "unblocks": 0,
+            "blocked_external": None,
+            "state": "ready",
+            "next_action": False,
+            "action": "merge",
+            "why": "ready",
+            "reasons": [],
+            "blockers": [],
+            "waits": [],
+            "gates": [],
+            "human_state": "ready",
+            "human_missing": [],
+            "notes": [],
         }
         entry.update(overrides)
-        queue = {"head": None, "scope": "party:a", "synced_at": "now", "synced_label": "synced now", "main": [], "queue": [entry]}
+        queue = {
+            "head": None,
+            "scope": "party:a",
+            "synced_at": "now",
+            "synced_label": "synced now",
+            "main": [],
+            "queue": [entry],
+        }
         return _render(dict(_BOARD, merge_queues=[queue]), "all", "all", "merge-queues", "text")
 
     def test_unseen_comments_offer_the_ack_button(self):
@@ -220,7 +349,14 @@ class WebQueueBlockBehaviorTests(unittest.TestCase):
 class WebMainRowBehaviorTests(unittest.TestCase):
     def _text(self, external):
         row = {"repo": "o/r", "source": "gh", "reason": "checks failing: lint", "external": external}
-        queue = {"head": None, "scope": "party:a", "synced_at": "now", "synced_label": "synced now", "main": [row], "queue": []}
+        queue = {
+            "head": None,
+            "scope": "party:a",
+            "synced_at": "now",
+            "synced_label": "synced now",
+            "main": [row],
+            "queue": [],
+        }
         return _render(dict(_BOARD, merge_queues=[queue]), "all", "all", "merge-queues", "text")
 
     def test_red_main_row_says_fix_before_anything(self):
@@ -235,8 +371,14 @@ class WebMainRowBehaviorTests(unittest.TestCase):
 
 
 def _health_job(**overrides):
-    job = {"project": "acme", "name": "red-main", "state": "due", "last_done": None, "every": "1d",
-           "launch": "guild adventurer launch red-main"}
+    job = {
+        "project": "acme",
+        "name": "red-main",
+        "state": "due",
+        "last_done": None,
+        "every": "1d",
+        "launch": "guild adventurer launch red-main",
+    }
     return dict(job, **overrides)
 
 
@@ -267,17 +409,36 @@ class WebHealthJobBehaviorTests(unittest.TestCase):
 
 def _ask(**overrides):
     entry = {
-        "id": 3, "party": "a", "question": "Ship it?", "context": "x", "options": [], "refs": ["card:ABC-1"],
-        "blocked": 0, "total_refs": 1, "created_at": "2026-10-24T10:00:00+00:00", "state": "open",
-        "answer": None, "answered_at": None, "dates": "created 2026-10-24 10:00",
+        "id": 3,
+        "party": "a",
+        "question": "Ship it?",
+        "context": "x",
+        "options": [],
+        "refs": ["card:ABC-1"],
+        "blocked": 0,
+        "total_refs": 1,
+        "created_at": "2026-10-24T10:00:00+00:00",
+        "state": "open",
+        "answer": None,
+        "answered_at": None,
+        "dates": "created 2026-10-24 10:00",
     }
     return dict(entry, **overrides)
 
 
 def _adventurer(**overrides):
     entry = {
-        "id": 1, "project": "acme", "job": "fix typo", "task": "demo/T02", "state": "active", "pending": None,
-        "live": False, "stopped_without_report": True, "prs": [], "reason": None, "dates": "created 2026-10-24 10:00",
+        "id": 1,
+        "project": "acme",
+        "job": "fix typo",
+        "task": "demo/T02",
+        "state": "active",
+        "pending": None,
+        "live": False,
+        "stopped_without_report": True,
+        "prs": [],
+        "reason": None,
+        "dates": "created 2026-10-24 10:00",
     }
     return dict(entry, **overrides)
 
@@ -338,10 +499,26 @@ class WebAdventurerBehaviorTests(unittest.TestCase):
 
     def test_adventurer_pr_shows_under_the_adventurer_and_not_under_a_party(self):
         pr = {
-            "repo": "o/r", "number": 7, "lifecycle": "draft", "what": "typo fix", "task": None, "card": "ABC-1",
-            "card_url": None, "waits": "review", "branch": "fix/typo", "url": None, "base_branch": None,
-            "needs_ask_answer": False, "needs_human_pr_review": False, "fixes_main": False, "fixes_flaky": False,
-            "blocked_external": None, "ask_id": None, "review_reasons": [], "checks_failing": 0, "checks_passing": 0,
+            "repo": "o/r",
+            "number": 7,
+            "lifecycle": "draft",
+            "what": "typo fix",
+            "task": None,
+            "card": "ABC-1",
+            "card_url": None,
+            "waits": "review",
+            "branch": "fix/typo",
+            "url": None,
+            "base_branch": None,
+            "needs_ask_answer": False,
+            "needs_human_pr_review": False,
+            "fixes_main": False,
+            "fixes_flaky": False,
+            "blocked_external": None,
+            "ask_id": None,
+            "review_reasons": [],
+            "checks_failing": 0,
+            "checks_passing": 0,
             "checks_pending": 0,
         }
         board = dict(_BOARD, adventurers=[_adventurer(prs=[pr])])
@@ -385,8 +562,14 @@ class WebNoticeAndRaidBehaviorTests(unittest.TestCase):
 
     def _idea(self, **overrides):
         idea = {
-            "id": 1, "title": "Dark mode", "description": "night owls", "requester": "ana",
-            "deadline": "2000-01-01", "project": "acme", "dates": "created 2026-10-01 10:00", "overdue": True,
+            "id": 1,
+            "title": "Dark mode",
+            "description": "night owls",
+            "requester": "ana",
+            "deadline": "2000-01-01",
+            "project": "acme",
+            "dates": "created 2026-10-01 10:00",
+            "overdue": True,
             "parties": [],
         }
         return dict(idea, **overrides)
@@ -394,7 +577,15 @@ class WebNoticeAndRaidBehaviorTests(unittest.TestCase):
     def test_ideas_render_with_meta_and_overdue_mark(self):
         board = dict(self._board(False), ideas=[self._idea()])
         out = self._rendered(board, "ideas")
-        for expected in ("#1 Dark mode", "night owls", "from ana", "due 2000-01-01 (overdue)", "Edit", "Delete", "Add idea"):
+        for expected in (
+            "#1 Dark mode",
+            "night owls",
+            "from ana",
+            "due 2000-01-01 (overdue)",
+            "Edit",
+            "Delete",
+            "Add idea",
+        ):
             self.assertIn(expected, out)
 
     def test_idea_shows_linked_parties_with_unlink_and_link_choices(self):
@@ -417,7 +608,10 @@ class WebNoticeAndRaidBehaviorTests(unittest.TestCase):
 
     def test_party_tracking_a_pr_has_no_unlink_while_another_keeps_it(self):
         idea = self._idea(
-            parties=[{"name": "a", "state": "active", "has_prs": True}, {"name": "b", "state": "active", "has_prs": False}]
+            parties=[
+                {"name": "a", "state": "active", "has_prs": True},
+                {"name": "b", "state": "active", "has_prs": False},
+            ]
         )
         tree = json.loads(_render(dict(self._board(False), ideas=[idea]), "all", "all", "ideas", "tree"))
         unlinks = [n for n in self._tree_nodes(json.dumps(tree)) if n["text"] == "Unlink"]
@@ -493,8 +687,16 @@ class WebNoticeAndRaidBehaviorTests(unittest.TestCase):
 
     def test_notice_from_unbound_session_shows_its_label_not_human(self):
         notice = {
-            "id": 1, "party": None, "author": "unbound session", "scope": "guild", "text": "pipeline down",
-            "issued_at": "now", "issued": "now", "expires_at": "later", "time_left": "1h left", "seen": False,
+            "id": 1,
+            "party": None,
+            "author": "unbound session",
+            "scope": "guild",
+            "text": "pipeline down",
+            "issued_at": "now",
+            "issued": "now",
+            "expires_at": "later",
+            "time_left": "1h left",
+            "seen": False,
         }
         board = dict(self._board(False), notices=[notice])
         out = self._rendered(board, "notices")
@@ -503,8 +705,16 @@ class WebNoticeAndRaidBehaviorTests(unittest.TestCase):
 
     def test_flagged_notice_shows_the_flagged_badge(self):
         notice = {
-            "id": 1, "party": None, "author": "unbound session", "scope": "guild", "text": "orden del dev",
-            "issued_at": "now", "issued": "now", "expires_at": "later", "time_left": "1h left", "seen": False,
+            "id": 1,
+            "party": None,
+            "author": "unbound session",
+            "scope": "guild",
+            "text": "orden del dev",
+            "issued_at": "now",
+            "issued": "now",
+            "expires_at": "later",
+            "time_left": "1h left",
+            "seen": False,
             "flagged": True,
         }
         board = dict(self._board(False), notices=[notice])
@@ -513,8 +723,16 @@ class WebNoticeAndRaidBehaviorTests(unittest.TestCase):
 
     def test_unflagged_notice_has_no_flagged_badge(self):
         notice = {
-            "id": 1, "party": None, "author": "unbound session", "scope": "guild", "text": "pipeline down",
-            "issued_at": "now", "issued": "now", "expires_at": "later", "time_left": "1h left", "seen": False,
+            "id": 1,
+            "party": None,
+            "author": "unbound session",
+            "scope": "guild",
+            "text": "pipeline down",
+            "issued_at": "now",
+            "issued": "now",
+            "expires_at": "later",
+            "time_left": "1h left",
+            "seen": False,
             "flagged": False,
         }
         board = dict(self._board(False), notices=[notice])
@@ -552,9 +770,7 @@ class WebMemoryBehaviorTests(unittest.TestCase):
 @unittest.skipIf(shutil.which("node") is None, "node not installed")
 class WebPartyHandoffBehaviorTests(unittest.TestCase):
     def _rendered(self, state, has_live_leader):
-        parties = [
-            dict(_BOARD["parties"][0], name="a", state=state, has_live_leader=has_live_leader)
-        ]
+        parties = [dict(_BOARD["parties"][0], name="a", state=state, has_live_leader=has_live_leader)]
         board = dict(_BOARD, parties=parties)
         return _render(board, "all", "all", "parties", "text").strip()
 
@@ -592,8 +808,13 @@ class WebPartyWaitsBehaviorTests(unittest.TestCase):
 class WebTaskMoveBehaviorTests(unittest.TestCase):
     def _rendered(self, task_state, move_targets):
         task = {
-            "tid": "T01", "title": "First", "state": task_state, "summary": None,
-            "blocked_reason": None, "card_url": None, "prs": [],
+            "tid": "T01",
+            "title": "First",
+            "state": task_state,
+            "summary": None,
+            "blocked_reason": None,
+            "card_url": None,
+            "prs": [],
         }
         quest = {"slug": "src", "title": "Src", "move_targets": move_targets, "tasks": [task]}
         parties = [dict(_BOARD["parties"][0], name="a", quests=[quest])]
@@ -660,8 +881,15 @@ class WebCloseBlockersBehaviorTests(unittest.TestCase):
 
 def _ready_item(ref, party, scopes, review_first, notes):
     return {
-        "ref": ref, "title": "T " + ref, "url": "https://example.test/" + ref, "party": party, "scope": scopes[0], "scopes": scopes,
-        "review_first": review_first, "checks": "1 passing", "notes": notes,
+        "ref": ref,
+        "title": "T " + ref,
+        "url": "https://example.test/" + ref,
+        "party": party,
+        "scope": scopes[0],
+        "scopes": scopes,
+        "review_first": review_first,
+        "checks": "1 passing",
+        "notes": notes,
     }
 
 
@@ -674,11 +902,22 @@ class WebReadyForYouBehaviorTests(unittest.TestCase):
     ]
 
     def _text(self, items, party_filter, raid_filter, mode):
-        return _render(dict(_BOARD, ready_for_you=items, raids=[{"name": name, "members": ["c"]} for name in ("r", "r2", "other")]), party_filter, raid_filter, "ready-for-you", mode).strip()
+        return _render(
+            dict(
+                _BOARD, ready_for_you=items, raids=[{"name": name, "members": ["c"]} for name in ("r", "r2", "other")]
+            ),
+            party_filter,
+            raid_filter,
+            "ready-for-you",
+            mode,
+        ).strip()
 
     def test_items_render_in_the_given_order(self):
         text = self._text(self._ITEMS, "all", "all", "text")
-        self.assertEqual([text.index(ref) for ref in ("o/r#2", "o/r#1", "o/r#3")], sorted(text.index(ref) for ref in ("o/r#2", "o/r#1", "o/r#3")))
+        self.assertEqual(
+            [text.index(ref) for ref in ("o/r#2", "o/r#1", "o/r#3")],
+            sorted(text.index(ref) for ref in ("o/r#2", "o/r#1", "o/r#3")),
+        )
         self.assertIn("T o/r#1", text)
 
     def test_empty_state(self):
@@ -718,12 +957,21 @@ class WebReadyForYouBehaviorTests(unittest.TestCase):
 
 
 _QUEST_BOARD = {
-    "open_quests": [{
-        "slug": "pre", "epic": "demo", "title": "Pre work", "dates": "created 2026-10-24 09:00",
-        "tasks": [{"tid": "T01", "title": "First", "adventurer": None}, {"tid": "T02", "title": "Second", "adventurer": 7}],
-    }],
+    "open_quests": [
+        {
+            "slug": "pre",
+            "epic": "demo",
+            "title": "Pre work",
+            "dates": "created 2026-10-24 09:00",
+            "tasks": [
+                {"tid": "T01", "title": "First", "adventurer": None},
+                {"tid": "T02", "title": "Second", "adventurer": 7},
+            ],
+        }
+    ],
     "free_tasks": [{"epic": "demo", "tasks": [{"tid": "T03", "title": "Third"}, {"tid": "T04", "title": "Fourth"}]}],
-    "parties": ["a", "c"], "name": "acme",
+    "parties": ["a", "c"],
+    "name": "acme",
 }
 
 
@@ -735,7 +983,15 @@ class WebQuestBoardBehaviorTests(unittest.TestCase):
 
     def test_lists_open_quest_tasks_and_marks_the_held_one(self):
         out = self._text(_QUEST_BOARD)
-        for expected in ("quest board", "acme", "pre", "Pre work", "T01 First", "T02 Second (held by adventurer 7)", "Assign"):
+        for expected in (
+            "quest board",
+            "acme",
+            "pre",
+            "Pre work",
+            "T01 First",
+            "T02 Second (held by adventurer 7)",
+            "Assign",
+        ):
             self.assertIn(expected, out)
 
     def test_assign_select_offers_the_active_parties(self):
@@ -769,7 +1025,14 @@ class WebQuestBoardBehaviorTests(unittest.TestCase):
 
     def test_party_quest_shows_release_only_when_releasable(self):
         def parties(releasable):
-            quest = {"slug": "q", "title": "Q", "tasks": [], "close_blockers": None, "move_targets": [], "releasable": releasable}
+            quest = {
+                "slug": "q",
+                "title": "Q",
+                "tasks": [],
+                "close_blockers": None,
+                "move_targets": [],
+                "releasable": releasable,
+            }
             return [dict(_BOARD["parties"][0], quests=[quest])]
 
         shown = _render(dict(_BOARD, parties=parties(True)), "all", "all", "parties", "text")
@@ -785,12 +1048,23 @@ class WebQuestBoardBehaviorTests(unittest.TestCase):
     def test_party_quest_and_task_show_dates_only_when_known(self):
         def rendered(quest_dates, task_dates):
             task = {
-                "tid": "T01", "title": "First", "state": "active", "dates": task_dates, "summary": None,
-                "blocked_reason": None, "card_url": None, "prs": [],
+                "tid": "T01",
+                "title": "First",
+                "state": "active",
+                "dates": task_dates,
+                "summary": None,
+                "blocked_reason": None,
+                "card_url": None,
+                "prs": [],
             }
             quest = {
-                "slug": "q", "title": "Q", "dates": quest_dates, "tasks": [task], "close_blockers": None,
-                "move_targets": [], "releasable": False,
+                "slug": "q",
+                "title": "Q",
+                "dates": quest_dates,
+                "tasks": [task],
+                "close_blockers": None,
+                "move_targets": [],
+                "releasable": False,
             }
             parties = [dict(_BOARD["parties"][0], quests=[quest])]
             return _render(dict(_BOARD, parties=parties), "all", "all", "parties", "text")
@@ -805,11 +1079,28 @@ class WebQuestBoardBehaviorTests(unittest.TestCase):
     def test_party_pr_and_claim_show_dates_only_when_known(self):
         def rendered(party_dates, pr_dates, claim_dates):
             pr = {
-                "repo": "o/r", "number": 1, "lifecycle": "ready", "needs_ask_answer": False, "ask_id": None,
-                "needs_human_pr_review": False, "fixes_main": False, "fixes_flaky": False, "blocked_external": None,
-                "party": "a", "checks_failing": 0, "checks_passing": 0, "checks_pending": 0, "what": "w",
-                "waits": None, "branch": None, "base_branch": None, "review_reasons": [], "card": None,
-                "card_url": None, "dates": pr_dates, "url": "https://example.com/pr",
+                "repo": "o/r",
+                "number": 1,
+                "lifecycle": "ready",
+                "needs_ask_answer": False,
+                "ask_id": None,
+                "needs_human_pr_review": False,
+                "fixes_main": False,
+                "fixes_flaky": False,
+                "blocked_external": None,
+                "party": "a",
+                "checks_failing": 0,
+                "checks_passing": 0,
+                "checks_pending": 0,
+                "what": "w",
+                "waits": None,
+                "branch": None,
+                "base_branch": None,
+                "review_reasons": [],
+                "card": None,
+                "card_url": None,
+                "dates": pr_dates,
+                "url": "https://example.com/pr",
             }
             claim = {"area": "src/x", "expires_at": "2026-10-24T11:00:00+00:00", "dates": claim_dates}
             party = dict(_BOARD["parties"][0], dates=party_dates, prs=[pr], claims=[claim])
@@ -824,5 +1115,9 @@ class WebQuestBoardBehaviorTests(unittest.TestCase):
         self.assertIn("claims: src/x", hidden)
 
     def test_writes_go_through_send_post(self):
-        for expected in ('"/api/quests/create-open"', '"/api/quests/" + quest.slug + "/take"', '"/api/quests/" + quest.slug + "/release"'):
+        for expected in (
+            '"/api/quests/create-open"',
+            '"/api/quests/" + quest.slug + "/take"',
+            '"/api/quests/" + quest.slug + "/release"',
+        ):
             self.assertIn(expected, _APP_JS)

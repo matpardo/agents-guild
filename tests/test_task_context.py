@@ -39,9 +39,7 @@ class TaskContextTests(GuildTestCase):
 
     def test_task_ref_missing(self):
         ref = task_context.task_ref(self.ctx, None, "task:demo/T99")
-        self.assertEqual(
-            ref, {"kind": "task", "ref": "task:demo/T99", "quest": "demo", "tid": "T99", "missing": True}
-        )
+        self.assertEqual(ref, {"kind": "task", "ref": "task:demo/T99", "quest": "demo", "tid": "T99", "missing": True})
 
     def test_sdd_paths_root(self):
         paths_pair = task_context.sdd_paths({"sdd": {"root": "/r", "epics_dir": "epics"}}, "widget")

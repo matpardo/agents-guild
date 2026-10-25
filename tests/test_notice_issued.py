@@ -62,8 +62,14 @@ class NoticeIssuedTests(GuildTestCase):
     def test_web_model_carries_issue_time_newest_first(self):
         conn = db.connect(paths.db_path())
         ctx = context.RunContext(
-            conn, None, None, _READ_AT, None,
-            paths.claude_sessions_dir(), paths.projects_config_dir(), None,
+            conn,
+            None,
+            None,
+            _READ_AT,
+            None,
+            paths.claude_sessions_dir(),
+            paths.projects_config_dir(),
+            None,
         )
         model = board_commands.board_model(ctx)
         conn.close()

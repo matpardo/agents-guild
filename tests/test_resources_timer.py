@@ -81,7 +81,13 @@ class ResourcesUnitTests(unittest.TestCase):
     def test_install_hint_points_to_the_resources_timer(self):
         with self.assertRaises(GuildError) as raised:
             timer_commands.install(
-                timer_commands.RESOURCES_COLLECT, mock.Mock(), "/opt/bin/guild", "2h", _RecordingRunner(), "darwin", True
+                timer_commands.RESOURCES_COLLECT,
+                mock.Mock(),
+                "/opt/bin/guild",
+                "2h",
+                _RecordingRunner(),
+                "darwin",
+                True,
             )
         self.assertIn("guild resources-timer print", raised.exception.message)
 

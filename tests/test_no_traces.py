@@ -23,12 +23,11 @@ class PublishableTextTests(GuildTestCase):
     def test_pr_track_and_set_output_has_no_traces(self):
         code, track_out, err = self.run_cli(
             ["pr", "track", "acme/app#1", "--task", "demo/T01", "--what", "x", "--waits", "y"],
-            "sess-1", self.repo_dir,
+            "sess-1",
+            self.repo_dir,
         )
         self.assertEqual(code, 0, err)
-        code, set_out, err = self.run_cli(
-            ["pr", "set", "acme/app#1", "--lifecycle", "ready"], "sess-1", self.repo_dir
-        )
+        code, set_out, err = self.run_cli(["pr", "set", "acme/app#1", "--lifecycle", "ready"], "sess-1", self.repo_dir)
         self.assertEqual(code, 0, err)
         self.assertIsNone(_TRACE_RE.search(track_out))
         self.assertIsNone(_TRACE_RE.search(set_out))
@@ -36,14 +35,18 @@ class PublishableTextTests(GuildTestCase):
     def test_adventurer_pr_track_output_has_no_traces(self):
         self.run_cli(
             ["quest", "add", "chore", "--open", "--no-epic", "--title", "chore", "--tasks", "T01", "--titles", "one"],
-            None, self.repo_dir,
+            None,
+            self.repo_dir,
         )
         self.run_cli(
-            ["adventurer", "start", "fix typo", "--task", "chore/T01", "--reason", "test reason"], "adv-1", self.repo_dir
+            ["adventurer", "start", "fix typo", "--task", "chore/T01", "--reason", "test reason"],
+            "adv-1",
+            self.repo_dir,
         )
         code, track_out, err = self.run_cli(
             ["pr", "track", "acme/app#1", "--task", "chore/T01", "--card", "ABC-1", "--what", "x", "--waits", "y"],
-            "adv-1", self.repo_dir,
+            "adv-1",
+            self.repo_dir,
         )
         self.assertEqual(code, 0, err)
         self.assertIsNone(_TRACE_RE.search(track_out))
@@ -51,10 +54,13 @@ class PublishableTextTests(GuildTestCase):
     def test_pending_reports_are_rejected_when_they_carry_a_secret_or_email(self):
         self.run_cli(
             ["quest", "add", "chore", "--open", "--no-epic", "--title", "chore", "--tasks", "T01", "--titles", "one"],
-            None, self.repo_dir,
+            None,
+            self.repo_dir,
         )
         self.run_cli(
-            ["adventurer", "start", "fix typo", "--task", "chore/T01", "--reason", "test reason"], "adv-1", self.repo_dir
+            ["adventurer", "start", "fix typo", "--task", "chore/T01", "--reason", "test reason"],
+            "adv-1",
+            self.repo_dir,
         )
         for pending in ("mail me@x.com", " "):
             code, out, err = self.run_cli(["adventurer", "done", "--pending", pending], "adv-1", self.repo_dir)
@@ -75,7 +81,8 @@ class PublishableTextTests(GuildTestCase):
         self.assertIn("optional", pii.LOCAL_ONLY_REMINDER)
 
     def test_ask_creation_reminds_local_only(self):
-        code, out, err = self.run_cli(["ask", "q?", "--context", "c", "--ref", "task:demo/T01"], "sess-1", self.repo_dir
+        code, out, err = self.run_cli(
+            ["ask", "q?", "--context", "c", "--ref", "task:demo/T01"], "sess-1", self.repo_dir
         )
         self.assertEqual(code, 0, err)
         self.assertIn(pii.LOCAL_ONLY_REMINDER, out)

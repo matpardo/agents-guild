@@ -13,9 +13,7 @@ class WebWriteTestCase(WebServerTestCase):
         self.run_cli(["party", "start", "alpha", "--reason", "test reason"], "sess-1", self.repo_dir)
         self.run_cli(["quest", "add", "demo", "--title", "Demo", "--no-epic"], "sess-1", self.repo_dir)
         self.run_cli(["task", "add", "demo/T01", "--title", "First"], "sess-1", self.repo_dir)
-        self.run_cli(
-            ["ask", "ready?", "--context", "x", "--ref", "task:demo/T01"], "sess-1", self.repo_dir
-        )
+        self.run_cli(["ask", "ready?", "--context", "x", "--ref", "task:demo/T01"], "sess-1", self.repo_dir)
         self.run_cli(["inbox", "--since-last"], "sess-1", self.repo_dir)
 
     def _host(self):

@@ -31,9 +31,7 @@ def record_change(ctx, binding, kind, payload):
 
 
 def is_change(conn, session_id, status):
-    row = conn.execute(
-        "SELECT status FROM session_status WHERE session_id = ?", (session_id,)
-    ).fetchone()
+    row = conn.execute("SELECT status FROM session_status WHERE session_id = ?", (session_id,)).fetchone()
     return row is None or row["status"] != status
 
 

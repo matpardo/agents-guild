@@ -47,9 +47,7 @@ def _quest_lines(conn, party):
 
 
 def _pr_lines(conn, party):
-    rows = conn.execute(
-        "SELECT * FROM prs WHERE party = ? ORDER BY repo ASC, number ASC", (party,)
-    ).fetchall()
+    rows = conn.execute("SELECT * FROM prs WHERE party = ? ORDER BY repo ASC, number ASC", (party,)).fetchall()
     return ["- {}".format(render.pr_line(row)) for row in rows]
 
 
@@ -63,10 +61,7 @@ def _ask_lines(conn, party):
 
 def _notice_lines(conn, now, party):
     rows = [row for row in notice_commands.active_notices(conn, now) if row["party"] == party]
-    return [
-        "- #{} ({}): {}".format(row["id"], timeutil.issued_label(row["created_at"]), row["text"])
-        for row in rows
-    ]
+    return ["- #{} ({}): {}".format(row["id"], timeutil.issued_label(row["created_at"]), row["text"]) for row in rows]
 
 
 def _claim_lines(conn, now, party):
@@ -77,9 +72,7 @@ def _claim_lines(conn, now, party):
 def _render_handoff(ctx, binding, in_flight, learned):
     lines = ["# Handoff: {} (generation {})".format(binding["party"], binding["generation"]), ""]
     lines += _section("Quest", _quest_lines(ctx.conn, binding["party"]))
-    lines += _section(
-        "Next", ["- {}".format(line) for line in next_commands.run(ctx, binding, True, False)]
-    )
+    lines += _section("Next", ["- {}".format(line) for line in next_commands.run(ctx, binding, True, False)])
     lines += _section("PRs", _pr_lines(ctx.conn, binding["party"]))
     lines += _section("Open asks", _ask_lines(ctx.conn, binding["party"]))
     lines += _section("Active notices", _notice_lines(ctx.conn, ctx.now, binding["party"]))
@@ -147,9 +140,7 @@ def _record_launch(ctx, binding, window_id):
 
 
 def _bind_status(conn, tmux, party, generation, old_session_id, new_window_id):
-    row = conn.execute(
-        "SELECT generation, leader_session_id, state FROM parties WHERE name = ?", (party,)
-    ).fetchone()
+    row = conn.execute("SELECT generation, leader_session_id, state FROM parties WHERE name = ?", (party,)).fetchone()
     if row is None or row["state"] == "closed":
         return _PARTY_GONE
     if row["generation"] >= generation and row["leader_session_id"] != old_session_id:
@@ -195,7 +186,9 @@ def _close(ctx, binding, tmux, tmux_pane):
     pane = _closable_pane(tmux, tmux_pane, recorded_window)
     label = "{}-g{}".format(binding["party"], binding["generation"])
     if pane is None:
-        return _with_reminder("handoff written for {}; not a window guild launched, close it yourself".format(label)), None
+        return _with_reminder(
+            "handoff written for {}; not a window guild launched, close it yourself".format(label)
+        ), None
     return _with_reminder("handoff written for {}; closing this pane".format(label)), pane
 
 
@@ -228,9 +221,7 @@ def _respawn(ctx, binding, model, recorded_window, tmux, tmux_pane, sleep):
         return _with_reminder(
             "respawned: {} bound; close this window yourself (not a window guild launched)".format(label)
         ), None
-    return _with_reminder(
-        "respawned: {} bound in window {}; closing this pane".format(label, recorded_window)
-    ), pane
+    return _with_reminder("respawned: {} bound in window {}; closing this pane".format(label, recorded_window)), pane
 
 
 def run(ctx, in_flight, learned, model, respawn, close, tmux, tmux_pane, sleep):
@@ -362,9 +353,7 @@ def run_for_party(ctx, party):
     names.validate_name(party, "party name")
     party_row = _party_row_for_handoff(ctx.conn, party)
     if party_status.has_live_leader(ctx, party_row):
-        raise GuildError(
-            "party '{}' has a live leader: run `guild handoff` from that session instead".format(party), 1
-        )
+        raise GuildError("party '{}' has a live leader: run `guild handoff` from that session instead".format(party), 1)
     binding = {"party": party_row["name"], "project": party_row["project"], "generation": party_row["generation"]}
     write_auto(ctx, binding)
     return "handoff written for '{}', generation {}".format(party_row["name"], party_row["generation"])

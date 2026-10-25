@@ -66,8 +66,7 @@ class RunCaptureTests(unittest.TestCase):
                 str(pid_file)
             )
             code = (
-                "import subprocess, sys, time; "
-                "subprocess.Popen([sys.executable, '-c', {!r}]); time.sleep(60)"
+                "import subprocess, sys, time; subprocess.Popen([sys.executable, '-c', {!r}]); time.sleep(60)"
             ).format(child_code)
             started = time.monotonic()
             result = probe.run_capture(_python(code), 2)
@@ -84,9 +83,7 @@ class RunCaptureTests(unittest.TestCase):
             self.assertFalse(_alive(grandchild))
 
     def test_large_output_is_returned_whole(self):
-        result = probe.run_capture(
-            _python("import sys; sys.stdout.write('x' * 3000000)"), _TIMEOUT_SECONDS
-        )
+        result = probe.run_capture(_python("import sys; sys.stdout.write('x' * 3000000)"), _TIMEOUT_SECONDS)
         self.assertEqual(len(result["stdout"]), 3000000)
 
 

@@ -86,13 +86,33 @@ class SyncTrackerTests(GuildTestCase):
         self._sync_sdd()
         self.write_acli_fixture(
             "parent = DEMO-1",
-            [{"key": "DEMO-2", "fields": {"status": {"name": "In Progress", "statusCategory": {"key": "indeterminate"}}, "issuetype": {"name": "Task"}}}],
+            [
+                {
+                    "key": "DEMO-2",
+                    "fields": {
+                        "status": {"name": "In Progress", "statusCategory": {"key": "indeterminate"}},
+                        "issuetype": {"name": "Task"},
+                    },
+                }
+            ],
         )
         self.write_acli_fixture(
             "key in (DEMO-1,DEMO-9)",
             [
-                {"key": "DEMO-1", "fields": {"status": {"name": "In Progress", "statusCategory": {"key": "indeterminate"}}, "issuetype": {"name": "Epic"}}},
-                {"key": "DEMO-9", "fields": {"status": {"name": "Done", "statusCategory": {"key": "done"}}, "issuetype": {"name": "Task"}}},
+                {
+                    "key": "DEMO-1",
+                    "fields": {
+                        "status": {"name": "In Progress", "statusCategory": {"key": "indeterminate"}},
+                        "issuetype": {"name": "Epic"},
+                    },
+                },
+                {
+                    "key": "DEMO-9",
+                    "fields": {
+                        "status": {"name": "Done", "statusCategory": {"key": "done"}},
+                        "issuetype": {"name": "Task"},
+                    },
+                },
             ],
         )
         code, out, err = self._sync_tracker()
@@ -108,9 +128,7 @@ class SyncTrackerTests(GuildTestCase):
             tracker_config={"kind": "jira-acli"},
             sdd_config=dict(_SDD_PATTERNS, root=str(self.sdd_root), epics_dir="epics"),
         )
-        self._write_epic(
-            "## T01 — Gone\n\n**JIRA:** DEMO-404\n**Deps:** —\n**Status:** [ ] pending\n"
-        )
+        self._write_epic("## T01 — Gone\n\n**JIRA:** DEMO-404\n**Deps:** —\n**Status:** [ ] pending\n")
         self._sync_sdd()
         self.write_acli_fixture("key in (DEMO-404)", [])
         code, out, err = self._sync_tracker()
@@ -122,9 +140,7 @@ class SyncTrackerTests(GuildTestCase):
             tracker_config={"kind": "jira-acli"},
             sdd_config=dict(_SDD_PATTERNS, root=str(self.sdd_root), epics_dir="epics", key_ref=r"[A-Z]-\d+"),
         )
-        self._write_epic(
-            "## T01 — Bad key\n\n**JIRA:** A-1\n**Deps:** —\n**Status:** [ ] pending\n"
-        )
+        self._write_epic("## T01 — Bad key\n\n**JIRA:** A-1\n**Deps:** —\n**Status:** [ ] pending\n")
         self._sync_sdd()
         code, out, err = self._sync_tracker()
         self.assertEqual(code, 1)
@@ -142,11 +158,27 @@ class SyncTrackerTests(GuildTestCase):
         self._sync_sdd()
         self.write_acli_fixture(
             "parent = DEMO-1",
-            [{"key": "DEMO-2", "fields": {"status": {"name": "To Do", "statusCategory": {"key": "new"}}, "issuetype": {"name": "Task"}}}],
+            [
+                {
+                    "key": "DEMO-2",
+                    "fields": {
+                        "status": {"name": "To Do", "statusCategory": {"key": "new"}},
+                        "issuetype": {"name": "Task"},
+                    },
+                }
+            ],
         )
         self.write_acli_fixture(
             "key in (DEMO-1)",
-            [{"key": "DEMO-1", "fields": {"status": {"name": "Open", "statusCategory": {"key": "new"}}, "issuetype": {"name": "Epic"}}}],
+            [
+                {
+                    "key": "DEMO-1",
+                    "fields": {
+                        "status": {"name": "Open", "statusCategory": {"key": "new"}},
+                        "issuetype": {"name": "Epic"},
+                    },
+                }
+            ],
         )
         code, out, err = self._sync_tracker()
         self.assertEqual(code, 0, err)
@@ -155,8 +187,20 @@ class SyncTrackerTests(GuildTestCase):
         self.write_acli_fixture(
             "key in (DEMO-1,DEMO-2)",
             [
-                {"key": "DEMO-1", "fields": {"status": {"name": "Open", "statusCategory": {"key": "new"}}, "issuetype": {"name": "Epic"}}},
-                {"key": "DEMO-2", "fields": {"status": {"name": "Done", "statusCategory": {"key": "done"}}, "issuetype": {"name": "Task"}}},
+                {
+                    "key": "DEMO-1",
+                    "fields": {
+                        "status": {"name": "Open", "statusCategory": {"key": "new"}},
+                        "issuetype": {"name": "Epic"},
+                    },
+                },
+                {
+                    "key": "DEMO-2",
+                    "fields": {
+                        "status": {"name": "Done", "statusCategory": {"key": "done"}},
+                        "issuetype": {"name": "Task"},
+                    },
+                },
             ],
         )
         code, out, err = self._sync_tracker()
@@ -186,9 +230,7 @@ class SyncTrackerTests(GuildTestCase):
             tracker_config={"kind": "jira-acli"},
             sdd_config=dict(_SDD_PATTERNS, root=str(self.sdd_root), epics_dir="epics"),
         )
-        self._write_epic(
-            "## T01 — Standalone\n\n**JIRA:** DEMO-9\n**Deps:** —\n**Status:** [ ] pending\n"
-        )
+        self._write_epic("## T01 — Standalone\n\n**JIRA:** DEMO-9\n**Deps:** —\n**Status:** [ ] pending\n")
         self._sync_sdd()
         self.write_acli_error("key in (DEMO-9)", "boom")
         code, out, err = self._sync_tracker()
@@ -214,9 +256,28 @@ class SyncTrackerTests(GuildTestCase):
         self._sync_sdd()
         self.write_acli_fixture(
             "parent = DEMO-1",
-            [{"key": "DEMO-2", "fields": {"status": {"name": "To Do", "statusCategory": {"key": "new"}}, "issuetype": {"name": "Task"}}}],
+            [
+                {
+                    "key": "DEMO-2",
+                    "fields": {
+                        "status": {"name": "To Do", "statusCategory": {"key": "new"}},
+                        "issuetype": {"name": "Task"},
+                    },
+                }
+            ],
         )
-        self.write_acli_fixture("key in (DEMO-1)", [{"key": "DEMO-1", "fields": {"status": {"name": "Open", "statusCategory": {"key": "new"}}, "issuetype": {"name": "Epic"}}}])
+        self.write_acli_fixture(
+            "key in (DEMO-1)",
+            [
+                {
+                    "key": "DEMO-1",
+                    "fields": {
+                        "status": {"name": "Open", "statusCategory": {"key": "new"}},
+                        "issuetype": {"name": "Epic"},
+                    },
+                }
+            ],
+        )
         self._sync_tracker()
         self._sync_tracker()
         code, out, err = self.run_cli(["rebuild"], None, self.root)

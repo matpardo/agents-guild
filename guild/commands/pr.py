@@ -6,15 +6,11 @@ from guild.errors import GuildError
 
 _CLOSED_LIFECYCLES = ("merged", "closed")
 _TRACK_INITIAL_LIFECYCLE = "draft"
-_DRAFT_READY_HINT = (
-    "PR is draft on GitHub; mark it ready there (gh pr ready {}) or the next sync reverts it"
-)
+_DRAFT_READY_HINT = "PR is draft on GitHub; mark it ready there (gh pr ready {}) or the next sync reverts it"
 
 
 def _load_pr(conn, repo, number):
-    row = conn.execute(
-        "SELECT * FROM prs WHERE repo = ? AND number = ?", (repo, number)
-    ).fetchone()
+    row = conn.execute("SELECT * FROM prs WHERE repo = ? AND number = ?", (repo, number)).fetchone()
     if row is None:
         raise GuildError("PR '{}#{}' is not tracked".format(repo, number), 1)
     return row
@@ -24,9 +20,7 @@ def _task_fields(ctx, task_ref):
     if task_ref is None:
         return None, None
     quest, tid = refs.parse_task_ref(task_ref)
-    task_row = ctx.conn.execute(
-        "SELECT quest FROM quest_tasks WHERE quest = ? AND tid = ?", (quest, tid)
-    ).fetchone()
+    task_row = ctx.conn.execute("SELECT quest FROM quest_tasks WHERE quest = ? AND tid = ?", (quest, tid)).fetchone()
     if task_row is None:
         raise GuildError("unknown task '{}/{}'".format(quest, tid), 1)
     return quest, tid
@@ -64,12 +58,8 @@ def track(ctx, ref, task_ref, card, what, waits, needs_human_pr_review, fixes_ma
     project = config.require_project(ctx.cwd, ctx.projects_dir)
     project_data = config.load_project(ctx.projects_dir, project)
     if repo not in project_data["github"]["repos"]:
-        raise GuildError(
-            "repo '{}' is not in project '{}' github.repos".format(repo, project), 1
-        )
-    existing = ctx.conn.execute(
-        "SELECT repo FROM prs WHERE repo = ? AND number = ?", (repo, number)
-    ).fetchone()
+        raise GuildError("repo '{}' is not in project '{}' github.repos".format(repo, project), 1)
+    existing = ctx.conn.execute("SELECT repo FROM prs WHERE repo = ? AND number = ?", (repo, number)).fetchone()
     if existing is not None:
         raise GuildError("PR '{}#{}' is already tracked".format(repo, number), 1)
     try:
@@ -217,8 +207,15 @@ def relink_as_human(ctx, ref, task_ref, card):
 def _record_untracked(ctx, actor, project, repo, number):
     with db.writing(ctx.conn):
         events.record(
-            ctx.conn, ctx.now, ctx.origin, actor, ctx.session_id, project,
-            "pr.untracked", "guild", {"repo": repo, "number": number},
+            ctx.conn,
+            ctx.now,
+            ctx.origin,
+            actor,
+            ctx.session_id,
+            project,
+            "pr.untracked",
+            "guild",
+            {"repo": repo, "number": number},
         )
     return "PR '{}#{}' untracked".format(repo, number)
 
@@ -257,12 +254,29 @@ def unblock_external(ctx, ref):
 
 
 def set_(
-    ctx, ref, lifecycle, waits, needs_ask_answer, needs_human_pr_review, fixes_main, fixes_flaky,
-    blocked_external, no_blocked_external, task_ref, card,
+    ctx,
+    ref,
+    lifecycle,
+    waits,
+    needs_ask_answer,
+    needs_human_pr_review,
+    fixes_main,
+    fixes_flaky,
+    blocked_external,
+    no_blocked_external,
+    task_ref,
+    card,
 ):
     options = (
-        lifecycle, waits, needs_ask_answer, needs_human_pr_review, fixes_main, fixes_flaky, blocked_external,
-        task_ref, card,
+        lifecycle,
+        waits,
+        needs_ask_answer,
+        needs_human_pr_review,
+        fixes_main,
+        fixes_flaky,
+        blocked_external,
+        task_ref,
+        card,
     )
     if all(option is None for option in options) and not no_blocked_external:
         raise GuildError(

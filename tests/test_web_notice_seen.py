@@ -278,9 +278,7 @@ class NoticeActionTests(NoticeWebTestCase):
     def test_unknown_notice_is_422(self):
         for action in _ACTIONS:
             with self.subTest(action=action):
-                response, payload = self._post_json(
-                    "/api/notices/42/{}".format(action), self._good_headers(), {}
-                )
+                response, payload = self._post_json("/api/notices/42/{}".format(action), self._good_headers(), {})
                 self.assertEqual(response.status, 422)
                 self.assertIn("unknown notice", self._error(payload))
 

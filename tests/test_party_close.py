@@ -12,9 +12,7 @@ class PartyCloseTests(GuildTestCase):
         self.run_cli(["quest", "add", "demo", "--title", "Demo", "--no-epic"], "sess-1", self.repo_dir)
         self.run_cli(["task", "add", "demo/T01", "--title", "First"], "sess-1", self.repo_dir)
         self.run_cli(["task", "done", "demo/T01", "--summary", "shipped"], "sess-1", self.repo_dir)
-        self.run_cli(
-            ["ask", "Ship it?", "--context", "tests green", "--ref", "task:demo/T01"], "sess-1", self.repo_dir
-        )
+        self.run_cli(["ask", "Ship it?", "--context", "tests green", "--ref", "task:demo/T01"], "sess-1", self.repo_dir)
         self.run_cli(["claim", "ci.yml", "--ttl", "8h"], "sess-1", self.repo_dir)
 
     def _row(self, query, params):
@@ -64,7 +62,9 @@ class PartyCloseTests(GuildTestCase):
 
     def test_session_cannot_close_another_party(self):
         self.run_cli(["party", "start", "beta", "--reason", "test reason"], "sess-2", self.repo_dir)
-        code, out, err = self.run_cli(["party", "close", "alpha", "--force", "--pending", "none"], "sess-2", self.repo_dir)
+        code, out, err = self.run_cli(
+            ["party", "close", "alpha", "--force", "--pending", "none"], "sess-2", self.repo_dir
+        )
         self.assertEqual(code, 1)
         self.assertIn("cannot close another party", err)
 
@@ -75,7 +75,8 @@ class PartyCloseTests(GuildTestCase):
         )
         self.run_cli(
             ["pr", "track", "acme/app#1", "--task", "demo/T01", "--what", "x", "--waits", "y"],
-            "sess-1", self.repo_dir,
+            "sess-1",
+            self.repo_dir,
         )
         code, out, err = self.run_cli(["party", "close", "alpha", "--force", "--pending", "none"], None, None)
         self.assertEqual(code, 0, err)
@@ -88,9 +89,19 @@ class PartyCloseTests(GuildTestCase):
                 {"state": "OPEN", "isDraft": True, "headRefName": "feature/x", "title": "t"},
             )
             self.run_cli(
-                ["pr", "track", "acme/app#{}".format(number), "--task", "demo/T01", "--what", "does {}".format(number),
-                 "--waits", "y"],
-                "sess-1", self.repo_dir,
+                [
+                    "pr",
+                    "track",
+                    "acme/app#{}".format(number),
+                    "--task",
+                    "demo/T01",
+                    "--what",
+                    "does {}".format(number),
+                    "--waits",
+                    "y",
+                ],
+                "sess-1",
+                self.repo_dir,
             )
         conn = sqlite3.connect(str(self.data_home / "guild" / "guild.db"))
         conn.execute("UPDATE prs SET lifecycle = 'merged' WHERE number = 1")
@@ -102,7 +113,8 @@ class PartyCloseTests(GuildTestCase):
         self.run_cli(["notice", "create", "heads up", "--to", "project:acme", "--ttl", "1h"], "sess-1", self.repo_dir)
         self.run_cli(
             ["quest", "add", "later", "--open", "--no-epic", "--title", "l", "--tasks", "T01", "--titles", "one"],
-            "sess-1", self.repo_dir,
+            "sess-1",
+            self.repo_dir,
         )
         code, out, err = self.run_cli(["party", "close", "alpha", "--force", "--pending", "check the docs"], None, None)
         self.assertEqual(code, 0, err)
@@ -138,7 +150,6 @@ class PartyCloseTests(GuildTestCase):
         self.assertEqual(self._row("SELECT state FROM quests WHERE slug = ?", ("demo",))["state"], "done")
         self.assertEqual(self._row("SELECT state FROM asks WHERE id = 1", ())["state"], "dismissed")
 
-
     def _track_open_pr(self):
         self.write_gh_fixture(
             "view_acme-app_1",
@@ -146,7 +157,8 @@ class PartyCloseTests(GuildTestCase):
         )
         self.run_cli(
             ["pr", "track", "acme/app#1", "--task", "demo/T01", "--what", "x", "--waits", "y"],
-            "sess-1", self.repo_dir,
+            "sess-1",
+            self.repo_dir,
         )
 
     def test_close_without_force_succeeds_when_no_open_work(self):
@@ -159,7 +171,13 @@ class PartyCloseTests(GuildTestCase):
         self._track_open_pr()
         self.write_gh_fixture(
             "view_acme-app_1",
-            {"state": "MERGED", "isDraft": False, "headRefName": "feature/x", "title": "t", "mergedAt": "2026-01-01T00:00:00Z"},
+            {
+                "state": "MERGED",
+                "isDraft": False,
+                "headRefName": "feature/x",
+                "title": "t",
+                "mergedAt": "2026-01-01T00:00:00Z",
+            },
         )
         self.run_cli(["dismiss", "1"], None, None)
         code, out, err = self.run_cli(["party", "close", "alpha", "--pending", "none"], None, None)

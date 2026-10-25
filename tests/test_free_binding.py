@@ -14,7 +14,9 @@ class ReasonOnStartTests(AdventurerTestCase):
     def test_empty_or_sensitive_reason_is_refused(self):
         self.assertEqual(self.cli(["party", "start", "alpha", "--reason", "  "], "sess-1")[0], 1)
         self.assertEqual(self.cli(["party", "start", "alpha", "--reason", "mail me@x.com"], "sess-1")[0], 1)
-        self.assertEqual(self.cli(["adventurer", "start", "x", "--task", "demo-epic/T90", "--reason", "  "], "adv-1")[0], 1)
+        self.assertEqual(
+            self.cli(["adventurer", "start", "x", "--task", "demo-epic/T90", "--reason", "  "], "adv-1")[0], 1
+        )
         self.assertEqual(self.rows("SELECT * FROM parties"), [])
         self.assertEqual(self.rows("SELECT * FROM adventurers"), [])
 
@@ -83,8 +85,14 @@ class PromoteTests(AdventurerTestCase):
         conn = db.connect(paths.db_path())
         self.addCleanup(conn.close)
         ctx = context.RunContext(
-            conn, None, None, timeutil.utcnow(), None,
-            paths.claude_sessions_dir(), paths.projects_config_dir(), paths.state_dir(),
+            conn,
+            None,
+            None,
+            timeutil.utcnow(),
+            None,
+            paths.claude_sessions_dir(),
+            paths.projects_config_dir(),
+            paths.state_dir(),
         )
         model = board_commands.board_model(ctx)
         self.assertEqual(model["adventurers"], [])
@@ -101,8 +109,14 @@ class AdventurerBoardReasonTests(AdventurerTestCase):
         conn = db.connect(paths.db_path())
         self.addCleanup(conn.close)
         ctx = context.RunContext(
-            conn, None, None, timeutil.utcnow(), None,
-            paths.claude_sessions_dir(), paths.projects_config_dir(), paths.state_dir(),
+            conn,
+            None,
+            None,
+            timeutil.utcnow(),
+            None,
+            paths.claude_sessions_dir(),
+            paths.projects_config_dir(),
+            paths.state_dir(),
         )
         entry = board_commands.board_model(ctx)["adventurers"][0]
         self.assertEqual(entry["reason"], "test reason")
@@ -117,7 +131,9 @@ class AddReasonTests(AdventurerTestCase):
         self.cli(["party", "start", "alpha", "--reason", "r"], "sess-1")
 
     def _payloads(self, kind):
-        return [json.loads(row["payload"]) for row in self.rows("SELECT payload FROM events WHERE kind = '{}'".format(kind))]
+        return [
+            json.loads(row["payload"]) for row in self.rows("SELECT payload FROM events WHERE kind = '{}'".format(kind))
+        ]
 
     def test_quest_and_task_add_record_reason_only_when_given(self):
         self.cli(["quest", "add", "q1", "--title", "Q", "--no-epic", "--reason", "found on the fly"], "sess-1")

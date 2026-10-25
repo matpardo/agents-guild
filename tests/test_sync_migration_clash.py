@@ -6,8 +6,12 @@ from guild.adapters import github
 from tests.testutil import GuildTestCase
 
 _OPEN_VIEW = {
-    "state": "OPEN", "isDraft": False, "headRefName": "feature/x", "title": "t",
-    "statusCheckRollup": [{"conclusion": "SUCCESS"}], "mergeable": "MERGEABLE",
+    "state": "OPEN",
+    "isDraft": False,
+    "headRefName": "feature/x",
+    "title": "t",
+    "statusCheckRollup": [{"conclusion": "SUCCESS"}],
+    "mergeable": "MERGEABLE",
 }
 
 
@@ -42,7 +46,8 @@ class MigrationClashTests(GuildTestCase):
         self.write_gh_fixture(name, {"state": "OPEN", "isDraft": True, "headRefName": "f", "title": "t"})
         self.run_cli(
             ["pr", "track", "acme/app#{}".format(number), "--task", task, "--what", "x", "--waits", "y"],
-            session, self.repo_dir,
+            session,
+            self.repo_dir,
         )
         self.write_gh_fixture(name, _OPEN_VIEW)
 
@@ -68,9 +73,7 @@ class MigrationClashTests(GuildTestCase):
     def _clash_notices(self):
         conn = sqlite3.connect(str(self.data_home / "guild" / "guild.db"))
         conn.row_factory = sqlite3.Row
-        rows = conn.execute(
-            "SELECT * FROM notices WHERE announces LIKE 'migration:%' ORDER BY id"
-        ).fetchall()
+        rows = conn.execute("SELECT * FROM notices WHERE announces LIKE 'migration:%' ORDER BY id").fetchall()
         conn.close()
         return rows
 

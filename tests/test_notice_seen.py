@@ -159,9 +159,7 @@ class SeenListTests(NoticeSeenTestCase):
     def test_no_count_line_when_everything_is_seen(self):
         self._create("pipeline down", "5h")
         self.run_cli(["notice", "seen", "1"], None, None)
-        self.assertEqual(
-            self._notices(), "#1 [human] pipeline down (guild, {}, 4h left)\n".format(self._issued(1))
-        )
+        self.assertEqual(self._notices(), "#1 [human] pipeline down (guild, {}, 4h left)\n".format(self._issued(1)))
 
     def test_unseen_restores_the_marker(self):
         self._create("pipeline down", "5h")
@@ -187,8 +185,14 @@ class SeenBoardTests(NoticeSeenTestCase):
     def _colored_board(self):
         conn = db.connect(paths.db_path())
         ctx = context.RunContext(
-            conn, None, None, timeutil.utcnow(), None,
-            paths.claude_sessions_dir(), paths.projects_config_dir(), paths.state_dir(),
+            conn,
+            None,
+            None,
+            timeutil.utcnow(),
+            None,
+            paths.claude_sessions_dir(),
+            paths.projects_config_dir(),
+            paths.state_dir(),
         )
         try:
             return "\n".join(board_commands.render_board(ctx, None, None, True, 80))

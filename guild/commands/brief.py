@@ -48,7 +48,7 @@ def _adventurer_line(adventurer):
     line = "{}: {}".format(identity.adventurer_label(adventurer["id"]), adventurer["job"])
     if adventurer["task"] is not None:
         line += " (task {})".format(adventurer["task"])
-    return line + "; before you stop run `guild adventurer done --pending \"<text>\"`"
+    return line + '; before you stop run `guild adventurer done --pending "<text>"`'
 
 
 def render_brief(ctx):
@@ -85,9 +85,7 @@ def render_brief(ctx):
     my_open_asks = ctx.conn.execute(
         "SELECT COUNT(*) AS n FROM asks WHERE party = ? AND state = 'open'", (binding["party"],)
     ).fetchone()["n"]
-    total_open_asks = ctx.conn.execute(
-        "SELECT COUNT(*) AS n FROM asks WHERE state = 'open'"
-    ).fetchone()["n"]
+    total_open_asks = ctx.conn.execute("SELECT COUNT(*) AS n FROM asks WHERE state = 'open'").fetchone()["n"]
     lines.append("open asks: {} mine, {} total".format(my_open_asks, total_open_asks))
 
     raids = raid_commands.member_raids(ctx.conn, ctx.now, binding["party"])

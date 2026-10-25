@@ -16,9 +16,7 @@ def _git(path, args):
     environment = dict(os.environ)
     environment["GIT_TERMINAL_PROMPT"] = "0"
     try:
-        result = subprocess.run(
-            ["git", "-C", str(path)] + args, capture_output=True, text=True, env=environment
-        )
+        result = subprocess.run(["git", "-C", str(path)] + args, capture_output=True, text=True, env=environment)
     except OSError as error:
         return 1, "", str(error)
     return result.returncode, result.stdout.strip(), result.stderr.strip()
@@ -106,9 +104,7 @@ def behind_warning_lines(project):
         behind = _commits_behind(clone["path"], base)
         if not behind:
             continue
-        lines.append(
-            "local {} of {} is {} commits behind {}/{}".format(base, clone["repo"], behind, _ORIGIN, base)
-        )
+        lines.append("local {} of {} is {} commits behind {}/{}".format(base, clone["repo"], behind, _ORIGIN, base))
     return lines
 
 
@@ -119,17 +115,17 @@ def _checked_out_worktree(clone_path, base):
     current = None
     for line in out.splitlines():
         if line.startswith(_WORKTREE_PREFIX):
-            current = line[len(_WORKTREE_PREFIX):]
+            current = line[len(_WORKTREE_PREFIX) :]
         elif line == _BRANCH_PREFIX + base:
             return current
     return None
 
 
 def _worktree_block(lines, is_main):
-    entry = {"path": lines[0][len(_WORKTREE_PREFIX):], "branch": None, "is_main": is_main, "prunable": False}
+    entry = {"path": lines[0][len(_WORKTREE_PREFIX) :], "branch": None, "is_main": is_main, "prunable": False}
     for line in lines[1:]:
         if line.startswith(_BRANCH_PREFIX):
-            entry["branch"] = line[len(_BRANCH_PREFIX):]
+            entry["branch"] = line[len(_BRANCH_PREFIX) :]
         elif line == _PRUNABLE_PREFIX or line.startswith(_PRUNABLE_PREFIX + " "):
             entry["prunable"] = True
     return entry

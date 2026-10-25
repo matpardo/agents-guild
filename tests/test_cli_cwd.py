@@ -41,8 +41,6 @@ class DeletedCwdTest(GuildTestCase):
 
     def test_hook_falls_back_when_stdin_cwd_was_deleted(self):
         self.gone.rmdir()
-        code, out, err = self.run_hook(
-            "session-start", {"session_id": "s-1", "cwd": str(self.gone)}
-        )
+        code, out, err = self.run_hook("session-start", {"session_id": "s-1", "cwd": str(self.gone)})
         self.assertEqual(code, 0)
         self.assertNotIn("guild hook error", out)

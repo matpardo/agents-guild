@@ -127,9 +127,7 @@ class ScanTests(unittest.TestCase):
 
     def test_totals_tolerate_missing_types(self):
         verbose = fixtures.ok_result(_fixture_text("system_df_v.json"))
-        only_images = fixtures.ok_result(
-            json.dumps({"Type": "Images", "Size": "1GB", "Reclaimable": "0B (0%)"}) + "\n"
-        )
+        only_images = fixtures.ok_result(json.dumps({"Type": "Images", "Size": "1GB", "Reclaimable": "0B (0%)"}) + "\n")
         result = docker.scan(fixtures.FakeProbe(_responder(verbose, only_images)))
         self.assertEqual(result["totals"]["images"], 1000000000)
         self.assertIsNone(result["totals"]["build_cache"])

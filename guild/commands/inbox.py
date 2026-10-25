@@ -20,17 +20,17 @@ def _cursor_seq(conn, session_id):
 
 
 def advance_cursor(conn, session_id, seq):
-    conn.execute(
-        "INSERT OR REPLACE INTO cursors (session_id, last_seq) VALUES (?, ?)", (session_id, seq)
-    )
+    conn.execute("INSERT OR REPLACE INTO cursors (session_id, last_seq) VALUES (?, ?)", (session_id, seq))
 
 
 def new_lines(ctx, binding):
     last_seq = _cursor_seq(ctx.conn, identity.cursor_key(ctx.session_id))
     new_events = events.events_after(ctx.conn, last_seq)
     caller_party, _ = identity.resolve_actor(ctx.conn, ctx.session_id)
-    project = binding["project"] if binding is not None else config.resolve_project(
-        ctx.cwd, config.load_all_projects(ctx.projects_dir)
+    project = (
+        binding["project"]
+        if binding is not None
+        else config.resolve_project(ctx.cwd, config.load_all_projects(ctx.projects_dir))
     )
     active_notice_ids = {row["id"] for row in notice.active_notices(ctx.conn, ctx.now)}
     raid_member_of = raid_commands.member_raid_names(ctx.conn, ctx.now, caller_party)
@@ -46,14 +46,15 @@ def new_lines(ctx, binding):
             if notice.targeting([payload], project, True, raid_member_of):
                 lines.append(
                     notice.format_notice_line(
-                        payload["id"], payload["party"], event["ts"], payload["text"],
+                        payload["id"],
+                        payload["party"],
+                        event["ts"],
+                        payload["text"],
                         payload.get("unbound", False),
                     )
                 )
         elif event["kind"] in ("ask.answered", "ask.dismissed") and caller_party is not None:
-            ask_row = ctx.conn.execute(
-                "SELECT party FROM asks WHERE id = ?", (payload["id"],)
-            ).fetchone()
+            ask_row = ctx.conn.execute("SELECT party FROM asks WHERE id = ?", (payload["id"],)).fetchone()
             if ask_row is None or ask_row["party"] != caller_party:
                 continue
             if event["kind"] == "ask.answered":

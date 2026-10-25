@@ -21,7 +21,14 @@ class LeaderWindowsBase(GuildTestCase):
     def _launched(self, generation, window_id):
         with db.writing(self.conn):
             events.record(
-                self.conn, timeutil.utcnow(), "tester@host", "alpha", None, "acme", "leader.window_launched", "local",
+                self.conn,
+                timeutil.utcnow(),
+                "tester@host",
+                "alpha",
+                None,
+                "acme",
+                "leader.window_launched",
+                "local",
                 {"party": "alpha", "generation": generation, "window_id": window_id},
             )
 
