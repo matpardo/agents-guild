@@ -382,7 +382,11 @@ web board has no party close action.
 After the close line, close prints a final report block read from existing
 state: each PR the party tracked (`<repo>#<n> | what | state`, state `merged`,
 `closed` or `open`), each quest with its done/total tasks, the ideas linked to
-the party and the pending text. The tracked PRs are refreshed from GitHub first;
+the party, then what the party generated: its asks with their state
+(`ask #<n> (<state>): <question>`), the ideas it created and did not link
+(`idea #<n> created: <title>`), the open quests its leaders added
+(`open quest <slug>: no party yet | taken by <party>`) and its notices still in
+force (`notice #<n> (until <time>): <text>`), and last the pending text. The tracked PRs are refreshed from GitHub first;
 if that fails the report keeps the last synced states and says so. The session ends with a report to the human
 built from it.
 Closing cascades in the same event: the party's active quests become `done`,
@@ -1299,8 +1303,11 @@ secret and project-pattern checks as `handoff --learned`. `guild adventurers`
 lists the active adventurers and the ten most recent finished ones with job,
 task, project, state and pending report; `guild adventurers <id>` shows one.
 `adventurer done` also prints a final report block: job, task, the PRs the
-adventurer tracked (`<repo>#<n> | what | state`, refreshed from GitHub first)
-and the pending text.
+adventurer tracked (`<repo>#<n> | what | state`, refreshed from GitHub first),
+what it generated (its asks, the ideas it created, the open quests it added and
+its notices still in force, in the same lines as the party report), a
+`warning: left open: <n> asks, <n> PRs` line when an ask is still open or a PR
+is not merged or closed (it warns, it does not refuse), and the pending text.
 
 An adventurer can track its PRs (`guild pr track ... --task` equal to its own
 `<epic>/<tid>`, `--card <KEY>` optional; a health-job adventurer passes no `--task`; the PR records the adventurer and an empty

@@ -99,6 +99,12 @@ class PartyCloseTests(GuildTestCase):
         conn.close()
         self.run_cli(["idea", "add", "Better thing", "--description", "d"], "sess-1", self.repo_dir)
         self.run_cli(["idea", "link", "1", "--party", "alpha"], "sess-1", self.repo_dir)
+        self.run_cli(["idea", "add", "Loose thing", "--description", "d"], "sess-1", self.repo_dir)
+        self.run_cli(["notice", "create", "heads up", "--to", "project:acme", "--ttl", "1h"], "sess-1", self.repo_dir)
+        self.run_cli(
+            ["quest", "add", "later", "--open", "--no-epic", "--title", "l", "--tasks", "T01", "--titles", "one"],
+            "sess-1", self.repo_dir,
+        )
         code, out, err = self.run_cli(["party", "close", "alpha", "--force", "--pending", "check the docs"], None, None)
         self.assertEqual(code, 0, err)
         self.assertIn("final report for party 'alpha'", out)
@@ -106,6 +112,11 @@ class PartyCloseTests(GuildTestCase):
         self.assertIn("acme/app#2 | does 2 | open", out)
         self.assertIn("quest demo: 1/1 tasks done", out)
         self.assertIn("idea #1: Better thing", out)
+        self.assertEqual(out.count("Better thing"), 1)
+        self.assertIn("idea #2 created: Loose thing", out)
+        self.assertIn("ask #1 (dismissed): Ship it?", out)
+        self.assertIn("open quest later: no party yet", out)
+        self.assertRegex(out, r"notice #1 \(until [^)]+\): heads up")
         self.assertIn("pending: check the docs", out)
 
     def test_close_unknown_or_closed_party_fails(self):

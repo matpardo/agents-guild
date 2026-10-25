@@ -159,3 +159,14 @@ updated: 2026-10-24
 **Acceptance:**
 - [x] A merged adventurer PR whose task id is missing from the synced epic is a finding, in the default scope, with `--epic` and with `--all`.
 - [x] A task present in the SDD, or a task of an open quest outside any epic, is not a finding.
+
+## T15 — Final reports list what the session generated
+
+**Depends on:** T14
+**Status:** [x] done
+
+**What:** The final report of `adventurer done` and `party close` keeps its current lines and adds what the session generated: asks with their state, ideas it created, open quests it added and notices still in force. `adventurer done` also warns, without refusing, when an ask is open or a PR is not merged or closed.
+
+**Acceptance:**
+- [x] Both reports list the generated asks, created ideas, open quests and notices; an idea already listed as linked is not repeated.
+- [x] `adventurer done` prints `warning: left open: ...` only when an ask or a PR is still open.

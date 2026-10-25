@@ -231,6 +231,26 @@ class AdventurerPermissionTests(AdventurerTestCase):
         self.assertIn("acme/app#2 | fixes typo | open", out)
         self.assertIn("pending: none", out)
 
+    def test_done_reports_what_the_adventurer_generated_and_warns_on_open_work(self):
+        self.cli(["ask", "Ship it?", "--context", "c", "--ref", "task:demo-epic/T02"], "adv-1")
+        self.cli(["idea", "add", "An idea", "--description", "d"], "adv-1")
+        self.cli(["quest", "add", "chore", "--open", "--no-epic", "--title", "c", "--tasks", "T01", "--titles", "one"], "adv-1")
+        self.cli(["notice", "create", "heads up", "--to", "project:acme", "--ttl", "1h"], "adv-1")
+        self.cli(["pr", "track", "acme/app#2", "--task", "demo-epic/T02", "--what", "fixes typo", "--waits", "r"], "adv-1")
+        code, out, err = self.cli(["adventurer", "done", "--pending", "none"], "adv-1")
+        self.assertEqual(code, 0, err)
+        self.assertIn("ask #1 (open): Ship it?", out)
+        self.assertIn("idea #1 created: An idea", out)
+        self.assertIn("open quest chore: no party yet", out)
+        self.assertRegex(out, r"notice #1 \(until [^)]+\): heads up")
+        self.assertIn("warning: left open: 1 ask, 1 PR", out)
+
+    def test_done_without_open_work_has_no_warning(self):
+        code, out, err = self.cli(["adventurer", "done", "--pending", "none"], "adv-1")
+        self.assertEqual(code, 0, err)
+        self.assertNotIn("warning", out)
+        self.assertNotIn("ask #", out)
+
     def test_done_refreshes_a_stale_pr_to_merged(self):
         self.start("adv-1", "fix typo", "--task", "demo-epic/T02")
         self.cli(["pr", "track", "acme/app#2", "--task", "demo-epic/T02", "--what", "fixes typo", "--waits", "r"], "adv-1")
