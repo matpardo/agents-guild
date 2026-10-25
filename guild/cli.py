@@ -1550,7 +1550,7 @@ def build_parser():
     handoff.set_defaults(handler=_handle_handoff)
 
     sync = subparsers.add_parser("sync", help="refresh state from GitHub, the SDD or the tracker")
-    sync.add_argument("--source", required=True, choices=["gh", "sdd", "tracker"], help="what to refresh from")
+    sync.add_argument("--source", required=True, choices=["gh", "sdd", "tracker", "bases"], help="what to refresh from")
     sync.add_argument("--all-projects", action="store_true", help="every project config, for timers (sdd and tracker)")
     sync.set_defaults(handler=_handle_sync)
 
@@ -1572,6 +1572,7 @@ def build_parser():
     _add_timer_parser(subparsers, "sync-timer", "sync-gh")
     _add_timer_parser(subparsers, "sync-sdd-timer", "sync-sdd")
     _add_timer_parser(subparsers, "sync-tracker-timer", "sync-tracker")
+    _add_timer_parser(subparsers, "sync-bases-timer", "sync-bases")
     _add_timer_parser(subparsers, "resources-timer", "resources-collect")
     _add_timer_parser(subparsers, "compact-timer", "compact")
 

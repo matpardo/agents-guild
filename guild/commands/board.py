@@ -158,7 +158,21 @@ def _card_prefix(pr_row):
     return "{}  ".format(sanitize.strip_control_sequences(pr_row["card"]))
 
 
-def _pr_lines(ctx, painter, pr_row, indent):
+def _behind_label(repo_clones, pr_row):
+    clone = repo_clones.get(pr_row["repo"])
+    branch = _optional_text(pr_row["branch"])
+    if clone is None or branch is None or pr_row["lifecycle"] in ("merged", "closed"):
+        return None
+    base = _optional_text(pr_row["base_branch"]) or clone["base"]
+    if base is None:
+        return None
+    behind = localbase.branch_behind(clone["path"], branch, base)
+    if not behind:
+        return None
+    return "{} behind {}".format(behind, base)
+
+
+def _pr_lines(ctx, repo_clones, painter, pr_row, indent):
     badges = _badges(ctx, pr_row)
     status_plain = "{}  {}".format(" ".join(label for label, _ in badges), _checks_plain(pr_row))
     status_painted = "{}  {}".format(
@@ -183,6 +197,9 @@ def _pr_lines(ctx, painter, pr_row, indent):
     if branch is not None:
         branch_lines = painter.wrap("branch: {}".format(branch), indent + "  ")
         head_lines = head_lines + [painter.paint(line, "dim") for line in branch_lines]
+    behind = _behind_label(repo_clones, pr_row)
+    if behind is not None:
+        head_lines = head_lines + [painter.paint(line, "dim") for line in painter.wrap(behind, indent + "  ")]
     waits = _visible_waits(pr_row)
     if waits:
         head_lines = head_lines + painter.wrap("waits: {}".format(waits), indent + "  ")
@@ -484,7 +501,7 @@ def _dated(painter, text, dates):
     return "{}  {}".format(text, painter.paint(dates, "dim"))
 
 
-def _task_lines(ctx, painter, task_row, task_prs):
+def _task_lines(ctx, repo_clones, painter, task_row, task_prs):
     dates = _row_dates(task_row)
     if task_row["state"] == "blocked":
         return [
@@ -499,7 +516,7 @@ def _task_lines(ctx, painter, task_row, task_prs):
     if task_row["summary"]:
         lines.extend(painter.paint(line, "dim") for line in painter.wrap(task_row["summary"], "        "))
     for pr_row in task_prs:
-        lines.extend(_pr_lines(ctx, painter, pr_row, "        "))
+        lines.extend(_pr_lines(ctx, repo_clones, painter, pr_row, "        "))
     return lines
 
 
@@ -536,7 +553,7 @@ def _close_blocker_lines(painter, blockers):
     return lines
 
 
-def _quest_lines(ctx, painter, quest_row, prs_by_task):
+def _quest_lines(ctx, repo_clones, painter, quest_row, prs_by_task):
     title = sanitize.strip_control_sequences(quest_row["title"])
     lines = [
         _dated(painter, "  {} — {}".format(painter.paint(quest_row["slug"], "bold"), title), _row_dates(quest_row))
@@ -548,7 +565,7 @@ def _quest_lines(ctx, painter, quest_row, prs_by_task):
             queued.append(task_row["tid"])
             continue
         task_prs = prs_by_task.get((quest_row["slug"], task_row["tid"]), [])
-        lines.extend(_task_lines(ctx, painter, task_row, task_prs))
+        lines.extend(_task_lines(ctx, repo_clones, painter, task_row, task_prs))
     if queued:
         lines.append(painter.paint("    ○ queued: {}".format(", ".join(queued)), "dim"))
     blockers = _close_blockers(ctx, quest_row)
@@ -797,7 +814,7 @@ def _claim_text(ctx, row):
     return "{} ({}{})".format(row["area"], timeutil.time_left_label(ctx.now, row["expires_at"]), suffix)
 
 
-def _party_section(ctx, painter, party_row, project_config):
+def _party_section(ctx, repo_clones, painter, party_row, project_config):
     lines = [
         "{} {}  {}".format(
             painter.paint("━━", "cyan"),
@@ -836,12 +853,12 @@ def _party_section(ctx, painter, party_row, project_config):
     prs_by_task = _prs_by_task(pr_rows)
     quests = _active_quests(ctx.conn, party_row["name"])
     for quest_row in quests:
-        lines.extend(_quest_lines(ctx, painter, quest_row, prs_by_task))
+        lines.extend(_quest_lines(ctx, repo_clones, painter, quest_row, prs_by_task))
     orphan_prs = _orphan_pr_rows(ctx, quests, pr_rows)
     if orphan_prs:
         lines.append(painter.paint("  PRs outside active tasks", "dim"))
         for pr_row in orphan_prs:
-            lines.extend(_pr_lines(ctx, painter, pr_row, "    "))
+            lines.extend(_pr_lines(ctx, repo_clones, painter, pr_row, "    "))
     claims = _party_claims(ctx, party_row["name"])
     if claims:
         claim_text = ", ".join(_claim_text(ctx, row) for row in claims)
@@ -886,7 +903,7 @@ def _adventurer_stopped(row, live_ids):
     return row["state"] == "active" and row["session_id"] not in live_ids
 
 
-def _adventurer_lines(ctx, painter):
+def _adventurer_lines(ctx, repo_clones, painter):
     rows = _adventurer_rows(ctx.conn)
     if not rows:
         return []
@@ -909,7 +926,7 @@ def _adventurer_lines(ctx, painter):
         if row["state"] == "done":
             lines.extend(painter.wrap("pending: {}".format(sanitize.strip_control_sequences(row["pending"])), "    "))
         for pr_row in _adventurer_pr_rows(ctx.conn, row["id"]):
-            lines.extend(_pr_lines(ctx, painter, pr_row, "    "))
+            lines.extend(_pr_lines(ctx, repo_clones, painter, pr_row, "    "))
     lines.append("")
     return lines
 
@@ -988,14 +1005,15 @@ def render_board(ctx, party_filter, raid_filter, color, width):
     lines.extend(_ready_for_you_lines(ctx, painter, party_filter, raid_filter))
     lines.extend(_notices_section(ctx, painter, notice_rows))
     projects_by_name = {project["name"]: project for project in config.load_all_projects(ctx.projects_dir)}
+    repo_clones = localbase.repo_clones(projects_by_name.values())
     if party_filter is None and raid_filter is None:
-        lines.extend(_adventurer_lines(ctx, painter))
+        lines.extend(_adventurer_lines(ctx, repo_clones, painter))
         lines.extend(_health_job_lines(painter, projects_by_name, ctx))
     lines.extend(_bases_lines(ctx, _bases_projects(projects_by_name, party_rows, party_filter, raid_filter)))
     lines.extend(_project_lines(ctx, painter, party_rows, projects_by_name))
     lines.extend(_quest_board_lines(ctx, painter, projects_by_name))
     for party_row in party_rows:
-        lines.extend(_party_section(ctx, painter, party_row, projects_by_name.get(party_row["project"])))
+        lines.extend(_party_section(ctx, repo_clones, painter, party_row, projects_by_name.get(party_row["project"])))
     return lines
 
 
@@ -1005,7 +1023,7 @@ def _optional_text(value):
     return sanitize.strip_control_sequences(value)
 
 
-def _pr_model(ctx, pr_row, project_config):
+def _pr_model(ctx, repo_clones, pr_row, project_config):
     card = _optional_text(pr_row["card"])
     return {
         "repo": pr_row["repo"],
@@ -1025,6 +1043,7 @@ def _pr_model(ctx, pr_row, project_config):
         "waits": _optional_text(_visible_waits(pr_row)),
         "branch": _optional_text(pr_row["branch"]),
         "base_branch": _optional_text(pr_row["base_branch"]),
+        "behind": _behind_label(repo_clones, pr_row),
         "review_reasons": merge_queue.review_reasons(
             pr_row["mergeable"], pr_row["review_decision"], pr_row["unresolved_threads"], pr_row["merge_state"]
         ),
@@ -1099,7 +1118,7 @@ def _idea_model(ctx, row):
     }
 
 
-def _adventurer_model(ctx, row, live_ids, projects_by_name):
+def _adventurer_model(ctx, repo_clones, row, live_ids, projects_by_name):
     project_config = projects_by_name.get(row["project"])
     return {
         "id": row["id"],
@@ -1112,7 +1131,9 @@ def _adventurer_model(ctx, row, live_ids, projects_by_name):
         "dates": timeutil.dates_label(row["started_at"], row["done_at"]),
         "live": row["session_id"] in live_ids,
         "stopped_without_report": _adventurer_stopped(row, live_ids),
-        "prs": [_pr_model(ctx, pr_row, project_config) for pr_row in _adventurer_pr_rows(ctx.conn, row["id"])],
+        "prs": [
+            _pr_model(ctx, repo_clones, pr_row, project_config) for pr_row in _adventurer_pr_rows(ctx.conn, row["id"])
+        ],
     }
 
 
@@ -1125,7 +1146,7 @@ def _memory_item_model(item):
     }
 
 
-def _task_model(ctx, project, epic, task_row, task_prs, project_config):
+def _task_model(ctx, repo_clones, project, epic, task_row, task_prs, project_config):
     key = _task_card_key(ctx.conn, project, epic, task_row["tid"])
     return {
         "tid": task_row["tid"],
@@ -1135,7 +1156,7 @@ def _task_model(ctx, project, epic, task_row, task_prs, project_config):
         "summary": _optional_text(task_row["summary"]),
         "blocked_reason": _optional_text(task_row["blocked_reason"]),
         "card_url": links.card_url(project_config, key),
-        "prs": [_pr_model(ctx, pr_row, project_config) for pr_row in task_prs],
+        "prs": [_pr_model(ctx, repo_clones, pr_row, project_config) for pr_row in task_prs],
     }
 
 
@@ -1148,11 +1169,12 @@ def _move_targets(conn, quest_row):
     return [row["slug"] for row in rows]
 
 
-def _quest_model(ctx, project, quest_row, prs_by_task, project_config):
+def _quest_model(ctx, repo_clones, project, quest_row, prs_by_task, project_config):
     task_rows = _open_task_rows(ctx.conn, quest_row["slug"])
     tasks = [
         _task_model(
             ctx,
+            repo_clones,
             project,
             quest_row["epic"],
             task_row,
@@ -1202,12 +1224,13 @@ def _party_drift_model(ctx, party_row):
     }
 
 
-def _party_model(ctx, party_row, project_config):
+def _party_model(ctx, repo_clones, party_row, project_config):
     pr_rows = _party_pr_rows(ctx.conn, party_row["name"])
     prs_by_task = _prs_by_task(pr_rows)
     quests = _active_quests(ctx.conn, party_row["name"])
     quest_models = [
-        _quest_model(ctx, party_row["project"], quest_row, prs_by_task, project_config) for quest_row in quests
+        _quest_model(ctx, repo_clones, party_row["project"], quest_row, prs_by_task, project_config)
+        for quest_row in quests
     ]
     orphan_prs = _orphan_pr_rows(ctx, quests, pr_rows)
     claims = _party_claims(ctx, party_row["name"])
@@ -1234,7 +1257,7 @@ def _party_model(ctx, party_row, project_config):
             {"id": row["id"], "title": sanitize.strip_control_sequences(row["title"])}
             for row in idea_commands.linked_ideas(ctx, party_row["name"])
         ],
-        "prs": [_pr_model(ctx, pr_row, project_config) for pr_row in orphan_prs],
+        "prs": [_pr_model(ctx, repo_clones, pr_row, project_config) for pr_row in orphan_prs],
         "raids": [
             {
                 "raid": row["raid"],
@@ -1273,6 +1296,7 @@ def _realm_model():
 def board_model(ctx):
     party_rows = ctx.conn.execute("SELECT * FROM parties WHERE state != 'closed' ORDER BY name ASC").fetchall()
     projects_by_name = {project["name"]: project for project in config.load_all_projects(ctx.projects_dir)}
+    repo_clones = localbase.repo_clones(projects_by_name.values())
     ask_rows = _sorted_open_asks(ctx.conn, None)
     notice_rows = notice_commands.active_notices(ctx.conn, ctx.now)
     project_names = sorted({row["project"] for row in party_rows if row["project"] is not None})
@@ -1285,13 +1309,16 @@ def board_model(ctx):
         "notices": [_notice_model(ctx, row) for row in notice_rows],
         "new_notice_count": notice_commands.count_new(notice_rows),
         "ideas": [_idea_model(ctx, row) for row in idea_commands.sorted_rows(ctx, None)],
-        "adventurers": [_adventurer_model(ctx, row, live_ids, projects_by_name) for row in _adventurer_rows(ctx.conn)],
+        "adventurers": [
+            _adventurer_model(ctx, repo_clones, row, live_ids, projects_by_name) for row in _adventurer_rows(ctx.conn)
+        ],
         "health_jobs": health_jobs.models(ctx, projects_by_name),
         "memory": [
             _memory_item_model(item) for item in memory_commands.all_items(None) if item["party"] in live_party_names
         ],
         "parties": [
-            _party_model(ctx, party_row, projects_by_name.get(party_row["project"])) for party_row in party_rows
+            _party_model(ctx, repo_clones, party_row, projects_by_name.get(party_row["project"]))
+            for party_row in party_rows
         ],
         "blocked": [_blocked_model(ctx, row) for row in session_status.blocked_rows(ctx.conn, None)],
         "drift": [drift_commands.board_findings(ctx, project_name) for project_name in project_names],

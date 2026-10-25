@@ -2428,6 +2428,12 @@ realmDoctorLines: [],
       row.appendChild(explain(base, "ui", "baseBranch"));
     }
     appendAll(row, renderReasonPills(pr.review_reasons));
+    if (pr.behind) {
+      var behind = textEl("span", pr.behind);
+      behind.className = "pill behind-pill";
+      behind.title = "The PR branch is " + pr.behind.split(" ")[0] + " commits behind its base branch, as of its last local push.";
+      row.appendChild(behind);
+    }
     row.appendChild(renderChecks(pr));
     row.appendChild(renderPrBlockControls(pr.repo + "#" + pr.number, pr.blocked_external, "card"));
     if (pr.card_url) {
