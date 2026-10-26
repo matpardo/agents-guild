@@ -692,7 +692,8 @@ The service runs at `Nice=19` and `IOSchedulingClass=idle`. Every 2 hours is
 the recommended cadence.
 
 The web board shows the same values as coloured pills (disk green under 70%,
-amber under 85%, red above; RAM red under 10% available; growth amber, shrink or
+amber under 85%, red above; RAM red under 10% available; CPU load per core amber from
+0.8, red from 1.5; growth amber, shrink or
 no change green; unmeasured values grey) and a disk pill in the sidebar. The
 report itself still has no thresholds.
 
@@ -744,12 +745,13 @@ there is no baseline and no deltas. Per category it shows the total and delta
 and the 10 biggest items (`+N more` for the rest); an item absent from the
 baseline is `new`. `top growers` lists the up to 5 items that grew at least
 1 MiB (a new item counts with its whole size). The `machine` line shows disk
-use, memory available, Docker totals, the database size and the sample age.
+use, memory available, CPU load per core (1-minute load over the core count, with
+the 15-minute load), Docker totals, the database size and the sample age.
 `untracked growth` appears when the disk grew at least 1 GiB more than every
 tracked delta together, which is how the next unknown cause shows up.
 
 ```
-machine   disk 82% used (412.0 GB of 500.0 GB, +6.0 GB in 1d)   ram 9.0 GB available of 31.0 GB
+machine   disk 82% used (412.0 GB of 500.0 GB, +6.0 GB in 1d)   ram 9.0 GB available of 31.0 GB   cpu 1.8/core (load 7.2 on 4 cores, 15m 6.1)
           docker 17.4 GB (reclaimable 5.2 GB)   guild.db 173 MB   sampled 41m ago
 untracked growth: +1.4 GB (machine +6.0 GB, tracked +4.6 GB)
 

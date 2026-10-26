@@ -20,6 +20,10 @@ def machine_payload(docker):
         "disk_used": 400,
         "mem_total": 32,
         "mem_available": 16,
+        "load1": 2.5,
+        "load5": 2.0,
+        "load15": 1.5,
+        "cpu_count": 4,
         "guild_db_bytes": 7,
         "docker": docker,
     }
@@ -98,6 +102,19 @@ class ResourcesProjectionTests(GuildTestCase):
             ),
             (100, 40, 10, 20, 5),
         )
+
+    def test_machine_load_columns_are_stored(self):
+        self._record("acme", sampled_payload([], None))
+        row = self._machine()[0]
+        self.assertEqual((row["load1"], row["load5"], row["load15"], row["cpu_count"]), (2.5, 2.0, 1.5, 4))
+
+    def test_old_payload_without_load_keys_replays_as_null(self):
+        payload = sampled_payload([], None)
+        for key in ("load1", "load5", "load15", "cpu_count"):
+            del payload["machine"][key]
+        self._record("acme", payload)
+        row = self._machine()[0]
+        self.assertEqual((row["load1"], row["load5"], row["load15"], row["cpu_count"]), (None, None, None, None))
 
     def test_machine_docker_null_leaves_docker_columns_null(self):
         self._record("acme", sampled_payload([], None))

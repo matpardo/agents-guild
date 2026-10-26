@@ -802,14 +802,19 @@ def _resources_sampled(conn, event):
     docker = machine["docker"] or {}
     conn.execute(
         "INSERT OR REPLACE INTO resource_machine (ts, disk_total, disk_used, mem_total, mem_available,"
-        " guild_db_bytes, docker_images, docker_images_reclaimable, docker_containers, docker_volumes,"
-        " docker_build_cache) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        " load1, load5, load15, cpu_count, guild_db_bytes, docker_images, docker_images_reclaimable,"
+        " docker_containers, docker_volumes, docker_build_cache)"
+        " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         (
             event["ts"],
             machine["disk_total"],
             machine["disk_used"],
             machine["mem_total"],
             machine["mem_available"],
+            machine.get("load1"),
+            machine.get("load5"),
+            machine.get("load15"),
+            machine.get("cpu_count"),
             machine["guild_db_bytes"],
             docker.get("images"),
             docker.get("images_reclaimable"),

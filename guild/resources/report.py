@@ -208,6 +208,12 @@ def _untracked_growth(disk_delta, tracked_deltas):
     return untracked
 
 
+def _load_per_core(row):
+    if row["load1"] is None or not row["cpu_count"]:
+        return None
+    return row["load1"] / row["cpu_count"]
+
+
 def _machine_model(conn, cutoff_iso, tracked_deltas):
     latest = _bound(conn, "resource_machine", "MAX", _ALL_ROWS, [])
     if latest is None:
@@ -224,6 +230,11 @@ def _machine_model(conn, cutoff_iso, tracked_deltas):
         "disk_delta": disk_delta,
         "mem_total": row["mem_total"],
         "mem_available": row["mem_available"],
+        "load1": row["load1"],
+        "load5": row["load5"],
+        "load15": row["load15"],
+        "cpu_count": row["cpu_count"],
+        "load_per_core": _load_per_core(row),
         "guild_db_bytes": row["guild_db_bytes"],
         "docker": _docker_totals(row),
         "untracked_growth": _untracked_growth(disk_delta, tracked_deltas),
@@ -306,13 +317,18 @@ def _machine_lines(machine, since, now):
     ram = "ram n/a"
     if machine["mem_available"] is not None:
         ram = "ram {} available of {}".format(_human(machine["mem_available"]), _human(machine["mem_total"]))
+    cpu = "cpu n/a"
+    if machine["load_per_core"] is not None:
+        cpu = "cpu {:.1f}/core (load {:.1f} on {} cores, 15m {:.1f})".format(
+            machine["load_per_core"], machine["load1"], machine["cpu_count"], machine["load15"]
+        )
     docker_label = "docker n/a"
     if machine["docker"] is not None:
         docker_label = "docker {} (reclaimable {})".format(
             _bytes_label(machine["docker"]["total"]), _bytes_label(machine["docker"]["images_reclaimable"])
         )
     lines = [
-        "machine   {}   {}".format(disk, ram),
+        "machine   {}   {}   {}".format(disk, ram, cpu),
         "          {}   guild.db {}   sampled {} ago".format(
             docker_label, _human(machine["guild_db_bytes"]), _age(now, machine["sampled_at"])
         ),

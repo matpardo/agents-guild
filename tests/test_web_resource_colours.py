@@ -8,7 +8,7 @@ _HARNESS_NAME = "web_resources_harness.js"
 _APP_JS = Path(__file__).resolve().parent.parent / "guild" / "web" / "app.js"
 
 
-def _machine(disk_percent, mem_available, disk_delta, untracked_growth, reclaimable):
+def _machine(disk_percent, mem_available, disk_delta, untracked_growth, reclaimable, load_per_core=None):
     return {
         "sampled_at": "t",
         "disk_percent": disk_percent,
@@ -17,6 +17,11 @@ def _machine(disk_percent, mem_available, disk_delta, untracked_growth, reclaima
         "disk_delta": disk_delta,
         "mem_total": 100,
         "mem_available": mem_available,
+        "load1": None if load_per_core is None else load_per_core * 4,
+        "load5": None,
+        "load15": None if load_per_core is None else 1.0,
+        "cpu_count": 4,
+        "load_per_core": load_per_core,
         "guild_db_bytes": 1,
         "untracked_growth": untracked_growth,
         "docker": {"total": 1, "images_reclaimable": reclaimable},
@@ -77,6 +82,17 @@ class WebResourceColourTests(unittest.TestCase):
         for available, expected in ((5, "pill res-bad"), (20, "pill res-warn"), (60, "pill res-ok")):
             rendered = self._render(_machine(10, available, 0, 0, 0), [])
             self.assertEqual(self._class_of(rendered["resources"], "ram"), expected)
+
+    def test_cpu_thresholds_and_text(self):
+        for load, expected in ((0.5, "pill res-ok"), (0.8, "pill res-warn"), (1.5, "pill res-bad")):
+            rendered = self._render(_machine(10, 50, 0, 0, 0, load), [])["resources"]
+            self.assertEqual(self._class_of(rendered, "cpu"), expected)
+        rendered = self._render(_machine(10, 50, 0, 0, 0, 1.8), [])["resources"]
+        self.assertEqual(self._class_of(rendered, "cpu 1.8/core (load 7.2 on 4 cores, 15m 1.0)"), "pill res-bad")
+
+    def test_cpu_is_dim_when_unmeasured(self):
+        rendered = self._render(_machine(10, 50, 0, 0, 0), [])["resources"]
+        self.assertEqual(self._class_of(rendered, "cpu n/a"), "pill res-dim")
 
     def test_machine_deltas_and_docker(self):
         rendered = self._render(_machine(10, 50, 5, -5, 7), [])["resources"]

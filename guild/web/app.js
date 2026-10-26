@@ -3043,6 +3043,8 @@ realmDoctorLines: [],
   var DISK_BAD_PERCENT = 85;
   var RAM_BAD_RATIO = 0.1;
   var RAM_WARN_RATIO = 0.25;
+  var CPU_BAD_PER_CORE = 1.5;
+  var CPU_WARN_PER_CORE = 0.8;
 
   function pill(text, tone) {
     return classedText("span", text, "pill res-" + tone);
@@ -3067,6 +3069,13 @@ realmDoctorLines: [],
       return "bad";
     }
     return machine.mem_available < machine.mem_total * RAM_WARN_RATIO ? "warn" : "ok";
+  }
+
+  function cpuTone(loadPerCore) {
+    if (loadPerCore >= CPU_BAD_PER_CORE) {
+      return "bad";
+    }
+    return loadPerCore >= CPU_WARN_PER_CORE ? "warn" : "ok";
   }
 
   function diskText(machine) {
@@ -3186,6 +3195,14 @@ realmDoctorLines: [],
     return pill("ram " + formatBytes(machine.mem_available) + " available of " + formatBytes(machine.mem_total), ramTone(machine));
   }
 
+  function cpuPill(machine) {
+    if (machine.load_per_core === null) {
+      return pill("cpu n/a", "dim");
+    }
+    var text = "cpu " + machine.load_per_core.toFixed(1) + "/core (load " + machine.load1.toFixed(1) + " on " + machine.cpu_count + " cores, 15m " + machine.load15.toFixed(1) + ")";
+    return pill(text, cpuTone(machine.load_per_core));
+  }
+
   function dockerPill(machine) {
     if (machine.docker === null) {
       return pill("docker n/a", "dim");
@@ -3200,6 +3217,7 @@ realmDoctorLines: [],
       pills.push(deltaPill(signedBytes(machine.disk_delta) + " in " + since, machine.disk_delta));
     }
     pills.push(ramPill(machine));
+    pills.push(cpuPill(machine));
     pills.push(dockerPill(machine));
     pills.push(pill("guild.db " + formatBytes(machine.guild_db_bytes), "dim"));
     if (machine.untracked_growth !== null) {

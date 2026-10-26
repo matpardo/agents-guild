@@ -324,6 +324,18 @@ class MigrationTests(GuildTestCase):
         )
         self.assertEqual(conn.execute("SELECT COUNT(*) AS n FROM cards").fetchone()["n"], 0)
 
+    def test_old_resource_machine_gains_load_columns(self):
+        db_path = self.data_home / "guild.db"
+        conn = sqlite3.connect(str(db_path))
+        conn.execute("CREATE TABLE resource_machine (ts TEXT PRIMARY KEY, guild_db_bytes INTEGER NOT NULL)")
+        conn.commit()
+        conn.close()
+
+        again = db.connect(db_path)
+        columns = {row["name"] for row in again.execute("PRAGMA table_info(resource_machine)").fetchall()}
+        again.close()
+        self.assertTrue({"load1", "load5", "load15", "cpu_count"} <= columns)
+
     def test_old_schema_db_gains_notices_announces_column(self):
         db_path = self.data_home / "guild.db"
         _make_old_schema_db(db_path)
