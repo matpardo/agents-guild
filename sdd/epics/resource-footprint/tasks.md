@@ -157,3 +157,14 @@ updated: 2026-10-04
 **Acceptance:**
 - [x] The endpoint records the samples and returns the summary line.
 - [x] The button shows the summary or the error and leaves its busy state.
+
+## T14 — CPU load per core in the snapshot
+
+**Depends on:** T13
+**Status:** [x] done
+
+**What:** The machine snapshot records the 1, 5 and 15 minute load and the core count at capture time. The report and the web board show the 1-minute load per core next to RAM: amber from 0.8, red from 1.5, `cpu n/a` when unmeasured.
+
+**Acceptance:**
+- [x] `guild resources collect` stores the load and the core count in the machine row; old events replay with null values.
+- [x] The `machine` line and the web pill show `cpu <load>/core (load <load1> on <n> cores, 15m <load15>)`.

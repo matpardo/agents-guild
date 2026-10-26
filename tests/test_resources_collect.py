@@ -88,7 +88,18 @@ class CollectRecordTests(CollectFixture):
         machine = payload["machine"]
         self.assertEqual(
             set(machine),
-            {"disk_total", "disk_used", "mem_total", "mem_available", "guild_db_bytes", "docker"},
+            {
+                "disk_total",
+                "disk_used",
+                "mem_total",
+                "mem_available",
+                "load1",
+                "load5",
+                "load15",
+                "cpu_count",
+                "guild_db_bytes",
+                "docker",
+            },
         )
         self.assertEqual(
             machine["docker"],

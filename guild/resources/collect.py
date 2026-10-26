@@ -9,6 +9,7 @@ _LOCK_FILE = "collect.lock"
 _LOCK_DIR_NAME = "resources"
 _ALREADY_RUNNING = "collect already running"
 _MEMINFO_PATH = Path("/proc/meminfo")
+_LOADAVG_PATH = Path("/proc/loadavg")
 _DISK_ROOT = Path("/")
 _KIND = "resources.sampled"
 _VISIBILITY = "local"
@@ -36,7 +37,7 @@ def _measure(ctx, projects, runner, deadline):
         rows_by_project[project].append(row)
     for project, rows in _docker_rows(scan, found).items():
         rows_by_project.setdefault(project, []).extend(rows)
-    snapshot = machine.snapshot(_DISK_ROOT, _MEMINFO_PATH, paths.db_path())
+    snapshot = machine.snapshot(_DISK_ROOT, _MEMINFO_PATH, _LOADAVG_PATH, paths.db_path())
     snapshot["docker"] = scan["totals"]
     return rows_by_project, snapshot, scan
 

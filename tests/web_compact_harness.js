@@ -37,7 +37,7 @@ async function run({ src, scenario }) {
   const board = { generated_at: "now", parties: [], raids: [], asks: [], blocked: [], notices: [], projects: [],
     memory: [], merge_queues: [], drift: [], answered_asks: [] };
   const machine = { sampled_at: "t", disk_percent: null, mem_available: null, docker: null,
-    guild_db_bytes: 0, untracked_growth: null };
+    load_per_core: null, guild_db_bytes: 0, untracked_growth: null };
   function respond(body, ok) {
     return Promise.resolve({ ok, json: () => Promise.resolve(body) });
   }

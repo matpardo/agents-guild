@@ -1,3 +1,4 @@
+import os
 import re
 import shutil
 
@@ -15,6 +16,14 @@ def read_memory(meminfo_path):
     if "MemTotal" not in values or "MemAvailable" not in values:
         return None, None
     return values["MemTotal"], values["MemAvailable"]
+
+
+def read_load(loadavg_path):
+    try:
+        fields = loadavg_path.read_text().split()
+        return float(fields[0]), float(fields[1]), float(fields[2])
+    except (OSError, ValueError, IndexError):
+        return None, None, None
 
 
 def _file_bytes(path):
@@ -39,13 +48,18 @@ def _disk_totals(root_path):
     return usage.total, usage.used
 
 
-def snapshot(root_path, meminfo_path, db_path):
+def snapshot(root_path, meminfo_path, loadavg_path, db_path):
     disk_total, disk_used = _disk_totals(root_path)
     mem_total, mem_available = read_memory(meminfo_path)
+    load1, load5, load15 = read_load(loadavg_path)
     return {
         "disk_total": disk_total,
         "disk_used": disk_used,
         "mem_total": mem_total,
         "mem_available": mem_available,
+        "load1": load1,
+        "load5": load5,
+        "load15": load15,
+        "cpu_count": os.cpu_count(),
         "guild_db_bytes": database_bytes(db_path),
     }

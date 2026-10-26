@@ -24,6 +24,10 @@ def _machine(used, total, docker):
         "disk_used": used,
         "mem_total": 31 * _GB,
         "mem_available": 9 * _GB,
+        "load1": 7.2,
+        "load5": 6.5,
+        "load15": 6.1,
+        "cpu_count": 4,
         "guild_db_bytes": 173000000,
         "docker": docker,
     }
@@ -257,6 +261,19 @@ class MachineTests(ReportFixture):
         self.assertEqual(machine["docker"]["images"], 8 * _GB)
         self.assertEqual(machine["docker"]["total"], 8 * _GB + 100000000 + 4 * _GB + 5300000000)
 
+    def test_load_per_core_is_load_over_cores(self):
+        self.sample("acme", _ago(hours=1), [], _PLAIN_MACHINE)
+        machine = self.model(None, "1d")["machine"]
+        self.assertEqual((machine["load1"], machine["load15"], machine["cpu_count"]), (7.2, 6.1, 4))
+        self.assertAlmostEqual(machine["load_per_core"], 1.8)
+
+    def test_load_per_core_is_null_without_load_or_cores(self):
+        for key in ("load1", "cpu_count"):
+            machine = dict(_PLAIN_MACHINE)
+            machine[key] = None
+            self.sample("acme", _ago(hours=1), [], machine)
+            self.assertIsNone(self.model(None, "1d")["machine"]["load_per_core"])
+
     def test_machine_docker_is_null_when_unavailable(self):
         self.sample("acme", _ago(hours=1), [], _PLAIN_MACHINE)
         self.assertIsNone(self.model(None, "1d")["machine"]["docker"])
@@ -387,7 +404,7 @@ class RenderTests(ReportFixture):
         self._seed_example()
         baseline = _ago(days=2).astimezone().strftime("%Y-%m-%d %H:%M")
         expected = [
-            "machine   disk 82% used (412.0 GB of 500.0 GB, +6.0 GB in 1d)   ram 9.0 GB available of 31.0 GB",
+            "machine   disk 82% used (412.0 GB of 500.0 GB, +6.0 GB in 1d)   ram 9.0 GB available of 31.0 GB   cpu 1.8/core (load 7.2 on 4 cores, 15m 6.1)",
             "          docker 17.4 GB (reclaimable 5.2 GB)   guild.db 173 MB   sampled 41m ago",
             "untracked growth: +1.4 GB (machine +6.0 GB, tracked +4.6 GB)",
             "",
@@ -452,6 +469,12 @@ class RenderTests(ReportFixture):
         lines = self._lines(None, "1d")
         self.assertIn("ram n/a", lines[0])
         self.assertIn("docker n/a", lines[1])
+
+    def test_machine_line_without_load_shows_cpu_na(self):
+        machine = _machine(400 * _GB, 500 * _GB, None)
+        machine["load1"] = None
+        self.sample("acme", _ago(hours=1), [], machine)
+        self.assertIn("cpu n/a", self._lines(None, "1d")[0])
 
     def test_categories_show_top_ten_items_and_a_remainder(self):
         items = [
