@@ -967,7 +967,17 @@ def _daily_tasks(conn, now, party_name):
         _count_on_local_day(created, row["created_at"])
         if row["state"] == "done":
             _count_on_local_day(done, row["updated_at"])
-    return [{"day": day.isoformat(), "created": created[day], "done": done[day]} for day in days]
+    session_events = dict.fromkeys(days, 0)
+    event_rows = conn.execute(
+        "SELECT ts FROM events WHERE party = ? AND session_id IS NOT NULL AND ts >= ?",
+        (party_name, timeutil.to_iso(now - timedelta(days=_DAILY_TASK_DAYS))),
+    ).fetchall()
+    for row in event_rows:
+        _count_on_local_day(session_events, row["ts"])
+    return [
+        {"day": day.isoformat(), "created": created[day], "done": done[day], "active": session_events[day] > 0}
+        for day in days
+    ]
 
 
 def _summed_daily_tasks(ctx, party_rows):
@@ -979,9 +989,16 @@ def _summed_daily_tasks(ctx, party_rows):
             "day": entries[0]["day"],
             "created": sum(entry["created"] for entry in entries),
             "done": sum(entry["done"] for entry in entries),
+            "active": any(entry["active"] for entry in entries),
         }
         for entries in zip(*per_party, strict=True)
     ]
+
+
+def _daily_cell(day, key):
+    if not day["active"] and day[key] == 0:
+        return "-"
+    return day[key]
 
 
 def _daily_task_lines(painter, days):
@@ -991,8 +1008,8 @@ def _daily_task_lines(painter, days):
     return [
         painter.paint("TASKS PER DAY · last {} days".format(len(days)), "bold"),
         "  {:<8}".format("day") + " ".join("{:>3}".format(cell) for cell in cells),
-        "  {:<8}".format("created") + " ".join("{:>3}".format(day["created"]) for day in days),
-        "  {:<8}".format("done") + " ".join("{:>3}".format(day["done"]) for day in days),
+        "  {:<8}".format("created") + " ".join("{:>3}".format(_daily_cell(day, "created")) for day in days),
+        "  {:<8}".format("done") + " ".join("{:>3}".format(_daily_cell(day, "done")) for day in days),
         "",
     ]
 

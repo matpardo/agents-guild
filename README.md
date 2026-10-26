@@ -1447,8 +1447,10 @@ when it has no raid. The header keeps the PR state filter.
 
 **Tasks per day**: under the merge queue, the party and raid views show a table of the
 last 15 days, today included (one column per local day): `created` counts the tasks added
-to the party's quests that day, `done` the tasks finished that day. A raid view sums its
-member parties. A task counts for the party that owns its quest now. `guild board --party`
+to the party's quests that day, `done` the tasks finished that day. A `-` marks a day with
+no session of the party and no task created or done; a `0` means a session ran but created
+or finished nothing (model key `active`). A raid view sums its member parties, and a day is
+active when any member was. A task counts for the party that owns its quest now. `guild board --party`
 and `guild board --raid` print the same rows as `TASKS PER DAY · last 15 days` (model key
 `daily_tasks` on each party).
 

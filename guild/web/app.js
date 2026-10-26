@@ -2368,9 +2368,14 @@ realmDoctorLines: [],
       return parties.reduce(
         function (total, party) {
           var day = party.daily_tasks[index];
-          return { day: entry.day, created: total.created + day.created, done: total.done + day.done };
+          return {
+            day: entry.day,
+            created: total.created + day.created,
+            done: total.done + day.done,
+            active: total.active || day.active,
+          };
         },
-        { day: entry.day, created: 0, done: 0 }
+        { day: entry.day, created: 0, done: 0, active: false }
       );
     });
   }
@@ -2379,6 +2384,10 @@ realmDoctorLines: [],
     var row = el("tr");
     row.appendChild(textEl("th", label));
     days.forEach(function (day) {
+      if (!day.active && day[key] === 0) {
+        row.appendChild(classedText("td", "-", "muted"));
+        return;
+      }
       row.appendChild(textEl("td", String(day[key])));
     });
     return row;
