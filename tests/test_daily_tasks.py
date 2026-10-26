@@ -44,10 +44,20 @@ class DailyTasksTests(QuestBoardTestCase):
         days = self.party_days("alpha")
         self.assertEqual(len(days), 15)
         self.assertEqual(days[0]["day"], _day(14))
-        self.assertEqual(days[-1], {"day": _day(0), "created": 0, "done": 1})
-        self.assertEqual(days[-4], {"day": _day(3), "created": 1, "done": 1})
+        self.assertEqual(days[-1], {"day": _day(0), "created": 0, "done": 1, "active": True})
+        self.assertEqual(days[-4], {"day": _day(3), "created": 1, "done": 1, "active": True})
         self.assertEqual(sum(day["created"] for day in days), 1)
         self.assertEqual(sum(day["done"] for day in days), 2)
+
+    def test_days_without_a_session_event_are_inactive(self):
+        days = self.party_days("alpha")
+        self.assertEqual([day["day"] for day in days if day["active"]], [_day(3), _day(0)])
+
+    def test_session_that_produced_nothing_shows_zero_not_a_dash(self):
+        self.at(1, ["task", "start", "old/T02"], "sess-1")
+        out = self.board(["--party", "alpha"])
+        created_line = next(line for line in out.splitlines() if line.strip().startswith("created"))
+        self.assertEqual(created_line.split()[-2], "0")
 
     def test_other_party_tasks_stay_out_of_the_party_counts(self):
         self.at(10, ["party", "start", "beta", "--reason", "r"], "sess-2")
@@ -60,8 +70,8 @@ class DailyTasksTests(QuestBoardTestCase):
         self.assertIn("TASKS PER DAY · last 15 days", out)
         created_line = next(line for line in out.splitlines() if line.strip().startswith("created"))
         done_line = next(line for line in out.splitlines() if line.strip().startswith("done "))
-        self.assertEqual(created_line.split()[1:], ["0"] * 11 + ["1", "0", "0", "0"])
-        self.assertEqual(done_line.split()[1:], ["0"] * 11 + ["1", "0", "0", "1"])
+        self.assertEqual(created_line.split()[1:], ["-"] * 11 + ["1", "-", "-", "0"])
+        self.assertEqual(done_line.split()[1:], ["-"] * 11 + ["1", "-", "-", "1"])
 
     def test_raid_board_sums_its_member_parties(self):
         self.at(10, ["party", "start", "beta", "--reason", "r"], "sess-2")
@@ -71,6 +81,8 @@ class DailyTasksTests(QuestBoardTestCase):
         out = self.board(["--raid", "ci"])
         created_line = next(line for line in out.splitlines() if line.strip().startswith("created"))
         self.assertEqual(created_line.split()[-4], "3")
+        self.assertEqual(created_line.split()[-2], "0")
+        self.assertEqual(created_line.split()[-5], "-")
 
     def test_full_board_has_no_daily_rows(self):
         self.assertNotIn("TASKS PER DAY", self.board([]))

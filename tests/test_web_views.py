@@ -130,23 +130,36 @@ class WebViewBehaviorTests(unittest.TestCase):
         self.assertNotIn("o/r#1", text)
 
     def _daily_tasks_text(self, hash_value):
-        def days(created, done):
-            return [{"day": "2026-10-2{}".format(index), "created": created, "done": done} for index in (4, 5)]
+        def days(created, done, active):
+            return [
+                {"day": "2026-10-2{}".format(index), "created": created, "done": done, "active": flag}
+                for index, flag in zip((4, 5), active, strict=True)
+            ]
 
-        parties = [dict(_party("a", ["r"]), daily_tasks=days(1, 0)), dict(_party("b", ["r"]), daily_tasks=days(2, 3))]
-        board = dict(_VIEWS_BOARD, parties=parties + [dict(_party("d", []), daily_tasks=days(7, 7))])
+        parties = [
+            dict(_party("a", ["r"]), daily_tasks=days(1, 0, (True, False))),
+            dict(_party("b", ["r"]), daily_tasks=days(2, 3, (False, False))),
+            dict(_party("c", ["r"]), daily_tasks=days(0, 0, (False, False))),
+        ]
+        board = dict(_VIEWS_BOARD, parties=parties + [dict(_party("d", []), daily_tasks=days(7, 7, (True, True)))])
         return _render(board, hash_value, "daily-tasks", "text").split()
 
     def test_party_view_shows_its_daily_tasks(self):
         self.assertEqual(
             self._daily_tasks_text("#party/a"),
-            ["tasks", "per", "day", "day", "10-24", "10-25", "created", "1", "1", "done", "0", "0"],
+            ["tasks", "per", "day", "day", "10-24", "10-25", "created", "1", "1", "done", "0", "-"],
         )
 
     def test_raid_view_sums_the_daily_tasks_of_its_members(self):
         self.assertEqual(
             self._daily_tasks_text("#raid/r"),
             ["tasks", "per", "day", "day", "10-24", "10-25", "created", "3", "3", "done", "3", "3"],
+        )
+
+    def test_party_view_marks_days_without_a_session(self):
+        self.assertEqual(
+            self._daily_tasks_text("#party/c"),
+            ["tasks", "per", "day", "day", "10-24", "10-25", "created", "-", "-", "done", "-", "-"],
         )
 
     def test_sidebar_groups_parties_by_raid_then_solo(self):

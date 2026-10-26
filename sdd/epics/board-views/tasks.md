@@ -3,7 +3,7 @@ epic: board-views
 type: tasks
 title: Sidebar and views on the web board
 status: done
-updated: 2026-10-25
+updated: 2026-10-26
 ---
 
 # Tasks: Sidebar and views on the web board
@@ -42,3 +42,10 @@ updated: 2026-10-25
 **Status:** [x] done
 
 **What:** `guild/commands/board.py`, `guild/web/app.js`, `app.css`, `index.html`: each party model carries `daily_tasks`, the tasks created and done per local day over the last 15 days; the party and raid views show them as a table under the merge queue (a raid sums its members), and `guild board --party|--raid` prints the same rows.
+
+## T06 — Rest days in tasks per day
+
+**Depends on:** T05
+**Status:** [x] done
+
+**What:** `guild/commands/board.py`, `guild/web/app.js`: each `daily_tasks` day carries `active`, true when a session of the party recorded an event that day; the CLI rows and the web table show `-` for an inactive day with no task created or done, so a day the party was off reads apart from a day a session produced nothing.
