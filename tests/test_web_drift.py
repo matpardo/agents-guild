@@ -131,7 +131,7 @@ _BOARD = {
             "from_adventurer": None,
             "dates": "created 2026-10-24 10:00",
             "status": {"name": "idle", "label": "idle"},
-            "remaining": {"all_done": True},
+            "remaining": {"all_done": True, "quests": [], "active": 0, "blocked": 0, "queued": 0},
             "ctx": None,
             "resume_command": None,
             "caps": None,
@@ -140,6 +140,7 @@ _BOARD = {
             "waits": [],
             "ideas": [],
             "daily_tasks": [],
+            "blocked_groups": [],
         }
         for name in ("a", "c")
     ],

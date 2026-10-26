@@ -44,3 +44,16 @@ def remaining(conn, party_name):
         "extra_prs": extra_prs,
         "all_done": pending == 0 and extra_prs == 0,
     }
+
+
+def blocked_groups(conn, party_name):
+    rows = conn.execute(
+        "SELECT t.quest, t.tid, t.blocked_reason FROM quest_tasks t JOIN quests q ON q.slug = t.quest"
+        " WHERE q.party = ? AND q.state = 'active' AND t.state = 'blocked' ORDER BY t.quest ASC, t.tid ASC",
+        (party_name,),
+    ).fetchall()
+    by_reason = {}
+    for row in rows:
+        by_reason.setdefault(row["blocked_reason"], []).append("{}/{}".format(row["quest"], row["tid"]))
+    groups = [{"reason": reason, "tids": tids} for reason, tids in by_reason.items()]
+    return sorted(groups, key=lambda group: (-len(group["tids"]), group["reason"] or ""))

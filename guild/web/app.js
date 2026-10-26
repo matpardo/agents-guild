@@ -2360,6 +2360,78 @@ realmDoctorLines: [],
     section.appendChild(classedText("p", "guild never merges: merge in this order by hand", "muted"));
   }
 
+  function percentOf(done, total) {
+    return total === 0 ? 0 : Math.round((done * 100) / total);
+  }
+
+  function progressBar(done, total) {
+    var bar = el("progress");
+    bar.max = total;
+    bar.value = done;
+    return bar;
+  }
+
+  function progressRow(label, done, total) {
+    var row = el("div");
+    row.className = "epic-progress";
+    row.appendChild(textEl("span", label + " " + done + "/" + total));
+    row.appendChild(progressBar(done, total));
+    return row;
+  }
+
+  function mergedBlockedGroups(parties) {
+    var byReason = {};
+    parties.forEach(function (party) {
+      party.blocked_groups.forEach(function (group) {
+        byReason[group.reason] = (byReason[group.reason] || []).concat(group.tids);
+      });
+    });
+    return Object.keys(byReason)
+      .map(function (reason) {
+        return { reason: reason, tids: byReason[reason] };
+      })
+      .sort(function (a, b) {
+        return b.tids.length - a.tids.length || (a.reason < b.reason ? -1 : 1);
+      });
+  }
+
+  function renderProgress(parties) {
+    var section = document.getElementById("progress");
+    clear(section);
+    section.appendChild(textEl("h2", "progress"));
+    if (parties.length === 0) {
+      section.appendChild(textEl("p", "no party in view"));
+      return;
+    }
+    var quests = [];
+    var counts = { active: 0, blocked: 0, queued: 0 };
+    parties.forEach(function (party) {
+      quests = quests.concat(party.remaining.quests);
+      Object.keys(counts).forEach(function (key) {
+        counts[key] += party.remaining[key];
+      });
+    });
+    if (quests.length === 0) {
+      section.appendChild(textEl("p", "no active quest"));
+      return;
+    }
+    var done = quests.reduce(function (sum, quest) { return sum + quest.done; }, 0);
+    var total = quests.reduce(function (sum, quest) { return sum + quest.total; }, 0);
+    section.appendChild(textEl("p", done + "/" + total + " tasks done (" + percentOf(done, total) + "%)"));
+    section.appendChild(progressBar(done, total));
+    quests.forEach(function (quest) {
+      section.appendChild(progressRow(quest.slug, quest.done, quest.total));
+    });
+    section.appendChild(
+      textEl("p", "active " + counts.active + " · blocked " + counts.blocked + " · queued " + counts.queued)
+    );
+    mergedBlockedGroups(parties).forEach(function (group) {
+      var line = textEl("p", group.tids.length + " blocked — " + group.reason);
+      line.title = group.tids.join(", ");
+      section.appendChild(line);
+    });
+  }
+
   function summedDailyTasks(parties) {
     if (parties.length === 0) {
       return [];
@@ -3585,8 +3657,8 @@ realmDoctorLines: [],
 
   var VIEW_SECTIONS = {
     "needs-you": ["asks", "ready-for-you", "answered-asks"],
-    party: ["asks", "merge-queues", "daily-tasks", "parties", "memory"],
-    raid: ["asks", "merge-queues", "daily-tasks", "parties", "memory"],
+    party: ["asks", "merge-queues", "progress", "daily-tasks", "parties", "memory"],
+    raid: ["asks", "merge-queues", "progress", "daily-tasks", "parties", "memory"],
     adventurers: ["adventurers", "health-jobs"],
     ideas: ["ideas"],
     quests: ["quest-board"],
@@ -3594,7 +3666,7 @@ realmDoctorLines: [],
   };
   var ALL_SECTION_IDS = [
     "asks", "ready-for-you", "answered-asks", "notices", "ideas", "adventurers", "health-jobs",
-    "memory", "raids", "drift", "projects", "quest-board", "merge-queues", "daily-tasks", "parties", "realm",
+    "memory", "raids", "drift", "projects", "quest-board", "merge-queues", "progress", "daily-tasks", "parties", "realm",
   ];
   var DEFAULT_VIEW = { kind: "needs-you", name: "", hash: "needs-you" };
 
@@ -3859,6 +3931,7 @@ realmDoctorLines: [],
     renderSection("memory", [filtered.memory], renderMemory, onlyIfChanged);
     renderSection("raids", [filtered.raids], renderRaids, onlyIfChanged);
     renderSection("merge-queues", [filtered.merge_queues], renderMergeQueues, onlyIfChanged);
+    renderSection("progress", [filtered.parties], renderProgress, onlyIfChanged);
     renderSection("daily-tasks", [filtered.parties], renderDailyTasks, onlyIfChanged);
     renderSection("drift", [filtered.drift], renderDrift, onlyIfChanged);
     renderSection("projects", [filtered.projects], renderProjects, onlyIfChanged);

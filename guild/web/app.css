@@ -717,7 +717,8 @@ main.history-main {
   gap: 0.2rem;
 }
 
-.epic-progress progress {
+.epic-progress progress,
+#progress > progress {
   width: 100%;
   height: 0.6rem;
   accent-color: var(--green);

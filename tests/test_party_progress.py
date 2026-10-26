@@ -40,6 +40,39 @@ class PartyProgressTests(GuildTestCase):
         self.assertEqual(result["quests"], [{"slug": "demo", "done": 1, "total": 4}])
         self.assertFalse(result["all_done"])
 
+    def _blocked_groups(self):
+        conn = db.connect(paths.db_path())
+        try:
+            return party_progress.blocked_groups(conn, "alpha")
+        finally:
+            conn.close()
+
+    def _block(self, tid, reason):
+        self._cli(["task", "start", tid])
+        self._cli(["task", "block", tid, "--reason", reason])
+
+    def test_blocked_groups_group_by_reason_largest_first(self):
+        self._add_quest("demo", ["A", "B", "C", "D"])
+        self._block("demo/A", "zeta")
+        self._block("demo/B", "alpha")
+        self._block("demo/C", "zeta")
+        self.assertEqual(
+            self._blocked_groups(),
+            [{"reason": "zeta", "tids": ["demo/A", "demo/C"]}, {"reason": "alpha", "tids": ["demo/B"]}],
+        )
+
+    def test_blocked_groups_order_equal_sizes_by_reason(self):
+        self._add_quest("demo", ["A", "B"])
+        self._block("demo/A", "zeta")
+        self._block("demo/B", "alpha")
+        self.assertEqual([group["reason"] for group in self._blocked_groups()], ["alpha", "zeta"])
+
+    def test_blocked_groups_ignore_done_quest(self):
+        self._add_quest("demo", ["A"])
+        self._block("demo/A", "wait")
+        self._cli(["quest", "done", "demo", "--force"])
+        self.assertEqual(self._blocked_groups(), [])
+
     def test_sums_two_quests(self):
         self._add_quest("one", ["A", "B"])
         self._add_quest("two", ["C"])

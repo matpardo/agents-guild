@@ -293,6 +293,7 @@ class BoardModelShapeTests(BoardModelTestCase):
                 "drift",
                 "waits",
                 "daily_tasks",
+                "blocked_groups",
             },
         )
         self.assertEqual(party["name"], "alpha")
