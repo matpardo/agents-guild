@@ -87,3 +87,15 @@ updated: 2026-10-25
 - [x] A paused repo's `origin/<base>` does not move on `sync --source bases` and moves again after resume; double pause, resume when not paused and an unknown repo fail.
 - [x] The pause is stored in `base_pauses` and replays in `guild rebuild`.
 - [x] The web header renders a pause or resume button per base and the route calls the same function as the CLI.
+
+## T08 — Park a party waiting on outside work
+
+**Depends on:** T07
+**Status:** [x] done
+
+**What:** `guild handoff --parked "<reason>"`, `guild party park <name> --reason "<reason>"` and `guild party unpark <name>` (and Park and Unpark controls on the web party card) mark a party that waits on something outside development. A party without a live session shows `parked` with the reason, or `blocked` when its only work left is blocked tasks, instead of `idle`. The mark clears when a session resumes the party. `guild revive --list` prints the reason.
+
+**Acceptance:**
+- [x] An open ask beats `parked`, `parked` beats `queued`, `queued` beats `blocked`, and a resume or an unpark clears the mark; the mark replays in `guild rebuild`.
+- [x] `handoff --parked` refuses a blank reason, `--party` and `prune`; `party park` and `unpark` refuse unknown or closed parties, a blank reason and unparking a party that is not parked.
+- [x] The web sidebar and party card show the badge with the detail, and the park route calls the same function as the CLI.

@@ -420,6 +420,8 @@ _COLUMN_MIGRATIONS = (
     ("notices", "unbound", "INTEGER"),
     ("main_status", "external", "TEXT"),
     ("parties", "reason", "TEXT"),
+    ("parties", "parked", "TEXT"),
+    ("parties", "parked_at", "TEXT"),
     ("parties", "from_adventurer", "INTEGER"),
     ("adventurers", "reason", "TEXT"),
 )

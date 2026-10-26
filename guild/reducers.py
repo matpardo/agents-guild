@@ -37,7 +37,8 @@ def _party_resumed(conn, event):
         (payload["party"], payload["generation"]),
     )
     conn.execute(
-        "UPDATE parties SET leader_session_id = ?, generation = ?, state = 'active', updated_at = ? WHERE name = ?",
+        "UPDATE parties SET leader_session_id = ?, generation = ?, state = 'active', parked = NULL, parked_at = NULL,"
+        " updated_at = ? WHERE name = ?",
         (event["session_id"], payload["generation"], event["ts"], payload["party"]),
     )
     conn.execute(
@@ -78,6 +79,23 @@ def _party_handed_off(conn, event):
     conn.execute(
         "UPDATE leaders SET handoff_path = ? WHERE party = ? AND generation = ?",
         (payload["handoff_path"], payload["party"], payload["generation"]),
+    )
+    if payload.get("parked") is not None:
+        _set_parked(conn, event["ts"], payload["party"], payload["parked"])
+
+
+def _set_parked(conn, ts, party, reason):
+    conn.execute("UPDATE parties SET parked = ?, parked_at = ?, updated_at = ? WHERE name = ?", (reason, ts, ts, party))
+
+
+def _party_parked(conn, event):
+    _set_parked(conn, event["ts"], event["payload"]["party"], event["payload"]["reason"])
+
+
+def _party_unparked(conn, event):
+    conn.execute(
+        "UPDATE parties SET parked = NULL, parked_at = NULL, updated_at = ? WHERE name = ?",
+        (event["ts"], event["payload"]["party"]),
     )
 
 
@@ -842,6 +860,8 @@ _REDUCERS = {
     "party.resumed": _party_resumed,
     "party.closed": _party_closed,
     "party.handed_off": _party_handed_off,
+    "party.parked": _party_parked,
+    "party.unparked": _party_unparked,
     "handoff.pruned": _handoff_pruned,
     "leader.located": _leader_located,
     "leader.window_launched": _leader_window_launched,

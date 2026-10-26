@@ -85,6 +85,10 @@ realmDoctorLines: [],
     baseStatuses: {},
     partyHandoffStatuses: {},
     partyHandoffBusy: {},
+    partyParkOpen: {},
+    partyParkDrafts: {},
+    partyParkStatuses: {},
+    partyParkBusy: {},
     compactStatus: "",
     compactBusy: false,
     collectStatus: "",
@@ -144,6 +148,8 @@ realmDoctorLines: [],
       unknown: "A running leader session never reported its status.",
       idle: "The party has no live session and nothing to do.",
       queued: "The party has no live session but has work waiting; start a fresh session from its brief.",
+      parked: "The party handed off to wait on something outside development; resume it once that is resolved.",
+      blocked: "The party has no live session and all its work left is blocked tasks.",
       closed: "The party is closed and its work is over.",
     },
     partyState: {
@@ -463,6 +469,38 @@ realmDoctorLines: [],
       }
       fetchBoard();
     });
+  }
+
+  function postPartyParkAction(partyName, action, payload) {
+    if (sessionToken === null) {
+      state.partyParkStatuses[partyName] = NO_SESSION_MESSAGE;
+      fetchBoard();
+      return;
+    }
+    state.partyParkBusy[partyName] = true;
+    state.partyParkStatuses[partyName] = "sending...";
+    fetchBoard();
+    sendPost("/api/parties/" + partyName + "/" + action, payload).then(function (result) {
+      delete state.partyParkBusy[partyName];
+      if (result.ok) {
+        delete state.partyParkOpen[partyName];
+        delete state.partyParkDrafts[partyName];
+        delete state.partyParkStatuses[partyName];
+      } else {
+        state.partyParkStatuses[partyName] = errorMessage(result.body);
+      }
+      fetchBoard();
+    });
+  }
+
+  function submitPartyPark(partyName) {
+    var text = state.partyParkDrafts[partyName] || "";
+    if (text.trim() === "") {
+      state.partyParkStatuses[partyName] = EMPTY_REASON_MESSAGE;
+      fetchBoard();
+      return;
+    }
+    postPartyParkAction(partyName, "park", { reason: text });
   }
 
   function postAdventurerDismiss(adventurerId) {
@@ -1242,6 +1280,16 @@ realmDoctorLines: [],
     var badge = textEl("span", status.label);
     badge.className = "status-badge status-" + status.name;
     return explain(badge, "partyStatus", status.name);
+  }
+
+  function renderStatusDetail(status) {
+    if ((status.name !== "parked" && status.name !== "blocked") || status.detail === null) {
+      return null;
+    }
+    var detail = textEl("span", status.detail);
+    detail.className = "status-detail";
+    detail.title = status.detail;
+    return detail;
   }
 
   function renderNotice(notice) {
@@ -2802,6 +2850,58 @@ realmDoctorLines: [],
     return controls;
   }
 
+  function partyParkButton(party, label, handler) {
+    var button = textEl("button", label);
+    button.type = "button";
+    button.disabled = state.partyParkBusy[party.name] === true;
+    button.addEventListener("click", handler);
+    return button;
+  }
+
+  function renderPartyParkInput(party) {
+    var input = el("input");
+    input.type = "text";
+    input.className = "block-reason";
+    input.placeholder = "what it waits on";
+    input.value = state.partyParkDrafts[party.name] || "";
+    input.disabled = state.partyParkBusy[party.name] === true;
+    input.dataset.focusKey = "park|" + party.name;
+    input.addEventListener("input", function () {
+      state.partyParkDrafts[party.name] = input.value;
+    });
+    return input;
+  }
+
+  function renderPartyParkControls(party) {
+    var controls = el("span");
+    controls.className = "pr-block-controls";
+    if (party.parked !== null) {
+      controls.appendChild(
+        partyParkButton(party, "Unpark", function () {
+          postPartyParkAction(party.name, "unpark", {});
+        })
+      );
+    } else if (state.partyParkOpen[party.name]) {
+      controls.appendChild(renderPartyParkInput(party));
+      controls.appendChild(
+        partyParkButton(party, "Confirm park", function () {
+          submitPartyPark(party.name);
+        })
+      );
+    } else {
+      controls.appendChild(
+        partyParkButton(party, "Park", function () {
+          state.partyParkOpen[party.name] = true;
+          fetchBoard();
+        })
+      );
+    }
+    var status = textEl("span", state.partyParkStatuses[party.name] || "");
+    status.className = "ask-status";
+    controls.appendChild(status);
+    return controls;
+  }
+
   function renderPartyWaits(waits) {
     if (waits.length === 0) {
       return null;
@@ -2863,6 +2963,11 @@ realmDoctorLines: [],
     summary.appendChild(explain(textEl("span", party.leader_session_name || "no leader"), "ui", leaderKey));
     details.appendChild(summary);
 
+    var statusDetail = renderStatusDetail(party.status);
+    if (statusDetail !== null) {
+      details.appendChild(statusDetail);
+    }
+
     var origin = partyOrigin(party);
     if (origin !== null) {
       details.appendChild(explain(textEl("p", origin), "ui", "bindingReason"));
@@ -2883,6 +2988,9 @@ realmDoctorLines: [],
 
     if (party.state === "active" && !party.has_live_leader) {
       details.appendChild(renderPartyHandoffControls(party));
+    }
+    if (party.state !== "closed") {
+      details.appendChild(renderPartyParkControls(party));
     }
 
     if (party.caps !== null && party.caps.cap !== null) {
@@ -3709,7 +3817,7 @@ realmDoctorLines: [],
     });
   }
 
-  var ATTENTION_ORDER = ["waiting-permission", "waiting-ask", "ctx-high", "waiting-input", "stopped-with-work", "working", "waiting-background", "queued"];
+  var ATTENTION_ORDER = ["waiting-permission", "waiting-ask", "ctx-high", "waiting-input", "stopped-with-work", "working", "waiting-background", "queued", "parked", "blocked"];
 
   function attentionRank(row) {
     var key = row.ctxHigh && row.status.name !== "waiting-permission" && row.status.name !== "waiting-ask" ? "ctx-high" : row.status.name;
@@ -3809,6 +3917,10 @@ realmDoctorLines: [],
       badges.appendChild(classedText("span", STOPPED_WITHOUT_REPORT_TEXT, "pill stopped-without-report"));
     }
     item.appendChild(badges);
+    var statusDetail = renderStatusDetail(row.status);
+    if (statusDetail !== null) {
+      item.appendChild(statusDetail);
+    }
     return item;
   }
 

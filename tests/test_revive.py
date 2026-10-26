@@ -183,6 +183,13 @@ class ListTests(ReviveBase):
         beta_status = next(line for line in lines if line.startswith("   status: ") and "idle" in line)
         self.assertEqual(beta_status, "   status: idle")
 
+    def test_list_shows_parked_reason(self):
+        self.run_cli(["party", "park", "alpha", "--reason", "legal answer"], None, None)
+        out = self._revive([], False, True, self._tmux(installed=False), None)
+        self.assertIn("status: parked", out)
+        self.assertIn(" — legal answer", out)
+        self.assertNotIn("| parked:", out)
+
     def test_list_prints_copy_paste_one_liner_per_party(self):
         self._set_leader("alpha", str(self.work_a), "acceptEdits")
         _write_transcript(self.claude_projects_dir, "-a", "sess-a", [{"cwd": str(self.work_a)}])

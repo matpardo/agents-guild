@@ -19,6 +19,7 @@ from guild.commands import history as history_commands
 from guild.commands import idea as idea_commands
 from guild.commands import memory as memory_commands
 from guild.commands import notice as notice_commands
+from guild.commands import party as party_commands
 from guild.commands import pr as pr_commands
 from guild.commands import quest as quest_commands
 from guild.commands import raid_pause as raid_pause_commands
@@ -49,6 +50,7 @@ _RAID_ACTION_RE = re.compile(r"^/api/raids/([^/]+)/(pause|resume)$")
 _MEMORY_ACTION_RE = re.compile(r"^/api/memory/([^/]+)/([1-9][0-9]*)/rm$")
 _TASK_MOVE_RE = re.compile(r"^/api/quests/([^/]+)/tasks/([^/]+)/move$")
 _PARTY_HANDOFF_RE = re.compile(r"^/api/parties/([^/]+)/hand-off$")
+_PARTY_PARK_RE = re.compile(r"^/api/parties/([^/]+)/(park|unpark)$")
 _IDEA_ACTION_RE = re.compile(r"^/api/ideas/([^/]+)/(edit|delete|link|unlink)$")
 _IDEA_CREATE_PATH = "/api/ideas/create"
 _QUEST_ACTION_RE = re.compile(r"^/api/quests/([^/]+)/(take|release)$")
@@ -286,6 +288,16 @@ def _run_party_handoff_action(party):
         ctx.conn.close()
 
 
+def _run_party_park_action(action, party, payload):
+    ctx = _action_context()
+    try:
+        if action == "park":
+            return party_commands.park(ctx, party, payload["reason"])
+        return party_commands.unpark(ctx, party)
+    finally:
+        ctx.conn.close()
+
+
 def _run_compact():
     ctx = _action_context()
     try:
@@ -477,7 +489,7 @@ class BoardRequestHandler(http_server.BaseHTTPRequestHandler):
             raise _RequestRejected(400, "party must be a string")
         if action == "move" and not isinstance(payload.get("to"), str):
             raise _RequestRejected(400, "to must be a string")
-        if action == "block" and not isinstance(payload.get("reason"), str):
+        if action in ("block", "park") and not isinstance(payload.get("reason"), str):
             raise _RequestRejected(400, "reason must be a string")
         if action == "relink" and not all(isinstance(payload.get(key, ""), str) for key in ("task", "card")):
             raise _RequestRejected(400, "task and card must be strings")
@@ -572,6 +584,10 @@ class BoardRequestHandler(http_server.BaseHTTPRequestHandler):
         if party_handoff_match is not None:
             party = party_handoff_match.group(1)
             return self._post_action("hand-off", lambda payload: _run_party_handoff_action(party))
+        party_park_match = _PARTY_PARK_RE.match(path)
+        if party_park_match is not None:
+            party, action = party_park_match.groups()
+            return self._post_action(action, lambda payload: _run_party_park_action(action, party, payload))
         task_move_match = _TASK_MOVE_RE.match(path)
         if task_move_match is not None:
             quest, tid = task_move_match.groups()

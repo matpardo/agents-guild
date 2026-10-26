@@ -275,6 +275,7 @@ class BoardModelShapeTests(BoardModelTestCase):
                 "state",
                 "generation",
                 "reason",
+                "parked",
                 "from_adventurer",
                 "dates",
                 "status",

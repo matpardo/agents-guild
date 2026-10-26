@@ -291,3 +291,50 @@ def close(ctx, name, force, pending, lifecycle_runner):
     if stale:
         lines.append(final_report.STALE_PR_NOTE)
     return "\n".join(lines)
+
+
+def _active_party_row(conn, name):
+    names.validate_name(name, "party name")
+    row = conn.execute("SELECT project, state, parked FROM parties WHERE name = ?", (name,)).fetchone()
+    if row is None:
+        raise GuildError("unknown party '{}'".format(name), 1)
+    if row["state"] == "closed":
+        raise GuildError("party '{}' is closed".format(name), 1)
+    return row
+
+
+def park(ctx, name, reason):
+    row = _active_party_row(ctx.conn, name)
+    pii.validate_reason(reason, ctx.projects_dir, row["project"])
+    with db.writing(ctx.conn):
+        events.record(
+            ctx.conn,
+            ctx.now,
+            ctx.origin,
+            None,
+            ctx.session_id,
+            row["project"],
+            "party.parked",
+            "local",
+            {"party": name, "reason": reason.strip()},
+        )
+    return "party '{}' parked".format(name)
+
+
+def unpark(ctx, name):
+    row = _active_party_row(ctx.conn, name)
+    if row["parked"] is None:
+        raise GuildError("party '{}' is not parked".format(name), 1)
+    with db.writing(ctx.conn):
+        events.record(
+            ctx.conn,
+            ctx.now,
+            ctx.origin,
+            None,
+            ctx.session_id,
+            row["project"],
+            "party.unparked",
+            "local",
+            {"party": name},
+        )
+    return "party '{}' unparked".format(name)

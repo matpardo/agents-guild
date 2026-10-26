@@ -92,6 +92,20 @@ def _handle_party_resume(ctx, args):
     return 0
 
 
+def _handle_party_park(ctx, args):
+    from guild.commands import party as party_commands
+
+    _print(party_commands.park(ctx, args.name, args.reason))
+    return 0
+
+
+def _handle_party_unpark(ctx, args):
+    from guild.commands import party as party_commands
+
+    _print(party_commands.unpark(ctx, args.name))
+    return 0
+
+
 def _handle_party_close(ctx, args):
     from guild import lifecycle
     from guild.commands import party as party_commands
@@ -799,6 +813,7 @@ def _handle_handoff(ctx, args):
             ("prune", args.action is not None),
             ("--in-flight", args.in_flight is not None),
             ("--learned", args.learned is not None),
+            ("--parked", args.parked is not None),
             ("--model", args.model is not None),
             ("--dry-run", args.dry_run),
             ("--respawn", args.respawn),
@@ -815,6 +830,7 @@ def _handle_handoff(ctx, args):
         provided = (
             ("--in-flight", args.in_flight is not None),
             ("--learned", args.learned is not None),
+            ("--parked", args.parked is not None),
             ("--model", args.model is not None),
             ("--respawn", args.respawn),
             ("--close", args.close),
@@ -835,6 +851,7 @@ def _handle_handoff(ctx, args):
         ctx,
         args.in_flight,
         args.learned,
+        args.parked,
         args.model,
         args.respawn,
         args.close,
@@ -1005,6 +1022,15 @@ def _add_party_parser(subparsers):
     resume.add_argument("party")
     resume.add_argument("--session", help="session name; from a human terminal only")
     resume.set_defaults(handler=_handle_party_resume)
+
+    park = actions.add_parser("park", help="mark a party as waiting on something outside development")
+    park.add_argument("name")
+    park.add_argument("--reason", required=True, help="what the party waits on")
+    park.set_defaults(handler=_handle_party_park)
+
+    unpark = actions.add_parser("unpark", help="clear the parked mark of a party")
+    unpark.add_argument("name")
+    unpark.set_defaults(handler=_handle_party_unpark)
 
     close = actions.add_parser(
         "close", help="close a party; refuses while quests are unfinished or asks or PRs are open unless --force"
@@ -1570,6 +1596,7 @@ def build_parser():
     handoff.add_argument("action", nargs="?", choices=["prune"], help="prune: delete old handoff files")
     handoff.add_argument("--in-flight", help="work still running")
     handoff.add_argument("--learned", help="what the next session should know")
+    handoff.add_argument("--parked", help="what the party waits on outside development; the board shows it as parked")
     handoff.add_argument("--model", help="model for the next session")
     handoff.add_argument("--dry-run", action="store_true", help="with prune: list what would be deleted")
     handoff.add_argument("--respawn", action="store_true", help="launch the next session in a new tmux window")

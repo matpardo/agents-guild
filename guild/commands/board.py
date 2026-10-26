@@ -72,6 +72,8 @@ _STATUS_STYLES = {
     "unknown": "dim",
     "idle": "dim",
     "queued": "cyan",
+    "parked": "yellow",
+    "blocked": "red",
     "closed": "dim",
 }
 
@@ -836,7 +838,9 @@ def _party_section(ctx, repo_clones, painter, party_row, project_config):
         lines.extend(painter.wrap("reason: {}".format(sanitize.strip_control_sequences(party_row["reason"])), "  "))
     status = party_status.derive(ctx, party_row)
     lines.append(
-        painter.paint("  status: {}".format(party_status.label(ctx, status)), _STATUS_STYLES[status["status"]])
+        painter.paint(
+            "  status: {}".format(party_status.label_with_detail(ctx, status)), _STATUS_STYLES[status["status"]]
+        )
     )
     if _party_stopped_without_report(ctx, party_row):
         lines.append(painter.paint("  " + STOPPED_WITHOUT_REPORT, "red"))
@@ -1339,6 +1343,7 @@ def _party_model(ctx, repo_clones, party_row, project_config):
         "state": party_row["state"],
         "generation": party_row["generation"],
         "reason": _optional_text(party_row["reason"]),
+        "parked": _optional_text(party_row["parked"]),
         "from_adventurer": party_row["from_adventurer"],
         "dates": _party_dates(ctx.conn, party_row),
         "status": _status_model(ctx, party_row),

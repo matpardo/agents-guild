@@ -308,6 +308,9 @@ _STATE_BOARD = dict(
         _state_party("k", ["r"], "waiting-ask"),
         _state_party("p", [], "waiting-permission"),
         _state_party("i", [], "idle"),
+        dict(
+            _state_party("pk", [], "parked"), status={"name": "parked", "label": "parked 3h", "detail": "legal answer"}
+        ),
         _state_party("h", [], "idle", ctx={"pct": 80, "threshold": 70, "source": "configured", "high": True}),
     ],
     asks=[{"party": "k"}, {"party": "k"}],
@@ -327,6 +330,10 @@ class WebSidebarStateTests(unittest.TestCase):
         for name in ("working", "queued", "waiting-ask", "waiting-permission", "idle"):
             with self.subTest(status=name):
                 self.assertIn("status-badge status-" + name, classes)
+
+    def test_parked_row_shows_the_reason_with_a_title(self):
+        details = [node for node in self._nodes() if node["className"] == "status-detail"]
+        self.assertEqual([node["text"] for node in details], ["legal answer"])
 
     def test_ask_count_pill_only_for_parties_with_asks(self):
         pills = [node["text"] for node in self._nodes() if node["className"] == "pill ask-count"]
