@@ -126,3 +126,10 @@ updated: 2026-10-25
 **Status:** [x] done
 
 **What:** `.github/dependabot.yml` checks the GitHub actions and `requirements-lint.txt` monthly and proposes a bump only 14 days after a release, keeping the commit SHA and sha256 pins. `required-version` in `ruff.toml` stays, so a ruff bump fails CI until it is raised in the same branch.
+
+## T18 — Manage the dev tools as a uv project
+
+**Depends on:** T14, T17
+**Status:** [x] done
+
+**What:** `pyproject.toml` declares ruff and coverage in a `dev` dependency group by exact version and pins uv with `required-version`; `uv.lock` holds the sha256 of every published file and replaces `requirements-lint.txt`. CI installs uv through `astral-sh/setup-uv` (pinned by commit SHA, version read from `pyproject.toml`), runs `uv sync --locked` and the lint through `uv run`; Dependabot watches the `uv` ecosystem. A machine without pip or `ensurepip` can lint.
