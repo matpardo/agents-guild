@@ -1445,6 +1445,13 @@ ask, context high, waiting on input, stopped with work, working, queued) and a r
 shows its worst member state. A party view shows the whole merge queue of its raids, or its own queue
 when it has no raid. The header keeps the PR state filter.
 
+**Progress**: under the merge queue, the party and raid views show the tasks done out of
+the total of the active quests with a bar, one bar per quest, the active, blocked and queued
+counts, and the blocked tasks grouped by reason (the tooltip lists their ids). A raid view
+sums its member parties. `guild board --party` and `guild board --raid` print the same as
+`PROGRESS · <done>/<total> tasks done (<pct>%)` (model key `blocked_groups` on each party;
+the totals come from `remaining`).
+
 **Tasks per day**: under the merge queue, the party and raid views show a table of the
 last 15 days, today included (one column per local day): `created` counts the tasks added
 to the party's quests that day, `done` the tasks finished that day. A `-` marks a day with

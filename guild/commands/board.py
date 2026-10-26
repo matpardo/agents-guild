@@ -1015,6 +1015,25 @@ def _daily_task_lines(painter, days):
     ]
 
 
+def _progress_lines(ctx, painter, party_rows):
+    quests = []
+    merged = {}
+    for row in party_rows:
+        quests.extend(party_progress.remaining(ctx.conn, row["name"])["quests"])
+        for group in party_progress.blocked_groups(ctx.conn, row["name"]):
+            merged.setdefault(group["reason"], []).extend(group["tids"])
+    if not quests:
+        return []
+    done = sum(quest["done"] for quest in quests)
+    total = sum(quest["total"] for quest in quests)
+    percent = round(done * 100 / total) if total else 0
+    lines = [painter.paint("PROGRESS · {}/{} tasks done ({}%)".format(done, total, percent), "bold")]
+    lines.extend("  {} {}/{}".format(quest["slug"], quest["done"], quest["total"]) for quest in quests)
+    for reason, tids in sorted(merged.items(), key=lambda item: (-len(item[1]), item[0] or "")):
+        lines.append("  blocked {} — {}".format(len(tids), reason))
+    return [*lines, ""]
+
+
 def _party_rows_for_names(conn, party_names):
     if not party_names:
         return []
@@ -1079,6 +1098,7 @@ def render_board(ctx, party_filter, raid_filter, color, width):
     if raid_filter is not None:
         lines.extend(_raid_next_to_merge_lines(ctx, painter, party_names))
     if party_names is not None:
+        lines.extend(_progress_lines(ctx, painter, party_rows))
         lines.extend(_daily_task_lines(painter, _summed_daily_tasks(ctx, party_rows)))
     lines.extend(render_asks(ctx, party_names, color, width, False))
     lines.extend(_ready_for_you_lines(ctx, painter, party_filter, raid_filter))
@@ -1347,6 +1367,7 @@ def _party_model(ctx, repo_clones, party_row, project_config):
         ],
         "claims": [{"area": row["area"], "expires_at": row["expires_at"], "dates": _row_dates(row)} for row in claims],
         "daily_tasks": _daily_tasks(ctx.conn, ctx.now, party_row["name"]),
+        "blocked_groups": party_progress.blocked_groups(ctx.conn, party_row["name"]),
     }
 
 

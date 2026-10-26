@@ -56,3 +56,10 @@ updated: 2026-10-26
 **Status:** [x] done
 
 **What:** `guild/commands/board.py`, `guild/web/app.js`: each `-` cell of the web table carries a tooltip and the CLI rows end with a dim legend line, both saying a `-` means no session event that day and that a session idle across midnight also shows `-`.
+
+## T08 — Task progress on party and raid views
+
+**Depends on:** T07
+**Status:** [x] done
+
+**What:** `guild/party_progress.py`, `guild/commands/board.py`, `guild/web/app.js`, `app.css`, `index.html`: each party model carries `blocked_groups`, the blocked tasks of its active quests grouped by reason; the party and raid views show the tasks done of the total, a bar per quest, the active, blocked and queued counts and the blocked groups above tasks per day (a raid sums its members), and `guild board --party|--raid` prints the same as `PROGRESS` lines.

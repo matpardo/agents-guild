@@ -87,3 +87,24 @@ class DailyTasksTests(QuestBoardTestCase):
 
     def test_full_board_has_no_daily_rows(self):
         self.assertNotIn("TASKS PER DAY", self.board([]))
+
+
+class ProgressLinesTests(DailyTasksTests):
+    def test_party_board_prints_progress_before_daily_rows(self):
+        self.at(0, ["task", "start", "old/T02"], "sess-1")
+        self.at(0, ["task", "block", "old/T02", "--reason", "waits on ci"], "sess-1")
+        lines = self.board(["--party", "alpha"]).splitlines()
+        self.assertEqual(
+            lines[lines.index("PROGRESS · 2/3 tasks done (67%)") + 1 :][:2], ["  old 2/3", "  blocked 1 — waits on ci"]
+        )
+        self.assertLess(lines.index("PROGRESS · 2/3 tasks done (67%)"), lines.index("TASKS PER DAY · last 15 days"))
+
+    def test_raid_board_sums_progress_of_members(self):
+        self.at(10, ["party", "start", "beta", "--reason", "r"], "sess-2")
+        self.add_quest(3, "fresh", "sess-2")
+        self.at(1, ["raid", "join", "ci", "--ttl", "30d"], "sess-1")
+        self.at(1, ["raid", "join", "ci", "--ttl", "30d"], "sess-2")
+        self.assertIn("PROGRESS · 2/5 tasks done (40%)", self.board(["--raid", "ci"]))
+
+    def test_full_board_has_no_progress_lines(self):
+        self.assertNotIn("PROGRESS", self.board([]))

@@ -24,6 +24,7 @@ class BoardLayoutTests(unittest.TestCase):
                 "ready-for-you",
                 "answered-asks",
                 "merge-queues",
+                "progress",
                 "daily-tasks",
                 "parties",
                 "memory",
