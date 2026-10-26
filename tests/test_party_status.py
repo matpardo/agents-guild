@@ -97,6 +97,57 @@ class PartyStatusTests(GuildTestCase):
         self._kill_session()
         self.assertEqual(self._derive()["status"], "queued")
 
+    def _hand_off_parked(self, reason):
+        self.run_cli(["handoff", "--in-flight", "x", "--learned", "y", "--parked", reason], "sess-1", self.repo_dir)
+
+    def _block_task(self):
+        self._add_task()
+        self.run_cli(["task", "block", "demo/T01", "--reason", "legal"], "sess-1", self.repo_dir)
+
+    def test_parked_offline_shows_reason_and_age_start(self):
+        self._kill_session()
+        self._hand_off_parked("legal answer")
+        result = self._derive()
+        self.assertEqual(result["status"], "parked")
+        self.assertEqual(result["detail"], "legal answer")
+        self.assertIsNotNone(result["since"])
+
+    def test_open_ask_beats_parked(self):
+        self._ask()
+        self._kill_session()
+        self._hand_off_parked("legal answer")
+        self.assertEqual(self._derive()["status"], "waiting-ask")
+
+    def test_parked_beats_queued(self):
+        self._add_task()
+        self._kill_session()
+        self._hand_off_parked("legal answer")
+        self.assertEqual(self._derive()["status"], "parked")
+
+    def test_resume_clears_parked(self):
+        self._kill_session()
+        self._hand_off_parked("legal answer")
+        self.write_session(os.getpid(), "sess-2", "alpha-g2")
+        self.run_cli(["party", "resume", "alpha"], "sess-2", self.repo_dir)
+        self._kill_session()
+        self.assertEqual(self._derive()["status"], "idle")
+
+    def test_blocked_only_work_is_blocked_with_groups(self):
+        self._block_task()
+        self._kill_session()
+        self._hand_off()
+        result = self._derive()
+        self.assertEqual(result["status"], "blocked")
+        self.assertEqual(result["detail"], "1 blocked: 1 — legal")
+        self.assertIsNone(result["since"])
+
+    def test_queued_beats_blocked(self):
+        self._block_task()
+        self.run_cli(["task", "add", "demo/T02", "--title", "Second"], "sess-1", self.repo_dir)
+        self._kill_session()
+        self._hand_off()
+        self.assertEqual(self._derive()["status"], "queued")
+
     def test_dead_session_with_stale_working_row_is_idle(self):
         self._session("session.working", {})
         self._kill_session()

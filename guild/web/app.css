@@ -779,6 +779,25 @@ main.history-main {
   color: var(--status-stopped-fg);
 }
 
+.status-parked {
+  background: var(--lifecycle-converging-bg);
+  color: var(--lifecycle-converging-fg);
+}
+
+.status-blocked {
+  background: var(--danger);
+  color: var(--bg);
+}
+
+.status-detail {
+  display: block;
+  color: var(--muted);
+  font-size: 0.85em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .blocked-session {
   color: var(--danger);
 }

@@ -128,6 +128,7 @@ _BOARD = {
             "state": "active",
             "generation": 1,
             "reason": None,
+            "parked": None,
             "from_adventurer": None,
             "dates": "created 2026-10-24 10:00",
             "status": {"name": "idle", "label": "idle"},
@@ -852,6 +853,32 @@ class WebPartyHandoffBehaviorTests(unittest.TestCase):
 
     def test_non_active_party_has_no_hand_off_button(self):
         self.assertNotIn("Hand off", self._rendered("awaiting-leader", False))
+
+
+@unittest.skipIf(shutil.which("node") is None, "node not installed")
+class WebPartyParkBehaviorTests(unittest.TestCase):
+    def _rendered(self, state, parked, status):
+        party = dict(_BOARD["parties"][0], name="a", state=state, parked=parked, status=status)
+        return _render(dict(_BOARD, parties=[party]), "all", "all", "parties", "text").strip()
+
+    def test_idle_party_shows_the_park_button(self):
+        text = self._rendered("active", None, {"name": "idle", "label": "idle"})
+        self.assertIn("Park", text)
+        self.assertNotIn("Unpark", text)
+
+    def test_parked_party_shows_the_reason_and_the_unpark_button(self):
+        status = {"name": "parked", "label": "parked 3h", "detail": "legal answer"}
+        text = self._rendered("awaiting-leader", "legal answer", status)
+        self.assertIn("parked 3h", text)
+        self.assertIn("legal answer", text)
+        self.assertIn("Unpark", text)
+
+    def test_blocked_party_shows_the_blocked_detail(self):
+        status = {"name": "blocked", "label": "blocked", "detail": "2 blocked: 2 — ci"}
+        self.assertIn("2 blocked: 2 — ci", self._rendered("active", None, status))
+
+    def test_closed_party_has_no_park_button(self):
+        self.assertNotIn("Park", self._rendered("closed", None, {"name": "closed", "label": "closed"}))
 
 
 @unittest.skipIf(shutil.which("node") is None, "node not installed")

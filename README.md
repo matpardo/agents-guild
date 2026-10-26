@@ -124,6 +124,8 @@ guild wire-settings   # merge guild hooks and permission rules into ~/.claude/se
 
 guild party start <name> --reason "<why>"       # no permission prompt; refused while this session leads another active party
 guild party resume <party> [--session <name>]   # --session: from a human terminal only
+guild party park <party> --reason "<what it waits on>"   # human terminal or web: mark a party as waiting on something outside development
+guild party unpark <party>   # clear the mark; a session resuming the party clears it too
 guild party close [<party>] --pending "<text>" [--force]  # <party>: from a terminal, or your own party; --pending none when nothing is left; --force overrides the quest done gate and the open ask and PR check
 
 guild quest add <slug> --title "..." --epic <slug> [--tasks T09,T07b] [--reason "<why>"]   # without --tasks: an empty epic quest; --reason is optional on every quest add
@@ -205,7 +207,7 @@ guild raids
 guild base pause|resume <owner/repo>   # stop or restart the bases fetch of a repo
 
 guild next [--all]     # ranked action queue for the caller's party
-guild handoff --in-flight "..." --learned "..." [--model <m>] [--respawn] [--close]
+guild handoff --in-flight "..." --learned "..." [--parked "<what it waits on>"] [--model <m>] [--respawn] [--close]
 guild handoff prune [--dry-run]
 guild handoff --party <name>   # terminal only: hand off a party whose leader session is gone
 
@@ -1441,7 +1443,7 @@ two raids shows under both) and a `solo` group for parties outside raids, with c
 asks, ready PRs, blocked and context-high parties (a count above zero is a pill coloured by
 its type), active adventurers, ideas, open quests and new notices. Each party row shows its state badge, its open asks, the work left and
 `stopped without report`; parties sort by attention (waiting on permission, waiting on an
-ask, context high, waiting on input, stopped with work, working, queued) and a raid header
+ask, context high, waiting on input, stopped with work, working, queued, parked, blocked) and a raid header
 shows its worst member state. A party view shows the whole merge queue of its raids, or its own queue
 when it has no raid. The header keeps the PR state filter.
 
@@ -1628,6 +1630,17 @@ event, status, detail, last output line).
 
 ### `guild handoff` and resuming a party
 
+`guild handoff --parked "<what it waits on>"` also marks the party as parked
+(waiting on something outside development, such as a legal answer): the board
+and the web show the status `parked` with that reason and the age, and
+`guild revive --list` prints it as `parked: <reason>`. The reason follows the
+same checks as `--reason`. `guild party park <party> --reason "..."` and
+`guild party unpark <party>` (and the Park and Unpark buttons on the web party
+card) do the same from a terminal. The mark clears when a session resumes the
+party, or on unpark; `--parked` cannot be combined with `--party` or `prune`.
+A party without a live session whose only work left is blocked tasks shows
+`blocked` with the blocked count per reason.
+
 `guild handoff --in-flight "..." --learned "..."` (both required, non-empty)
 renders `$XDG_DATA_HOME/guild/handoffs/<party>-g<N>.md` from the DB (active
 quests, the full `guild next --all` queue, PRs, open asks, active notices and
@@ -1720,7 +1733,7 @@ handoff content can never pass for a frame, notice or closing line.
 Invisible and bidirectional Unicode characters (zero-width, bidi overrides,
 tag characters, private use, surrogates) are stripped along with control
 sequences everywhere guild strips them; a joiner inside an emoji sequence is
-lost. A party shows `idle`, `queued` or `waiting-ask` unless the leader's
+lost. A party shows `idle`, `queued`, `parked`, `blocked` or `waiting-ask` unless the leader's
 session file names a process that still exists. If building the brief fails
 the hook falls back to the handoff and adds `guild: task brief unavailable
 (<ExceptionClass>)`.
@@ -2691,7 +2704,9 @@ status is ignored.
 |---|---|---|
 | 1 | party `closed` | `closed` |
 | 2 | no live leader and an open ask | `waiting-ask` (age from the oldest open ask) |
+| 2b | no live leader and the party is parked | `parked` (age from when it was parked, detail is the reason) |
 | 3 | no live leader and `guild next` would return work (never when a raid pause is on) | `queued` |
+| 3b | no live leader and the active quests hold blocked tasks only | `blocked` (detail `N blocked: <count> — <reason>; ...`) |
 | 4 | no live leader otherwise | `idle` |
 | 5 | live leader blocked on a permission prompt or an elicitation dialog | `waiting-permission` |
 | 6 | live leader, open ask and session not working | `waiting-ask` |
@@ -2701,7 +2716,7 @@ status is ignored.
 | 10 | live leader that never reported a status (for example a session started before the `Notification`/`Stop` hooks were wired) | `unknown` |
 | 11 | live leader otherwise | `working` |
 
-`idle` and `queued` carry no age. The stored party state `awaiting-leader` is
+`idle`, `queued` and `blocked` carry no age. The stored party state `awaiting-leader` is
 unchanged and is never a display status.
 
 Surfaces, each with the age of the status (`45s`, `12m`, `3h`, `2d`):

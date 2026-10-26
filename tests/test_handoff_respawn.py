@@ -94,7 +94,7 @@ class RespawnBase(GuildTestCase):
         return FakeTmux(installed, windows, pane_windows, session_up, create_returncode)
 
     def _respawn(self, tmux, pane):
-        return handoff_commands.run(self.ctx, "x", "y", None, True, False, tmux, pane, self._sleep)
+        return handoff_commands.run(self.ctx, "x", "y", None, None, True, False, tmux, pane, self._sleep)
 
     def _state(self):
         return self.ctx.conn.execute("SELECT state FROM parties WHERE name = 'alpha'").fetchone()["state"]
@@ -327,8 +327,8 @@ class RespawnCliTests(RespawnBase):
             mock.patch.dict("os.environ", {"TMUX_PANE": "%9"}),
         ):
             self.run_cli(["handoff", "--respawn", "--in-flight", "x", "--learned", "y"], "sess-1", self.repo_dir)
-        self.assertEqual(run.call_args[0][7], "%9")
-        self.assertTrue(run.call_args[0][4])
+        self.assertEqual(run.call_args[0][8], "%9")
+        self.assertTrue(run.call_args[0][5])
 
     def test_prune_rejects_respawn(self):
         code, out, err = self.run_cli(["handoff", "prune", "--respawn"], None, None)
@@ -349,11 +349,11 @@ class RespawnCliTests(RespawnBase):
 
 class HandoffCloseTests(RespawnBase):
     def _close(self, tmux, pane):
-        return handoff_commands.run(self.ctx, "x", "y", None, False, True, tmux, pane, self._sleep)
+        return handoff_commands.run(self.ctx, "x", "y", None, None, False, True, tmux, pane, self._sleep)
 
     def test_respawn_and_close_together_is_rejected_and_writes_nothing(self):
         with self.assertRaises(GuildError) as raised:
-            handoff_commands.run(self.ctx, "x", "y", None, True, True, self._fake(), "%5", self._sleep)
+            handoff_commands.run(self.ctx, "x", "y", None, None, True, True, self._fake(), "%5", self._sleep)
         self.assertIn("--respawn", str(raised.exception))
         self.assertIn("--close", str(raised.exception))
         self.assertFalse((paths.handoffs_dir() / "alpha-g1.md").is_file())
@@ -408,7 +408,7 @@ class HandoffCloseCliTests(RespawnBase):
     def test_cli_passes_close_flag_to_run(self):
         with mock.patch("guild.commands.handoff.run", return_value=("t", None)) as run:
             self.run_cli(["handoff", "--close", "--in-flight", "x", "--learned", "y"], "sess-1", self.repo_dir)
-        self.assertTrue(run.call_args[0][5])
+        self.assertTrue(run.call_args[0][6])
 
     def test_cli_rejects_respawn_and_close_together(self):
         code, out, err = self.run_cli(

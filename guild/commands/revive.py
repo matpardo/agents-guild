@@ -2,7 +2,7 @@ import json
 import os
 from pathlib import Path
 
-from guild import db, events, localbase, party_status, resume, tmux_windows
+from guild import db, events, localbase, party_status, resume, sanitize, tmux_windows
 from guild.errors import GuildError
 
 TRANSCRIPT_LINE_LIMIT = 200
@@ -113,6 +113,17 @@ def _quest_label(conn, party):
     return ", ".join(labels)
 
 
+def _status_label(ctx, party):
+    status = party_status.derive(ctx, party)
+    label = party_status.label(ctx, status)
+    if party["parked"] is None:
+        return label
+    reason = sanitize.strip_control_sequences(party["parked"])
+    if status["status"] == "parked":
+        return "{} — {}".format(label, reason)
+    return "{} | parked: {}".format(label, reason)
+
+
 def _entry(ctx, transcripts_dir, party):
     leader = ctx.conn.execute(
         "SELECT * FROM leaders WHERE party = ? AND generation = ?",
@@ -140,7 +151,7 @@ def _entry(ctx, transcripts_dir, party):
         session_id,
         None if leader is None else leader["session_name"],
         _quest_label(ctx.conn, party["name"]),
-        party_status.label(ctx, party_status.derive(ctx, party)),
+        _status_label(ctx, party),
         last_activity,
         cwd,
         mode,

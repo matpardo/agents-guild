@@ -86,7 +86,7 @@ def _with_reminder(text):
     return "{}\n{}".format(text, pii.BROADCAST_REMINDER)
 
 
-def _write_handoff(ctx, binding, in_flight, learned, auto):
+def _write_handoff(ctx, binding, in_flight, learned, auto, parked):
     party, generation = binding["party"], binding["generation"]
     content = _render_handoff(ctx, binding, in_flight, learned)
     handoffs_dir = paths.handoffs_dir()
@@ -94,6 +94,9 @@ def _write_handoff(ctx, binding, in_flight, learned, auto):
     handoffs_dir.mkdir(parents=True, exist_ok=True)
     handoff_path = names.ensure_within(handoff_path, handoffs_dir)
     handoff_path.write_text(content)
+    payload = {"party": party, "generation": generation, "handoff_path": str(handoff_path), "auto": auto}
+    if parked is not None:
+        payload["parked"] = parked
     with db.writing(ctx.conn):
         events.record(
             ctx.conn,
@@ -104,7 +107,7 @@ def _write_handoff(ctx, binding, in_flight, learned, auto):
             binding["project"],
             "party.handed_off",
             "local",
-            {"party": party, "generation": generation, "handoff_path": str(handoff_path), "auto": auto},
+            payload,
         )
 
 
@@ -224,7 +227,7 @@ def _respawn(ctx, binding, model, recorded_window, tmux, tmux_pane, sleep):
     return _with_reminder("respawned: {} bound in window {}; closing this pane".format(label, recorded_window)), pane
 
 
-def run(ctx, in_flight, learned, model, respawn, close, tmux, tmux_pane, sleep):
+def run(ctx, in_flight, learned, parked, model, respawn, close, tmux, tmux_pane, sleep):
     if not in_flight.strip():
         raise GuildError("--in-flight must not be empty", 1)
     if not learned.strip():
@@ -240,8 +243,12 @@ def run(ctx, in_flight, learned, model, respawn, close, tmux, tmux_pane, sleep):
     patterns = pii.project_patterns(ctx.projects_dir, binding["project"])
     pii.validate_field(in_flight, "--in-flight", pii.HANDOFF_FIELD_MAX_LENGTH, patterns)
     pii.validate_field(learned, "--learned", pii.HANDOFF_FIELD_MAX_LENGTH, patterns)
+    if parked is not None:
+        if not parked.strip():
+            raise GuildError("--parked must not be empty", 1)
+        pii.validate_field(parked, "--parked", pii.REASON_MAX_LENGTH, patterns)
     memory_commands.add(ctx, _for_memory(learned))
-    _write_handoff(ctx, binding, in_flight, learned, False)
+    _write_handoff(ctx, binding, in_flight, learned, False, None if parked is None else parked.strip())
     if respawn:
         return _respawn(ctx, binding, model, recorded_window, tmux, tmux_pane, sleep)
     if close:
@@ -337,7 +344,7 @@ def write_auto(ctx, binding):
     in_flight = _auto_in_flight(cwd)
     patterns = pii.project_patterns(ctx.projects_dir, binding["project"])
     pii.validate_field(in_flight, "--in-flight", pii.HANDOFF_FIELD_MAX_LENGTH, patterns)
-    _write_handoff(ctx, binding, in_flight, _AUTO_LEARNED, True)
+    _write_handoff(ctx, binding, in_flight, _AUTO_LEARNED, True, None)
 
 
 def _party_row_for_handoff(conn, party):
