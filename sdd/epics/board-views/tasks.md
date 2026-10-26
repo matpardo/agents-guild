@@ -49,3 +49,10 @@ updated: 2026-10-26
 **Status:** [x] done
 
 **What:** `guild/commands/board.py`, `guild/web/app.js`: each `daily_tasks` day carries `active`, true when a session of the party recorded an event that day; the CLI rows and the web table show `-` for an inactive day with no task created or done, so a day the party was off reads apart from a day a session produced nothing.
+
+## T07 — Explain the dash in tasks per day
+
+**Depends on:** T06
+**Status:** [x] done
+
+**What:** `guild/commands/board.py`, `guild/web/app.js`: each `-` cell of the web table carries a tooltip and the CLI rows end with a dim legend line, both saying a `-` means no session event that day and that a session idle across midnight also shows `-`.

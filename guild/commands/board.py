@@ -1010,6 +1010,7 @@ def _daily_task_lines(painter, days):
         "  {:<8}".format("day") + " ".join("{:>3}".format(cell) for cell in cells),
         "  {:<8}".format("created") + " ".join("{:>3}".format(_daily_cell(day, "created")) for day in days),
         "  {:<8}".format("done") + " ".join("{:>3}".format(_daily_cell(day, "done")) for day in days),
+        painter.paint("  - no session event that day; a session idle across midnight also shows -", "dim"),
         "",
     ]
 

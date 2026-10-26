@@ -2380,12 +2380,17 @@ realmDoctorLines: [],
     });
   }
 
+  var DAILY_DASH_HINT =
+    "no session event this day; a session that sat idle across midnight leaves no event and also shows -";
+
   function dailyTaskRow(label, days, key) {
     var row = el("tr");
     row.appendChild(textEl("th", label));
     days.forEach(function (day) {
       if (!day.active && day[key] === 0) {
-        row.appendChild(classedText("td", "-", "muted"));
+        var cell = classedText("td", "-", "muted");
+        cell.title = DAILY_DASH_HINT;
+        row.appendChild(cell);
         return;
       }
       row.appendChild(textEl("td", String(day[key])));

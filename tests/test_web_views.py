@@ -162,6 +162,26 @@ class WebViewBehaviorTests(unittest.TestCase):
             ["tasks", "per", "day", "day", "10-24", "10-25", "created", "-", "-", "done", "-", "-"],
         )
 
+    def test_dash_cells_explain_themselves_in_a_tooltip(self):
+        board = dict(
+            _VIEWS_BOARD,
+            parties=[
+                dict(_party("a", []), daily_tasks=[{"day": "2026-10-24", "created": 0, "done": 0, "active": False}])
+            ],
+        )
+        tree = json.loads(_render(board, "#party/a", "daily-tasks", "tree"))
+        titles = []
+
+        def walk(node):
+            if node["text"] == "-":
+                titles.append(node["title"])
+            for child in node["children"]:
+                walk(child)
+
+        walk(tree)
+        self.assertEqual(len(titles), 2)
+        self.assertTrue(all("idle across midnight" in title for title in titles))
+
     def test_sidebar_groups_parties_by_raid_then_solo(self):
         text = _render(_VIEWS_BOARD, "", "sidebar", "text")
         self.assertEqual(text.count("raid r"), 2)

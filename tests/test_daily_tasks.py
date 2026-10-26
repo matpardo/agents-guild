@@ -68,6 +68,7 @@ class DailyTasksTests(QuestBoardTestCase):
     def test_party_board_prints_the_daily_rows(self):
         out = self.board(["--party", "alpha"])
         self.assertIn("TASKS PER DAY · last 15 days", out)
+        self.assertIn("a session idle across midnight also shows -", out)
         created_line = next(line for line in out.splitlines() if line.strip().startswith("created"))
         done_line = next(line for line in out.splitlines() if line.strip().startswith("done "))
         self.assertEqual(created_line.split()[1:], ["-"] * 11 + ["1", "-", "-", "0"])
