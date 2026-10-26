@@ -91,6 +91,7 @@ _PANE_IDS = {
     "projects",
     "quest-board",
     "merge-queues",
+    "daily-tasks",
     "parties",
     "realm",
 }
@@ -127,6 +128,26 @@ class WebViewBehaviorTests(unittest.TestCase):
         text = self._queues("#raid/r2")
         self.assertIn("o/r#3", text)
         self.assertNotIn("o/r#1", text)
+
+    def _daily_tasks_text(self, hash_value):
+        def days(created, done):
+            return [{"day": "2026-10-2{}".format(index), "created": created, "done": done} for index in (4, 5)]
+
+        parties = [dict(_party("a", ["r"]), daily_tasks=days(1, 0)), dict(_party("b", ["r"]), daily_tasks=days(2, 3))]
+        board = dict(_VIEWS_BOARD, parties=parties + [dict(_party("d", []), daily_tasks=days(7, 7))])
+        return _render(board, hash_value, "daily-tasks", "text").split()
+
+    def test_party_view_shows_its_daily_tasks(self):
+        self.assertEqual(
+            self._daily_tasks_text("#party/a"),
+            ["tasks", "per", "day", "day", "10-24", "10-25", "created", "1", "1", "done", "0", "0"],
+        )
+
+    def test_raid_view_sums_the_daily_tasks_of_its_members(self):
+        self.assertEqual(
+            self._daily_tasks_text("#raid/r"),
+            ["tasks", "per", "day", "day", "10-24", "10-25", "created", "3", "3", "done", "3", "3"],
+        )
 
     def test_sidebar_groups_parties_by_raid_then_solo(self):
         text = _render(_VIEWS_BOARD, "", "sidebar", "text")
@@ -180,7 +201,9 @@ class WebViewBehaviorTests(unittest.TestCase):
                 self.assertEqual(self._hidden(hash_value), expected)
 
     def test_party_view_hides_every_section_it_does_not_list(self):
-        self.assertEqual(self._hidden("#party/a"), _PANE_IDS - {"asks", "merge-queues", "parties", "memory"})
+        self.assertEqual(
+            self._hidden("#party/a"), _PANE_IDS - {"asks", "merge-queues", "daily-tasks", "parties", "memory"}
+        )
 
     def test_other_views_hide_their_complement(self):
         shown = {
@@ -188,7 +211,7 @@ class WebViewBehaviorTests(unittest.TestCase):
             "#ideas": {"ideas"},
             "#quests": {"quest-board"},
             "#overview": {"notices", "raids", "drift", "projects", "realm"},
-            "#raid/r": {"asks", "merge-queues", "parties", "memory"},
+            "#raid/r": {"asks", "merge-queues", "daily-tasks", "parties", "memory"},
         }
         for hash_value, ids in shown.items():
             with self.subTest(hash=hash_value):

@@ -1,6 +1,7 @@
 import json
 import shlex
 import textwrap
+from datetime import timedelta
 
 from guild import (
     config,
@@ -39,6 +40,7 @@ from guild.errors import GuildError
 from guild.realm import clientconfig
 
 _ANSWERED_PAGE_SIZE = 10
+_DAILY_TASK_DAYS = 15
 
 _STYLES = {
     "bold": "1",
@@ -943,6 +945,58 @@ def _health_job_lines(painter, projects_by_name, ctx):
     return [painter.paint("HEALTH JOBS · {}".format(len(pending)), "bold"), *pending, ""]
 
 
+def _count_on_local_day(counts, iso_text):
+    if iso_text is None:
+        return
+    day = timeutil.from_iso(iso_text).astimezone().date()
+    if day in counts:
+        counts[day] += 1
+
+
+def _daily_tasks(conn, now, party_name):
+    today = now.astimezone().date()
+    days = [today - timedelta(days=offset) for offset in range(_DAILY_TASK_DAYS - 1, -1, -1)]
+    created = dict.fromkeys(days, 0)
+    done = dict.fromkeys(days, 0)
+    rows = conn.execute(
+        "SELECT t.state, t.created_at, t.updated_at FROM quest_tasks t JOIN quests q ON q.slug = t.quest"
+        " WHERE q.party = ?",
+        (party_name,),
+    ).fetchall()
+    for row in rows:
+        _count_on_local_day(created, row["created_at"])
+        if row["state"] == "done":
+            _count_on_local_day(done, row["updated_at"])
+    return [{"day": day.isoformat(), "created": created[day], "done": done[day]} for day in days]
+
+
+def _summed_daily_tasks(ctx, party_rows):
+    per_party = [_daily_tasks(ctx.conn, ctx.now, row["name"]) for row in party_rows]
+    if not per_party:
+        return []
+    return [
+        {
+            "day": entries[0]["day"],
+            "created": sum(entry["created"] for entry in entries),
+            "done": sum(entry["done"] for entry in entries),
+        }
+        for entries in zip(*per_party, strict=True)
+    ]
+
+
+def _daily_task_lines(painter, days):
+    if not days:
+        return []
+    cells = [day["day"][8:] for day in days]
+    return [
+        painter.paint("TASKS PER DAY · last {} days".format(len(days)), "bold"),
+        "  {:<8}".format("day") + " ".join("{:>3}".format(cell) for cell in cells),
+        "  {:<8}".format("created") + " ".join("{:>3}".format(day["created"]) for day in days),
+        "  {:<8}".format("done") + " ".join("{:>3}".format(day["done"]) for day in days),
+        "",
+    ]
+
+
 def _party_rows_for_names(conn, party_names):
     if not party_names:
         return []
@@ -1006,6 +1060,8 @@ def render_board(ctx, party_filter, raid_filter, color, width):
         lines.extend([painter.paint("raid {} PAUSED".format(raid_filter), "red"), ""])
     if raid_filter is not None:
         lines.extend(_raid_next_to_merge_lines(ctx, painter, party_names))
+    if party_names is not None:
+        lines.extend(_daily_task_lines(painter, _summed_daily_tasks(ctx, party_rows)))
     lines.extend(render_asks(ctx, party_names, color, width, False))
     lines.extend(_ready_for_you_lines(ctx, painter, party_filter, raid_filter))
     lines.extend(_notices_section(ctx, painter, notice_rows))
@@ -1272,6 +1328,7 @@ def _party_model(ctx, repo_clones, party_row, project_config):
             for row in raids
         ],
         "claims": [{"area": row["area"], "expires_at": row["expires_at"], "dates": _row_dates(row)} for row in claims],
+        "daily_tasks": _daily_tasks(ctx.conn, ctx.now, party_row["name"]),
     }
 
 

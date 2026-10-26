@@ -139,6 +139,7 @@ _BOARD = {
             "leader_session_name": None,
             "waits": [],
             "ideas": [],
+            "daily_tasks": [],
         }
         for name in ("a", "c")
     ],

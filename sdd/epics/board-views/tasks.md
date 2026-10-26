@@ -3,7 +3,7 @@ epic: board-views
 type: tasks
 title: Sidebar and views on the web board
 status: done
-updated: 2026-10-24
+updated: 2026-10-25
 ---
 
 # Tasks: Sidebar and views on the web board
@@ -35,3 +35,10 @@ updated: 2026-10-24
 **Status:** [x] done
 
 **What:** `guild/web/app.js`, `app.css`: the board refreshes every 10 seconds instead of 15; each sidebar needs-you count above zero (asks, ready, blocked, context high) is a pill coloured by its type, a zero stays muted.
+
+## T05 — Tasks per day
+
+**Depends on:** T01
+**Status:** [x] done
+
+**What:** `guild/commands/board.py`, `guild/web/app.js`, `app.css`, `index.html`: each party model carries `daily_tasks`, the tasks created and done per local day over the last 15 days; the party and raid views show them as a table under the merge queue (a raid sums its members), and `guild board --party|--raid` prints the same rows.

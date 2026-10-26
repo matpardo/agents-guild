@@ -2360,6 +2360,55 @@ realmDoctorLines: [],
     section.appendChild(classedText("p", "guild never merges: merge in this order by hand", "muted"));
   }
 
+  function summedDailyTasks(parties) {
+    if (parties.length === 0) {
+      return [];
+    }
+    return parties[0].daily_tasks.map(function (entry, index) {
+      return parties.reduce(
+        function (total, party) {
+          var day = party.daily_tasks[index];
+          return { day: entry.day, created: total.created + day.created, done: total.done + day.done };
+        },
+        { day: entry.day, created: 0, done: 0 }
+      );
+    });
+  }
+
+  function dailyTaskRow(label, days, key) {
+    var row = el("tr");
+    row.appendChild(textEl("th", label));
+    days.forEach(function (day) {
+      row.appendChild(textEl("td", String(day[key])));
+    });
+    return row;
+  }
+
+  function renderDailyTasks(parties) {
+    var section = document.getElementById("daily-tasks");
+    clear(section);
+    section.appendChild(textEl("h2", "tasks per day"));
+    var days = summedDailyTasks(parties);
+    if (days.length === 0) {
+      section.appendChild(textEl("p", "no party in view"));
+      return;
+    }
+    var head = el("tr");
+    head.appendChild(textEl("th", "day"));
+    days.forEach(function (day, index) {
+      head.appendChild(classedText("th", day.day.slice(5), index === days.length - 1 ? "today" : ""));
+    });
+    var table = el("table");
+    table.className = "progress-table daily-tasks";
+    table.appendChild(head);
+    table.appendChild(dailyTaskRow("created", days, "created"));
+    table.appendChild(dailyTaskRow("done", days, "done"));
+    var scroller = el("div");
+    scroller.className = "table-scroll";
+    scroller.appendChild(table);
+    section.appendChild(scroller);
+  }
+
   function prMatchesStateFilter(pr) {
     if (state.stateFilter === "all") {
       return true;
@@ -3504,8 +3553,8 @@ realmDoctorLines: [],
 
   var VIEW_SECTIONS = {
     "needs-you": ["asks", "ready-for-you", "answered-asks"],
-    party: ["asks", "merge-queues", "parties", "memory"],
-    raid: ["asks", "merge-queues", "parties", "memory"],
+    party: ["asks", "merge-queues", "daily-tasks", "parties", "memory"],
+    raid: ["asks", "merge-queues", "daily-tasks", "parties", "memory"],
     adventurers: ["adventurers", "health-jobs"],
     ideas: ["ideas"],
     quests: ["quest-board"],
@@ -3513,7 +3562,7 @@ realmDoctorLines: [],
   };
   var ALL_SECTION_IDS = [
     "asks", "ready-for-you", "answered-asks", "notices", "ideas", "adventurers", "health-jobs",
-    "memory", "raids", "drift", "projects", "quest-board", "merge-queues", "parties", "realm",
+    "memory", "raids", "drift", "projects", "quest-board", "merge-queues", "daily-tasks", "parties", "realm",
   ];
   var DEFAULT_VIEW = { kind: "needs-you", name: "", hash: "needs-you" };
 
@@ -3778,6 +3827,7 @@ realmDoctorLines: [],
     renderSection("memory", [filtered.memory], renderMemory, onlyIfChanged);
     renderSection("raids", [filtered.raids], renderRaids, onlyIfChanged);
     renderSection("merge-queues", [filtered.merge_queues], renderMergeQueues, onlyIfChanged);
+    renderSection("daily-tasks", [filtered.parties], renderDailyTasks, onlyIfChanged);
     renderSection("drift", [filtered.drift], renderDrift, onlyIfChanged);
     renderSection("projects", [filtered.projects], renderProjects, onlyIfChanged);
     renderSection("quest-board", [data.quest_boards], renderQuestBoard, onlyIfChanged);
