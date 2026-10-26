@@ -900,6 +900,18 @@ main.history-main {
   accent-color: var(--green);
 }
 
+.daily-tasks th,
+.daily-tasks td {
+  text-align: right;
+  padding: 0.35rem 0.5rem;
+  white-space: nowrap;
+}
+
+.daily-tasks .today {
+  color: var(--fg);
+  font-weight: 600;
+}
+
 .quest-title {
   font-weight: 600;
 }
