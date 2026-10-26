@@ -1,0 +1,12 @@
+[project]
+name = "agents-guild"
+version = "0.0.0"
+requires-python = ">=3.10"
+dependencies = []
+
+[dependency-groups]
+dev = ["coverage==7.16.2", "ruff==0.17.0"]
+
+[tool.uv]
+package = false
+required-version = "==0.13.0"

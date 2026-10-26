@@ -2917,28 +2917,32 @@ git identity: each test that commits configures its own.
 Every action in a workflow is pinned by its full commit SHA, with the
 release tag beside it; `tests/test_ci_pins.py` fails on a tag or branch ref.
 Dependabot (`.github/dependabot.yml`) opens a monthly pull request for a
-newer action or ruff, waiting 14 days after each release; a ruff bump also
+newer action or dev tool, waiting 14 days after each release; a ruff bump also
 needs `required-version` in `ruff.toml` raised by hand before CI passes.
 
-Lint (dev-only, not a runtime dependency): ruff, pinned by version and
-sha256 in `requirements-lint.txt`, configured in `ruff.toml`. CI runs the
-lint and the format check before the tests; `ruff format .` fixes the
-format.
+Dev tools (dev-only, never a runtime dependency) are managed with
+[uv](https://docs.astral.sh/uv/): `pyproject.toml` lists them in the `dev`
+dependency group by exact version, `uv.lock` pins the sha256 of every
+published file, and `required-version` in `[tool.uv]` pins uv itself (CI
+reads it from there). `uv sync --locked` builds `.venv` from the lock and
+fails if the lock no longer matches `pyproject.toml`; it needs neither pip
+nor `ensurepip`. After changing the `dev` group, run `uv lock` and commit
+both files.
+
+Lint: ruff, configured in `ruff.toml`. CI runs the lint and the format
+check before the tests; `uv run ruff format .` fixes the format.
 
 ```
-python3 -m venv .venv
-.venv/bin/pip install --require-hashes -r requirements-lint.txt
-.venv/bin/ruff check .
-.venv/bin/ruff format --check .
+uv sync --locked
+uv run ruff check .
+uv run ruff format --check .
 ```
 
-Coverage (dev-only, not a runtime dependency):
+Coverage:
 
 ```
-python3 -m venv .venv
-.venv/bin/pip install coverage
-.venv/bin/coverage run -m unittest discover -s tests
-.venv/bin/coverage report
+uv run coverage run -m unittest discover -s tests
+uv run coverage report
 ```
 
 ## Status

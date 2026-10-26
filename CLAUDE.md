@@ -17,7 +17,7 @@ Guild is a Python 3.10 stdlib-only CLI (`guild/`) with a browser board (`guild/w
 ## Tests
 
 - Run all: `TMPDIR=/dev/shm python3 tests/run_parallel.py`. One module: `python3 -m unittest tests.test_<name>`.
-- Lint: `ruff check .` and `ruff format --check .` must pass (CI runs both; `ruff format .` fixes the second). Ruff installs only from `requirements-lint.txt`, pinned by sha256; a version bump updates every hash and `required-version` in `ruff.toml`. Fix findings in code, never with `noqa` or ignores.
+- Lint: `uv run ruff check .` and `uv run ruff format --check .` must pass (CI runs both; `uv run ruff format .` fixes the second). Dev tools come from the `dev` group in `pyproject.toml`, locked with hashes in `uv.lock`: run them with `uv sync --locked` and `uv run ruff ...`; a ruff bump runs `uv lock` and raises `required-version` in `ruff.toml`. Fix findings in code, never with `noqa` or ignores.
 - `tests/__init__.py` turns commit signing off for test repos.
 - GitHub actions are pinned by full commit SHA (`uses: owner/action@<sha> # vX.Y.Z`), never by tag; `tests/test_ci_pins.py` guards it.
 - Dependabot (`.github/dependabot.yml`) proposes action and ruff bumps monthly, 14 days after a release. A ruff bump fails CI until `required-version` in `ruff.toml` matches: update it in the same branch, never drop it.
