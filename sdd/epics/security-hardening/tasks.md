@@ -71,3 +71,10 @@ updated: 2026-09-28
 **What:** `revive` and `handoff --respawn` pass a recorded permission mode on only when it is `default`, `acceptEdits`, `plan`, `auto` or `dontAsk`; `bypassPermissions` and unknown values are dropped.
 
 **Acceptance:** a leader row or transcript holding `bypassPermissions` yields a relaunch command without `--permission-mode`.
+
+## T11 — Hook command parsers cover more shell shapes
+
+**Depends on:** T01
+**Status:** [x] done
+
+**What:** the push and PR-owner guards share the segment splitter and wrapper skipper of the answer guard (pipes, subshells, braces, `bash -lc`, `timeout`/`nice`/`stdbuf`, every git global option); the answer guard denies on an internal error.

@@ -724,6 +724,71 @@ class PrePushObfuscatedCommandMatrixTests(GuildTestCase):
         self.write_gh_fixture("list_feature-wrap-or", [{"number": 18, "state": "MERGED", "url": "x"}])
         self._assert_blocked(repo_dir, "false || git push origin feature/wrap-or")
 
+    def test_bash_lc_push_is_detected(self):
+        repo_dir = self._init_repo("repo-bash_lc", "feature/obf-bash-lc")
+        self.write_gh_fixture("list_feature-obf-bash-lc", [{"number": 30, "state": "MERGED", "url": "x"}])
+        self._assert_blocked(repo_dir, 'bash -lc "git push"')
+
+    def test_pipe_push_is_detected(self):
+        repo_dir = self._init_repo("repo-pipe", "feature/obf-pipe")
+        self.write_gh_fixture("list_feature-obf-pipe", [{"number": 30, "state": "MERGED", "url": "x"}])
+        self._assert_blocked(repo_dir, "true | git push")
+
+    def test_subshell_push_is_detected(self):
+        repo_dir = self._init_repo("repo-subshell", "feature/obf-subshell")
+        self.write_gh_fixture("list_feature-obf-subshell", [{"number": 30, "state": "MERGED", "url": "x"}])
+        self._assert_blocked(repo_dir, "(git push)")
+
+    def test_brace_push_is_detected(self):
+        repo_dir = self._init_repo("repo-brace", "feature/obf-brace")
+        self.write_gh_fixture("list_feature-obf-brace", [{"number": 30, "state": "MERGED", "url": "x"}])
+        self._assert_blocked(repo_dir, "{ git push; }")
+
+    def test_work_tree_push_is_detected(self):
+        repo_dir = self._init_repo("repo-work_tree", "feature/obf-work-tree")
+        self.write_gh_fixture("list_feature-obf-work-tree", [{"number": 30, "state": "MERGED", "url": "x"}])
+        self._assert_blocked(repo_dir, "git --work-tree=. push")
+
+    def test_git_dir_space_push_is_detected(self):
+        repo_dir = self._init_repo("repo-git_dir_space", "feature/obf-git-dir-space")
+        self.write_gh_fixture("list_feature-obf-git-dir-space", [{"number": 30, "state": "MERGED", "url": "x"}])
+        self._assert_blocked(repo_dir, "git --git-dir .git push")
+
+    def test_no_pager_push_is_detected(self):
+        repo_dir = self._init_repo("repo-no_pager", "feature/obf-no-pager")
+        self.write_gh_fixture("list_feature-obf-no-pager", [{"number": 30, "state": "MERGED", "url": "x"}])
+        self._assert_blocked(repo_dir, "git --no-pager push")
+
+    def test_config_flag_push_is_detected(self):
+        repo_dir = self._init_repo("repo-config_flag", "feature/obf-config-flag")
+        self.write_gh_fixture("list_feature-obf-config-flag", [{"number": 30, "state": "MERGED", "url": "x"}])
+        self._assert_blocked(repo_dir, "git -c core.editor=true push")
+
+    def test_timeout_push_is_detected(self):
+        repo_dir = self._init_repo("repo-timeout", "feature/obf-timeout")
+        self.write_gh_fixture("list_feature-obf-timeout", [{"number": 30, "state": "MERGED", "url": "x"}])
+        self._assert_blocked(repo_dir, "timeout 60 git push")
+
+    def test_timeout_flags_push_is_detected(self):
+        repo_dir = self._init_repo("repo-timeout_flags", "feature/obf-timeout-flags")
+        self.write_gh_fixture("list_feature-obf-timeout-flags", [{"number": 30, "state": "MERGED", "url": "x"}])
+        self._assert_blocked(repo_dir, "timeout -s KILL -k 5 1.5m git push")
+
+    def test_nice_push_is_detected(self):
+        repo_dir = self._init_repo("repo-nice", "feature/obf-nice")
+        self.write_gh_fixture("list_feature-obf-nice", [{"number": 30, "state": "MERGED", "url": "x"}])
+        self._assert_blocked(repo_dir, "nice git push")
+
+    def test_nice_n_push_is_detected(self):
+        repo_dir = self._init_repo("repo-nice_n", "feature/obf-nice-n")
+        self.write_gh_fixture("list_feature-obf-nice-n", [{"number": 30, "state": "MERGED", "url": "x"}])
+        self._assert_blocked(repo_dir, "nice -n 5 git push")
+
+    def test_stdbuf_push_is_detected(self):
+        repo_dir = self._init_repo("repo-stdbuf", "feature/obf-stdbuf")
+        self.write_gh_fixture("list_feature-obf-stdbuf", [{"number": 30, "state": "MERGED", "url": "x"}])
+        self._assert_blocked(repo_dir, "stdbuf -o0 git push")
+
 
 class PrePushUnresolvedBranchTests(GuildTestCase):
     def test_bad_dash_c_dir_emits_warning_instead_of_allowing(self):
@@ -1457,6 +1522,18 @@ class PrePrOwnerHookTests(GuildTestCase):
     def test_foreign_push_inside_shell_c_asks(self):
         self._assert_asks("sess-2", "bash -c 'git push origin feature/x'")
 
+    def test_foreign_push_in_pipe_asks(self):
+        self._assert_asks("sess-2", "true | git push")
+
+    def test_foreign_push_in_bash_lc_asks(self):
+        self._assert_asks("sess-2", 'bash -lc "git push"')
+
+    def test_foreign_push_with_work_tree_asks(self):
+        self._assert_asks("sess-2", "git --work-tree=. push")
+
+    def test_foreign_push_after_timeout_asks(self):
+        self._assert_asks("sess-2", "timeout 60 git push")
+
     def test_foreign_push_after_env_assignment_asks(self):
         self._assert_asks("sess-2", "FOO=1 git push")
 
@@ -1639,9 +1716,10 @@ class PreAnswerHookTests(GuildTestCase):
         self._assert_silent("sess-1", "guild realm status")
         self._assert_silent("sess-1", "echo guild realm send")
 
-    def test_swallows_exceptions_as_system_message(self):
+    def test_internal_error_denies(self):
         with mock.patch("guild.commands.hook.pre_answer", side_effect=RuntimeError("boom")):
             code, out, err = self._bash("sess-1", "guild answer 1 --answer x")
         self.assertEqual(code, 0)
-        self.assertIn("guild hook error: boom", out)
-        self.assertIn("guild hook error: boom", out)
+        decision = json.loads(out)["hookSpecificOutput"]
+        self.assertEqual(decision["permissionDecision"], "deny")
+        self.assertIn("boom", decision["permissionDecisionReason"])

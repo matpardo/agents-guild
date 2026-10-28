@@ -2601,8 +2601,9 @@ Without a hooks manager, add the same call to the repository's
   completely silent (no output at all) when there is nothing new. Both hooks
   run in well under 100ms against a local SQLite DB.
 - `pre-push`: inspects `git push` commands before they run (including
-  `env`/`command`/`sudo`-wrapped, `VAR=val`-prefixed, `bash -c`/`sh -c`
-  nested, and `&&`/`;`/`||`-chained forms, following `cd <dir>` segments so
+  `env`/`command`/`sudo`/`timeout`/`nice`/`stdbuf`-wrapped, `VAR=val`-prefixed,
+  `bash -c`/`-lc`/`sh -c` nested, `git` global options such as `--work-tree=<d>`,
+  `--no-pager` or `-c <k=v>`, and `&&`/`;`/`||`/`|`/`( )`/`{ }`-chained forms, following `cd <dir>` segments so
   later segments use that directory; a `cd` that cannot be resolved gives the
   unresolved warning below for a later push, `gh pr ready` or `gh pr create`;
   `--repo=<r>`, `--head=<b>` and bundled `-fd` forms are understood); blocks pushes to a branch whose
@@ -2649,8 +2650,12 @@ Without a hooks manager, add the same call to the repository's
   "permissionDecision": "deny", "permissionDecisionReason": "..."}}` —
   whatever the session's binding, since the point is that only a human
   answers an ask or dismisses it. A command that only mentions the words, or
-  a different `guild` subcommand, passes silently; errors become a
-  `systemMessage` and never block.
+  a different `guild` subcommand, passes silently; an internal
+  error denies the command, with the error as the reason.
+- Known limit of the `pre-push`, `pre-pr-owner` and `pre-answer` command
+  parsers: they read the command text, so git aliases (`git -c alias.p=push p`),
+  `eval`, shell variables and command substitution are not resolved. The hooks
+  are guardrails, not a sandbox.
 - `pre-edit`: guards a project's `shared_areas` (see "Project config") on
   `Edit`/`Write`/`MultiEdit`/`NotebookEdit` calls (`tool_input.file_path`, or
   `notebook_path` for `NotebookEdit`). Any other tool, no path, an unbound

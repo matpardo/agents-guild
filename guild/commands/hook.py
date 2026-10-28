@@ -390,9 +390,7 @@ def post_tool_use(ctx):
 
 
 _UNRESOLVED_BRANCH_MESSAGE = "guild: could not determine the branch for this push; PR state not verified"
-_PUSH_OPERATORS = ("&&", "||", ";")
-_PUSH_WRAPPER_COMMANDS = ("env", "command", "sudo")
-_PUSH_SHELL_C_INVOKERS = ("bash", "sh")
+_GIT_VALUE_GLOBAL_OPTIONS = ("-C", "-c", "--git-dir", "--work-tree", "--namespace", "--super-prefix", "--config-env")
 _ASSIGNMENT_TOKEN_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*=")
 
 
@@ -402,49 +400,8 @@ def _tokenize_command(command):
     return list(lexer)
 
 
-def _split_top_level_segments(tokens):
-    segments = []
-    current = []
-    for token in tokens:
-        if token in _PUSH_OPERATORS:
-            if current:
-                segments.append(current)
-            current = []
-            continue
-        current.append(token)
-    if current:
-        segments.append(current)
-    return segments
-
-
-def _strip_wrapper_prefix(tokens):
-    while tokens and _ASSIGNMENT_TOKEN_RE.match(tokens[0]):
-        tokens = tokens[1:]
-    while tokens and Path(tokens[0]).name in _PUSH_WRAPPER_COMMANDS:
-        tokens = tokens[1:]
-        while tokens and _ASSIGNMENT_TOKEN_RE.match(tokens[0]):
-            tokens = tokens[1:]
-    return tokens
-
-
-def _shell_c_inner_command(tokens):
-    if len(tokens) < 3:
-        return None
-    if Path(tokens[0]).name not in _PUSH_SHELL_C_INVOKERS or tokens[1] != "-c":
-        return None
-    return tokens[2]
-
-
 def _push_segments(command):
-    segments = []
-    for raw_segment in _split_top_level_segments(_tokenize_command(command)):
-        stripped = _strip_wrapper_prefix(raw_segment)
-        inner_command = _shell_c_inner_command(stripped)
-        if inner_command is not None:
-            segments.extend(_push_segments(inner_command))
-            continue
-        segments.append(stripped)
-    return segments
+    return [tokens for tokens in _hook_segments(command) if tokens]
 
 
 def _strip_ref_prefix(ref):
@@ -466,23 +423,14 @@ def _current_branch(cwd):
 
 def _git_global_options(tokens, default_cwd):
     target_dir = default_cwd
-    remaining = []
     index = 0
-    while index < len(tokens):
+    while index < len(tokens) and tokens[index].startswith("-"):
         token = tokens[index]
+        takes_value = token in _GIT_VALUE_GLOBAL_OPTIONS
         if token == "-C" and index + 1 < len(tokens):
             target_dir = tokens[index + 1]
-            index += 2
-            continue
-        if token == "-c" and index + 1 < len(tokens):
-            index += 2
-            continue
-        if token.startswith("--git-dir="):
-            index += 1
-            continue
-        remaining.append(token)
-        index += 1
-    return target_dir, remaining
+        index += 2 if takes_value else 1
+    return target_dir, tokens[index:]
 
 
 def _push_invocation(tokens, default_cwd):
@@ -929,7 +877,9 @@ _REALM_DENY_REASON = (
 )
 _PYTHON_RE = re.compile(r"python(3(\.\d+)?)?")
 _GUILD_MODULES = ("guild", "guild.cli")
-_REALM_WRAPPERS = ("nohup", "time", "exec", "xargs", "env", "command", "sudo")
+_REALM_WRAPPERS = ("nohup", "time", "exec", "xargs", "env", "command", "sudo", "timeout", "nice", "stdbuf")
+_WRAPPER_VALUE_FLAGS = ("-s", "-k", "--signal", "--kill-after")
+_WRAPPER_NUMBER_RE = re.compile(r"\d+(\.\d+)?[smhd]?")
 _REALM_SHELLS = ("bash", "sh", "zsh", "dash")
 _SEGMENT_BREAKS = frozenset(("&&", "||", ";", ";;", "|", "|&", "&", "(", ")", "{", "}", "!", "$("))
 
@@ -942,8 +892,8 @@ def _skip_wrappers(tokens):
         if Path(tokens[0]).name not in _REALM_WRAPPERS:
             return tokens
         tokens = tokens[1:]
-        while tokens and (tokens[0].startswith("-") or tokens[0].isdigit()):
-            tokens = tokens[1:]
+        while tokens and (tokens[0].startswith("-") or _WRAPPER_NUMBER_RE.fullmatch(tokens[0])):
+            tokens = tokens[2:] if tokens[0] in _WRAPPER_VALUE_FLAGS else tokens[1:]
     return tokens
 
 
@@ -992,7 +942,7 @@ def _guild_words(tokens):
     return [token for token in rest if not token.startswith("-")]
 
 
-def _deny_result(reason):
+def deny_result(reason):
     return {
         "hookSpecificOutput": {
             "hookEventName": "PreToolUse",
@@ -1026,11 +976,11 @@ def pre_answer(command):
         segments = _hook_segments(command)
     except ValueError:
         reason = _unparseable_deny_reason(command)
-        return None if reason is None else _deny_result(reason)
+        return None if reason is None else deny_result(reason)
     for tokens in segments:
         reason = _segment_deny_reason(tokens)
         if reason is not None:
-            return _deny_result(reason)
+            return deny_result(reason)
     return None
 
 
