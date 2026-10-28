@@ -3,7 +3,7 @@ epic: board-views
 type: tasks
 title: Sidebar and views on the web board
 status: done
-updated: 2026-10-26
+updated: 2026-10-28
 ---
 
 # Tasks: Sidebar and views on the web board
@@ -63,3 +63,10 @@ updated: 2026-10-26
 **Status:** [x] done
 
 **What:** `guild/party_progress.py`, `guild/commands/board.py`, `guild/web/app.js`, `app.css`, `index.html`: each party model carries `blocked_groups`, the blocked tasks of its active quests grouped by reason; the party and raid views show the tasks done of the total, a bar per quest, the active, blocked and queued counts and the blocked groups above tasks per day (a raid sums its members), and `guild board --party|--raid` prints the same as `PROGRESS` lines.
+
+## T09 — Mark days before the party existed
+
+**Depends on:** T07
+**Status:** [x] done
+
+**What:** `guild/commands/board.py`, `guild/web/app.js`: each tasks-per-day entry carries `existed`, false for a day before the party's first leader started; such a day shows `x` instead of `-` in the CLI rows (with a legend line) and in the web table (with a tooltip), and a raid day exists when any member existed.

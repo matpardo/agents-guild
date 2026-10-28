@@ -1479,8 +1479,9 @@ to the party's quests that day, `done` the tasks finished that day. A `-` marks 
 no session of the party and no task created or done; a `0` means a session ran but created
 or finished nothing (model key `active`). A session that sits idle across midnight leaves
 no event on the second day, so that day also shows `-`: the web cell's tooltip and a line
-under the CLI rows say so. A raid view sums its member parties, and a day is
-active when any member was. A task counts for the party that owns its quest now. `guild board --party`
+under the CLI rows say so. An `x` marks a day before the party's first leader started
+(model key `existed`). A raid view sums its member parties, and a day is
+active (or existed) when any member was. A task counts for the party that owns its quest now. `guild board --party`
 and `guild board --raid` print the same rows as `TASKS PER DAY · last 15 days` (model key
 `daily_tasks` on each party).
 

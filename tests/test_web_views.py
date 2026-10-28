@@ -164,7 +164,7 @@ class WebViewBehaviorTests(unittest.TestCase):
     def _daily_tasks_text(self, hash_value):
         def days(created, done, active):
             return [
-                {"day": "2026-10-2{}".format(index), "created": created, "done": done, "active": flag}
+                {"day": "2026-10-2{}".format(index), "created": created, "done": done, "active": flag, "existed": True}
                 for index, flag in zip((4, 5), active, strict=True)
             ]
 
@@ -198,7 +198,10 @@ class WebViewBehaviorTests(unittest.TestCase):
         board = dict(
             _VIEWS_BOARD,
             parties=[
-                dict(_party("a", []), daily_tasks=[{"day": "2026-10-24", "created": 0, "done": 0, "active": False}])
+                dict(
+                    _party("a", []),
+                    daily_tasks=[{"day": "2026-10-24", "created": 0, "done": 0, "active": False, "existed": True}],
+                )
             ],
         )
         tree = json.loads(_render(board, "#party/a", "daily-tasks", "tree"))
@@ -213,6 +216,35 @@ class WebViewBehaviorTests(unittest.TestCase):
         walk(tree)
         self.assertEqual(len(titles), 2)
         self.assertTrue(all("idle across midnight" in title for title in titles))
+
+    def _missing_day_tree(self, hash_value):
+        def day(existed):
+            return {"day": "2026-10-24", "created": 0, "done": 0, "active": False, "existed": existed}
+
+        board = dict(
+            _VIEWS_BOARD,
+            parties=[
+                dict(_party("a", ["r"]), daily_tasks=[day(False)]),
+                dict(_party("b", ["r"]), daily_tasks=[day(True)]),
+            ],
+        )
+        return _render(board, hash_value, "daily-tasks", "tree")
+
+    def test_days_before_the_party_existed_show_x_with_a_tooltip(self):
+        tree = json.loads(self._missing_day_tree("#party/a"))
+        titles = []
+
+        def walk(node):
+            if node["text"] == "x":
+                titles.append(node["title"])
+            for child in node["children"]:
+                walk(child)
+
+        walk(tree)
+        self.assertEqual(titles, ["party did not exist yet"] * 2)
+
+    def test_raid_day_exists_when_any_member_existed(self):
+        self.assertNotIn('"text": "x"', self._missing_day_tree("#raid/r").replace('":"', '": "'))
 
     def test_sidebar_groups_parties_by_raid_then_solo(self):
         text = _render(_VIEWS_BOARD, "", "sidebar", "text")
