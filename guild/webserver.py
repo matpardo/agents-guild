@@ -44,6 +44,7 @@ _STATIC_FILES = {
 _PAGE_FILES = ("index.html", "history.html", "progress.html")
 
 _MAX_BODY_BYTES = 16384
+_INTERNAL_ERROR = {"error": "internal error"}
 _ASK_ACTION_RE = re.compile(r"^/api/asks/([^/]+)/(answer|dismiss)$")
 _NOTICE_ACTION_RE = re.compile(r"^/api/notices/([^/]+)/(seen|unseen)$")
 _PR_ACTION_RE = re.compile(r"^/api/prs/([^/]+/[^/]+)/(\d+)/(block|unblock|relink|untrack|ack)$")
@@ -68,6 +69,7 @@ _SEEN_ALL_PATH = "/api/notices/seen-all"
 _NOTICE_CREATE_PATH = "/api/notices/create"
 _ANSWERED_ASKS_PATH = "/api/asks/answered"
 _ASK_DETAIL_RE = re.compile(r"^/api/asks/(\d+)$")
+_API_GET_PATHS = ("/api/board", _ANSWERED_ASKS_PATH, "/api/history", "/api/resources")
 _ASK_ID_RE = re.compile(r"^[1-9][0-9]{0,17}$")
 _JSON_CONTENT_TYPE = "application/json; charset=utf-8"
 _RESOURCES_SINCE = "1d"
@@ -446,7 +448,7 @@ class BoardRequestHandler(http_server.BaseHTTPRequestHandler):
         raw = self.rfile.read(self._body_length())
         try:
             payload = json.loads(raw.decode("utf-8"))
-        except (UnicodeDecodeError, ValueError):
+        except (UnicodeDecodeError, ValueError, RecursionError):
             raise _RequestRejected(400, "body must be valid JSON") from None
         if not isinstance(payload, dict):
             raise _RequestRejected(400, "body must be a JSON object")
@@ -512,6 +514,8 @@ class BoardRequestHandler(http_server.BaseHTTPRequestHandler):
             return self._write_json(422, {"error": error.message})
         except sqlite3.Error as error:
             return self._write_json(500, {"error": str(error)})
+        except Exception:
+            return self._write_json(500, _INTERNAL_ERROR)
         return self._write_json(200, body)
 
     def _route_post(self):
@@ -602,9 +606,6 @@ class BoardRequestHandler(http_server.BaseHTTPRequestHandler):
             return self._not_found()
         return self._post_action(action, lambda payload: _run_notice_action(action, int(notice_id)))
 
-    def _serve_session(self):
-        self._write_json(200, {"token": self.server.session_token})
-
     def _reject_host(self):
         self._write(421, b"host not allowed", "text/plain; charset=utf-8", None)
 
@@ -623,6 +624,8 @@ class BoardRequestHandler(http_server.BaseHTTPRequestHandler):
             payload = build_model(ctx)
         except GuildError as error:
             return self._write_json(422, {"error": error.message})
+        except Exception:
+            return self._write_json(500, _INTERNAL_ERROR)
         finally:
             ctx.conn.close()
         body = json.dumps(payload).encode("utf-8")
@@ -643,11 +646,13 @@ class BoardRequestHandler(http_server.BaseHTTPRequestHandler):
         path = parts.path
         if path == "/":
             return self._serve_file("index.html", "text/html; charset=utf-8")
+        ask_match = _ASK_DETAIL_RE.match(path)
+        if (path in _API_GET_PATHS or ask_match is not None) and not self._token_valid():
+            return self._write_json(403, {"error": "invalid session token"})
         if path == "/api/board":
             return self._serve_model(board_commands.board_model)
         if path == _ANSWERED_ASKS_PATH:
             return self._serve_model(_answered_asks_model(parts.query))
-        ask_match = _ASK_DETAIL_RE.match(path)
         if ask_match is not None:
             return self._serve_ask_detail(int(ask_match.group(1)))
         if path == "/history":
@@ -658,8 +663,6 @@ class BoardRequestHandler(http_server.BaseHTTPRequestHandler):
             return self._serve_model(_history_model(parts.query))
         if path == "/api/resources":
             return self._serve_model(_resources_model(parts.query))
-        if path == "/api/session":
-            return self._serve_session()
         if path in _STATIC_FILES:
             name, content_type = _STATIC_FILES[path]
             return self._serve_file(name, content_type)
@@ -719,7 +722,7 @@ def serve_forever(port):
     server = start(port)
     ticker_stop = _start_due_jobs_ticker()
     actual_port = server.server_address[1]
-    print("guild web: http://127.0.0.1:{}/".format(actual_port), flush=True)
+    print("guild web: http://127.0.0.1:{}/#t={}".format(actual_port, server.session_token), flush=True)
     try:
         server.serve_forever()
     except KeyboardInterrupt:

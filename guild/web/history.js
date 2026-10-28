@@ -1,7 +1,26 @@
 (function () {
   "use strict";
 
+  function readToken() {
+    var match = /^#t=([A-Za-z0-9_-]+)$/.exec(window.location.hash);
+    if (match === null) {
+      try {
+        return window.sessionStorage.getItem("guild-token");
+      } catch (error) {
+        return null;
+      }
+    }
+    try {
+      window.sessionStorage.setItem("guild-token", match[1]);
+    } catch (error) {
+      console.error(error);
+    }
+    window.history.replaceState(null, "", window.location.pathname + window.location.search);
+    return match[1];
+  }
+
   var HISTORY_URL = "/api/history";
+  var sessionToken = readToken();
   var MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
   var DAY_MS = 86400000;
   var PARTIAL_DATA_HINT = "recorded before achievements were captured; some fields unknown";
@@ -500,7 +519,7 @@
   }
 
   function load() {
-    fetch(HISTORY_URL, { cache: "no-store" })
+    fetch(HISTORY_URL, { cache: "no-store", headers: { "X-Guild-Token": sessionToken } })
       .then(function (response) {
         if (!response.ok) {
           throw new Error("history request failed: " + response.status);

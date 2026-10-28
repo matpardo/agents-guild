@@ -31,8 +31,11 @@ class WebServerTestCase(GuildTestCase):
         return http.client.HTTPConnection("127.0.0.1", self.port, timeout=5)
 
     def _get(self, path, host):
+        return self._get_with_headers(path, {"Host": host, "X-Guild-Token": self.server.session_token})
+
+    def _get_with_headers(self, path, headers):
         conn = self._connection()
-        conn.request("GET", path, headers={"Host": host})
+        conn.request("GET", path, headers=headers)
         response = conn.getresponse()
         body = response.read()
         conn.close()
@@ -42,6 +45,31 @@ class WebServerTestCase(GuildTestCase):
 class RouteTests(WebServerTestCase):
     def _host(self):
         return "127.0.0.1:{}".format(self.port)
+
+    def test_session_endpoint_is_gone(self):
+        response, body = self._get("/api/session", self._host())
+        self.assertEqual(response.status, 404)
+        self.assertNotIn(self.server.session_token.encode("utf-8"), body)
+
+    def test_api_get_without_token_is_forbidden(self):
+        for path in ("/api/board", "/api/history", "/api/resources", "/api/asks/1", "/api/asks/answered"):
+            with self.subTest(path=path):
+                response, body = self._get_with_headers(path, {"Host": self._host()})
+                self.assertEqual(response.status, 403)
+
+    def test_api_get_with_wrong_token_is_forbidden(self):
+        response, body = self._get_with_headers("/api/board", {"Host": self._host(), "X-Guild-Token": "nope"})
+        self.assertEqual(response.status, 403)
+
+    def test_api_get_with_token_is_served(self):
+        response, body = self._get("/api/board", self._host())
+        self.assertEqual(response.status, 200)
+
+    def test_pages_and_static_files_need_no_token(self):
+        for path in ("/", "/history", "/progress", "/app.js", "/app.css"):
+            with self.subTest(path=path):
+                response, body = self._get_with_headers(path, {"Host": self._host()})
+                self.assertEqual(response.status, 200)
 
     def test_root_serves_index_html(self):
         response, body = self._get("/", self._host())
@@ -201,7 +229,7 @@ class ServeForeverTests(GuildTestCase):
             with contextlib.redirect_stdout(stdout):
                 exit_code = webserver.serve_forever(0)
         self.assertEqual(exit_code, 0)
-        self.assertRegex(stdout.getvalue(), r"guild web: http://127\.0\.0\.1:\d+/\n")
+        self.assertRegex(stdout.getvalue(), r"guild web: http://127\.0\.0\.1:\d+/#t=[A-Za-z0-9_-]{40,}\n")
 
 
 class CliWiringTests(GuildTestCase):

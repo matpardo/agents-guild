@@ -1432,10 +1432,11 @@ by the column migration; `guild rebuild` replays it.
 `guild web [--port <n>]` serves the same board in a browser, with more room
 than a terminal for filtering, collapsing and linking out. `--port` defaults
 to 8765; pass `--port 0` to let the OS pick a free port. It always prints
-the real, resolved URL before serving:
+the real, resolved URL before serving, with the session token in the
+fragment (the fragment is never sent to the server); open that exact URL:
 
 ```
-guild web: http://127.0.0.1:<port>/
+guild web: http://127.0.0.1:<port>/#t=<token>
 ```
 
 The server serves the page files it loaded at start, so restart `guild web`
@@ -1597,8 +1598,13 @@ application/json` (`415`); a `Content-Length` of at most 16384 bytes (`411`
 when missing, `413` when larger, exactly that many bytes are read); and a
 JSON object with the required string key (`400`). The token is generated
 with `secrets.token_urlsafe(32)` at each start, lives in memory only, is
-never logged or printed, and is served only by `GET /api/session`; the page
-keeps it in a script variable, never in `localStorage`, a cookie or the URL.
+never logged, and is printed only in the URL fragment `guild web` shows
+at start. The page reads it from the fragment, keeps it in `sessionStorage`
+for that tab, removes it from the address bar and sends it in
+`X-Guild-Token` on every `/api` request; it never uses `localStorage` or a
+cookie. Every `GET /api/*` without a valid token answers `403`; the HTML and
+static files stay public. There is no `/api/session` endpoint (`404`).
+An unexpected error answers a generic `500` `{"error": "internal error"}`.
 A custom header cannot be sent cross-origin without a preflight, which is
 refused. Validation failures answer `422` with `{"error": "<message>"}`
 and never echo the submitted text. Every response carries a strict

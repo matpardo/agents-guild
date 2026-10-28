@@ -43,7 +43,6 @@ async function run({ src, scenario }) {
   }
   function fetchStub(url, options) {
     if (url === "/api/board") return respond(board, true);
-    if (url === "/api/session") return respond({ token: "t" }, true);
     if (url === "/api/compact") {
       return new Promise((resolve, reject) => setTimeout(() => {
         if (scenario === "dropped") return reject(new Error("connection reset"));
@@ -54,7 +53,7 @@ async function run({ src, scenario }) {
     if (resourcesCalls <= 2) return respond({ machine, since: "1d", projects: [], unattributed: null }, true);
     return respond({ error: "database is locked" }, false);
   }
-  const ctx = { document: doc, window: {}, location: { hash: "" }, addEventListener() {}, console, setInterval() {}, setTimeout() {}, fetch: fetchStub };
+  const ctx = { document: doc, window: {}, location: { hash: "#t=t", pathname: "/", search: "" }, history: { replaceState() {} }, addEventListener() {}, console, setInterval() {}, setTimeout() {}, fetch: fetchStub };
   ctx.window = ctx;
   vm.createContext(ctx);
   vm.runInContext(fs.readFileSync(src, "utf8"), ctx);
