@@ -51,3 +51,14 @@ updated: 2026-09-28
 **Status:** [x] done — #3
 
 **What:** reminder read as an error (duplicate notices); `next` crashed on PRs tracked before the migration; live install moved to a dedicated worktree.
+
+## T09 — Ask replies refuse inside a session
+
+**Depends on:** T04
+**Status:** [x] done
+
+**What:** The ask reply and dismiss commands refuse when the call carries a session id, so an agent cannot reply to its own ask by dodging the hook command parsing. The terminal and the web board carry no session id and keep working.
+
+**Acceptance:**
+- [x] Reply and dismiss with a session id fail and leave the ask open.
+- [x] Reply and dismiss from the human terminal and the web board still work.

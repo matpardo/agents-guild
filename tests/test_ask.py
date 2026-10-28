@@ -193,6 +193,22 @@ class AskTests(GuildTestCase):
         code, out, err = self.run_cli(["asks"], None, None)
         self.assertIn("NEEDS YOU · nothing", out)
 
+    def test_answer_inside_session_is_refused_and_ask_stays_open(self):
+        self.run_cli(["ask", "ready?", "--context", "x", "--ref", "task:demo/T01"], "sess-1", self.repo_dir)
+        code, out, err = self.run_cli(["answer", "1", "yes"], "sess-1", self.repo_dir)
+        self.assertEqual(code, 1)
+        self.assertIn("not inside a Claude Code session", err)
+        code, out, err = self.run_cli(["asks"], None, None)
+        self.assertIn("#1 alpha · ready?", out)
+
+    def test_dismiss_inside_session_is_refused_and_ask_stays_open(self):
+        self.run_cli(["ask", "ready?", "--context", "x", "--ref", "task:demo/T01"], "sess-1", self.repo_dir)
+        code, out, err = self.run_cli(["dismiss", "1"], "sess-1", self.repo_dir)
+        self.assertEqual(code, 1)
+        self.assertIn("not inside a Claude Code session", err)
+        code, out, err = self.run_cli(["asks"], None, None)
+        self.assertIn("#1 alpha · ready?", out)
+
     def test_cannot_answer_twice(self):
         self.run_cli(["ask", "ready?", "--context", "x", "--ref", "task:demo/T01"], "sess-1", self.repo_dir)
         self.run_cli(["answer", "1", "yes"], None, None)

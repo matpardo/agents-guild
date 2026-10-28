@@ -142,6 +142,10 @@ def create(ctx, question, context_text, ref_list, option_list):
 
 
 def answer(ctx, ask_id, text):
+    if ctx.session_id is not None:
+        raise GuildError(
+            "ask answer runs from the human terminal or the web board, not inside a Claude Code session", 1
+        )
     row = ctx.conn.execute(
         "SELECT asks.id AS id, asks.state AS state, parties.project AS project FROM asks"
         " LEFT JOIN parties ON parties.name = asks.party WHERE asks.id = ?",
@@ -171,6 +175,10 @@ def answer(ctx, ask_id, text):
 
 
 def dismiss(ctx, ask_id):
+    if ctx.session_id is not None:
+        raise GuildError(
+            "ask dismiss runs from the human terminal or the web board, not inside a Claude Code session", 1
+        )
     row = ctx.conn.execute("SELECT id, state FROM asks WHERE id = ?", (ask_id,)).fetchone()
     if row is None:
         raise GuildError("unknown ask #{}".format(ask_id), 1)
