@@ -3,8 +3,8 @@ import sqlite3
 from datetime import timedelta
 
 from guild import compact, config, db, events, paths, timeutil
-from guild.cli import _build_context, build_parser
-from guild.commands import project_status, rebuild, timer
+from guild.cli import _build_context
+from guild.commands import project_status, rebuild
 from guild.errors import GuildError
 from tests.testutil import GuildTestCase
 
@@ -317,16 +317,3 @@ class CompactConfigTests(GuildTestCase):
         self.addCleanup(conn.close)
         names = [row["name"] for row in conn.execute("PRAGMA index_list(events)").fetchall()]
         self.assertIn("idx_events_kind_project", names)
-
-
-class CompactTimerTests(GuildTestCase):
-    def test_unit_renders_low_priority_compact_service(self):
-        service, timer_text = timer.render_units(timer.UNITS["compact"], "/opt/bin/guild", "1d")
-        self.assertIn("ExecStart=/opt/bin/guild compact\n", service)
-        self.assertIn("Nice=19", service)
-        self.assertIn("IOSchedulingClass=idle", service)
-        self.assertIn("Unit=guild-compact.service", timer_text)
-
-    def test_timer_command_is_registered(self):
-        args = build_parser().parse_args(["compact-timer", "print", "--every", "1d"])
-        self.assertEqual(args.timer_unit, "compact")

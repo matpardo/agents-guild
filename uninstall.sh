@@ -3,7 +3,7 @@ set -euo pipefail
 
 if [ "$#" -gt 1 ] || { [ "$#" -eq 1 ] && [ "$1" != "--purge" ]; }; then
   echo "usage: ./uninstall.sh [--purge]"
-  echo "removes the timers, the hooks and permission rules, and the symlinks install.sh made; --purge also deletes the data, config and state directories"
+  echo "removes any legacy timers, the hooks and permission rules, and the symlinks install.sh made; --purge also deletes the data, config and state directories"
   exit 2
 fi
 PURGE="${1:-}"

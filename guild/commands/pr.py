@@ -337,8 +337,9 @@ _STALE_SECONDS = 1800
 
 
 class _PrWatch:
-    def __init__(self, ref, started_at):
+    def __init__(self, ref, started_at, refresh):
         self._ref = ref
+        self._refresh = refresh
         self._baseline = None
         self._seen_pending = False
         self._synced_at = None
@@ -355,10 +356,8 @@ class _PrWatch:
                 self._ref, row["checks_failing"] or 0, row["checks_passing"] or 0
             ), 0
         if self._stale(row["synced_at"], now):
-            return (
-                "{}: no sync for 30m: run guild sync --source gh or install guild sync-timer".format(self._ref),
-                4,
-            )
+            self._refresh()
+            self._changed_at = now
         return None
 
     def _closed_line(self, row):
@@ -398,11 +397,11 @@ def _read_pr(conn, repo, number):
     return row
 
 
-def wait(conn, ref, timeout, sleep, clock):
+def wait(conn, ref, timeout, sleep, clock, refresh):
     repo, number = refs.parse_pr_ref(ref)
     if _load_pr(conn, repo, number)["other_author_comments"] is None:
         raise GuildError("no sync data yet for {}: run guild sync --source gh first".format(ref), 1)
-    watch = _PrWatch(ref, clock())
+    watch = _PrWatch(ref, clock(), refresh)
     result = polling.until(
         lambda: _read_pr(conn, repo, number),
         lambda row: watch.check(row, clock()),

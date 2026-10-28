@@ -1,18 +1,24 @@
 import re
 import shutil
-import sys
 from pathlib import Path
 
 from guild import claude_settings, config, ctx_pressure, identity, localbase, paths, tmux_windows
 from guild.adapters import github
 from guild.commands import realm as realm_commands
 from guild.commands import statusline as statusline_commands
-from guild.commands import timer as timer_commands
 from guild.errors import GuildError
 from guild.realm import checks as realm_checks
 
 _TRACE_RE = re.compile(r"guild|ask #[0-9]|notice #[0-9]", re.IGNORECASE)
 _RETIRED_UNIT_NAMES = ("guild-dispatch.timer", "guild-dispatch.service")
+_LEGACY_TIMER_NAMES = (
+    "guild-sync-gh",
+    "guild-sync-sdd",
+    "guild-sync-tracker",
+    "guild-sync-bases",
+    "guild-resources-collect",
+    "guild-compact",
+)
 _PR_SCAN_FIELDS = ("number", "title", "body", "comments", "commits")
 _DATED_COLUMNS = (
     ("quests", "created_at"),
@@ -91,16 +97,12 @@ def _dispatch_unit_lines():
 
 
 def _timer_lines():
-    guild_executable = shutil.which("guild")
-    if sys.platform != "linux" or shutil.which("systemctl") is None or guild_executable is None:
-        return []
     unit_dir = paths.systemd_user_dir()
-    lines = []
-    for unit in timer_commands.UNITS.values():
-        state = timer_commands.installed_state(unit, unit_dir, guild_executable)
-        if state != "current":
-            lines.append((True, "warn    timer {} is {}: run timers.sh".format(unit.timer_name, state)))
-    return lines
+    return [
+        (True, "warn    legacy timer {} installed: run install.sh".format(name))
+        for name in _LEGACY_TIMER_NAMES
+        if (unit_dir / (name + ".timer")).exists() or (unit_dir / (name + ".service")).exists()
+    ]
 
 
 def _global_config_lines(global_config_path):

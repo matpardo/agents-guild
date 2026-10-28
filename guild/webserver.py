@@ -4,11 +4,12 @@ import re
 import secrets
 import sqlite3
 import sys
+import time
 from http import server as http_server
 from pathlib import Path
 from urllib.parse import parse_qs, urlsplit
 
-from guild import ask_detail, context, db, origin, paths, timeutil
+from guild import ask_detail, context, db, due_jobs, origin, paths, timeutil
 from guild.commands import adventurer as adventurer_commands
 from guild.commands import ask as ask_commands
 from guild.commands import base_pause as base_pause_commands
@@ -642,6 +643,7 @@ class BoardRequestHandler(http_server.BaseHTTPRequestHandler):
         if path == "/":
             return self._serve_file("index.html", "text/html; charset=utf-8")
         if path == "/api/board":
+            due_jobs.spawn_due(paths.state_dir(), Path.home(), time.time(), due_jobs.spawn_detached)
             return self._serve_model(board_commands.board_model)
         if path == _ANSWERED_ASKS_PATH:
             return self._serve_model(_answered_asks_model(parts.query))

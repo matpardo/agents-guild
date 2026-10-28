@@ -156,6 +156,7 @@ def _entry(login, body, **extra):
 class PrWaitTests(WaitTestCase):
     def setUp(self):
         super().setUp()
+        self.refreshes = 0
         self.run_cli(["quest", "add", "demo", "--title", "Demo", "--no-epic"], "sess-1", self.repo_dir)
         self.run_cli(["task", "add", "demo/T01", "--title", "First"], "sess-1", self.repo_dir)
         self.track("sess-1", 7, "demo/T01", "ready")
@@ -178,7 +179,10 @@ class PrWaitTests(WaitTestCase):
         return lambda: self._publish(**extra)
 
     def _wait(self, ref, timeout):
-        return pr_commands.wait(self.conn, ref, timeout, self.time.sleep, self.time.clock)
+        return pr_commands.wait(self.conn, ref, timeout, self.time.sleep, self.time.clock, self._count_refresh)
+
+    def _count_refresh(self):
+        self.refreshes += 1
 
     def test_wakes_on_comment_by_another_author(self):
         self.time.on_sleep[2] = self._later(comments=[_entry("human", "hi", createdAt="2026-10-20T11:00:00Z")])
@@ -237,11 +241,10 @@ class PrWaitTests(WaitTestCase):
         with self.assertRaises(GuildError):
             self._wait("nonsense", _TWO_HOURS)
 
-    def test_no_sync_for_thirty_minutes_exits_four(self):
+    def test_stale_sync_triggers_refresh_and_keeps_waiting(self):
         line, code = self._wait(_REF, _TWO_HOURS)
-        self.assertEqual(code, 4)
-        self.assertEqual(line, "acme/app#7: no sync for 30m: run guild sync --source gh or install guild sync-timer")
-        self.assertEqual(len(self.time.sleeps), 121)
+        self.assertEqual((line, code), ("acme/app#7 no change in 120m", 3))
+        self.assertEqual(self.refreshes, 3)
 
     def test_timeout_while_syncs_keep_running(self):
         counter = {"n": 0}
@@ -290,7 +293,7 @@ class PrWaitTests(WaitTestCase):
         marker_dir = _build_context("sess-1", self.repo_dir).state_dir / "background" / "sess-1"
         seen = []
 
-        def fake_wait(conn, ref, timeout, sleep, clock):
+        def fake_wait(conn, ref, timeout, sleep, clock, refresh):
             seen.append(self._marker_texts(marker_dir))
             return "done", 0
 
