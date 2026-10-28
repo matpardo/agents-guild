@@ -3,7 +3,7 @@ epic: party-identity
 type: tasks
 title: A session leads one party for its whole life
 status: done
-updated: 2026-10-23
+updated: 2026-10-28
 ---
 
 # Tasks: A session leads one party for its whole life
@@ -38,3 +38,13 @@ updated: 2026-10-23
 
 **Acceptance:**
 - [x] `GUILD.md` names the rule next to the binding rule.
+
+## T04 — A party name is never reused
+
+**Depends on:** T01
+**Status:** [x] done
+
+**What:** tests guard that `party start` and `adventurer promote` refuse the name of a closed party, and `README.md` says a name always means one party and its history.
+
+**Acceptance:**
+- [x] Starting or promoting onto a closed party's name fails with `already exists`.

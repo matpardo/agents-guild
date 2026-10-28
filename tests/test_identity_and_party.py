@@ -60,6 +60,13 @@ class PartyStartResumeCloseTests(GuildTestCase):
         self.assertEqual(code, 1)
         self.assertIn("already exists", err)
 
+    def test_start_rejects_name_of_a_closed_party(self):
+        self.run_cli(["party", "start", "alpha", "--reason", "test reason"], "sess-1", None)
+        self.assertEqual(self.run_cli(["party", "close", "--pending", "none"], "sess-1", None)[0], 0)
+        code, out, err = self.run_cli(["party", "start", "alpha", "--reason", "test reason"], "sess-2", None)
+        self.assertEqual(code, 1)
+        self.assertIn("already exists", err)
+
     def test_resume_binds_new_session_as_next_generation(self):
         self.run_cli(["party", "start", "alpha", "--reason", "test reason"], "sess-1", None)
         code, out, err = self.run_cli(["party", "resume", "alpha"], "sess-2", None)
