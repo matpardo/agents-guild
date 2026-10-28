@@ -1,6 +1,7 @@
 import os
 import subprocess
 import sys
+import time
 from pathlib import Path
 
 from guild import paths
@@ -57,3 +58,10 @@ def spawn_due(state_dir, cwd, now_epoch, spawner):
         stamp.touch()
         os.utime(stamp, (now_epoch, now_epoch))
         spawner(argv, cwd, low_priority)
+
+
+def tick_until_stopped(stop_event, interval_seconds, state_dir, cwd, spawner):
+    while True:
+        spawn_due(state_dir, cwd, time.time(), spawner)
+        if stop_event.wait(interval_seconds):
+            return

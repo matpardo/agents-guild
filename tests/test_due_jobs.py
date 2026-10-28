@@ -1,3 +1,5 @@
+import threading
+import time
 from unittest import mock
 
 from guild import due_jobs
@@ -24,6 +26,24 @@ class DueJobsTests(GuildTestCase):
         self._spawn_due(1000.0)
         self.assertEqual([call[0] for call in self.calls], [job[0] for job in due_jobs.JOBS.values()])
         self.assertTrue(all(call[1] == self.root for call in self.calls))
+
+    def test_ticker_spawns_due_jobs_until_stopped(self):
+        stop_event = threading.Event()
+
+        def spawner(argv, cwd, low_priority):
+            self.calls.append((argv, cwd, low_priority))
+            stop_event.set()
+
+        due_jobs.tick_until_stopped(stop_event, 60, self.state_dir, self.root, spawner)
+        self.assertEqual(len(self.calls), len(due_jobs.JOBS))
+
+    def test_ticker_returns_at_once_when_already_stopped_and_nothing_due(self):
+        stop_event = threading.Event()
+        self._spawn_due(time.time())
+        self.calls.clear()
+        stop_event.set()
+        due_jobs.tick_until_stopped(stop_event, 60, self.state_dir, self.root, self._spawner)
+        self.assertEqual(self.calls, [])
 
     def test_low_priority_only_for_heavy_jobs(self):
         self._spawn_due(1000.0)

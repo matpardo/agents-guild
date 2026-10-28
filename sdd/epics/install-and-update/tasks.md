@@ -111,4 +111,4 @@ updated: 2026-10-28
 **Depends on:** T14
 **Status:** [x] done
 
-**What:** The six systemd timers and their `*-timer` commands and `timers.sh` are gone. The sync, resources-collect and compact jobs start detached, throttled by a stamp file per job, from the session hooks (`session-start`, `prompt-submit`, `stop`), from `pr wait` while it sees stale data and from the web board's `/api/board`, so an idle machine runs nothing. `pr wait` keeps waiting instead of exiting 4. `install.sh` removes the legacy units and `guild doctor` warns while any remain.
+**What:** The six systemd timers and their `*-timer` commands and `timers.sh` are gone. The sync, resources-collect and compact jobs start detached, throttled by a stamp file per job, from the session hooks (`session-start`, `prompt-submit`, `stop`), from `pr wait` while it sees stale data and from a ticker in `guild web` that checks every minute while it runs, so an idle machine runs nothing. `pr wait` keeps waiting instead of exiting 4. `install.sh` removes the legacy units and `guild doctor` warns while any remain.

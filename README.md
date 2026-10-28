@@ -902,8 +902,10 @@ unchanged and does not wake.
 `guild` has no daemon and installs no systemd timers. Six jobs keep the stored
 state fresh, and each starts, detached, when it is due and one of these runs:
 a session hook (`session-start`, `prompt-submit`, `stop`), a `pr wait` that
-sees no sync for 30 minutes, or a request to the web board's `/api/board`.
-An idle machine, with no session and no board open, runs nothing.
+sees no sync for 30 minutes, or `guild web`, which checks every minute while it
+runs, with or without a browser open. Leave `guild web` running (tmux, a login
+autostart) for a schedule like the old timers. An idle machine, with no session
+and no `guild web`, runs nothing.
 
 | job | command | every |
 |---|---|---|

@@ -4,7 +4,7 @@ import re
 import secrets
 import sqlite3
 import sys
-import time
+import threading
 from http import server as http_server
 from pathlib import Path
 from urllib.parse import parse_qs, urlsplit
@@ -31,6 +31,7 @@ from guild.errors import GuildError
 from guild.realm import hub as realm_hub
 from guild.resources import report as resources_report
 
+_DUE_JOBS_TICK_SECONDS = 60
 _WEB_DIR = Path(__file__).resolve().parent / "web"
 
 _STATIC_FILES = {
@@ -643,7 +644,6 @@ class BoardRequestHandler(http_server.BaseHTTPRequestHandler):
         if path == "/":
             return self._serve_file("index.html", "text/html; charset=utf-8")
         if path == "/api/board":
-            due_jobs.spawn_due(paths.state_dir(), Path.home(), time.time(), due_jobs.spawn_detached)
             return self._serve_model(board_commands.board_model)
         if path == _ANSWERED_ASKS_PATH:
             return self._serve_model(_answered_asks_model(parts.query))
@@ -705,8 +705,19 @@ def start(port):
     return server
 
 
+def _start_due_jobs_ticker():
+    stop_event = threading.Event()
+    threading.Thread(
+        target=due_jobs.tick_until_stopped,
+        args=(stop_event, _DUE_JOBS_TICK_SECONDS, paths.state_dir(), Path.home(), due_jobs.spawn_detached),
+        daemon=True,
+    ).start()
+    return stop_event
+
+
 def serve_forever(port):
     server = start(port)
+    ticker_stop = _start_due_jobs_ticker()
     actual_port = server.server_address[1]
     print("guild web: http://127.0.0.1:{}/".format(actual_port), flush=True)
     try:
@@ -714,5 +725,6 @@ def serve_forever(port):
     except KeyboardInterrupt:
         pass
     finally:
+        ticker_stop.set()
         server.server_close()
     return 0
