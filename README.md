@@ -2122,6 +2122,9 @@ Party, quest and project names are validated against a slug rule
 (`^[A-Za-z0-9][A-Za-z0-9._-]*$`, no `..` anywhere) before they can become a
 filesystem path (handoff files, project config files) — this is defense
 against path traversal, not an identity boundary.
+A party name is never reused: `party start` and `adventurer promote` refuse a name
+that any party ever had, closed parties included, so a name always means one party
+and its history (tasks per day, leaders, events).
 
 ## Global config
 

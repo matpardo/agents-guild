@@ -69,6 +69,13 @@ class PromoteTests(AdventurerTestCase):
         self.assertEqual(code, 0, err)
         self.assertNotIn("add task", out)
 
+    def test_promote_refuses_name_of_a_closed_party(self):
+        self.cli(["party", "start", "gone", "--reason", "r"], "sess-1")
+        self.assertEqual(self.cli(["party", "close", "--pending", "none"], "sess-1")[0], 0)
+        code, out, err = self.cli(["adventurer", "promote", "gone", "--reason", "r"], "adv-1")
+        self.assertEqual(code, 1)
+        self.assertIn("already exists", err)
+
     def test_promote_refusals(self):
         self.assertEqual(self.cli(["adventurer", "promote", "alpha", "--reason", "r"], "sess-9")[0], 1)
         self.cli(["party", "start", "taken", "--reason", "r"], "sess-1")
