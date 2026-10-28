@@ -4,6 +4,7 @@ import io
 import json
 import os
 import shutil
+import socket
 import ssl
 import unittest
 import unittest.mock
@@ -192,6 +193,36 @@ class RealmHubTests(GuildTestCase):
         shutdown.assert_called_once()
         for _ in slots:
             self.server.connection_slots.release()
+
+    def _stall(self, send_headers):
+        sock = socket.create_connection(("127.0.0.1", self.port), timeout=10)
+        self.addCleanup(sock.close)
+        if send_headers:
+            sock.sendall(b"\x16")
+        return sock
+
+    def _closed_within(self, sock, seconds):
+        sock.settimeout(seconds)
+        try:
+            return sock.recv(1) == b""
+        except ConnectionResetError:
+            return True
+        except socket.timeout:
+            return False
+
+    def test_stalled_connection_is_closed_at_the_deadline(self):
+        with mock.patch.object(hub, "PRE_AUTH_DEADLINE_SECONDS", 0.5):
+            silent = self._stall(False)
+            dribbling = self._stall(True)
+            self.assertTrue(self._closed_within(silent, 5))
+            self.assertTrue(self._closed_within(dribbling, 5))
+
+    def test_stalled_connections_free_their_slots_for_a_real_request(self):
+        with mock.patch.object(hub, "PRE_AUTH_DEADLINE_SECONDS", 0.5):
+            stalled = [self._stall(False) for _ in range(hub.MAX_CONNECTIONS)]
+            for sock in stalled:
+                self.assertTrue(self._closed_within(sock, 5))
+            self.assertEqual(self._as("alpha", "GET", "/whoami")[0], 200)
 
     def test_client_capped_at_tls12_is_refused(self):
         context = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
