@@ -3,7 +3,7 @@ epic: install-and-update
 type: tasks
 title: Versioned install and self-update
 status: active
-updated: 2026-10-24
+updated: 2026-10-28
 ---
 
 # Tasks: Versioned install and self-update
@@ -98,3 +98,10 @@ updated: 2026-10-24
 **Status:** [x] done
 
 **What:** The SDD task of a PR lands `[x] done` in the change's single commit, with no PR number. Only the checkbox is read, so the number cost an amend and a force-push, and with CI a second run, for text nothing parses. Tasks already marked `— #<pr>` stay as they are.
+
+## T14 — Soft uninstall
+
+**Depends on:** T01
+**Status:** [x] done
+
+**What:** `./uninstall.sh` undoes what `install.sh` and `timers.sh` put on the machine: the systemd timer and service units, the guild hooks and permission rules in `~/.claude/settings.json` (through the new `guild unwire-settings`, which keeps a `.bak` and leaves every other entry as it is), and the symlinks to `bin/guild` and `GUILD.md` that point at this clone. The data, config and state directories are kept unless `--purge` is passed. Lines it cannot edit safely, such as `@~/.claude/GUILD.md` in `CLAUDE.md` and a `guild hook pre-commit` line in a git or husky hook, are reported to remove by hand.
