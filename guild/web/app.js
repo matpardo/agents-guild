@@ -2493,9 +2493,10 @@ realmDoctorLines: [],
             created: total.created + day.created,
             done: total.done + day.done,
             active: total.active || day.active,
+            existed: total.existed || day.existed,
           };
         },
-        { day: entry.day, created: 0, done: 0, active: false }
+        { day: entry.day, created: 0, done: 0, active: false, existed: false }
       );
     });
   }
@@ -2503,10 +2504,18 @@ realmDoctorLines: [],
   var DAILY_DASH_HINT =
     "no session event this day; a session that sat idle across midnight leaves no event and also shows -";
 
+  var DAILY_X_HINT = "party did not exist yet";
+
   function dailyTaskRow(label, days, key) {
     var row = el("tr");
     row.appendChild(textEl("th", label));
     days.forEach(function (day) {
+      if (!day.existed) {
+        var missing = classedText("td", "x", "muted");
+        missing.title = DAILY_X_HINT;
+        row.appendChild(missing);
+        return;
+      }
       if (!day.active && day[key] === 0) {
         var cell = classedText("td", "-", "muted");
         cell.title = DAILY_DASH_HINT;

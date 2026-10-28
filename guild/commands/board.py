@@ -978,10 +978,24 @@ def _daily_tasks(conn, now, party_name):
     ).fetchall()
     for row in event_rows:
         _count_on_local_day(session_events, row["ts"])
+    start_day = _party_start_day(conn, party_name)
     return [
-        {"day": day.isoformat(), "created": created[day], "done": done[day], "active": session_events[day] > 0}
+        {
+            "day": day.isoformat(),
+            "created": created[day],
+            "done": done[day],
+            "active": session_events[day] > 0,
+            "existed": start_day is None or day >= start_day,
+        }
         for day in days
     ]
+
+
+def _party_start_day(conn, party_name):
+    started_at = conn.execute("SELECT MIN(started_at) FROM leaders WHERE party = ?", (party_name,)).fetchone()[0]
+    if started_at is None:
+        return None
+    return timeutil.from_iso(started_at).astimezone().date()
 
 
 def _summed_daily_tasks(ctx, party_rows):
@@ -994,12 +1008,15 @@ def _summed_daily_tasks(ctx, party_rows):
             "created": sum(entry["created"] for entry in entries),
             "done": sum(entry["done"] for entry in entries),
             "active": any(entry["active"] for entry in entries),
+            "existed": any(entry["existed"] for entry in entries),
         }
         for entries in zip(*per_party, strict=True)
     ]
 
 
 def _daily_cell(day, key):
+    if not day["existed"]:
+        return "x"
     if not day["active"] and day[key] == 0:
         return "-"
     return day[key]
@@ -1014,7 +1031,10 @@ def _daily_task_lines(painter, days):
         "  {:<8}".format("day") + " ".join("{:>3}".format(cell) for cell in cells),
         "  {:<8}".format("created") + " ".join("{:>3}".format(_daily_cell(day, "created")) for day in days),
         "  {:<8}".format("done") + " ".join("{:>3}".format(_daily_cell(day, "done")) for day in days),
-        painter.paint("  - no session event that day; a session idle across midnight also shows -", "dim"),
+        painter.paint(
+            "  x party did not exist yet · - no session event that day; a session idle across midnight also shows -",
+            "dim",
+        ),
         "",
     ]
 

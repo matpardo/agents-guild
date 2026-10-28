@@ -44,8 +44,8 @@ class DailyTasksTests(QuestBoardTestCase):
         days = self.party_days("alpha")
         self.assertEqual(len(days), 15)
         self.assertEqual(days[0]["day"], _day(14))
-        self.assertEqual(days[-1], {"day": _day(0), "created": 0, "done": 1, "active": True})
-        self.assertEqual(days[-4], {"day": _day(3), "created": 1, "done": 1, "active": True})
+        self.assertEqual(days[-1], {"day": _day(0), "created": 0, "done": 1, "active": True, "existed": True})
+        self.assertEqual(days[-4], {"day": _day(3), "created": 1, "done": 1, "active": True, "existed": True})
         self.assertEqual(sum(day["created"] for day in days), 1)
         self.assertEqual(sum(day["done"] for day in days), 2)
 
@@ -84,6 +84,27 @@ class DailyTasksTests(QuestBoardTestCase):
         self.assertEqual(created_line.split()[-4], "3")
         self.assertEqual(created_line.split()[-2], "0")
         self.assertEqual(created_line.split()[-5], "-")
+
+    def test_days_before_the_party_started_show_x(self):
+        self.at(2, ["party", "start", "beta", "--reason", "r"], "sess-2")
+        self.assertEqual([day["existed"] for day in self.party_days("beta")], [False] * 12 + [True] * 3)
+        out = self.board(["--party", "beta"])
+        created_line = next(line for line in out.splitlines() if line.strip().startswith("created"))
+        self.assertEqual(created_line.split()[1:], ["x"] * 12 + ["0", "-", "-"])
+        self.assertIn("x party did not exist yet", out)
+
+    def test_party_without_a_leader_row_never_shows_x(self):
+        self.ctx().conn.execute("DELETE FROM leaders WHERE party = ?", ("alpha",))
+        self.assertTrue(all(day["existed"] for day in self.party_days("alpha")))
+
+    def test_raid_day_exists_when_any_member_existed(self):
+        self.at(2, ["party", "start", "beta", "--reason", "r"], "sess-2")
+        self.at(1, ["raid", "join", "ci", "--ttl", "30d"], "sess-1")
+        self.at(1, ["raid", "join", "ci", "--ttl", "30d"], "sess-2")
+        created_line = next(
+            line for line in self.board(["--raid", "ci"]).splitlines() if line.strip().startswith("created")
+        )
+        self.assertNotIn("x", created_line.split()[1:])
 
     def test_full_board_has_no_daily_rows(self):
         self.assertNotIn("TASKS PER DAY", self.board([]))
