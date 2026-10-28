@@ -85,3 +85,10 @@ updated: 2026-09-28
 **Status:** [x] done
 
 **What:** a connection that does not finish the TLS handshake and request headers within 10 seconds is closed and its slot released, so unauthenticated slow sockets cannot hold all 32 slots.
+
+## T13 — Low-severity hardening
+
+**Depends on:** T06
+**Status:** [x] done
+
+**What:** hook ids that are not plain names are hashed before they become state file names; frame end markers inside handoff and memory text are dropped; `realm fetch --out` no longer changes the mode of an existing folder; concurrent hooks cannot spawn the same due background job twice.

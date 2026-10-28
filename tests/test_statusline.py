@@ -122,3 +122,15 @@ class StatuslineBlockedTests(GuildTestCase):
         self._block("sess-2")
         self.run_cli(["party", "close", "--pending", "none"], "sess-2", self.repo_dir)
         self.assertNotIn("blocked", self._statusline("sess-1"))
+
+
+class UnsafeSessionIdTests(GuildTestCase):
+    def test_traversal_session_id_stays_inside_the_state_dir(self):
+        state_dir = paths.state_dir()
+        statusline_commands.record_ctx(state_dir, "../../escaped", 42)
+        statusline_commands.record_baseline_once(state_dir, "../../escaped", 42)
+        self.assertEqual(statusline_commands.read_ctx(state_dir, "../../escaped"), 42)
+        self.assertFalse((state_dir.parent / "escaped").exists())
+        self.assertFalse((state_dir.parent.parent / "escaped").exists())
+        self.assertEqual(len(list((state_dir / "ctx").iterdir())), 1)
+        self.assertNotIn("escaped", [path.name for path in (state_dir / "ctx").iterdir()])

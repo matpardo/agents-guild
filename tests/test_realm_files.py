@@ -56,6 +56,14 @@ class RealmFilesTests(GuildTestCase):
         self._join("beta")
         return self.run_cli(["realm", "fetch", file_id, "--out", str(self.out)], None, self.root)
 
+    def test_fetch_leaves_an_existing_out_dir_mode_alone(self):
+        self.out.mkdir()
+        self.out.chmod(0o755)
+        file_id = self._send(self._write("note.md", b"hi"))
+        code, out, err = self._fetch(file_id)
+        self.assertEqual(code, 0, err)
+        self.assertEqual(stat.S_IMODE(self.out.stat().st_mode), 0o755)
+
     def test_round_trip_is_byte_identical(self):
         content = "# Request\n\nunicode: é中\r\nend".encode("utf-8")
         file_id = self._send(self._write("My Request.md", content))

@@ -213,7 +213,9 @@ def stop(ctx):
 def _subagent_meta_path(transcript_path, agent_id):
     if not transcript_path:
         return ""
-    return str(Path(transcript_path).with_suffix("") / "subagents" / "agent-{}.meta.json".format(agent_id))
+    return str(
+        Path(transcript_path).with_suffix("") / "subagents" / "agent-{}.meta.json".format(names.safe_key(agent_id))
+    )
 
 
 def subagent_start(ctx, agent_id, transcript_path):

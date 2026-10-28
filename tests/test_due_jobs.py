@@ -2,7 +2,7 @@ import threading
 import time
 from unittest import mock
 
-from guild import due_jobs
+from guild import due_jobs, locking
 from tests.testutil import GuildTestCase
 
 _REAL_SPAWN = due_jobs.spawn_detached
@@ -76,7 +76,7 @@ class DueJobsTests(GuildTestCase):
             stamps.append(sorted(path.name for path in (self.state_dir / "due").iterdir()))
 
         due_jobs.spawn_due(self.state_dir, self.root, 1000.0, spawner)
-        self.assertEqual(stamps[0], ["sync-gh"])
+        self.assertEqual(stamps[0], ["spawn.lock", "sync-gh"])
 
     def test_state_dir_is_private(self):
         self._spawn_due(1000.0)
@@ -117,3 +117,13 @@ class HookTriggersTests(GuildTestCase):
         count = len(self.spawned_jobs)
         self.run_hook("prompt-submit", {"session_id": "s-1", "cwd": str(self.root)})
         self.assertEqual(len(self.spawned_jobs), count)
+
+
+class DueJobsLockTests(GuildTestCase):
+    def test_nothing_spawns_while_another_process_holds_the_lock(self):
+        state_dir = self.root / "locked-state"
+        calls = []
+        with locking.try_lock(state_dir / "due", "spawn.lock") as acquired:
+            self.assertTrue(acquired)
+            due_jobs.spawn_due(state_dir, self.root, 1000.0, lambda argv, cwd, low: calls.append(argv))
+        self.assertEqual(calls, [])

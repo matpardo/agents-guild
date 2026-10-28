@@ -80,3 +80,15 @@ class BackgroundTests(unittest.TestCase):
 
     def test_clear_subagents_without_directory_is_a_no_op(self):
         background.clear_subagents(self.state_dir, "sess-1")
+
+
+class UnsafeIdTests(unittest.TestCase):
+    def test_traversal_ids_stay_inside_the_state_dir(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            state_dir = root / "state"
+            state_dir.mkdir()
+            background.mark(state_dir, "../../escaped", "pr-1", "label")
+            background.mark(state_dir, "sess-1", background.subagent_key("../../x"), "meta")
+            self.assertEqual([path.name for path in root.iterdir()], ["state"])
+            self.assertEqual(len(list((state_dir / "background").iterdir())), 2)

@@ -1,3 +1,4 @@
+import hashlib
 import re
 
 from guild.errors import GuildError
@@ -12,6 +13,12 @@ def validate_name(value, field_name):
             1,
         )
     return value
+
+
+def safe_key(value):
+    if _NAME_RE.fullmatch(value) is not None and ".." not in value:
+        return value
+    return "x-" + hashlib.sha256(value.encode()).hexdigest()[:32]
 
 
 def ensure_within(path, base_dir):

@@ -418,7 +418,10 @@ def fetch(file_id, out_dir, claudecode):
     _check_file_id(file_id)
     payload = client.request(clientconfig.load(), "GET", "/inbox/" + file_id, None)
     sender, file_name, data = _checked_file(payload)
-    directory = paths.ensure_private_dir(Path(out_dir)).resolve()
+    directory = Path(out_dir)
+    if not directory.exists():
+        paths.ensure_private_dir(directory)
+    directory = directory.resolve()
     saved = _save_file(directory, file_name, file_id, data)
     return {"path": str(saved), "from": sender, "flagged": pii.looks_instruction_like(data.decode("utf-8"))}
 

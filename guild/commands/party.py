@@ -26,7 +26,8 @@ def previous_handoff_content(conn, party, generation):
 
 
 def framed_handoff(content):
-    return [_HANDOFF_HEADER, sanitize.strip_control_sequences(content), "", _HANDOFF_END]
+    body = sanitize.drop_frame_lines(sanitize.strip_control_sequences(content), (_HANDOFF_HEADER, _HANDOFF_END))
+    return [_HANDOFF_HEADER, body, "", _HANDOFF_END]
 
 
 def record_location(ctx, party, project, generation, session_id, permission_mode):
