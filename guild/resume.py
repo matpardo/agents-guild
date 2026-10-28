@@ -3,8 +3,11 @@ import shlex
 RESUME_PROMPT = "Continue the work described in the guild brief."
 
 
+CARRIED_PERMISSION_MODES = ("default", "acceptEdits", "plan", "auto", "dontAsk")
+
+
 def _mode_flag(permission_mode):
-    if permission_mode is None:
+    if permission_mode not in CARRIED_PERMISSION_MODES:
         return ""
     return " --permission-mode {}".format(shlex.quote(permission_mode))
 

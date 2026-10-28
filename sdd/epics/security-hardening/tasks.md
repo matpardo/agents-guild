@@ -62,3 +62,12 @@ updated: 2026-09-28
 **Acceptance:**
 - [x] Reply and dismiss with a session id fail and leave the ask open.
 - [x] Reply and dismiss from the human terminal and the web board still work.
+
+## T10 — Relaunch never carries bypass permissions
+
+**Depends on:** —
+**Status:** [x] done
+
+**What:** `revive` and `handoff --respawn` pass a recorded permission mode on only when it is `default`, `acceptEdits`, `plan`, `auto` or `dontAsk`; `bypassPermissions` and unknown values are dropped.
+
+**Acceptance:** a leader row or transcript holding `bypassPermissions` yields a relaunch command without `--permission-mode`.
