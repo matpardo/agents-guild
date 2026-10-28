@@ -43,27 +43,30 @@ class InstallScriptTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("settings: already wired", result.stdout)
 
-    def test_removes_retired_dispatcher_timer(self):
+    def test_removes_retired_timers(self):
         self.unit_dir.mkdir(parents=True)
-        (self.unit_dir / "guild-dispatch.timer").write_text("")
-        (self.unit_dir / "guild-dispatch.service").write_text("")
-        (self.unit_dir / "guild-sync-gh.timer").write_text("")
+        for name in ("guild-dispatch.timer", "guild-dispatch.service", "guild-sync-gh.timer", "guild-compact.service"):
+            (self.unit_dir / name).write_text("")
         result = self._run()
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertFalse((self.unit_dir / "guild-dispatch.timer").exists())
-        self.assertFalse((self.unit_dir / "guild-dispatch.service").exists())
-        self.assertTrue((self.unit_dir / "guild-sync-gh.timer").exists())
+        self.assertEqual(list(self.unit_dir.iterdir()), [])
         self.assertEqual(
             self.systemctl_log.read_text().splitlines(),
-            ["--user disable --now guild-dispatch.timer", "--user daemon-reload"],
+            [
+                "--user disable --now guild-sync-gh.timer",
+                "--user disable --now guild-compact.timer",
+                "--user disable --now guild-dispatch.timer",
+                "--user daemon-reload",
+            ],
         )
-        self.assertIn("removed the retired dispatcher timer", result.stdout)
+        self.assertIn("removed the retired timer guild-sync-gh", result.stdout)
+        self.assertIn("removed the retired timer guild-dispatch", result.stdout)
 
     def test_leaves_systemd_alone_without_retired_timer(self):
         result = self._run()
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertFalse(self.systemctl_log.exists())
-        self.assertNotIn("retired dispatcher", result.stdout)
+        self.assertNotIn("retired timer", result.stdout)
 
     def test_hints_the_claude_md_line_when_missing(self):
         result = self._run()

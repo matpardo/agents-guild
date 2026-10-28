@@ -105,3 +105,10 @@ updated: 2026-10-28
 **Status:** [x] done
 
 **What:** `./uninstall.sh` undoes what `install.sh` and `timers.sh` put on the machine: the systemd timer and service units, the guild hooks and permission rules in `~/.claude/settings.json` (through the new `guild unwire-settings`, which keeps a `.bak` and leaves every other entry as it is), and the symlinks to `bin/guild` and `GUILD.md` that point at this clone. The data, config and state directories are kept unless `--purge` is passed. Lines it cannot edit safely, such as `@~/.claude/GUILD.md` in `CLAUDE.md` and a `guild hook pre-commit` line in a git or husky hook, are reported to remove by hand.
+
+## T15 — Hook-driven background jobs
+
+**Depends on:** T14
+**Status:** [x] done
+
+**What:** The six systemd timers and their `*-timer` commands and `timers.sh` are gone. The sync, resources-collect and compact jobs start detached, throttled by a stamp file per job, from the session hooks (`session-start`, `prompt-submit`, `stop`), from `pr wait` while it sees stale data and from a ticker in `guild web` that checks every minute while it runs, so an idle machine runs nothing. `pr wait` keeps waiting instead of exiting 4. `install.sh` removes the legacy units and `guild doctor` warns while any remain.

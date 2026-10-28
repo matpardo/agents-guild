@@ -65,6 +65,8 @@ class GuildTestCase(unittest.TestCase):
         os.environ["PATH"] = str(self.bin_dir) + os.pathsep + os.environ.get("PATH", "")
         os.environ.pop("CLAUDE_CODE_SESSION_ID", None)
         self._patch_runner("guild.cli.build_parser", _cached_parser)
+        self.spawned_jobs = []
+        self._patch_runner("guild.due_jobs.spawn_detached", self._record_spawn)
         self._patch_runner("guild.adapters.github._run", self._fake_gh_run)
         self._patch_runner("guild.adapters.jira_acli._run", self._fake_acli_run)
 
@@ -72,6 +74,9 @@ class GuildTestCase(unittest.TestCase):
         patcher = mock.patch(target, replacement)
         patcher.start()
         self.addCleanup(patcher.stop)
+
+    def _record_spawn(self, argv, cwd, low_priority):
+        self.spawned_jobs.append((argv, low_priority))
 
     def _fake_gh_run(self, args, cwd, capture_output, text):
         return fake_gh.respond(str(self.gh_fixtures_dir), args[1:])

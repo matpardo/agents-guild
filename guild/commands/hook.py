@@ -6,6 +6,7 @@ import re
 import shlex
 import subprocess
 import sys
+import time
 from pathlib import Path
 
 from guild import (
@@ -13,6 +14,7 @@ from guild import (
     config,
     ctx_pressure,
     db,
+    due_jobs,
     identity,
     localbase,
     names,
@@ -36,7 +38,6 @@ from guild.commands import task_brief
 from guild.errors import GuildError
 from guild.identity import UNBOUND_HINT
 
-_REPO_ROOT = Path(__file__).resolve().parents[2]
 _IDLE_COMPACTION_SECONDS = 30 * 60
 _EDIT_TOOL_PATH_FIELDS = {
     "Edit": "file_path",
@@ -44,23 +45,6 @@ _EDIT_TOOL_PATH_FIELDS = {
     "MultiEdit": "file_path",
     "NotebookEdit": "notebook_path",
 }
-
-
-_ISOLATED_LAUNCHER = (
-    "import runpy, sys; sys.path.insert(0, sys.argv.pop(1)); sys.argv[0] = 'guild'; "
-    "runpy.run_module('guild', run_name='__main__', alter_sys=True)"
-)
-
-
-def _spawn_background_sync(cwd):
-    subprocess.Popen(
-        [sys.executable, "-I", "-c", _ISOLATED_LAUNCHER, str(_REPO_ROOT), "sync", "--source", "gh"],
-        cwd=str(cwd),
-        stdin=subprocess.DEVNULL,
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
-        start_new_session=True,
-    )
 
 
 def _resume_marker_path(ctx, generation):
@@ -211,7 +195,12 @@ def _mark_working(ctx, binding):
     session_status.record_change(ctx, binding, "session.working", {})
 
 
+def _spawn_due_jobs(ctx):
+    due_jobs.spawn_due(ctx.state_dir, ctx.cwd, time.time(), due_jobs.spawn_detached)
+
+
 def stop(ctx):
+    _spawn_due_jobs(ctx)
     binding = _session_actor(ctx)
     if binding is None:
         return
@@ -293,7 +282,7 @@ def session_start(ctx, resume_party, health_job, permission_mode, source):
         lines.extend(_compact_nudge_lines(ctx, binding, source))
     lines.extend(brief_commands.render_brief(ctx))
     lines.extend(_membership_warning_lines(ctx, binding))
-    _spawn_background_sync(ctx.cwd)
+    _spawn_due_jobs(ctx)
     return "\n".join(lines)
 
 
@@ -358,6 +347,7 @@ def _nudge_text(ctx, binding, lead):
 
 
 def prompt_submit(ctx):
+    _spawn_due_jobs(ctx)
     binding = identity.resolve_binding(ctx.conn, ctx.session_id)
     adventurer = identity.resolve_adventurer(ctx.conn, ctx.session_id)
     message_lines, seq = inbox_commands.new_lines(ctx, binding)

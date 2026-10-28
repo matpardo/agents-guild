@@ -4,7 +4,7 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
-from guild.commands import hook as hook_commands
+from guild import due_jobs
 
 _REPO_ROOT = Path(__file__).resolve().parent.parent
 
@@ -35,7 +35,7 @@ class ShimIsolationTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             decoy = _decoy_checkout(Path(tmp))
             with mock.patch("subprocess.Popen") as popen:
-                hook_commands._spawn_background_sync(decoy)
+                due_jobs.spawn_detached(("sync", "--source", "gh"), decoy, False)
             argv = popen.call_args.args[0]
             result = subprocess.run(argv[:-3] + ["--help"], cwd=str(decoy), capture_output=True, text=True)
         self.assertEqual(argv[-3:], ["sync", "--source", "gh"])

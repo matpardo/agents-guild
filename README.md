@@ -102,7 +102,7 @@ re-runs `guild wire-settings`, which only adds what is missing and drops retired
 `~/.claude/GUILD.md` exists and that every project config loads; it exits 1
 and names what is missing. It also checks that the guild state commands are in
 `permissions.allow` (see "Hooks"); a missing allow rule is a `warn` line and
-never changes the exit code. It also warns for a session that leads more than one active party (`session leads 2 active parties: a, b`). On Linux with `systemctl` it also warns for each of the six systemd timers (see "`guild sync-timer`") that is missing or drifted from its unit template, with `run timers.sh`; an interval you chose is not drift. It also warns about a leftover `guild-dispatch.timer` or `guild-dispatch.service` unit file (`install.sh` removes both) and about a project config that still has a `dispatcher` key (ignored, safe to delete). With a global `handoff_margin` (see "Global config") and a recorded compaction it prints `ok      handoff at 76% (compaction 85% − 10%)`, plus a `warn` when that handoff sits less than 5 points above the starting percentage of the latest session (the handoff would fire on a fresh session, so sessions hand off at that start + 5 instead); without a margin it warns when a project's `handoff_threshold` is at or above the last compaction (recorded by the `PreCompact` hook), since that threshold never fires. An invalid `guild.json` fails the check.
+never changes the exit code. It also warns for a session that leads more than one active party (`session leads 2 active parties: a, b`). It also warns about each legacy `guild-sync-*`, `guild-resources-collect` or `guild-compact` timer or service unit file still in `$XDG_CONFIG_HOME/systemd/user` (`legacy timer <name> installed: run install.sh`; `install.sh` removes them). It also warns about a leftover `guild-dispatch.timer` or `guild-dispatch.service` unit file (`install.sh` removes both) and about a project config that still has a `dispatcher` key (ignored, safe to delete). With a global `handoff_margin` (see "Global config") and a recorded compaction it prints `ok      handoff at 76% (compaction 85% − 10%)`, plus a `warn` when that handoff sits less than 5 points above the starting percentage of the latest session (the handoff would fire on a fresh session, so sessions hand off at that start + 5 instead); without a margin it warns when a project's `handoff_threshold` is at or above the last compaction (recorded by the `PreCompact` hook), since that threshold never fires. An invalid `guild.json` fails the check.
 
 `guild doctor --scan-prs` additionally lists the open PRs of every project's
 `github.repos` through `gh` and scans title, body, comments and commit
@@ -118,7 +118,7 @@ default so `guild doctor` stays fast and offline.
 ./uninstall.sh [--purge]
 ```
 
-Removes the systemd timers, runs `guild unwire-settings` (it removes the hooks and
+Removes any legacy systemd timers, runs `guild unwire-settings` (it removes the hooks and
 permission rules from "Hooks" in `~/.claude/settings.json`, keeps every other entry,
 copies the previous file to `settings.json.bak` and prints `settings: nothing wired`
 when there is nothing to remove) and deletes `~/.local/bin/guild` and
@@ -242,14 +242,9 @@ guild history [--party <name>] [--raid <name>] [--project <name>]   # read-only:
 guild cost [--since <dur>] [--by session|party|model|quest|task] [--project <name>]   # token usage from Claude Code transcripts, in M tokens
 guild resources [--project <name>] [--since <dur>]   # read-only: what each project costs the machine in disk, with growth since the baseline
 guild resources collect                                # measure and record a resources.sampled event per project
-guild resources-timer install --every <dur> | uninstall | print
 guild board [--party <name> | --raid <name>]
 guild web [--port <n>]   # local board in a browser: board, in-progress and achievements pages
-guild sync --source gh|sdd|tracker|bases [--all-projects]   # --all-projects: every project config, for timers (sdd and tracker)
-guild sync-timer install --every <dur> | uninstall | print
-guild sync-sdd-timer install --every <dur> | uninstall | print
-guild sync-tracker-timer install --every <dur> | uninstall | print
-guild sync-bases-timer install --every <dur> | uninstall | print   # e.g. --every 1m
+guild sync --source gh|sdd|tracker|bases [--all-projects]   # --all-projects: every project config (sdd and tracker)
 guild lifecycle run on_pr_merged|on_pr_closed [--repo <owner/repo>] [--dry-run]   # run a project's lifecycle command by hand
 guild drift [--epic <slug> | --all]
 guild revive [--party <name> ...] [--all] [--list]   # relaunch active or handed-off parties
@@ -274,7 +269,6 @@ guild hook pre-compact     # records the context percentage before an automatic 
 guild seed <file.json>
 guild rebuild
 guild compact [--dry-run]   # back up the database, drop duplicate sync events and old resource samples
-guild compact-timer install --every <dur> | uninstall | print
 guild export --visibility guild
 ```
 
@@ -544,8 +538,8 @@ the comparison uses the last fetched state).
 
 Base drift: `guild sync --source bases` runs `git fetch origin <base>` in
 each located clone of every project, regardless of `fast_forward_base`; it makes
-no GitHub call and touches no tracker or SDD data, so a fast timer
-(`guild sync-bases-timer install --every 1m`) keeps it fresh. `sync --source gh`
+no GitHub call and touches no tracker or SDD data, so the background job
+runs it every minute. `sync --source gh`
 does not fetch bases. The fetch only updates `origin/<base>`; local branches and
 worktrees are never touched. A failed fetch is a sync failure
 (`<repo>: base fetch failed: <error>`). `guild board` and the web header read the
@@ -661,7 +655,6 @@ without changing any projection.
 
 ```
 guild compact [--dry-run]
-guild compact-timer install --every 1d | uninstall | print --every 1d
 ```
 
 For each run of consecutive identical `epic.synced` events (per project and
@@ -681,9 +674,8 @@ the copy fails nothing is deleted. After the deletes it records one local
 database size and fails with a clear error if the database is locked (the
 deletes are already committed then). `--dry-run` prints what would be deleted
 and neither backs up nor changes anything. A second `compact` while one runs
-prints `compact already running`. The timer service runs at `Nice=19` and
-`IOSchedulingClass=idle` (`guild-compact.service`, `guild-compact.timer`,
-same rules as `guild sync-timer`). On a large database `compact` blocks
+prints `compact already running`. The background job runs it at `Nice=19`
+(see "Background jobs"). On a large database `compact` blocks
 writes to the database for about a minute, so run it when idle; readers keep
 working.
 
@@ -702,15 +694,10 @@ per-process memory, and it has no thresholds.
 ```
 guild resources collect                 # measure now and record the samples
 guild resources [--project <name>] [--since 1d]
-guild resources-timer install --every 2h | uninstall | print --every 2h
 ```
 
-`collect` is what records history; the report only reads it. Run `collect` on a
-timer: `guild resources-timer install --every 2h` writes
-`guild-resources-collect.service` and `guild-resources-collect.timer` next to
-the sync timer (same rules as `guild sync-timer`; `print` only prints them).
-The service runs at `Nice=19` and `IOSchedulingClass=idle`. Every 2 hours is
-the recommended cadence.
+`collect` is what records history; the report only reads it. The background job
+runs it every 2 hours at `Nice=19` (see "Background jobs").
 
 The web board shows the same values as coloured pills (disk green under 70%,
 amber under 85%, red above; RAM red under 10% available; CPU load per core amber from
@@ -798,7 +785,7 @@ collect that finds another one running prints `collect already running` and
 exits 0 (lock `$XDG_STATE_HOME/guild/resources/collect.lock`).
 
 Cost and storage: sizes are measured one at a time with `du`, which can take
-minutes on large trees, hence the timer's low priority. All measuring happens
+minutes on large trees, hence the background job's low priority. All measuring happens
 before a single write transaction records every event, so the database is
 never locked while `du` or Docker runs. Each collect adds one `resources.sampled`
 local event per project plus one for unattributed items, roughly 3 KB each; at
@@ -891,8 +878,8 @@ the runner under a scheduler.
 something changes, so a session can start them in the background and wake up
 on the change. They poll every 15 seconds and read only guild's stored state:
 no sync, no GitHub call, no write. A PR only changes in that state when a sync
-runs, so keep `guild sync-timer` running; when the PR row has not been synced
-for 30 minutes `pr wait` gives up with exit 4. `--timeout` (default `2h`, such
+runs, so `pr wait` starts the due background syncs itself while it waits
+(see "Background jobs"). `--timeout` (default `2h`, such
 as `30m` or `4h`) ends the wait with exit 3.
 
 `ask wait` exits 0 when the ask is answered or dismissed and 1 on an unknown
@@ -910,35 +897,37 @@ count existed (run `guild sync --source gh` first). The count only moves
 with a sync: a comment deleted and another added between two syncs leaves it
 unchanged and does not wake.
 
-### `guild sync-timer`
+### Background jobs
 
-`guild` has no daemon. To keep `sync --source gh` fresh without running it by
-hand, `guild sync-timer install --every <dur>` (same duration format as
-`--ttl`, e.g. `10m`) writes two systemd user units,
-`guild-sync-gh.service` (runs `guild sync --source gh`) and
-`guild-sync-gh.timer`, into `$XDG_CONFIG_HOME/systemd/user` (default
-`~/.config/systemd/user`), then runs `systemctl --user daemon-reload` and
-`systemctl --user enable --now guild-sync-gh.timer`. `guild` must be on
-`PATH`; the unit records its absolute path.
+`guild` has no daemon and installs no systemd timers. Six jobs keep the stored
+state fresh, and each starts, detached, when it is due and one of these runs:
+a session hook (`session-start`, `prompt-submit`, `stop`), a `pr wait` that
+sees no sync for 30 minutes, or `guild web`, which checks every minute while it
+runs, with or without a browser open. Leave `guild web` running (tmux, a login
+autostart) for a schedule like the old timers. An idle machine, with no session
+and no `guild web`, runs nothing.
 
-`guild sync-timer uninstall` disables the timer, removes both units and
-reloads systemd. `guild sync-timer print --every <dur>` only prints the units
-and writes nothing, for installing them by hand. `install` and `uninstall`
-fail with a clear error when the platform is not Linux or `systemctl` is not
-available; use `print` there. Nothing is pushed to running sessions: the timer
-only refreshes the synced state that sessions read.
+| job | command | every |
+|---|---|---|
+| `sync-gh` | `guild sync --source gh` | 10m |
+| `sync-sdd` | `guild sync --source sdd --all-projects` | 10m |
+| `sync-tracker` | `guild sync --source tracker --all-projects` | 10m |
+| `sync-bases` | `guild sync --source bases` | 1m |
+| `resources-collect` | `guild resources collect` | 2h |
+| `compact` | `guild compact` | 1d |
 
-`guild resources-timer` takes the same
-`install --every <dur> | uninstall | print` (see "`guild resources`"). `guild sync-sdd-timer`, `guild sync-tracker-timer` and `guild sync-bases-timer` do too and manage their own units
-(`guild-sync-sdd.*`, `guild-sync-tracker.*`, `guild-sync-bases.*`), so `guild drift` and `guild next`
-do not go stale between manual runs. They run `guild sync --source sdd|tracker
---all-projects`: a timer has no working directory inside a project, so the sync
-visits every project config that has an `sdd` (or `tracker`) block and skips the
-rest without a failure. A project whose sync fails (unreadable SDD root, `acli`
+`resources-collect` and `compact` run at `Nice=19`. The last start of each job
+is a stamp file in `$XDG_STATE_HOME/guild/due/`; a job is due when its stamp is
+missing or older than its interval, and the stamp is touched before the start,
+so two hooks never start the same job twice. The `--all-projects` syncs visit
+every project config that has an `sdd` (or `tracker`) block and skip the rest
+without a failure. A project whose sync fails (unreadable SDD root, `acli`
 missing or not logged in) is reported as `<project>: <reason>` and the run exits
 non-zero; the previous tracker snapshot is kept.
 
-`./timers.sh`, run from the guild clone, installs or refreshes the six timers in one go (`sync-timer`, `sync-sdd-timer`, `sync-tracker-timer` every 10m, `sync-bases-timer` every 1m, `resources-timer` every 2h, `compact-timer` every 1d) and keeps the interval of any timer already installed. `install.sh` and `update.sh` never run it: `guild doctor`, which `update.sh` ends with, tells you when it is due.
+`install.sh` and `update.sh` remove the timers older versions installed
+(`guild-sync-gh`, `guild-sync-sdd`, `guild-sync-tracker`, `guild-sync-bases`,
+`guild-resources-collect`, `guild-compact`, `guild-dispatch`).
 
 ### `guild merge-queue`
 
