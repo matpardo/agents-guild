@@ -112,6 +112,24 @@ Each match is a `warn` line naming `repo#n` and where it matched
 code; if `gh` fails the scan prints a single `warn` and is skipped. Off by
 default so `guild doctor` stays fast and offline.
 
+## Uninstall
+
+```
+./uninstall.sh [--purge]
+```
+
+Removes the systemd timers, runs `guild unwire-settings` (it removes the hooks and
+permission rules from "Hooks" in `~/.claude/settings.json`, keeps every other entry,
+copies the previous file to `settings.json.bak` and prints `settings: nothing wired`
+when there is nothing to remove) and deletes `~/.local/bin/guild` and
+`~/.claude/GUILD.md` when they are symlinks to this clone; any other file there is
+left with a `WARN`. The data, config and state directories are kept; `--purge`
+deletes them.
+
+It does not edit what it cannot own: remove by hand the line
+`@~/.claude/GUILD.md` from `~/.claude/CLAUDE.md` and any `guild hook pre-commit`
+line in `~/.config/husky/init.sh` or in a repository's `.git/hooks/pre-commit`.
+
 ## Commands
 
 `guild --help` lists every command with a one-line description. `guild <command> --help` shows its subcommands and flags. This section is the full reference.
@@ -121,6 +139,7 @@ guild whoami
 guild doctor [--scan-prs]   # read-only checks: hooks, permission rules, GUILD.md, project configs; --scan-prs: guild traces in open PRs
 guild init-project <name> --config <file.json>
 guild wire-settings   # merge guild hooks and permission rules into ~/.claude/settings.json
+guild unwire-settings   # remove guild hooks and permission rules from ~/.claude/settings.json
 
 guild party start <name> --reason "<why>"       # no permission prompt; refused while this session leads another active party
 guild party resume <party> [--session <name>]   # --session: from a human terminal only

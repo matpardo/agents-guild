@@ -45,6 +45,13 @@ def _handle_wire_settings(ctx, args):
     return 0
 
 
+def _handle_unwire_settings(ctx, args):
+    from guild.commands import unwire_settings as unwire_settings_commands
+
+    _print(unwire_settings_commands.run())
+    return 0
+
+
 def _handle_revive(ctx, args):
     from guild import tmux_windows
     from guild.commands import revive as revive_commands
@@ -1477,6 +1484,11 @@ def build_parser():
         "wire-settings", help="merge guild hooks and permission rules into ~/.claude/settings.json"
     )
     wire_settings.set_defaults(handler=_handle_wire_settings)
+
+    unwire_settings = subparsers.add_parser(
+        "unwire-settings", help="remove guild hooks and permission rules from ~/.claude/settings.json"
+    )
+    unwire_settings.set_defaults(handler=_handle_unwire_settings)
 
     init_project = subparsers.add_parser("init-project", help="create a project config from a JSON file")
     init_project.add_argument("name")
