@@ -1811,7 +1811,11 @@ guild revive --list            # no tmux needed: one copy-paste command per part
   (`GUILD_RESUME=<party> claude -n <party>-g<N+1> ...`) from the same cwd.
 - cwd and permission mode come from the leader row (recorded by the
   `SessionStart` hook); when missing, the first lines of the transcript are
-  read. A mode that is not known is never invented.
+  read. A mode that is not known is never invented. Only `default`,
+  `acceptEdits`, `plan`, `auto` and `dontAsk` are carried over:
+  `bypassPermissions` and any other value are dropped, so a relaunched
+  session never starts with permission checks off (this also covers
+  `guild handoff --respawn`).
 - A party whose cwd no longer exists (a removed worktree) starts `fresh` from
   the nearest main checkout above that cwd, since its transcript cannot be
   resumed elsewhere. With no such checkout, or with a window already in the

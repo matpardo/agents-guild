@@ -60,6 +60,18 @@ class ResumeHelperTests(GuildTestCase):
         command = resume.fresh_command("alpha", 3, None, "plan", resume.RESUME_PROMPT)
         self.assertTrue(command.startswith("GUILD_RESUME=alpha claude -n alpha-g3 --permission-mode plan "))
 
+    def test_resume_command_drops_modes_outside_the_allow_list(self):
+        for mode in ("bypassPermissions", "somethingNew"):
+            self.assertNotIn("--permission-mode", resume.resume_command("sess-1", "alpha", 3, mode))
+
+    def test_fresh_command_drops_modes_outside_the_allow_list(self):
+        for mode in ("bypassPermissions", "somethingNew"):
+            self.assertNotIn("--permission-mode", resume.fresh_command("alpha", 3, None, mode, resume.RESUME_PROMPT))
+
+    def test_commands_keep_every_allowed_mode(self):
+        for mode in ("default", "acceptEdits", "plan", "auto", "dontAsk"):
+            self.assertIn("--permission-mode " + mode, resume.resume_command("sess-1", "alpha", 3, mode))
+
     def test_fresh_command_without_mode_or_model(self):
         command = resume.fresh_command("alpha", 2, None, None, resume.RESUME_PROMPT)
         self.assertNotIn("--permission-mode", command)
