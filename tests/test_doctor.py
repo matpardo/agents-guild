@@ -205,30 +205,6 @@ class DoctorTests(GuildTestCase):
         _, out, _ = self.run_cli(["doctor"], None, None)
         return out
 
-    def test_warns_on_leftover_dispatcher_unit_file(self):
-        unit_dir = self.config_home / "systemd" / "user"
-        unit_dir.mkdir(parents=True)
-        (unit_dir / "guild-dispatch.timer").write_text("")
-        out = self._doctor_out_for_clean_setup()
-        self.assertIn("warn    {}".format(unit_dir / "guild-dispatch.timer"), out)
-        self.assertNotIn("guild-dispatch.service", out)
-
-    def test_no_unit_warning_without_leftover(self):
-        self.assertNotIn("retired dispatcher", self._doctor_out_for_clean_setup())
-
-    def test_warns_on_legacy_timer_unit_files(self):
-        unit_dir = self.config_home / "systemd" / "user"
-        unit_dir.mkdir(parents=True)
-        (unit_dir / "guild-sync-gh.timer").write_text("")
-        (unit_dir / "guild-compact.service").write_text("")
-        out = self._doctor_out_for_clean_setup()
-        self.assertIn("warn    legacy timer guild-sync-gh installed: run install.sh", out)
-        self.assertIn("warn    legacy timer guild-compact installed: run install.sh", out)
-        self.assertNotIn("legacy timer guild-sync-sdd", out)
-
-    def test_no_legacy_timer_warning_without_unit_files(self):
-        self.assertNotIn("legacy timer", self._doctor_out_for_clean_setup())
-
     def test_warns_on_project_config_with_dispatcher_key(self):
         self.register_project("acme", ["acme/app"])
         path = self.config_home / "guild" / "projects" / "acme.json"

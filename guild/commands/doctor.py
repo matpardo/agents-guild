@@ -10,15 +10,6 @@ from guild.errors import GuildError
 from guild.realm import checks as realm_checks
 
 _TRACE_RE = re.compile(r"guild|ask #[0-9]|notice #[0-9]", re.IGNORECASE)
-_RETIRED_UNIT_NAMES = ("guild-dispatch.timer", "guild-dispatch.service")
-_LEGACY_TIMER_NAMES = (
-    "guild-sync-gh",
-    "guild-sync-sdd",
-    "guild-sync-tracker",
-    "guild-sync-bases",
-    "guild-resources-collect",
-    "guild-compact",
-)
 _PR_SCAN_FIELDS = ("number", "title", "body", "comments", "commits")
 _DATED_COLUMNS = (
     ("quests", "created_at"),
@@ -84,24 +75,6 @@ def _clipboard_lines():
             "warn    tmux copy reaches the clipboard only through the terminal (OSC 52): "
             "install xclip (X11) or wl-clipboard (Wayland)",
         )
-    ]
-
-
-def _dispatch_unit_lines():
-    unit_dir = paths.systemd_user_dir()
-    return [
-        (True, "warn    {} is left from the retired dispatcher: run install.sh to remove it".format(unit_dir / name))
-        for name in _RETIRED_UNIT_NAMES
-        if (unit_dir / name).exists()
-    ]
-
-
-def _timer_lines():
-    unit_dir = paths.systemd_user_dir()
-    return [
-        (True, "warn    legacy timer {} installed: run install.sh".format(name))
-        for name in _LEGACY_TIMER_NAMES
-        if (unit_dir / (name + ".timer")).exists() or (unit_dir / (name + ".service")).exists()
     ]
 
 
@@ -227,8 +200,6 @@ def run(ctx, scan_prs):
     checks.extend(_allow_rule_lines(settings))
     checks.append(_rules_line())
     checks.extend(_clipboard_lines())
-    checks.extend(_dispatch_unit_lines())
-    checks.extend(_timer_lines())
     global_config, global_lines = _global_config_lines(paths.global_config_path())
     checks.extend(global_lines)
     if global_config is not None:

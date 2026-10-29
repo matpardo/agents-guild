@@ -102,7 +102,7 @@ re-runs `guild wire-settings`, which only adds what is missing and drops retired
 `~/.claude/GUILD.md` exists and that every project config loads; it exits 1
 and names what is missing. It also checks that the guild state commands are in
 `permissions.allow` (see "Hooks"); a missing allow rule is a `warn` line and
-never changes the exit code. It also warns for a session that leads more than one active party (`session leads 2 active parties: a, b`). It also warns about each legacy `guild-sync-*`, `guild-resources-collect` or `guild-compact` timer or service unit file still in `$XDG_CONFIG_HOME/systemd/user` (`legacy timer <name> installed: run install.sh`; `install.sh` removes them). It also warns about a leftover `guild-dispatch.timer` or `guild-dispatch.service` unit file (`install.sh` removes both) and about a project config that still has a `dispatcher` key (ignored, safe to delete). With a global `handoff_margin` (see "Global config") and a recorded compaction it prints `ok      handoff at 76% (compaction 85% − 10%)`, plus a `warn` when that handoff sits less than 5 points above the starting percentage of the latest session (the handoff would fire on a fresh session, so sessions hand off at that start + 5 instead); without a margin it warns when a project's `handoff_threshold` is at or above the last compaction (recorded by the `PreCompact` hook), since that threshold never fires. An invalid `guild.json` fails the check.
+never changes the exit code. It also warns for a session that leads more than one active party (`session leads 2 active parties: a, b`). It also warns about a project config that still has a `dispatcher` key (ignored, safe to delete). With a global `handoff_margin` (see "Global config") and a recorded compaction it prints `ok      handoff at 76% (compaction 85% − 10%)`, plus a `warn` when that handoff sits less than 5 points above the starting percentage of the latest session (the handoff would fire on a fresh session, so sessions hand off at that start + 5 instead); without a margin it warns when a project's `handoff_threshold` is at or above the last compaction (recorded by the `PreCompact` hook), since that threshold never fires. An invalid `guild.json` fails the check.
 
 `guild doctor --scan-prs` additionally lists the open PRs of every project's
 `github.repos` through `gh` and scans title, body, comments and commit
@@ -118,7 +118,7 @@ default so `guild doctor` stays fast and offline.
 ./uninstall.sh [--purge]
 ```
 
-Removes any legacy systemd timers, runs `guild unwire-settings` (it removes the hooks and
+Runs `guild unwire-settings` (it removes the hooks and
 permission rules from "Hooks" in `~/.claude/settings.json`, keeps every other entry,
 copies the previous file to `settings.json.bak` and prints `settings: nothing wired`
 when there is nothing to remove) and deletes `~/.local/bin/guild` and
@@ -924,10 +924,6 @@ every project config that has an `sdd` (or `tracker`) block and skip the rest
 without a failure. A project whose sync fails (unreadable SDD root, `acli`
 missing or not logged in) is reported as `<project>: <reason>` and the run exits
 non-zero; the previous tracker snapshot is kept.
-
-`install.sh` and `update.sh` remove the timers older versions installed
-(`guild-sync-gh`, `guild-sync-sdd`, `guild-sync-tracker`, `guild-sync-bases`,
-`guild-resources-collect`, `guild-compact`, `guild-dispatch`).
 
 ### `guild merge-queue`
 

@@ -6,15 +6,6 @@ from pathlib import Path
 
 _REPO_ROOT = Path(__file__).resolve().parent.parent
 _SCRIPT = _REPO_ROOT / "uninstall.sh"
-_TIMERS = (
-    "guild-sync-gh",
-    "guild-sync-sdd",
-    "guild-sync-tracker",
-    "guild-sync-bases",
-    "guild-resources-collect",
-    "guild-compact",
-    "guild-dispatch",
-)
 
 
 class UninstallScriptTests(unittest.TestCase):
@@ -22,13 +13,6 @@ class UninstallScriptTests(unittest.TestCase):
         self.tmp = tempfile.TemporaryDirectory()
         self.addCleanup(self.tmp.cleanup)
         self.home = Path(self.tmp.name)
-        self.fake_bin = self.home / "fake-bin"
-        self.fake_bin.mkdir()
-        self.systemctl_log = self.home / "systemctl.log"
-        fake = self.fake_bin / "systemctl"
-        fake.write_text('#!/bin/sh\necho "$@" >> "{}"\n'.format(self.systemctl_log))
-        fake.chmod(0o755)
-        self.unit_dir = self.home / ".config" / "systemd" / "user"
         self.link = self.home / ".local" / "bin" / "guild"
         self.guild_md = self.home / ".claude" / "GUILD.md"
         self.data_dirs = [
@@ -38,7 +22,7 @@ class UninstallScriptTests(unittest.TestCase):
         ]
 
     def _run(self, *args):
-        env = dict(os.environ, HOME=str(self.home), PATH="{}:{}".format(self.fake_bin, os.environ["PATH"]))
+        env = dict(os.environ, HOME=str(self.home))
         for name in ("XDG_CONFIG_HOME", "XDG_DATA_HOME", "XDG_STATE_HOME"):
             env.pop(name, None)
         return subprocess.run(["bash", str(_SCRIPT), *args], capture_output=True, text=True, env=env)
@@ -53,25 +37,6 @@ class UninstallScriptTests(unittest.TestCase):
         for directory in self.data_dirs:
             directory.mkdir(parents=True)
             (directory / "file").write_text("x")
-
-    def test_removes_units_and_reloads_once(self):
-        self.unit_dir.mkdir(parents=True)
-        for name in _TIMERS:
-            (self.unit_dir / (name + ".timer")).write_text("")
-            (self.unit_dir / (name + ".service")).write_text("")
-        result = self._run()
-        self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual(list(self.unit_dir.iterdir()), [])
-        calls = self.systemctl_log.read_text().splitlines()
-        self.assertEqual(
-            calls, ["--user disable --now {}.timer".format(name) for name in _TIMERS] + ["--user daemon-reload"]
-        )
-        self.assertIn("removed guild-sync-gh", result.stdout)
-
-    def test_no_units_means_no_systemctl_calls(self):
-        result = self._run()
-        self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertFalse(self.systemctl_log.exists())
 
     def test_removes_symlinks_to_the_repo(self):
         self._install_links()
