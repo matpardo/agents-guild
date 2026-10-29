@@ -1747,8 +1747,7 @@ def _run_pre_answer_hook(stdin_data):
         command = stdin_data.get("tool_input", {}).get("command", "")
         result = hook_commands.pre_answer(command)
     except Exception as error:
-        sys.stdout.write(json.dumps({"systemMessage": "guild hook error: {}".format(error)}) + "\n")
-        return 0
+        result = hook_commands.deny_result("guild hook error: {}".format(error))
     if result is not None:
         sys.stdout.write(json.dumps(result) + "\n")
     return 0
