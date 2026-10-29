@@ -103,10 +103,3 @@ def ensure_private_dir(path):
     path.mkdir(parents=True, exist_ok=True)
     path.chmod(0o700)
     return path
-
-
-def systemd_user_dir():
-    value = os.environ.get("XDG_CONFIG_HOME")
-    if value:
-        return Path(value).expanduser() / "systemd" / "user"
-    return Path.home() / ".config" / "systemd" / "user"

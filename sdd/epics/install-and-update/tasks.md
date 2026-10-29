@@ -112,3 +112,10 @@ updated: 2026-10-28
 **Status:** [x] done
 
 **What:** The six systemd timers and their `*-timer` commands and `timers.sh` are gone. The sync, resources-collect and compact jobs start detached, throttled by a stamp file per job, from the session hooks (`session-start`, `prompt-submit`, `stop`), from `pr wait` while it sees stale data and from a ticker in `guild web` that checks every minute while it runs, so an idle machine runs nothing. `pr wait` keeps waiting instead of exiting 4. `install.sh` removes the legacy units and `guild doctor` warns while any remain.
+
+## T16 — Drop the legacy timer cleanup
+
+**Depends on:** T15
+**Status:** [x] done
+
+**What:** Every install moved off the systemd timers, so the code that removed them is gone: `install.sh` and `uninstall.sh` no longer touch systemd, and `guild doctor` no longer warns about leftover timer or dispatcher units. Install and uninstall now only link files and wire `~/.claude/settings.json`.

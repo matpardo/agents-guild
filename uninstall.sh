@@ -3,7 +3,7 @@ set -euo pipefail
 
 if [ "$#" -gt 1 ] || { [ "$#" -eq 1 ] && [ "$1" != "--purge" ]; }; then
   echo "usage: ./uninstall.sh [--purge]"
-  echo "removes any legacy timers, the hooks and permission rules, and the symlinks install.sh made; --purge also deletes the data, config and state directories"
+  echo "removes the hooks and permission rules, and the symlinks install.sh made; --purge also deletes the data, config and state directories"
   exit 2
 fi
 PURGE="${1:-}"
@@ -31,30 +31,6 @@ unlink_or_warn() {
     echo "WARN: $target is not a symlink to $source; leaving it untouched"
   fi
 }
-
-SYSTEMD_USER_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/systemd/user"
-HAS_SYSTEMCTL=0
-if command -v systemctl >/dev/null 2>&1; then
-  HAS_SYSTEMCTL=1
-fi
-REMOVED_UNITS=0
-for name in guild-sync-gh guild-sync-sdd guild-sync-tracker guild-sync-bases guild-resources-collect guild-compact guild-dispatch; do
-  if [ ! -e "$SYSTEMD_USER_DIR/$name.timer" ] && [ ! -e "$SYSTEMD_USER_DIR/$name.service" ]; then
-    continue
-  fi
-  if [ "$HAS_SYSTEMCTL" -eq 1 ]; then
-    systemctl --user disable --now "$name.timer" || true
-  fi
-  rm -f "$SYSTEMD_USER_DIR/$name.timer" "$SYSTEMD_USER_DIR/$name.service"
-  echo "removed $name from $SYSTEMD_USER_DIR"
-  REMOVED_UNITS=1
-done
-if [ "$REMOVED_UNITS" -eq 1 ] && [ "$HAS_SYSTEMCTL" -eq 1 ]; then
-  systemctl --user daemon-reload || true
-fi
-if [ "$REMOVED_UNITS" -eq 1 ] && [ "$HAS_SYSTEMCTL" -eq 0 ]; then
-  echo "systemctl not found; removed the unit files without disabling the timers"
-fi
 
 "$REPO_ROOT/bin/guild" unwire-settings
 
