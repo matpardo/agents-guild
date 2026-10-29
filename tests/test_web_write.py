@@ -1,5 +1,6 @@
 import json
 import re
+from unittest import mock
 
 from tests.test_web_server import WebServerTestCase
 
@@ -23,8 +24,7 @@ class WebWriteTestCase(WebServerTestCase):
         return "http://127.0.0.1:{}".format(self.port)
 
     def _token(self):
-        response, body = self._get("/api/session", self._host())
-        return json.loads(body)["token"]
+        return self.server.session_token
 
     def _good_headers(self):
         return {
@@ -56,20 +56,12 @@ class WebWriteTestCase(WebServerTestCase):
         return out
 
 
-class SessionEndpointTests(WebWriteTestCase):
-    def test_returns_token_with_no_store_and_security_headers(self):
-        response, body = self._get("/api/session", self._host())
-        self.assertEqual(response.status, 200)
-        self.assertEqual(response.getheader("Cache-Control"), "no-store")
-        self.assertEqual(response.getheader("X-Content-Type-Options"), "nosniff")
-        self.assertIn("default-src 'self'", response.getheader("Content-Security-Policy"))
-        self.assertRegex(json.loads(body)["token"], _TOKEN_RE)
-
-    def test_token_is_stable_within_one_server(self):
-        self.assertEqual(self._token(), self._token())
+class SessionTokenTests(WebWriteTestCase):
+    def test_token_has_enough_entropy(self):
+        self.assertRegex(self._token(), _TOKEN_RE)
 
     def test_bad_host_is_rejected(self):
-        response, body = self._get("/api/session", "evil.example")
+        response, body = self._get("/api/board", "evil.example")
         self.assertEqual(response.status, 421)
 
     def test_token_absent_from_other_get_responses(self):
@@ -78,6 +70,25 @@ class SessionEndpointTests(WebWriteTestCase):
             with self.subTest(path=path):
                 response, body = self._get(path, self._host())
                 self.assertNotIn(token.encode("utf-8"), body)
+
+
+class UnexpectedFailureTests(WebWriteTestCase):
+    def test_deeply_nested_json_body_is_a_json_400(self):
+        response, payload = self._post("/api/asks/1/answer", self._good_headers(), b"[" * 10000)
+        self.assertEqual(response.status, 400)
+        self.assertEqual(self._error(payload), "body must be valid JSON")
+
+    def test_unexpected_error_in_a_write_is_a_generic_json_500(self):
+        with mock.patch("guild.webserver._run_ask_action", side_effect=RuntimeError("secret detail")):
+            response, payload = self._answer("yes")
+        self.assertEqual(response.status, 500)
+        self.assertEqual(json.loads(payload), {"error": "internal error"})
+
+    def test_unexpected_error_in_a_read_is_a_generic_json_500(self):
+        with mock.patch("guild.commands.board.board_model", side_effect=RuntimeError("secret detail")):
+            response, payload = self._get("/api/board", self._host())
+        self.assertEqual(response.status, 500)
+        self.assertEqual(json.loads(payload), {"error": "internal error"})
 
 
 class RejectionTests(WebWriteTestCase):

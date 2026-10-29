@@ -9,7 +9,6 @@ _SCRIPT_TAG_RE = re.compile(r"<script\b([^>]*)>(.*?)</script>", re.IGNORECASE | 
 
 
 _SCRIPTS = ("app.js", "history.js", "progress.js")
-_WRITING_SCRIPTS = ("app.js",)
 _PAGES = ("index.html", "history.html", "progress.html")
 
 
@@ -43,14 +42,14 @@ class PageScriptSafeRenderingTests(unittest.TestCase):
 
 class PageScriptWriteTests(unittest.TestCase):
     def test_sends_the_session_token_header(self):
-        for name in _WRITING_SCRIPTS:
+        for name in _SCRIPTS:
             with self.subTest(script=name):
                 self.assertIn("X-Guild-Token", (_WEB_DIR / name).read_text())
 
-    def test_never_persists_the_token_in_the_browser(self):
+    def test_never_persists_the_token_beyond_the_tab(self):
         for name in _SCRIPTS:
             source = (_WEB_DIR / name).read_text()
-            for banned in ("localStorage", "sessionStorage", "document.cookie"):
+            for banned in ("localStorage", "document.cookie", "/api/session"):
                 with self.subTest(script=name, api=banned):
                     self.assertNotIn(banned, source)
 

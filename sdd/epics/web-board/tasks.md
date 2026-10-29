@@ -161,3 +161,10 @@ updated: 2026-10-04
 **Status:** [x] done — #193
 
 **What:** the 15-second poll repaints a board section only when its data changed, and idea fields keep their focus and caret when the ideas section does repaint.
+
+## T23 — Web token only through the URL fragment
+
+**Depends on:** T22
+**Status:** [x] done
+
+**What:** `GET /api/session` is gone (404); `guild web` prints `http://127.0.0.1:<port>/#t=<token>`, each page reads the token from the fragment, keeps it in `sessionStorage` for the tab, strips it from the address bar and sends it in `X-Guild-Token` on every `/api` request, and every `/api` GET without a valid token answers 403, so a local process that only sends the right `Host` can no longer get the write token. Unexpected errors in a read or a write answer a generic JSON 500, and a deeply nested JSON body answers 400.

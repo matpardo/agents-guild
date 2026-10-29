@@ -215,7 +215,11 @@ class ServerMergeQueueTests(MergeQueueModelTestCase):
         thread.start()
         try:
             conn = http.client.HTTPConnection("127.0.0.1", port, timeout=5)
-            conn.request("GET", "/api/board", headers={"Host": "127.0.0.1:{}".format(port)})
+            conn.request(
+                "GET",
+                "/api/board",
+                headers={"Host": "127.0.0.1:{}".format(port), "X-Guild-Token": server.session_token},
+            )
             body = json.loads(conn.getresponse().read())
             conn.close()
         finally:

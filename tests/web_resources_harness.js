@@ -33,10 +33,10 @@ async function run({ src, model }) {
   const board = { generated_at: "now", parties: [], raids: [], asks: [], blocked: [], notices: [], projects: [],
     memory: [], merge_queues: [], drift: [], answered_asks: [] };
   function fetchStub(url) {
-    const body = url === "/api/board" ? board : url === "/api/session" ? { token: "t" } : model;
+    const body = url === "/api/board" ? board : model;
     return Promise.resolve({ ok: true, json: () => Promise.resolve(body) });
   }
-  const ctx = { document: doc, window: {}, location: { hash: "" }, addEventListener() {}, console, setInterval() {}, setTimeout() {}, fetch: fetchStub };
+  const ctx = { document: doc, window: {}, location: { hash: "#t=t", pathname: "/", search: "" }, history: { replaceState() {} }, addEventListener() {}, console, setInterval() {}, setTimeout() {}, fetch: fetchStub };
   ctx.window = ctx;
   vm.createContext(ctx);
   vm.runInContext(fs.readFileSync(src, "utf8"), ctx);

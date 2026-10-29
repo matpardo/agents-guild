@@ -1,7 +1,26 @@
 (function () {
   "use strict";
 
+  function readToken() {
+    var match = /^#t=([A-Za-z0-9_-]+)$/.exec(window.location.hash);
+    if (match === null) {
+      try {
+        return window.sessionStorage.getItem("guild-token");
+      } catch (error) {
+        return null;
+      }
+    }
+    try {
+      window.sessionStorage.setItem("guild-token", match[1]);
+    } catch (error) {
+      console.error(error);
+    }
+    window.history.replaceState(null, "", window.location.pathname + window.location.search);
+    return match[1];
+  }
+
   var HISTORY_URL = "/api/history";
+  var sessionToken = readToken();
   var HOUR_MS = 3600000;
 
   function el(tag) {
@@ -159,7 +178,7 @@
   }
 
   function load() {
-    fetch(HISTORY_URL, { cache: "no-store" })
+    fetch(HISTORY_URL, { cache: "no-store", headers: { "X-Guild-Token": sessionToken } })
       .then(function (response) {
         if (!response.ok) {
           throw new Error("progress request failed: " + response.status);

@@ -45,13 +45,12 @@ async function run({ src, realm, refresh, clicks, replies, guild_name }) {
   }
   function fetchStub(url) {
     if (url === "/api/board") return respond(board, true);
-    if (url === "/api/session") return respond({ token: "t" }, true);
     if (url === "/api/realm/refresh") return respond(refresh.body, refresh.ok);
     if (url.startsWith("/api/realm/")) posts.push(url);
     const reply = (replies || {})[url];
     return reply ? respond(reply.body, reply.ok) : respond({}, false);
   }
-  const ctx = { document: doc, window: {}, location: { hash: "" }, addEventListener() {}, console, setInterval() {}, setTimeout() {}, fetch: fetchStub, confirm: () => true };
+  const ctx = { document: doc, window: {}, location: { hash: "#t=t", pathname: "/", search: "" }, history: { replaceState() {} }, addEventListener() {}, console, setInterval() {}, setTimeout() {}, fetch: fetchStub, confirm: () => true };
   ctx.window = ctx;
   ctx.Date = Date;
   vm.createContext(ctx);

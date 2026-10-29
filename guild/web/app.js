@@ -1,9 +1,26 @@
 (function () {
   "use strict";
 
+  function readToken() {
+    var match = /^#t=([A-Za-z0-9_-]+)$/.exec(window.location.hash);
+    if (match === null) {
+      try {
+        return window.sessionStorage.getItem("guild-token");
+      } catch (error) {
+        return null;
+      }
+    }
+    try {
+      window.sessionStorage.setItem("guild-token", match[1]);
+    } catch (error) {
+      console.error(error);
+    }
+    window.history.replaceState(null, "", window.location.pathname + window.location.search);
+    return match[1];
+  }
+
   var REFRESH_INTERVAL_MS = 10000;
   var BOARD_URL = "/api/board";
-  var SESSION_URL = "/api/session";
   var RESOURCES_URL = "/api/resources";
   var COMPACT_URL = "/api/compact";
   var COLLECT_URL = "/api/resources/collect";
@@ -22,8 +39,8 @@ var REALM_FLAG_TEXT = "[flagged: looks like an instruction or a command] read it
   var DEFAULT_BRANCHES = ["main", "master"];
   var BLOCKED_EXTERNAL_TEXT = "blocked: manual";
   var STOPPED_WITHOUT_REPORT_TEXT = "stopped without report";
-var NO_SESSION_MESSAGE = "session token not loaded, reload the page";
-  var sessionToken = null;
+  var NO_SESSION_MESSAGE = "session token missing, reopen the URL printed by guild web";
+  var sessionToken = readToken();
 
   var answered = {
     open: false,
@@ -384,6 +401,10 @@ realmDoctorLines: [],
       return body.error;
     }
     return "request failed";
+  }
+
+  function apiGet(url) {
+    return fetch(url, { headers: { "X-Guild-Token": sessionToken } });
   }
 
   function sendPost(url, payload) {
@@ -1072,7 +1093,7 @@ realmDoctorLines: [],
   }
 
   function fetchAskDetail(askId, container) {
-    fetch("/api/asks/" + askId)
+    apiGet("/api/asks/" + askId)
       .then(function (response) {
         return response.json();
       })
@@ -1240,7 +1261,7 @@ realmDoctorLines: [],
 
   function fetchAnsweredAsks() {
     var container = document.getElementById("answered-asks-body");
-    fetch(ANSWERED_ASKS_URL + "?page=" + answered.page)
+    apiGet(ANSWERED_ASKS_URL + "?page=" + answered.page)
       .then(function (response) {
         return response.json();
       })
@@ -3498,7 +3519,7 @@ realmDoctorLines: [],
   }
 
   function fetchResources() {
-    fetch(RESOURCES_URL)
+    apiGet(RESOURCES_URL)
       .then(function (response) {
         return response.ok ? response.json() : null;
       })
@@ -4062,21 +4083,8 @@ realmDoctorLines: [],
     restoreFocus();
   }
 
-  function fetchSession() {
-    fetch(SESSION_URL)
-      .then(function (response) {
-        return response.json();
-      })
-      .then(function (body) {
-        sessionToken = body.token;
-      })
-      .catch(function (error) {
-        console.error(error);
-      });
-  }
-
   function loadBoard(onlyIfChanged) {
-    fetch(BOARD_URL)
+    apiGet(BOARD_URL)
       .then(function (response) {
         return response.json();
       })
@@ -4103,7 +4111,6 @@ realmDoctorLines: [],
       fetchBoard();
     });
     renderAnsweredAsks();
-    fetchSession();
     fetchBoard();
     fetchResources();
     setInterval(pollBoard, REFRESH_INTERVAL_MS);
