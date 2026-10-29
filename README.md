@@ -2939,7 +2939,7 @@ Security:
 - Tokens are compared in constant time and stored hashed.
 - The status carries counts and booleans only (per project: parties, open quests, open PRs, ready PRs, open asks, red main), validated strictly; no free text crosses in it.
 - Agents may run `guild realm status` only: every other `guild realm` command refuses when `CLAUDECODE` is set, and a hook denies them too. Both are defence in depth, not a sandbox (the same known limit as ask answers).
-- The hub drops connections past 32 at once, caps a sender at 20 files per inbox, and removing a member deletes its status and inbox.
+- The hub drops connections past 32 at once, closes any connection that has not finished its TLS handshake and request headers within 10 seconds (so stalled sockets cannot hold every slot), caps a sender at 20 files per inbox, and removing a member deletes its status and inbox.
 
 ## Development
 

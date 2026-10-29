@@ -78,3 +78,10 @@ updated: 2026-09-28
 **Status:** [x] done
 
 **What:** the push and PR-owner guards share the segment splitter and wrapper skipper of the answer guard (pipes, subshells, braces, `bash -lc`, `timeout`/`nice`/`stdbuf`, every git global option); the answer guard denies on an internal error.
+
+## T12 — Bound the realm hub handshake and headers
+
+**Depends on:** —
+**Status:** [x] done
+
+**What:** a connection that does not finish the TLS handshake and request headers within 10 seconds is closed and its slot released, so unauthenticated slow sockets cannot hold all 32 slots.

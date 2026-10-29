@@ -3,6 +3,7 @@ import hmac
 import json
 import re
 import secrets
+import socket
 import ssl
 import sys
 import threading
@@ -20,6 +21,7 @@ INBOX_MAX_FILES = 100
 INBOX_MAX_PER_SENDER = 20
 MAX_CONNECTIONS = 32
 _REQUEST_TIMEOUT_SECONDS = 30
+PRE_AUTH_DEADLINE_SECONDS = 10
 _ID_RE = re.compile(r"[0-9a-f]{16}")
 _NAME_CHARS_RE = re.compile(r"[^A-Za-z0-9_-]+")
 _MAX_STEM_LENGTH = 64
@@ -73,6 +75,27 @@ class HubRequestHandler(http_server.BaseHTTPRequestHandler):
 
     def log_message(self, format_string, *args):
         return
+
+    def setup(self):
+        super().setup()
+        self._deadline = threading.Timer(PRE_AUTH_DEADLINE_SECONDS, self._abort_connection)
+        self._deadline.daemon = True
+        self._deadline.start()
+
+    def parse_request(self):
+        parsed = super().parse_request()
+        self._deadline.cancel()
+        return parsed
+
+    def finish(self):
+        self._deadline.cancel()
+        super().finish()
+
+    def _abort_connection(self):
+        try:
+            self.connection.shutdown(socket.SHUT_RDWR)
+        except OSError:
+            pass
 
     def _reply(self, status_code, payload):
         body = json.dumps(payload).encode("utf-8")
