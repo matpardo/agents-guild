@@ -1740,7 +1740,8 @@ recorded`) and the local-only reminder.
 Any caller can read any party's brief: guild is a single-user local tool and
 does not authenticate readers. The handoff text is quoted line by line behind
 a `  | ` marker and the brief ends with an `end of guild brief` line, so
-handoff content can never pass for a frame, notice or closing line.
+handoff content can never pass for a frame, notice or closing line. Handoff and memory text are framed the same way: a line equal to the frame's
+opening or closing line is dropped.
 Invisible and bidirectional Unicode characters (zero-width, bidi overrides,
 tag characters, private use, surrogates) are stripped along with control
 sequences everywhere guild strips them; a joiner inside an emoji sequence is
@@ -2886,7 +2887,8 @@ lists id, sender, name, size and age, and keeps the list in
 `realm-inbox-cache.json` (0600) in the guild data dir for the board. `fetch`
 writes the file as `<name>` (or `<name-stem>-<id>.md` when that name exists) with
 mode 0600 into `--out`, which defaults to `realm-files/` in the guild data dir
-(0700); it prints the path and the sender, and the file stays on the hub until
+(0700); `fetch` creates a missing `--out` folder as 0700 and never changes the mode of an
+existing one; it prints the path and the sender, and the file stays on the hub until
 `drop`. When the text looks like an instruction or a command, `fetch` adds the
 flag line and tells you to read it yourself before giving it to an agent. The
 rule is: a human reads a realm file first; nothing injects a realm file or the

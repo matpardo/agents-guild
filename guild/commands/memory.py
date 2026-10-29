@@ -94,7 +94,7 @@ def framed_memory(party):
     kept = []
     total = 0
     for item in items:
-        text = item["text"]
+        text = sanitize.drop_frame_lines(item["text"], (_MEMORY_HEADER, _MEMORY_END))
         if flagged(text):
             text = "{} {}".format(text, pii.INSTRUCTION_LIKE_FLAG)
         if kept and total + len(text) > _MEMORY_CAP:

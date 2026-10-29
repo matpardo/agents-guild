@@ -1,3 +1,4 @@
+from guild import names
 from guild.errors import GuildError
 
 HUMAN_LABEL = "human"
@@ -73,7 +74,7 @@ def require_actor(conn, session_id):
 def cursor_key(session_id):
     if session_id is None:
         return "human"
-    return session_id
+    return names.safe_key(session_id)
 
 
 def resolve_actor(conn, session_id):

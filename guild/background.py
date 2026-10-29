@@ -1,7 +1,7 @@
 import json
 from pathlib import Path
 
-from guild import session_info
+from guild import names, session_info
 
 _SUBAGENT_TTL_SECONDS = 2 * 60 * 60
 _PR_PREFIX = "pr-"
@@ -9,7 +9,7 @@ _SUBAGENT_PREFIX = "subagent-"
 
 
 def _session_dir(state_dir, session_id):
-    return state_dir / "background" / session_id
+    return state_dir / "background" / names.safe_key(session_id)
 
 
 def mark(state_dir, session_id, key, label):
@@ -35,7 +35,7 @@ def pr_key(pid):
 
 
 def subagent_key(agent_id):
-    return "{}{}".format(_SUBAGENT_PREFIX, agent_id)
+    return "{}{}".format(_SUBAGENT_PREFIX, names.safe_key(agent_id))
 
 
 def _subagent_finished(entry):

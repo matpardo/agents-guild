@@ -1,4 +1,4 @@
-from guild import identity, session_status
+from guild import identity, names, session_status
 from guild.commands import notice as notice_commands
 from guild.commands import raid as raid_commands
 
@@ -6,11 +6,11 @@ from guild.commands import raid as raid_commands
 def record_ctx(state_dir, session_id, pct):
     directory = state_dir / "ctx"
     directory.mkdir(parents=True, exist_ok=True)
-    (directory / session_id).write_text(str(pct))
+    (directory / names.safe_key(session_id)).write_text(str(pct))
 
 
 def record_baseline_once(state_dir, session_id, pct):
-    path = state_dir / "ctx-baseline" / session_id
+    path = state_dir / "ctx-baseline" / names.safe_key(session_id)
     if pct == 0 or path.exists():
         return
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -18,15 +18,15 @@ def record_baseline_once(state_dir, session_id, pct):
 
 
 def read_ctx(state_dir, session_id):
-    return _read_pct(state_dir / "ctx" / session_id)
+    return _read_pct(state_dir / "ctx" / names.safe_key(session_id))
 
 
 def ctx_recorded_at(state_dir, session_id):
-    return (state_dir / "ctx" / session_id).stat().st_mtime
+    return (state_dir / "ctx" / names.safe_key(session_id)).stat().st_mtime
 
 
 def read_baseline(state_dir, session_id):
-    return _read_pct(state_dir / "ctx-baseline" / session_id)
+    return _read_pct(state_dir / "ctx-baseline" / names.safe_key(session_id))
 
 
 def latest_baseline(state_dir):

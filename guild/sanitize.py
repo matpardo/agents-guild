@@ -27,6 +27,10 @@ def strip_control_sequences(text):
     return "".join(char for char in text if not _is_invisible(char))
 
 
+def drop_frame_lines(text, frame_lines):
+    return "\n".join(line for line in text.split("\n") if line.strip() not in frame_lines)
+
+
 def collapse_to_single_line(text):
     return re.sub(r"[\n\t]", " ", text)
 

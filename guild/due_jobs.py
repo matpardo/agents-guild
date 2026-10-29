@@ -4,7 +4,7 @@ import sys
 import time
 from pathlib import Path
 
-from guild import paths
+from guild import locking, paths
 
 _REPO_ROOT = Path(__file__).resolve().parents[1]
 _ISOLATED_LAUNCHER = (
@@ -15,6 +15,7 @@ _MINUTE = 60
 _HOUR = 60 * _MINUTE
 _DAY = 24 * _HOUR
 _LOW_PRIORITY_NICE = 19
+_LOCK_NAME = "spawn.lock"
 
 JOBS = {
     "sync-gh": (("sync", "--source", "gh"), 10 * _MINUTE, False),
@@ -51,13 +52,16 @@ def _is_due(stamp, interval, now_epoch):
 
 def spawn_due(state_dir, cwd, now_epoch, spawner):
     stamp_dir = paths.ensure_private_dir(state_dir / "due")
-    for name, (argv, interval, low_priority) in JOBS.items():
-        stamp = stamp_dir / name
-        if not _is_due(stamp, interval, now_epoch):
-            continue
-        stamp.touch()
-        os.utime(stamp, (now_epoch, now_epoch))
-        spawner(argv, cwd, low_priority)
+    with locking.try_lock(stamp_dir, _LOCK_NAME) as acquired:
+        if not acquired:
+            return
+        for name, (argv, interval, low_priority) in JOBS.items():
+            stamp = stamp_dir / name
+            if not _is_due(stamp, interval, now_epoch):
+                continue
+            stamp.touch()
+            os.utime(stamp, (now_epoch, now_epoch))
+            spawner(argv, cwd, low_priority)
 
 
 def tick_until_stopped(stop_event, interval_seconds, state_dir, cwd, spawner):
