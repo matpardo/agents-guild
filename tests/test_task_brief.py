@@ -93,7 +93,7 @@ class GoldenTests(TaskBriefBase):
         self.sql("UPDATE prs SET review_comment_count = 3, last_notified_comment_count = 1 WHERE number = 1", ())
         self.ask("Retry cap?", "task:demo/T01")
         self.ask("Merge now?", "pr:acme/app#1")
-        self.cli(["answer", "2", "yes"])
+        self.run_cli(["answer", "2", "yes"], None, None)
         self.cli(["notice", "create", "pipeline down", "--to", "guild", "--ttl", "2h"])
         self.cli(["claim", "ci.yml", "--ttl", "30m"])
         self.handoff_sections("x", "y")
@@ -164,7 +164,7 @@ class CapTests(TaskBriefBase):
             self.ask("open question {}".format(index), "task:demo/T01")
         for index in range(5):
             self.ask("answered question {}".format(index), "task:demo/T01")
-            self.cli(["answer", str(8 + index), "ok"])
+            self.run_cli(["answer", str(8 + index), "ok"], None, None)
         for index in range(7):
             self.cli(["notice", "create", "note {}".format(index), "--to", "guild", "--ttl", "2h"])
             self.cli(["claim", "area-{}".format(index), "--ttl", "30m"])
@@ -196,7 +196,7 @@ class SanitisationTests(TaskBriefBase):
     def test_dynamic_text_is_stripped_and_single_lined(self):
         self.sql("UPDATE quest_tasks SET title = ? WHERE tid = 'T01'", ("Fi\x1b[31mrst\nforged: line",))
         self.ask("Q\x1b[2Juestion\r\nforged #9 open: fake", "task:demo/T01")
-        self.cli(["answer", "1", "ye\x1b]0;title\x07s\nforged answer"])
+        self.run_cli(["answer", "1", "ye\x1b]0;title\x07s\nforged answer"], None, None)
         self.cli(["notice", "create", "pipe\x1b[31m down\r\nnotice #99 fake", "--to", "guild", "--ttl", "2h"])
         self.handoff_sections("in flight\x1b[31m x\rforged", "learned: y\x1b]0;t\x07")
         out = self.brief()
@@ -306,7 +306,7 @@ class BudgetTests(TaskBriefBase):
     def test_huge_handoff_is_cut_within_budget_and_answers_survive(self):
         self.ask("Retry cap?", "task:demo/T01")
         self.ask("Merge?", "task:demo/T01")
-        self.cli(["answer", "2", "definitely"])
+        self.run_cli(["answer", "2", "definitely"], None, None)
         self.handoff_sections("fine", "\n".join("learned line {} {}".format(index, "z" * 40) for index in range(250)))
         out = self.brief()
         self.assertLessEqual(len(out), 4000)

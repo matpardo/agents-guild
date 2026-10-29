@@ -184,7 +184,7 @@ guild finding record <owner/repo>#<n> --class <slug>   # count a recurring audit
 guild ask "<question, at most 300 chars>" --context "<at most 2000 chars>" [--ref <ref> ...] [--option "..."]   # refs: pr:<owner/repo>#<n>, task:<quest>/<tid>, card:<KEY>; with exactly one task in progress and no task:/card: ref it is added for you
 guild ask wait <id> [--timeout <dur>]   # block until the ask is answered or dismissed; exit 0 on either, 1 on an unknown id, 3 on timeout (default 2h)
 guild answer <id> "<text>"
-guild dismiss <id>
+guild dismiss <id>                  # both refuse inside a Claude Code session: run them from the human terminal or the web board
 guild asks [<id> | --all [--party <name>] [--since <dur>] | --answered [--page <n>] [--party <name>] [--since <dur>]]   # open asks; <id> shows task, card, PR, SDD paths, resume command and recent events; --all adds answered and dismissed with answers
 
 guild notice create "<text>" --to project:<name>|guild|raid:<name> --ttl <dur> [--until pr:<owner/repo>#<n>:merged|closed]
