@@ -148,29 +148,36 @@ class CompactFixture(GuildTestCase):
 
 
 class CompactDedupTests(CompactFixture):
-    def test_identical_epic_syncs_keep_only_the_latest(self):
+    def test_identical_epic_syncs_keep_the_latest_and_the_previous(self):
         for _ in range(5):
             self._record("epic.synced", _epic_payload("open"))
         seqs = self._seqs("epic.synced")
         self._compact(30)
-        self.assertEqual(self._seqs("epic.synced"), [seqs[-1]])
+        self.assertEqual(self._seqs("epic.synced"), seqs[-2:])
 
-    def test_differing_tracker_snapshots_keep_only_the_latest(self):
+    def test_differing_tracker_snapshots_keep_the_latest_and_the_previous(self):
         for status in ("a", "b", "a", "b"):
             self._record("tracker.synced", _tracker_payload(status))
         seqs = self._seqs("tracker.synced")
         self._compact(30)
-        self.assertEqual(self._seqs("tracker.synced"), [seqs[-1]])
+        self.assertEqual(self._seqs("tracker.synced"), seqs[-2:])
+
+    def test_two_snapshots_are_untouched(self):
+        for status in ("a", "b"):
+            self._record("tracker.synced", _tracker_payload(status))
+        seqs = self._seqs("tracker.synced")
+        self._compact(30)
+        self.assertEqual(self._seqs("tracker.synced"), seqs)
 
     def test_each_epic_keeps_its_latest_snapshot(self):
         other = _epic_payload("open")
         other["epic"] = "e2"
         self._record("epic.synced", other)
-        self._record("epic.synced", _epic_payload("open"))
-        self._record("epic.synced", _epic_payload("done"))
+        for status in ("open", "done", "open"):
+            self._record("epic.synced", _epic_payload(status))
         seqs = self._seqs("epic.synced")
         self._compact(30)
-        self.assertEqual(self._seqs("epic.synced"), [seqs[0], seqs[2]])
+        self.assertEqual(self._seqs("epic.synced"), [seqs[0], seqs[2], seqs[3]])
 
     def test_rebuild_after_compact_gives_identical_projections(self):
         self._track_pr()
@@ -232,7 +239,7 @@ class CompactDedupTests(CompactFixture):
         self._record("tracker.synced", _tracker_payload("open"))
         seqs = self._seqs("tracker.synced")
         self._compact(30)
-        self.assertEqual(self._seqs("tracker.synced"), [seqs[-2], seqs[-1]])
+        self.assertEqual(self._seqs("tracker.synced"), [seqs[0]] + seqs[-3:])
 
 
 class CompactResourcesTests(CompactFixture):
@@ -260,7 +267,7 @@ class CompactApplyTests(CompactFixture):
         count = self.ctx.conn.execute("SELECT COUNT(*) FROM events").fetchone()[0]
         code, out, err = self.run_cli(["compact", "--dry-run"], "sess-1", self.repo_dir)
         self.assertEqual(code, 0, err)
-        self.assertIn("epic.synced: would delete 4 of 5", out)
+        self.assertIn("epic.synced: would delete 3 of 5", out)
         self.assertEqual(self.ctx.conn.execute("SELECT COUNT(*) FROM events").fetchone()[0], count)
         self.assertFalse(compact.backup_path().exists())
 
@@ -287,7 +294,7 @@ class CompactApplyTests(CompactFixture):
             self._record("epic.synced", _epic_payload("open"))
         code, out, err = self.run_cli(["compact"], "sess-1", self.repo_dir)
         self.assertEqual(code, 0, err)
-        self.assertIn("epic.synced: deleted 4 of 5", out)
+        self.assertIn("epic.synced: deleted 3 of 5", out)
         self.assertIn("guild.db.pre-compact", out)
         self.assertIn("db ", out)
         self.assertEqual(len(self._seqs("db.compacted")), 1)

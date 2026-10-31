@@ -180,3 +180,13 @@ updated: 2026-10-04
 - [x] Differing tracker snapshots leave only the newest per project; a rebuild yields the same projections and the same sync freshness.
 - [x] Without configured retention, samples older than 90 days are deleted.
 - [x] Stale `ctx`, `ctx-baseline` and `background` files are deleted and fresh ones kept; a dry run deletes nothing.
+
+## T16 — Compact keeps the previous snapshot
+
+**Depends on:** T15
+**Status:** [x] done
+
+**What:** `guild compact` keeps the two newest epic and tracker snapshots per key instead of one, so the last change stays visible after a compact.
+
+**Acceptance:**
+- [x] Several snapshots of a key leave the newest and the previous one; two snapshots are left untouched.

@@ -8,6 +8,7 @@ from guild.errors import GuildError
 _BACKUP_NAME = "guild.db.pre-compact"
 _DEDUP_KINDS = ("epic.synced", "tracker.synced", "pr.synced")
 _SNAPSHOT_KINDS = ("epic.synced", "tracker.synced")
+_SNAPSHOTS_KEPT = 2
 _SESSION_FILE_MAX_AGE_DAYS = 30
 _SESSION_FILE_PATTERNS = ("ctx/*", "ctx-baseline/*", "background/*/*")
 
@@ -65,16 +66,16 @@ def _dedup_plan(conn):
     doomed = {kind: [] for kind in _DEDUP_KINDS}
     totals = {kind: 0 for kind in _DEDUP_KINDS}
     runs = {}
-    latest = {}
+    kept = {}
     for row in _stream(conn):
         kind = row["kind"]
         payload = json.loads(row["payload"])
         if kind in _SNAPSHOT_KINDS:
             totals[kind] += 1
-            previous = latest.get(_snapshot_key(kind, payload))
-            if previous is not None:
-                doomed[kind].append(previous)
-            latest[_snapshot_key(kind, payload)] = row["seq"]
+            snapshots = kept.setdefault(_snapshot_key(kind, payload), [])
+            snapshots.append(row["seq"])
+            if len(snapshots) > _SNAPSHOTS_KEPT:
+                doomed[kind].append(snapshots.pop(0))
             continue
         if kind not in _DEDUP_KINDS:
             if "repo" in payload and "number" in payload:

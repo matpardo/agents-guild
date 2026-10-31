@@ -657,9 +657,10 @@ without changing any projection.
 guild compact [--dry-run]
 ```
 
-It keeps only the newest `epic.synced` event per project and epic and the
-newest `tracker.synced` event per project: each one is a full snapshot that
-replaces the previous one. For each run of consecutive identical `pr.synced`
+It keeps only the two newest `epic.synced` events per project and epic and
+the two newest `tracker.synced` events per project: each one is a full
+snapshot that replaces the previous one, and the second newest stays as the
+last known change. For each run of consecutive identical `pr.synced`
 events (per PR, ignoring `synced_at`, and broken by any other `pr.*` event of
 that PR) it keeps the first and the last and deletes the ones in between. So
 `guild rebuild` gives the same projections and the board freshness (newest
