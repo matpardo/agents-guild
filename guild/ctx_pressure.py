@@ -1,5 +1,4 @@
-from guild import party_status
-from guild.commands import statusline as statusline_commands
+from guild import party_status, statusline_state
 
 DEFAULT_HANDOFF_THRESHOLD = 80
 BASELINE_HEADROOM = 5
@@ -16,7 +15,7 @@ def _configured(project_config):
 
 def threshold(state_dir, global_config, project_config):
     margin = global_config.get("handoff_margin")
-    compaction = statusline_commands.latest_compact_pct(state_dir)
+    compaction = statusline_state.latest_compact_pct(state_dir)
     if margin is None or compaction is None:
         return {"value": _configured(project_config), "source": "configured"}
     return {"value": compaction * (100 - margin) // 100, "source": "compaction {}% − {}%".format(compaction, margin)}
@@ -32,11 +31,11 @@ def floor_above_baseline(resolved, baseline):
 
 
 def reading(state_dir, session_id, global_config, project_config):
-    pct = statusline_commands.read_ctx(state_dir, session_id)
+    pct = statusline_state.read_ctx(state_dir, session_id)
     if pct is None:
         return None
     resolved = floor_above_baseline(
-        threshold(state_dir, global_config, project_config), statusline_commands.read_baseline(state_dir, session_id)
+        threshold(state_dir, global_config, project_config), statusline_state.read_baseline(state_dir, session_id)
     )
     return {"pct": pct, "threshold": resolved["value"], "source": resolved["source"], "high": pct >= resolved["value"]}
 

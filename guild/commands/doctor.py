@@ -2,10 +2,9 @@ import re
 import shutil
 from pathlib import Path
 
-from guild import claude_settings, config, ctx_pressure, identity, localbase, paths, tmux_windows
+from guild import claude_settings, config, ctx_pressure, identity, localbase, paths, statusline_state, tmux_windows
 from guild.adapters import github
 from guild.commands import realm as realm_commands
-from guild.commands import statusline as statusline_commands
 from guild.errors import GuildError
 from guild.realm import checks as realm_checks
 
@@ -99,7 +98,7 @@ def _handoff_line(state_dir, global_config):
     if resolved["source"] == "configured":
         return []
     lines = [(True, "ok      handoff at {}% ({})".format(resolved["value"], resolved["source"]))]
-    baseline = statusline_commands.latest_baseline(state_dir)
+    baseline = statusline_state.latest_baseline(state_dir)
     floored = ctx_pressure.floor_above_baseline(resolved, baseline)
     if floored is resolved:
         return lines
@@ -111,7 +110,7 @@ def _handoff_line(state_dir, global_config):
 def _compaction_lines(state_dir, global_config, data):
     if global_config is None or global_config.get("handoff_margin") is not None:
         return []
-    compaction = statusline_commands.latest_compact_pct(state_dir)
+    compaction = statusline_state.latest_compact_pct(state_dir)
     if compaction is None:
         return []
     threshold = ctx_pressure.threshold(state_dir, global_config, data)["value"]

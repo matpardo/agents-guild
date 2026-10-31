@@ -2,7 +2,7 @@ import json
 import os
 from pathlib import Path
 
-from guild import db, events, localbase, party_status, resume, sanitize, tmux_windows
+from guild import db, events, localbase, party_status, resume, sanitize, tmux_windows, transcripts
 from guild.errors import GuildError
 
 TRANSCRIPT_LINE_LIMIT = 200
@@ -53,15 +53,6 @@ class _Entry:
         if self.resumable():
             return resume.resume_command(self.session_id, self.party, self.generation, self.mode)
         return resume.fresh_command(self.party, self.generation + 1, None, self.mode, resume.RESUME_PROMPT)
-
-
-def find_transcript(projects_dir, session_id):
-    if session_id is None:
-        return None
-    matches = sorted(projects_dir.glob("*/{}.jsonl".format(session_id)))
-    if not matches:
-        return None
-    return matches[0]
 
 
 def read_location(transcript):
@@ -130,7 +121,7 @@ def _entry(ctx, transcripts_dir, party):
         (party["name"], party["generation"]),
     ).fetchone()
     session_id = party["leader_session_id"]
-    transcript = find_transcript(transcripts_dir, session_id)
+    transcript = transcripts.find_transcript(transcripts_dir, session_id)
     cwd = None if leader is None else leader["cwd"]
     mode = None if leader is None else leader["permission_mode"]
     if transcript is not None and (cwd is None or mode is None):

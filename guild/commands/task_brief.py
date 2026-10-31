@@ -1,14 +1,11 @@
 import json
 import textwrap
 
-from guild import names, pii, render, sanitize, task_context
+from guild import names, notices, pii, raid_members, render, sanitize, task_context, work_queue
 from guild.commands import brief as brief_commands
 from guild.commands import claim as claim_commands
 from guild.commands import handoff as handoff_commands
-from guild.commands import next as next_commands
-from guild.commands import notice as notice_commands
 from guild.commands import party as party_commands
-from guild.commands import raid as raid_commands
 from guild.errors import GuildError
 
 _BRIEF_MAX_CHARS = 4000
@@ -119,8 +116,8 @@ def _ask_lines(conn, party, refs):
 
 
 def _notice_lines(ctx, party, project):
-    raid_member_of = {row["raid"] for row in raid_commands.member_raids(ctx.conn, ctx.now, party)}
-    active = notice_commands.active_notices(ctx.conn, ctx.now)
+    raid_member_of = {row["raid"] for row in raid_members.member_raids(ctx.conn, ctx.now, party)}
+    active = notices.active_notices(ctx.conn, ctx.now)
     lines = brief_commands.targeting_lines(active, project, raid_member_of)
     if not lines:
         return []
@@ -227,7 +224,7 @@ def _active_task(conn, party):
 def render_for_binding(ctx, binding):
     task = _active_task(ctx.conn, binding["party"])
     if task is None:
-        task = next_commands.next_task_item(ctx, binding)
+        task = work_queue.next_task_item(ctx, binding)
     if task is None:
         return []
     return _render(

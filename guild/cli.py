@@ -6,7 +6,7 @@ import sys
 import time
 from pathlib import Path
 
-from guild import background, db, due_jobs, notify, origin, paths, pii, session_info, timeutil
+from guild import background, db, due_jobs, notify, origin, paths, pii, session_info, statusline_state, timeutil
 from guild.commands import hook as hook_commands
 from guild.context import RunContext
 from guild.errors import GuildError
@@ -951,8 +951,8 @@ def _handle_statusline(ctx, args):
     from guild.commands import statusline as statusline_commands
 
     if args.ctx is not None:
-        statusline_commands.record_ctx(ctx.state_dir, args.session, args.ctx)
-        statusline_commands.record_baseline_once(ctx.state_dir, args.session, args.ctx)
+        statusline_state.record_ctx(ctx.state_dir, args.session, args.ctx)
+        statusline_state.record_baseline_once(ctx.state_dir, args.session, args.ctx)
     _print(statusline_commands.render(ctx, args.session))
     return 0
 

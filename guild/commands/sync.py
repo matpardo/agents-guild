@@ -4,14 +4,25 @@ import re
 import sqlite3
 from pathlib import Path
 
-from guild import config, db, events, handoff_prune, human_ready, localbase, paths, timeutil, trace_validator
+from guild import (
+    config,
+    db,
+    events,
+    handoff_prune,
+    human_ready,
+    localbase,
+    notices,
+    paths,
+    raid_members,
+    timeutil,
+    trace_validator,
+)
 from guild.adapters import github, jira_acli, sdd
 from guild.commands import base_pause as base_pause_commands
 from guild.commands import claim as claim_commands
 from guild.commands import drift as drift_commands
 from guild.commands import lifecycle as lifecycle_commands
 from guild.commands import notice as notice_commands
-from guild.commands import raid as raid_commands
 from guild.errors import GuildError
 
 _SDD_PATTERN_KEYS = ("task_heading", "key_ref", "deps_line", "status_line")
@@ -262,7 +273,7 @@ def _fetch_changed_files(ctx, row, failures):
 
 
 def _queue_data_wanted(ctx, project, row):
-    if raid_commands.member_raids(ctx.conn, ctx.now, row["party"]):
+    if raid_members.member_raids(ctx.conn, ctx.now, row["party"]):
         return True
     return bool(claim_commands.held_areas(ctx, project["name"], row["party"]))
 
@@ -347,7 +358,7 @@ def _post_merge_notice(ctx, row, raids, text):
 
 
 def _handle_merge(ctx, projects, row, failures):
-    raids = raid_commands.member_raids(ctx.conn, ctx.now, row["party"])
+    raids = raid_members.member_raids(ctx.conn, ctx.now, row["party"])
     project = _project_for_repo(projects, row["repo"])
     shared_areas = project.get("shared_areas") if project is not None else None
     holds_areas = bool(shared_areas) and bool(claim_commands.held_areas(ctx, project["name"], row["party"]))
@@ -444,7 +455,7 @@ def _post_migration_notices(ctx, project, version, clashing):
         announces = "migration:{}:{}:{}#{}".format(project["name"], version, row["repo"], row["number"])
         if notice_commands.announced(ctx.conn, announces):
             continue
-        for raid_row in raid_commands.member_raids(ctx.conn, ctx.now, row["party"]):
+        for raid_row in raid_members.member_raids(ctx.conn, ctx.now, row["party"]):
             notice_commands.create_announcing(
                 ctx,
                 row["party"],
@@ -475,7 +486,7 @@ def _check_migration_clashes(ctx, projects, failures):
 
 
 def _close_met_notices(ctx):
-    rows = notice_commands.active_notices(ctx.conn, ctx.now)
+    rows = notices.active_notices(ctx.conn, ctx.now)
     for row in rows:
         if row["until_condition"] is None:
             continue

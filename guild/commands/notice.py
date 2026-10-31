@@ -1,12 +1,11 @@
 import json
 
-from guild import config, db, events, identity, names, pii, refs, sanitize, timeutil
+from guild import config, db, events, identity, names, notices, pii, refs, sanitize, timeutil
 from guild.commands import raid as raid_commands
 from guild.errors import GuildError
 from guild.ids import next_id
 
 _PROJECT_SCOPE_PREFIX = "project:"
-_RAID_SCOPE_PREFIX = "raid:"
 
 
 def _validate_scope(ctx, to):
@@ -15,8 +14,8 @@ def _validate_scope(ctx, to):
     if to.startswith(_PROJECT_SCOPE_PREFIX):
         config.load_project(ctx.projects_dir, to[len(_PROJECT_SCOPE_PREFIX) :])
         return
-    if to.startswith(_RAID_SCOPE_PREFIX):
-        raid_name = to[len(_RAID_SCOPE_PREFIX) :]
+    if to.startswith(notices.RAID_SCOPE_PREFIX):
+        raid_name = to[len(notices.RAID_SCOPE_PREFIX) :]
         names.validate_name(raid_name, "raid name")
         raid_commands.require_active_raid(ctx.conn, ctx.now, raid_name)
         return
@@ -24,7 +23,7 @@ def _validate_scope(ctx, to):
 
 
 def _reject_duplicate(ctx, actor_party, to, text):
-    for row in active_notices(ctx.conn, ctx.now):
+    for row in notices.active_notices(ctx.conn, ctx.now):
         if row["party"] == actor_party and row["scope"] == to and row["text"] == text:
             raise GuildError("same text already active as notice #{}".format(row["id"]), 1)
 
@@ -152,7 +151,7 @@ def mark_unseen(ctx, notice_id):
 
 
 def mark_all_seen(ctx):
-    unseen = [row for row in active_notices(ctx.conn, ctx.now) if row["seen_at"] is None]
+    unseen = [row for row in notices.active_notices(ctx.conn, ctx.now) if row["seen_at"] is None]
     for row in unseen:
         _record_notice_event(ctx, "notice.seen", row["id"])
     return "{} notices marked seen".format(len(unseen))
@@ -166,16 +165,6 @@ def count_new(rows):
     return len([row for row in rows if is_new(row)])
 
 
-def active_notices(conn, now):
-    rows = conn.execute("SELECT * FROM notices WHERE state = 'active' ORDER BY created_at DESC, id DESC").fetchall()
-    result = []
-    for row in rows:
-        if timeutil.is_expired(now, row["expires_at"]):
-            continue
-        result.append(row)
-    return result
-
-
 def format_notice_line(notice_id, party, issued_at, text, unbound):
     author = identity.actor_label(party, unbound)
     clean_text = sanitize.escape_quotes(sanitize.collapse_to_single_line(text))
@@ -183,18 +172,6 @@ def format_notice_line(notice_id, party, issued_at, text, unbound):
     if author != identity.HUMAN_LABEL and pii.looks_instruction_like(text):
         return "{} {}".format(line, pii.INSTRUCTION_LIKE_FLAG)
     return line
-
-
-def targeting(rows, project, scope_guild_always, raid_member_of):
-    matched = []
-    for row in rows:
-        if row["scope"] == "guild" and scope_guild_always:
-            matched.append(row)
-        elif project is not None and row["scope"] == "project:{}".format(project):
-            matched.append(row)
-        elif row["scope"].startswith(_RAID_SCOPE_PREFIX) and row["scope"][len(_RAID_SCOPE_PREFIX) :] in raid_member_of:
-            matched.append(row)
-    return matched
 
 
 def _list_line(ctx, row):
@@ -212,7 +189,7 @@ def _list_line(ctx, row):
 
 
 def list_active(ctx):
-    rows = active_notices(ctx.conn, ctx.now)
+    rows = notices.active_notices(ctx.conn, ctx.now)
     lines = [_list_line(ctx, row) for row in rows]
     new_count = count_new(rows)
     if new_count > 0:

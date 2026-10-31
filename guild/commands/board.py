@@ -7,21 +7,25 @@ from guild import (
     config,
     ctx_pressure,
     health_jobs,
+    ideas,
     identity,
     links,
     localbase,
     merge_queue,
+    notices,
     party_progress,
     party_status,
     party_waits,
     paths,
     pii,
     pr_asks,
+    raid_members,
     resume,
     sanitize,
     session_info,
     session_status,
     timeutil,
+    work_queue,
 )
 from guild.commands import base_pause as base_pause_commands
 from guild.commands import brief as brief_commands
@@ -30,7 +34,6 @@ from guild.commands import drift as drift_commands
 from guild.commands import idea as idea_commands
 from guild.commands import memory as memory_commands
 from guild.commands import merge_queue as merge_queue_commands
-from guild.commands import next as next_commands
 from guild.commands import notice as notice_commands
 from guild.commands import project_status, quest_board
 from guild.commands import quest as quest_commands
@@ -448,7 +451,7 @@ def _answered_ask_model(row):
 
 
 def _party_scoped_notices(ctx, party_filter):
-    rows = notice_commands.active_notices(ctx.conn, ctx.now)
+    rows = notices.active_notices(ctx.conn, ctx.now)
     if party_filter is None:
         return rows
     return [row for row in rows if row["party"] == party_filter]
@@ -456,7 +459,7 @@ def _party_scoped_notices(ctx, party_filter):
 
 def _raid_scoped_notices(ctx, raid_name):
     scope = "raid:{}".format(raid_name)
-    return [row for row in notice_commands.active_notices(ctx.conn, ctx.now) if row["scope"] == scope]
+    return [row for row in notices.active_notices(ctx.conn, ctx.now) if row["scope"] == scope]
 
 
 def _notice_flagged(row):
@@ -621,7 +624,7 @@ def _party_dates(conn, party_row):
 
 def _leader_label(ctx, party_row):
     session_name = _leader_session_name(ctx.conn, party_row["name"]) or "no leader"
-    role = raid_commands.raid_role_label(raid_commands.member_raids(ctx.conn, ctx.now, party_row["name"]))
+    role = raid_commands.raid_role_label(raid_members.member_raids(ctx.conn, ctx.now, party_row["name"]))
     return "{} (gen {}, {}, {})".format(session_name, party_row["generation"], party_row["state"], role)
 
 
@@ -712,7 +715,7 @@ def _remaining_line(painter, remaining):
 def _party_caps(ctx, party_row, project_config):
     if project_config is None:
         return None
-    status = next_commands.cap_status(ctx.conn, ctx.projects_dir, party_row["name"], party_row["project"])
+    status = work_queue.cap_status(ctx.conn, ctx.projects_dir, party_row["name"], party_row["project"])
     return {"open": status["party_open"], "cap": status["party_cap"], "wait": status["party_wait"]}
 
 
@@ -735,7 +738,7 @@ def _project_models(ctx, party_rows, projects_by_name):
         if project is None or project in seen or project not in projects_by_name:
             continue
         seen.add(project)
-        caps = next_commands.cap_status(ctx.conn, ctx.projects_dir, party_row["name"], project)
+        caps = work_queue.cap_status(ctx.conn, ctx.projects_dir, party_row["name"], project)
         models.append(project_status.project_model(ctx, project, caps))
     return sorted(models, key=lambda model: model["name"])
 
@@ -874,11 +877,11 @@ def _party_section(ctx, repo_clones, painter, party_row, project_config):
     if claims:
         claim_text = ", ".join(_claim_text(ctx, row) for row in claims)
         lines.append(painter.paint("  claims: {}".format(claim_text), "dim"))
-    for idea in idea_commands.linked_ideas(ctx, party_row["name"]):
+    for idea in ideas.linked_ideas(ctx, party_row["name"]):
         lines.append(
             painter.paint("  ideas: #{} {}".format(idea["id"], sanitize.strip_control_sequences(idea["title"])), "dim")
         )
-    raids = raid_commands.member_raids(ctx.conn, ctx.now, party_row["name"])
+    raids = raid_members.member_raids(ctx.conn, ctx.now, party_row["name"])
     if raids:
         raid_text = ", ".join(
             "{} ({}{})".format(
@@ -1357,7 +1360,7 @@ def _party_model(ctx, repo_clones, party_row, project_config):
     ]
     orphan_prs = _orphan_pr_rows(ctx, quests, pr_rows)
     claims = _party_claims(ctx, party_row["name"])
-    raids = raid_commands.member_raids(ctx.conn, ctx.now, party_row["name"])
+    raids = raid_members.member_raids(ctx.conn, ctx.now, party_row["name"])
     return {
         "name": party_row["name"],
         "state": party_row["state"],
@@ -1379,7 +1382,7 @@ def _party_model(ctx, repo_clones, party_row, project_config):
         "quests": quest_models,
         "ideas": [
             {"id": row["id"], "title": sanitize.strip_control_sequences(row["title"])}
-            for row in idea_commands.linked_ideas(ctx, party_row["name"])
+            for row in ideas.linked_ideas(ctx, party_row["name"])
         ],
         "prs": [_pr_model(ctx, repo_clones, pr_row, project_config) for pr_row in orphan_prs],
         "raids": [
@@ -1424,7 +1427,7 @@ def board_model(ctx):
     projects_by_name = {project["name"]: project for project in config.load_all_projects(ctx.projects_dir)}
     repo_clones = localbase.repo_clones(projects_by_name.values())
     ask_rows = _sorted_open_asks(ctx.conn, None)
-    notice_rows = notice_commands.active_notices(ctx.conn, ctx.now)
+    notice_rows = notices.active_notices(ctx.conn, ctx.now)
     project_names = sorted({row["project"] for row in party_rows if row["project"] is not None})
     live_party_names = {row["name"] for row in party_rows}
     live_ids = session_info.live_session_ids(ctx.sessions_dir)

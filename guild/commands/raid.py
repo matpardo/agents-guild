@@ -1,4 +1,4 @@
-from guild import config, db, events, identity, names, timeutil
+from guild import config, db, events, identity, names, raid_members, timeutil
 from guild.errors import GuildError
 
 
@@ -65,11 +65,6 @@ def require_active_raid(conn, now, raid_name):
     return members
 
 
-def member_raids(conn, now, party):
-    rows = conn.execute("SELECT * FROM raid_members WHERE party = ?", (party,)).fetchall()
-    return [row for row in rows if not timeutil.is_expired(now, row["expires_at"])]
-
-
 def raid_role_label(raids):
     if not raids:
         return "solo"
@@ -77,25 +72,8 @@ def raid_role_label(raids):
     return ", ".join(row["raid"] for row in entries)
 
 
-def member_raid_names(conn, now, party):
-    if party is None:
-        return set()
-    return {row["raid"] for row in member_raids(conn, now, party)}
-
-
-def pause_row(conn, raid_name):
-    return conn.execute("SELECT * FROM raid_pauses WHERE raid = ?", (raid_name,)).fetchone()
-
-
 def is_paused(conn, raid_name):
-    return pause_row(conn, raid_name) is not None
-
-
-def paused_member_raids(conn, now, party):
-    if party is None:
-        return []
-    rows = [pause_row(conn, name) for name in sorted(member_raid_names(conn, now, party))]
-    return [row for row in rows if row is not None]
+    return raid_members.pause_row(conn, raid_name) is not None
 
 
 def membership_label(now, row):

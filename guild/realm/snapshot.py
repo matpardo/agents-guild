@@ -1,5 +1,4 @@
-from guild import config, timeutil
-from guild.commands import main_status as main_status_commands
+from guild import config, main_status, timeutil
 from guild.realm import status
 
 _CLOSED_PR_LIFECYCLES = ("merged", "closed")
@@ -34,7 +33,7 @@ def _project_entry(conn, project, red_repos):
 
 
 def build(ctx, guild_name):
-    red_repos = {row["repo"] for row in main_status_commands.red_rows(ctx.conn) if row["external"] is None}
+    red_repos = {row["repo"] for row in main_status.red_rows(ctx.conn) if row["external"] is None}
     snapshot = {
         "guild": guild_name,
         "generated_at": timeutil.to_iso(ctx.now),

@@ -506,3 +506,17 @@ def ready_for_person(entries, main):
         and entry["action"] in MERGEABLE_ACTIONS
         and entry["repo"] not in red_repos
     ]
+
+
+def scoped_queue(records, pins, main_rows, party_names):
+    scoped = [record for record in records if record["party"] in party_names]
+    synced = [record["synced_at"] for record in scoped if record["synced_at"] is not None]
+    scoped_repos = {record["repo"] for record in scoped}
+    scoped_main = [row for row in main_rows if row["repo"] in scoped_repos]
+    result = compute(scoped, pins, scoped_main)
+    return {
+        "main": result["main"],
+        "queue": result["queue"],
+        "synced_at": max(synced) if synced else None,
+        "has_prs": bool(scoped),
+    }

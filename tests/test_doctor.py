@@ -2,8 +2,7 @@ import json
 import os
 from unittest import mock
 
-from guild import claude_settings, paths
-from guild.commands import statusline as statusline_commands
+from guild import claude_settings, paths, statusline_state
 from tests.testutil import GuildTestCase
 
 _ALL_HOOKS = {
@@ -230,8 +229,8 @@ class DoctorTests(GuildTestCase):
 
     def test_warns_when_threshold_is_above_the_last_compaction(self):
         self.register_project("acme", ["acme/app"])
-        statusline_commands.record_compact_pct(paths.state_dir(), 31)
-        statusline_commands.record_compact_pct(paths.state_dir(), 24)
+        statusline_state.record_compact_pct(paths.state_dir(), 31)
+        statusline_state.record_compact_pct(paths.state_dir(), 24)
         out = self._doctor_out_for_clean_setup()
         self.assertIn(
             "warn    project acme handoff_threshold 80% is above the last compaction at 24%: lower it or set handoff_margin",
@@ -244,7 +243,7 @@ class DoctorTests(GuildTestCase):
         data = json.loads(path.read_text())
         data["handoff_threshold"] = 20
         path.write_text(json.dumps(data))
-        statusline_commands.record_compact_pct(paths.state_dir(), 24)
+        statusline_state.record_compact_pct(paths.state_dir(), 24)
         self.assertNotIn("last compaction", self._doctor_out_for_clean_setup())
 
     def test_no_compaction_warning_without_samples(self):
@@ -254,7 +253,7 @@ class DoctorTests(GuildTestCase):
     def test_margin_prints_the_derived_handoff_and_silences_the_warning(self):
         self.register_project("acme", ["acme/app"])
         self._write_global({"handoff_margin": 10})
-        statusline_commands.record_compact_pct(paths.state_dir(), 85)
+        statusline_state.record_compact_pct(paths.state_dir(), 85)
         out = self._doctor_out_for_clean_setup()
         self.assertIn("ok      handoff at 76% (compaction 85% − 10%)", out)
         self.assertNotIn("last compaction", out)
@@ -262,8 +261,8 @@ class DoctorTests(GuildTestCase):
 
     def test_warns_when_the_derived_handoff_sits_near_a_fresh_session(self):
         self._write_global({"handoff_margin": 10})
-        statusline_commands.record_compact_pct(paths.state_dir(), 21)
-        statusline_commands.record_baseline_once(paths.state_dir(), "sess-1", 15)
+        statusline_state.record_compact_pct(paths.state_dir(), 21)
+        statusline_state.record_baseline_once(paths.state_dir(), "sess-1", 15)
         self.assertIn(
             "warn    handoff at 18% is under 5 points above a fresh session at 15%: sessions hand off at 20% instead",
             self._doctor_out_for_clean_setup(),

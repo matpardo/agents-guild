@@ -1,5 +1,4 @@
-from guild import background, party_progress, sanitize, session_info, session_status, timeutil
-from guild.commands import next as next_commands
+from guild import background, party_progress, sanitize, session_info, session_status, timeutil, work_queue
 
 
 def _result(status, since, detail):
@@ -18,7 +17,7 @@ def _oldest_open_ask_since(conn, party):
 
 def _stopped_result(ctx, party_row, session_row):
     binding = {"party": party_row["name"], "project": party_row["project"]}
-    if next_commands.has_work(ctx, binding):
+    if work_queue.has_work(ctx, binding):
         return _result("stopped-with-work", session_row["since"], None)
     return _result("done", session_row["since"], None)
 
@@ -42,7 +41,7 @@ def _offline_result(ctx, party_row):
     if party_row["parked"] is not None:
         return _result("parked", party_row["parked_at"], party_row["parked"])
     binding = {"party": party_row["name"], "project": party_row["project"]}
-    if next_commands.has_work(ctx, binding):
+    if work_queue.has_work(ctx, binding):
         return _result("queued", None, None)
     groups = party_progress.blocked_groups(ctx.conn, party_row["name"])
     if groups:

@@ -1,9 +1,7 @@
 import json
 from pathlib import Path
 
-from guild import links, paths, resume, sanitize, task_context, timeutil
-from guild.commands import ask as ask_commands
-from guild.commands import revive
+from guild import cards, links, paths, resume, sanitize, task_context, timeutil, transcripts
 
 _EVENT_KINDS = (
     "quest.added",
@@ -29,7 +27,7 @@ def _card_ref(ctx, project, project_config, ref):
     row = None
     if project is not None:
         row = ctx.conn.execute("SELECT status FROM cards WHERE project = ? AND key = ?", (project, key)).fetchone()
-    if row is None and not ask_commands.card_known(ctx, project, project_config, key):
+    if row is None and not cards.card_known(ctx, project, project_config, key):
         return {"kind": "card", "ref": ref, "key": key, "missing": True}
     return {
         "kind": "card",
@@ -93,7 +91,7 @@ def _resume(ctx, ask_row, origin):
         leader["generation"],
         leader["permission_mode"],
     )
-    if revive.find_transcript(paths.claude_projects_dir(), session_id) is None:
+    if transcripts.find_transcript(paths.claude_projects_dir(), session_id) is None:
         return "{} (transcript not found)".format(command)
     return command
 

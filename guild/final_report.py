@@ -1,5 +1,4 @@
-from guild import identity, timeutil
-from guild.commands import idea as idea_commands
+from guild import ideas, identity, timeutil
 
 _CLOSED_LIFECYCLES = ("merged", "closed")
 
@@ -110,7 +109,7 @@ def party_report(ctx, party, pending):
     lines.extend(
         "quest {}: {}/{} tasks done ({})".format(row["slug"], row["done"], row["total"], row["state"]) for row in quests
     )
-    linked = idea_commands.linked_ideas(ctx, party)
+    linked = ideas.linked_ideas(ctx, party)
     lines.extend("idea #{}: {}".format(row["id"], row["title"]) for row in linked)
     session_ids = [
         row["session_id"]

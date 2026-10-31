@@ -1,6 +1,5 @@
-from guild import db, events, identity, pii, task_holders, timeutil
+from guild import db, events, identity, pii, task_holders, timeutil, work_queue
 from guild.commands import drift as drift_commands
-from guild.commands import next as next_commands
 from guild.errors import GuildError
 
 
@@ -184,7 +183,7 @@ def _require_movable(ctx, quest_row, target, tid):
         raise GuildError(
             "task '{}/{}' has open PR {}#{}".format(quest_row["slug"], tid, open_pr["repo"], open_pr["number"]), 1
         )
-    area = next_commands.claim_area({"epic": quest_row["epic"], "quest": quest_row["slug"], "tid": tid})
+    area = work_queue.claim_area({"epic": quest_row["epic"], "quest": quest_row["slug"], "tid": tid})
     claim = ctx.conn.execute(
         "SELECT expires_at FROM claims WHERE project = ? AND area = ? AND party = ?",
         (quest_row["project"], area, quest_row["party"]),

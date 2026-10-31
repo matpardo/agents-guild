@@ -1,8 +1,7 @@
 import json
 
-from guild import db
+from guild import db, pr_records, work_queue
 from guild.commands import merge_queue as merge_queue_commands
-from guild.commands import next as next_commands
 from tests.mq_fixtures import MergeQueueTestCase
 
 
@@ -68,13 +67,13 @@ class ExternalBlockTestCase(MergeQueueTestCase):
     def test_external_refs_include_transitive(self):
         self.pr_set(1, "--blocked-external", "x")
         self.run_cli(["merge-queue", "pin", "acme/app#1", "--before", "acme/app#2"], "sess-1", self.repo_dir)
-        self.assertEqual(merge_queue_commands.external_blocked_refs(self.conn()), {"acme/app#1", "acme/app#2"})
+        self.assertEqual(pr_records.external_blocked_refs(self.conn()), {"acme/app#1", "acme/app#2"})
 
     def test_caps_exclude_external_prs(self):
         self.set_caps(max_open_prs_per_party=2, max_open_prs=2)
         self.pr_set(1, "--blocked-external", "x")
         self.run_cli(["merge-queue", "pin", "acme/app#1", "--before", "acme/app#2"], "sess-1", self.repo_dir)
         ctx_conn = self.conn()
-        self.assertEqual(len(next_commands._own_open_prs(ctx_conn, "alpha")), 1)
-        parties = next_commands._project_parties(ctx_conn, "acme")
-        self.assertEqual(len(next_commands._scope_open_prs(ctx_conn, parties)), 1)
+        self.assertEqual(len(work_queue._own_open_prs(ctx_conn, "alpha")), 1)
+        parties = work_queue._project_parties(ctx_conn, "acme")
+        self.assertEqual(len(work_queue._scope_open_prs(ctx_conn, parties)), 1)
