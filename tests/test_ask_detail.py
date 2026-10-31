@@ -1,6 +1,6 @@
 import json
 
-from guild import ask_detail, db, events, paths, timeutil
+from guild import ask_detail, db, paths
 from tests.testutil import GuildTestCase
 
 
@@ -194,72 +194,6 @@ class OriginAndResumeTests(AskDetailBase):
         self.assertEqual(self.model(1)["refs"][0]["spec"], None)
 
 
-class RecentEventsTests(AskDetailBase):
-    def test_events_scoped_to_party_newest_first_and_limited(self):
-        for index in range(12):
-            self.run_cli(["task", "add", "demo/X{:02d}".format(index), "--title", "t"], "sess-1", self.repo_dir)
-        self.ask("task:demo/T01")
-        events_list = self.model(1)["events"]
-        self.assertEqual(len(events_list), 10)
-        self.assertEqual(events_list[0]["kind"], "ask.created")
-        self.assertEqual(events_list[0]["summary"], "#1")
-        self.assertEqual(
-            events_list[1],
-            {"ts": events_list[1]["ts"], "time": events_list[1]["time"], "kind": "task.added", "summary": "demo/X11"},
-        )
-
-    def test_other_party_and_other_kinds_are_excluded(self):
-        with db.writing(self.conn):
-            events.record(
-                self.conn,
-                timeutil.utcnow(),
-                "test@host",
-                "beta",
-                None,
-                "acme",
-                "task.added",
-                "local",
-                {"quest": "other", "tid": "T09", "title": "t"},
-            )
-        self.ask("task:demo/T01")
-        kinds = [event["kind"] for event in self.model(1)["events"]]
-        self.assertNotIn("party.started", kinds)
-        summaries = [event["summary"] for event in self.model(1)["events"]]
-        self.assertNotIn("other/T09", summaries)
-
-    def test_summaries_per_kind(self):
-        self.write_gh_fixture(
-            "view_acme-app_41",
-            {"state": "OPEN", "isDraft": True, "headRefName": "feature/41", "title": "t"},
-        )
-        self.run_cli(
-            ["pr", "track", "acme/app#41", "--task", "demo/T01", "--what", "x", "--waits", "y"],
-            "sess-1",
-            self.repo_dir,
-        )
-        self.run_cli(["pr", "set", "acme/app#41", "--waits", "z"], "sess-1", self.repo_dir)
-        self.run_cli(["pr", "untrack", "acme/app#41"], "sess-1", self.repo_dir)
-        self.ask("task:demo/T01")
-        with db.writing(self.conn):
-            events.record(
-                self.conn,
-                timeutil.utcnow(),
-                "test@host",
-                "alpha",
-                None,
-                "acme",
-                "party.handed_off",
-                "local",
-                {"party": "alpha", "generation": 1, "handoff_path": "/p/alpha-g1.md"},
-            )
-        summary_by_kind = {event["kind"]: event["summary"] for event in self.model(1)["events"]}
-        self.assertEqual(summary_by_kind["pr.tracked"], "acme/app#41")
-        self.assertEqual(summary_by_kind["pr.set"], "acme/app#41")
-        self.assertEqual(summary_by_kind["pr.untracked"], "acme/app#41")
-        self.assertEqual(summary_by_kind["party.handed_off"], "alpha-g1.md")
-        self.assertEqual(summary_by_kind["quest.added"], "demo")
-
-
 class CliTests(AskDetailBase):
     def test_golden_output(self):
         self.insert_card("PROJ-12", "In Progress")
@@ -274,22 +208,37 @@ class CliTests(AskDetailBase):
         lines = out.splitlines()
         self.assertEqual(lines[0].split(" · created")[0], "ask #1 · alpha · open")
         self.assertEqual(
-            lines[1:5],
+            lines[1:8],
             [
                 "  Should the retry cap be 3 or 5?",
-                "  context: Both pass CI.",
+                "  context:",
+                "    Both pass CI.",
                 "  options: 3 | 5",
                 "task    wq/T01  First (PROJ-12)  [queued]  epic: widget",
+                "card    PROJ-12  In Progress  https://tracker.example.com/browse/PROJ-12",
+                "dig in",
             ],
         )
-        self.assertEqual(lines[5], "  spec:  {}".format(sdd_root / "epics" / "widget" / "spec.md"))
-        self.assertEqual(lines[6], "  tasks: {}".format(sdd_root / "epics" / "widget" / "tasks.md"))
-        self.assertEqual(lines[7], "card    PROJ-12  In Progress  https://tracker.example.com/browse/PROJ-12")
-        self.assertEqual(lines[8], "origin (at creation)")
-        self.assertEqual(lines[9], "  session: sess-1 (alpha-g1)")
+        self.assertEqual(lines[8], "  spec:  {}".format(sdd_root / "epics" / "widget" / "spec.md"))
+        self.assertEqual(lines[9], "  tasks: {}".format(sdd_root / "epics" / "widget" / "tasks.md"))
+        self.assertEqual(lines[10], "origin (at creation)")
+        self.assertEqual(lines[11], "  session: sess-1 (alpha-g1)")
         self.assertIn("resume: claude --resume sess-1 --name alpha-g1", out)
-        self.assertIn("recent events (alpha, last 10)", out)
+        self.assertNotIn("recent events", out)
+        self.assertNotIn("epics:", out)
+        self.assertNotIn("recommend", out)
         self.assertEqual(lines[-1], '  → guild answer 1 "..."')
+
+    def test_recommend_renders_before_refs_when_set(self):
+        self.run_cli(
+            ["ask", "Which cap?", "--context", "ctx", "--ref", "task:demo/T01", "--recommend", "Pick **3**"],
+            "sess-1",
+            self.repo_dir,
+        )
+        code, out, err = self.run_cli(["asks", "1"], None, None)
+        lines = out.splitlines()
+        self.assertEqual(lines[lines.index("  recommend:") + 1], "    Pick **3**")
+        self.assertLess(lines.index("  recommend:"), lines.index("dig in"))
 
     def test_answered_ask_shows_answer_instead_of_hint(self):
         self.ask("task:demo/T01")

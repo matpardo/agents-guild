@@ -109,6 +109,7 @@ def _seed_ask(ctx, ask):
             "context": ask.get("context", ""),
             "refs": ask.get("refs", []),
             "options": ask.get("options", []),
+            "recommend": ask.get("recommend"),
         },
     )
 

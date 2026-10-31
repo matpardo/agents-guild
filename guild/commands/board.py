@@ -4,6 +4,7 @@ import textwrap
 from datetime import timedelta
 
 from guild import (
+    ask_legibility,
     config,
     ctx_pressure,
     health_jobs,
@@ -244,6 +245,11 @@ def _blocked_ref_count(conn, ref_list):
     return count
 
 
+def _ask_text_lines(painter, text):
+    bold = (lambda inner: painter.paint(inner, "bold")) if painter.color else None
+    return ask_legibility.ask_text_lines(text, "       ", max(painter.width, 40), bold)
+
+
 def _ask_detail_lines(painter, conn, row):
     ref_list = json.loads(row["refs"])
     blocked_count = _blocked_ref_count(conn, ref_list)
@@ -254,10 +260,13 @@ def _ask_detail_lines(painter, conn, row):
             painter.paint(row["question"], "bold"),
         )
     ]
-    lines.extend(painter.paint(line, "dim") for line in painter.wrap(row["context"], "     "))
+    lines.extend(_ask_text_lines(painter, row["context"]))
     option_list = json.loads(row["options"])
     if option_list:
         lines.append("     options: {}".format(" | ".join(option_list)))
+    if row["recommend"] is not None:
+        lines.append("     recommend:")
+        lines.extend(_ask_text_lines(painter, row["recommend"]))
     lines.append(painter.paint("     refs: {}".format(", ".join(ref_list)), "dim"))
     if blocked_count > 0:
         blocks_text = "blocks: {} of {} refs still open".format(blocked_count, len(ref_list))
@@ -1206,6 +1215,7 @@ def _ask_model(conn, row):
         "question": sanitize.strip_control_sequences(row["question"]),
         "context": sanitize.strip_control_sequences(row["context"]),
         "options": json.loads(row["options"]),
+        "recommend": _optional_text(row["recommend"]),
         "refs": ref_list,
         "blocked": _blocked_ref_count(conn, ref_list),
         "total_refs": len(ref_list),

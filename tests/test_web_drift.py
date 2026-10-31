@@ -485,6 +485,7 @@ def _ask(**overrides):
         "question": "Ship it?",
         "context": "x",
         "options": [],
+        "recommend": None,
         "refs": ["card:ABC-1"],
         "blocked": 0,
         "total_refs": 1,
@@ -1295,3 +1296,41 @@ class WebQuestBoardBehaviorTests(unittest.TestCase):
             '"/api/quests/" + quest.slug + "/release"',
         ):
             self.assertIn(expected, _APP_JS)
+
+
+def _flatten(node):
+    yield node
+    for child in node["children"]:
+        yield from _flatten(child)
+
+
+@unittest.skipIf(shutil.which("node") is None, "node not installed")
+class WebAskTextBehaviorTests(unittest.TestCase):
+    def _asks_tree(self, context_text, recommend):
+        ask = _ask(context=context_text, recommend=recommend)
+        rendered = _render(dict(_BOARD, asks=[ask]), "all", "all", "asks", "tree")
+        return list(_flatten(json.loads(rendered)))
+
+    def test_context_builds_paragraphs_breaks_and_bold(self):
+        nodes = self._asks_tree("one\ntwo **bold**\n\nthree", None)
+        self.assertEqual(sum(1 for node in nodes if node["tag"] == "br"), 1)
+        self.assertEqual(
+            [node["text"] for node in nodes if node["tag"] == "strong" and node["text"] == "bold"], ["bold"]
+        )
+        self.assertEqual(
+            sum(
+                1 for node in nodes if node["tag"] == "p" and node["children"] and node["children"][0]["tag"] == "#text"
+            ),
+            2,
+        )
+
+    def test_markup_in_text_stays_text(self):
+        nodes = self._asks_tree("<script>x</script>", None)
+        self.assertFalse([node for node in nodes if node["tag"] == "script"])
+        self.assertIn("<script>x</script>", [node["text"] for node in nodes])
+
+    def test_recommend_shows_only_when_set(self):
+        shown = self._asks_tree("ctx", "do **this**")
+        self.assertTrue([node for node in shown if node["className"] == "ask-recommend"])
+        hidden = self._asks_tree("ctx", None)
+        self.assertFalse([node for node in hidden if node["className"] == "ask-recommend"])

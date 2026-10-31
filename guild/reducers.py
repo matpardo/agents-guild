@@ -477,7 +477,7 @@ def _ask_created(conn, event):
     payload = event["payload"]
     conn.execute(
         "INSERT INTO asks (id, party, question, context, refs, options, state, answer, created_at,"
-        " snapshot) VALUES (?, ?, ?, ?, ?, ?, 'open', NULL, ?, ?)",
+        " snapshot, recommend) VALUES (?, ?, ?, ?, ?, ?, 'open', NULL, ?, ?, ?)",
         (
             payload["id"],
             payload["party"],
@@ -487,6 +487,7 @@ def _ask_created(conn, event):
             _dump(payload["options"]),
             event["ts"],
             _snapshot_json(payload.get("snapshot")),
+            payload.get("recommend"),
         ),
     )
 

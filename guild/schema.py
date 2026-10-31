@@ -165,7 +165,8 @@ _CREATE_STATEMENTS = (
         options TEXT NOT NULL,
         state TEXT NOT NULL,
         answer TEXT,
-        created_at TEXT NOT NULL
+        created_at TEXT NOT NULL,
+        recommend TEXT
     )
     """,
     """
@@ -411,6 +412,7 @@ _COLUMN_MIGRATIONS = (
     ("adventurers", "health_job", "TEXT"),
     ("asks", "snapshot", "TEXT"),
     ("asks", "answered_at", "TEXT"),
+    ("asks", "recommend", "TEXT"),
     ("resource_machine", "load1", "REAL"),
     ("resource_machine", "load5", "REAL"),
     ("resource_machine", "load15", "REAL"),

@@ -1,25 +1,9 @@
 import json
-from pathlib import Path
 
-from guild import cards, links, paths, resume, sanitize, task_context, timeutil, transcripts
+from guild import ask_legibility, cards, links, paths, resume, sanitize, task_context, timeutil, transcripts
 
-_EVENT_KINDS = (
-    "quest.added",
-    "quest.done",
-    "task.added",
-    "task.started",
-    "task.blocked",
-    "task.done",
-    "pr.tracked",
-    "pr.set",
-    "pr.untracked",
-    "ask.created",
-    "ask.answered",
-    "party.handed_off",
-    "party.closed",
-)
-_EVENT_LIMIT = 10
 _NOT_FOUND = "(not found)"
+_TEXT_WIDTH = 100
 
 
 def _card_ref(ctx, project, project_config, ref):
@@ -96,39 +80,6 @@ def _resume(ctx, ask_row, origin):
     return command
 
 
-def _event_summary(kind, payload):
-    if kind.startswith("task."):
-        return "{}/{}".format(payload["quest"], payload["tid"])
-    if kind.startswith("pr."):
-        return "{}#{}".format(payload["repo"], payload["number"])
-    if kind.startswith("ask."):
-        return "#{}".format(payload["id"])
-    if kind.startswith("quest."):
-        return payload["slug"]
-    if kind == "party.handed_off":
-        return Path(payload["handoff_path"]).name
-    return ""
-
-
-def _recent_events(ctx, party):
-    placeholders = ", ".join("?" for _ in _EVENT_KINDS)
-    rows = ctx.conn.execute(
-        "SELECT ts, kind, payload FROM events WHERE party = ? AND kind IN ({}) ORDER BY seq DESC LIMIT ?".format(
-            placeholders
-        ),
-        (party, *_EVENT_KINDS, _EVENT_LIMIT),
-    ).fetchall()
-    return [
-        {
-            "ts": row["ts"],
-            "time": timeutil.issued_label(row["ts"]),
-            "kind": row["kind"],
-            "summary": _event_summary(row["kind"], json.loads(row["payload"])),
-        }
-        for row in rows
-    ]
-
-
 def _optional_label(iso_text):
     if iso_text is None:
         return None
@@ -145,6 +96,7 @@ def build(ctx, ask_row):
         "question": ask_row["question"],
         "context": ask_row["context"],
         "options": json.loads(ask_row["options"]),
+        "recommend": ask_row["recommend"],
         "created_at": ask_row["created_at"],
         "created": timeutil.issued_label(ask_row["created_at"]),
         "answer": ask_row["answer"],
@@ -153,7 +105,6 @@ def build(ctx, ask_row):
         "refs": [_expand_ref(ctx, project, project_config, ref) for ref in json.loads(ask_row["refs"])],
         "origin": origin,
         "resume": _resume(ctx, ask_row, origin),
-        "events": _recent_events(ctx, ask_row["party"]),
     }
     return sanitize.sanitize_payload(model)
 
@@ -176,6 +127,13 @@ def _task_lines(ref):
             ]
         )
     ]
+    return lines
+
+
+def _task_path_lines(ref):
+    if ref.get("missing"):
+        return []
+    lines = []
     if ref["spec"] is not None:
         lines.append("  spec:  {}".format(ref["spec"]))
     if ref["tasks"] is not None:
@@ -225,7 +183,6 @@ def _origin_lines(origin):
         "origin (at creation)",
         "  session: {}".format(session),
         "  in progress: {}".format(in_progress or "none"),
-        "  epics: {}   cards: {}".format(", ".join(origin["epics"]) or "none", ", ".join(origin["cards"]) or "none"),
     ]
     if origin.get("handoff_path"):
         lines.append("  handoff: {}".format(origin["handoff_path"]))
@@ -243,21 +200,33 @@ def _closing_lines(model):
     return lines
 
 
+def _text_block(label, text):
+    return ["  {}:".format(label)] + ask_legibility.ask_text_lines(text, "    ", _TEXT_WIDTH, None)
+
+
+def _dig_in_lines(model):
+    lines = ["dig in"]
+    for ref in model["refs"]:
+        if ref["kind"] == "task":
+            lines.extend(_task_path_lines(ref))
+    lines.extend(_origin_lines(model["origin"]))
+    if model["resume"] is not None:
+        lines.append("resume: {}".format(model["resume"]))
+    return lines
+
+
 def render_lines(model):
     lines = [
         "ask #{} · {} · {} · created {}".format(model["id"], model["party"], model["state"], model["created"]),
         "  {}".format(model["question"]),
-        "  context: {}".format(model["context"]),
     ]
+    lines.extend(_text_block("context", model["context"]))
     if model["options"]:
         lines.append("  options: {}".format(" | ".join(model["options"])))
+    if model["recommend"] is not None:
+        lines.extend(_text_block("recommend", model["recommend"]))
     for ref in model["refs"]:
         lines.extend(_REF_LINES[ref["kind"]](ref))
-    lines.extend(_origin_lines(model["origin"]))
-    if model["resume"] is not None:
-        lines.append("resume: {}".format(model["resume"]))
-    lines.append("recent events ({}, last {})".format(model["party"], _EVENT_LIMIT))
-    for event in model["events"]:
-        lines.append(_joined(["  {}".format(event["time"]), event["kind"], event["summary"]]))
+    lines.extend(_dig_in_lines(model))
     lines.extend(_closing_lines(model))
     return lines

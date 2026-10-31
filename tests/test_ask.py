@@ -186,6 +186,48 @@ class AskTests(GuildTestCase):
         self.assertIn("options: yes | no", out)
         self.assertIn('guild answer 1 "..."', out)
 
+    def _ask_args(self, question, context_text, *extra):
+        return ["ask", question, "--context", context_text, "--ref", "task:demo/T01", *extra]
+
+    def test_recommend_is_stored_and_listed(self):
+        code, out, err = self.run_cli(self._ask_args("which?", "ctx", "--recommend", "take A"), "sess-1", self.repo_dir)
+        self.assertEqual(code, 0, err)
+        row = self.conn.execute("SELECT recommend FROM asks WHERE id = 1").fetchone()
+        self.assertEqual(row["recommend"], "take A")
+        code, out, err = self.run_cli(["asks"], None, None)
+        self.assertIn("recommend:", out)
+        self.assertIn("take A", out)
+
+    def test_ask_without_recommend_stores_null_and_lists_no_line(self):
+        self.run_cli(self._ask_args("which?", "ctx"), "sess-1", self.repo_dir)
+        row = self.conn.execute("SELECT recommend FROM asks WHERE id = 1").fetchone()
+        self.assertIsNone(row["recommend"])
+        code, out, err = self.run_cli(["asks"], None, None)
+        self.assertNotIn("recommend:", out)
+
+    def test_overlong_recommend_is_refused(self):
+        code, out, err = self.run_cli(
+            self._ask_args("which?", "ctx", "--recommend", "x" * 301), "sess-1", self.repo_dir
+        )
+        self.assertEqual(code, 1)
+        self.assertEqual(self.conn.execute("SELECT COUNT(*) AS n FROM asks").fetchone()["n"], 0)
+
+    def test_recommend_is_refused_with_ask_wait(self):
+        code, out, err = self.run_cli(["ask", "wait", "1", "--recommend", "x"], "sess-1", self.repo_dir)
+        self.assertEqual(code, 1)
+
+    def test_jargon_heavy_question_warns_and_still_creates(self):
+        question = "merge T05 in guild/foo.py with #123 and abc1234?"
+        code, out, err = self.run_cli(self._ask_args(question, "ctx"), "sess-1", self.repo_dir)
+        self.assertEqual(code, 0, err)
+        self.assertIn("ask #1 created", out)
+        self.assertIn("warning: question carries", out)
+        self.assertIn("--recommend", out)
+
+    def test_plain_ask_prints_no_warning(self):
+        code, out, err = self.run_cli(self._ask_args("Ship the change now?", "Tests pass."), "sess-1", self.repo_dir)
+        self.assertNotIn("warning:", out)
+
     def test_answer_by_human(self):
         self.run_cli(["ask", "ready?", "--context", "x", "--ref", "task:demo/T01"], "sess-1", self.repo_dir)
         code, out, err = self.run_cli(["answer", "1", "yes, go ahead"], None, None)

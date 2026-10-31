@@ -5,7 +5,7 @@ title: Asks that carry the context to decide them
 status: done
 owner: matpardo
 created: 2026-10-04
-updated: 2026-10-04
+updated: 2026-10-31
 ---
 
 # Spec: Asks that carry the context to decide them
@@ -22,7 +22,7 @@ An ask holds a question, up to 2000 characters of context and refs to PRs or que
 
 - `card:<KEY>` refs besides `pr:` and `task:`.
 - At creation, snapshot the origin: session id and name, the party's in-progress tasks, their epic, card keys of linked PRs, last handoff. With no task or card ref and exactly one task in progress, ref it automatically.
-- `guild asks <id>`: refs expanded (task with SDD paths, card with tracker link, PR with URL and state), the resume command for the asking session, and the party's recent events.
+- `guild asks <id>`: refs expanded (task with SDD paths, card with tracker link, PR with URL and state), and the resume command for the asking session under a separate dig-in section.
 - `guild asks --all [--party] [--since]` with answers and `answered_at`.
 - The same detail on the web page.
 

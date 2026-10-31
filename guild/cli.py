@@ -6,7 +6,19 @@ import sys
 import time
 from pathlib import Path
 
-from guild import background, db, due_jobs, notify, origin, paths, pii, session_info, statusline_state, timeutil
+from guild import (
+    ask_legibility,
+    background,
+    db,
+    due_jobs,
+    notify,
+    origin,
+    paths,
+    pii,
+    session_info,
+    statusline_state,
+    timeutil,
+)
 from guild.commands import hook as hook_commands
 from guild.context import RunContext
 from guild.errors import GuildError
@@ -289,7 +301,7 @@ _DEFAULT_WAIT_TIMEOUT = "2h"
 def _handle_ask_wait(ctx, args):
     from guild.commands import ask as ask_commands
 
-    if args.context is not None or args.ref or args.option:
+    if args.context is not None or args.ref or args.option or args.recommend is not None:
         raise GuildError("`guild ask wait` takes only an id and --timeout", 1)
     if not args.wait_id.isdigit():
         raise GuildError("ask id '{}' must be an integer".format(args.wait_id), 1)
@@ -310,7 +322,7 @@ def _handle_ask(ctx, args):
         raise GuildError("--context is required", 1)
     if args.timeout is not None:
         raise GuildError("--timeout only applies to ask wait", 1)
-    _print(ask_commands.create(ctx, args.question, args.context, args.ref or [], args.option or []))
+    _print(ask_commands.create(ctx, args.question, args.context, args.ref or [], args.option or [], args.recommend))
     return 0
 
 
@@ -1489,7 +1501,7 @@ def build_parser():
     _add_pr_parser(subparsers)
     _add_finding_parser(subparsers)
 
-    ask = subparsers.add_parser("ask", help="ask the human a decision")
+    ask = subparsers.add_parser("ask", help="ask the human a decision", description=ask_legibility.TEMPLATE)
     ask.add_argument(
         "question", help="at most {} characters; put details in --context".format(pii.ASK_QUESTION_MAX_LENGTH)
     )
@@ -1500,6 +1512,10 @@ def build_parser():
     ask.add_argument("--timeout", help="with ask wait: give up after this long (default 2h)")
     ask.add_argument("--ref", action="append", help="pr:<owner/repo>#<n>, task:<quest>/<tid> or card:<KEY>; repeatable")
     ask.add_argument("--option", action="append", help="an answer option; repeatable")
+    ask.add_argument(
+        "--recommend",
+        help="the option you recommend and why, at most {} characters".format(pii.ASK_RECOMMEND_MAX_LENGTH),
+    )
     ask.set_defaults(handler=_handle_ask)
 
     answer = subparsers.add_parser("answer", help="answer an open ask")
