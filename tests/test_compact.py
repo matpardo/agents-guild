@@ -1,4 +1,5 @@
 import json
+import os
 import sqlite3
 from datetime import timedelta
 
@@ -147,24 +148,29 @@ class CompactFixture(GuildTestCase):
 
 
 class CompactDedupTests(CompactFixture):
-    def test_run_of_identical_epic_syncs_keeps_first_and_last(self):
+    def test_identical_epic_syncs_keep_only_the_latest(self):
         for _ in range(5):
             self._record("epic.synced", _epic_payload("open"))
         seqs = self._seqs("epic.synced")
-        self._compact(None)
-        self.assertEqual(self._seqs("epic.synced"), [seqs[0], seqs[-1]])
+        self._compact(30)
+        self.assertEqual(self._seqs("epic.synced"), [seqs[-1]])
 
-    def test_run_of_two_is_untouched(self):
-        for _ in range(2):
-            self._record("tracker.synced", _tracker_payload("open"))
-        self._compact(None)
-        self.assertEqual(len(self._seqs("tracker.synced")), 2)
-
-    def test_differing_payloads_are_all_kept(self):
+    def test_differing_tracker_snapshots_keep_only_the_latest(self):
         for status in ("a", "b", "a", "b"):
             self._record("tracker.synced", _tracker_payload(status))
-        self._compact(None)
-        self.assertEqual(len(self._seqs("tracker.synced")), 4)
+        seqs = self._seqs("tracker.synced")
+        self._compact(30)
+        self.assertEqual(self._seqs("tracker.synced"), [seqs[-1]])
+
+    def test_each_epic_keeps_its_latest_snapshot(self):
+        other = _epic_payload("open")
+        other["epic"] = "e2"
+        self._record("epic.synced", other)
+        self._record("epic.synced", _epic_payload("open"))
+        self._record("epic.synced", _epic_payload("done"))
+        seqs = self._seqs("epic.synced")
+        self._compact(30)
+        self.assertEqual(self._seqs("epic.synced"), [seqs[0], seqs[2]])
 
     def test_rebuild_after_compact_gives_identical_projections(self):
         self._track_pr()
@@ -183,7 +189,7 @@ class CompactDedupTests(CompactFixture):
         for _ in range(4):
             self._sync_pr("same")
         seqs = self._seqs("pr.synced")
-        self._compact(None)
+        self._compact(30)
         self.assertEqual(self._seqs("pr.synced"), [seqs[0], seqs[-1]])
 
     def test_pr_set_between_syncs_breaks_the_run(self):
@@ -194,7 +200,7 @@ class CompactDedupTests(CompactFixture):
         self._sync_pr("same")
         self._sync_pr("same")
         before = self._rebuilt_snapshot()
-        self._compact(None)
+        self._compact(30)
         self.assertEqual(len(self._seqs("pr.synced")), 4)
         self.assertEqual(self._rebuilt_snapshot(), before)
 
@@ -203,7 +209,7 @@ class CompactDedupTests(CompactFixture):
         for _ in range(5):
             self._sync_pr("same")
         before = self._rebuilt_snapshot()
-        self._compact(None)
+        self._compact(30)
         after = self._rebuilt_snapshot()
         self.assertEqual(after["prs"], before["prs"])
 
@@ -213,7 +219,7 @@ class CompactDedupTests(CompactFixture):
             self._record("tracker.synced", _tracker_payload("open"))
         before = project_status._age(self.ctx.conn, self.ctx.now, "acme", "epic.synced")
         beforet = project_status._age(self.ctx.conn, self.ctx.now, "acme", "tracker.synced")
-        self._compact(None)
+        self._compact(30)
         self.assertEqual(project_status._age(self.ctx.conn, self.ctx.now, "acme", "epic.synced"), before)
         self.assertEqual(project_status._age(self.ctx.conn, self.ctx.now, "acme", "tracker.synced"), beforet)
 
@@ -224,18 +230,19 @@ class CompactDedupTests(CompactFixture):
         for _ in range(4):
             self._record("tracker.synced", other, project="beta")
         self._record("tracker.synced", _tracker_payload("open"))
-        self._compact(None)
-        self.assertEqual(len(self._seqs("tracker.synced")), 4)
+        seqs = self._seqs("tracker.synced")
+        self._compact(30)
+        self.assertEqual(self._seqs("tracker.synced"), [seqs[-2], seqs[-1]])
 
 
 class CompactResourcesTests(CompactFixture):
-    def test_without_retention_resources_are_kept_and_reason_reported(self):
-        self._seed_resources(400)
-        compact_plan = compact.plan(self.ctx, None)
-        self.assertIn("resources kept: no resource_retention_days configured", compact.report_lines(compact_plan, True))
-        self._compact(None)
+    def test_without_configured_retention_the_default_applies(self):
+        self._seed_resources(100)
+        self._seed_resources(80)
+        code, out, err = self.run_cli(["compact"], "sess-1", self.repo_dir)
+        self.assertEqual(code, 0, err)
+        self.assertIn("resources older than 90d: deleted 1 events", out)
         self.assertEqual(len(self._seqs("resources.sampled")), 1)
-        self.assertEqual(self.ctx.conn.execute("SELECT COUNT(*) FROM resource_machine").fetchone()[0], 1)
 
     def test_retention_deletes_old_and_keeps_recent(self):
         self._seed_resources(40)
@@ -253,7 +260,7 @@ class CompactApplyTests(CompactFixture):
         count = self.ctx.conn.execute("SELECT COUNT(*) FROM events").fetchone()[0]
         code, out, err = self.run_cli(["compact", "--dry-run"], "sess-1", self.repo_dir)
         self.assertEqual(code, 0, err)
-        self.assertIn("epic.synced: would delete 3 of 5", out)
+        self.assertIn("epic.synced: would delete 4 of 5", out)
         self.assertEqual(self.ctx.conn.execute("SELECT COUNT(*) FROM events").fetchone()[0], count)
         self.assertFalse(compact.backup_path().exists())
 
@@ -261,7 +268,7 @@ class CompactApplyTests(CompactFixture):
         for _ in range(5):
             self._record("epic.synced", _epic_payload("open"))
         total = self.ctx.conn.execute("SELECT COUNT(*) FROM events").fetchone()[0]
-        self._compact(None)
+        self._compact(30)
         backup = sqlite3.connect(str(compact.backup_path()))
         self.addCleanup(backup.close)
         self.assertEqual(backup.execute("SELECT COUNT(*) FROM events").fetchone()[0], total)
@@ -272,7 +279,7 @@ class CompactApplyTests(CompactFixture):
         compact.backup_path().mkdir()
         before = self._seqs("epic.synced")
         with self.assertRaises(GuildError):
-            self._compact(None)
+            self._compact(30)
         self.assertEqual(self._seqs("epic.synced"), before)
 
     def test_cli_reports_counts_backup_and_sizes_and_records_event(self):
@@ -280,7 +287,7 @@ class CompactApplyTests(CompactFixture):
             self._record("epic.synced", _epic_payload("open"))
         code, out, err = self.run_cli(["compact"], "sess-1", self.repo_dir)
         self.assertEqual(code, 0, err)
-        self.assertIn("epic.synced: deleted 3 of 5", out)
+        self.assertIn("epic.synced: deleted 4 of 5", out)
         self.assertIn("guild.db.pre-compact", out)
         self.assertIn("db ", out)
         self.assertEqual(len(self._seqs("db.compacted")), 1)
@@ -293,8 +300,48 @@ class CompactApplyTests(CompactFixture):
         self.assertIn("resources older than 30d: would delete 1 events", out)
 
     def test_rebuild_replays_the_compacted_event(self):
-        self._compact(None)
+        self._compact(30)
         rebuild.run(self.ctx)
+
+
+class CompactSessionFilesTests(CompactFixture):
+    def _session_file(self, relative, days_ago):
+        path = self.state_home / "guild" / relative
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text("1")
+        stamp = timeutil.utcnow().timestamp() - days_ago * 86400
+        os.utime(path, (stamp, stamp))
+        return path
+
+    def _seed_session_files(self):
+        return {
+            "old": [
+                self._session_file("ctx/old", 31),
+                self._session_file("ctx-baseline/old", 31),
+                self._session_file("background/old/pr-1", 31),
+            ],
+            "fresh": [
+                self._session_file("ctx/fresh", 1),
+                self._session_file("ctx-baseline/fresh", 1),
+                self._session_file("background/fresh/pr-2", 1),
+            ],
+        }
+
+    def test_stale_session_files_are_deleted_and_fresh_ones_kept(self):
+        seeded = self._seed_session_files()
+        compact_plan = compact.plan(self.ctx, 30)
+        self.assertIn("session files older than 30d: deleted 3", compact.report_lines(compact_plan, False))
+        compact.apply(self.ctx, compact_plan)
+        self.assertFalse(any(path.exists() for path in seeded["old"]))
+        self.assertTrue(all(path.exists() for path in seeded["fresh"]))
+        self.assertFalse((self.state_home / "guild" / "background" / "old").exists())
+
+    def test_dry_run_keeps_stale_session_files(self):
+        seeded = self._seed_session_files()
+        code, out, err = self.run_cli(["compact", "--dry-run"], "sess-1", self.repo_dir)
+        self.assertEqual(code, 0, err)
+        self.assertIn("session files older than 30d: would delete 3", out)
+        self.assertTrue(all(path.exists() for path in seeded["old"]))
 
 
 class CompactConfigTests(GuildTestCase):

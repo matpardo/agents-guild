@@ -657,15 +657,17 @@ without changing any projection.
 guild compact [--dry-run]
 ```
 
-For each run of consecutive identical `epic.synced` events (per project and
-epic), `tracker.synced` events (per project) and `pr.synced` events (per PR,
-ignoring `synced_at`, and broken by any other `pr.*` event of that PR) it keeps
-the first and the last and deletes the ones in between, so `guild rebuild` gives
-the same projections and the board freshness (newest event per project and
-kind) does not move. With the global `resource_retention_days` set it also
-deletes `resources.sampled` events and the `resource_samples` and
-`resource_machine` rows older than that; without it the report says
-`resources kept: no resource_retention_days configured`.
+It keeps only the newest `epic.synced` event per project and epic and the
+newest `tracker.synced` event per project: each one is a full snapshot that
+replaces the previous one. For each run of consecutive identical `pr.synced`
+events (per PR, ignoring `synced_at`, and broken by any other `pr.*` event of
+that PR) it keeps the first and the last and deletes the ones in between. So
+`guild rebuild` gives the same projections and the board freshness (newest
+event per project and kind) does not move. It also deletes `resources.sampled`
+events and the `resource_samples` and `resource_machine` rows older than the
+global `resource_retention_days` (90 when absent), and the per-session files
+under `$XDG_STATE_HOME/guild` (`ctx/`, `ctx-baseline/`, `background/`) not
+touched for 30 days.
 
 Before deleting anything it copies the database with SQLite's online backup to
 `$XDG_DATA_HOME/guild/guild.db.pre-compact`, overwriting the previous copy; if
@@ -789,9 +791,9 @@ minutes on large trees, hence the background job's low priority. All measuring h
 before a single write transaction records every event, so the database is
 never locked while `du` or Docker runs. Each collect adds one `resources.sampled`
 local event per project plus one for unattributed items, roughly 3 KB each; at
-the recommended cadence that is about 30-40 MB a year in total. Samples are
-kept unless the global `resource_retention_days` is set, in which case
-`guild compact` deletes older ones (see "`guild compact`").
+the recommended cadence that is about 30-40 MB a year in total. `guild compact`
+deletes samples older than the global `resource_retention_days`, 90 days when
+absent (see "`guild compact`").
 
 Web: the board has a collapsible "resources" section built from
 `GET /api/resources[?project=<name>&since=<dur>]` (default `since=1d`), the
@@ -2146,8 +2148,8 @@ optional, written by hand:
   hands off early, and a higher old one is caught by the nudge that follows
   every compaction.
 
-- `resource_retention_days` (positive integer, at most 3650, absent: kept
-  forever): age in days past which `guild compact` deletes resource samples.
+- `resource_retention_days` (positive integer, at most 3650, absent: 90):
+  age in days past which `guild compact` deletes resource samples.
 
 Whatever the source, a session's threshold is never below its starting
 percentage plus 5 (the first nonzero `guild statusline --ctx` reading, kept in
@@ -2691,7 +2693,7 @@ Without a hooks manager, add the same call to the repository's
   `agent_type` (null on the main thread), and a `permissionDecisionReason`
   reaches the denied subagent verbatim.
 
-- `pre-compact` (matcher `auto`, so a manual `/compact` never fires it): appends the
+- `pre-compact` (matcher `auto`, so a manual `/compact` never fires it): writes the
   session's last statusline percentage, still the pre-compact value, to the global
   `$XDG_STATE_HOME/guild/compaction-pct`. Bound or not, since the compaction point
   comes from the user's Claude Code settings. It prints nothing. When the

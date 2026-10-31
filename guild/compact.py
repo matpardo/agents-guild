@@ -5,10 +5,11 @@ from datetime import timedelta
 from guild import db, events, locking, paths, timeutil
 from guild.errors import GuildError
 
-_NO_RETENTION_LINE = "resources kept: no resource_retention_days configured"
 _BACKUP_NAME = "guild.db.pre-compact"
 _DEDUP_KINDS = ("epic.synced", "tracker.synced", "pr.synced")
-_PR_SYNCED = "pr.synced"
+_SNAPSHOT_KINDS = ("epic.synced", "tracker.synced")
+_SESSION_FILE_MAX_AGE_DAYS = 30
+_SESSION_FILE_PATTERNS = ("ctx/*", "ctx-baseline/*", "background/*/*")
 
 
 class ResourcePlan:
@@ -21,10 +22,11 @@ class ResourcePlan:
 
 
 class Plan:
-    def __init__(self, doomed, totals, resources):
+    def __init__(self, doomed, totals, resources, session_files):
         self.doomed = doomed
         self.totals = totals
         self.resources = resources
+        self.session_files = session_files
 
 
 class Result:
@@ -40,14 +42,15 @@ def _pr_key(payload):
     return ("pr", payload["repo"], payload["number"])
 
 
-def _run_key_and_signature(kind, raw_payload):
-    payload = json.loads(raw_payload)
-    if kind == "epic.synced":
-        return ("epic", payload["project"], payload["epic"]), raw_payload
-    if kind == "tracker.synced":
-        return ("tracker", payload["project"]), raw_payload
+def _pr_signature(payload):
     comparable = {name: value for name, value in payload.items() if name != "synced_at"}
-    return _pr_key(payload), json.dumps(comparable, sort_keys=True)
+    return json.dumps(comparable, sort_keys=True)
+
+
+def _snapshot_key(kind, payload):
+    if kind == "epic.synced":
+        return (kind, payload["project"], payload["epic"])
+    return (kind, payload["project"])
 
 
 def _stream(conn):
@@ -62,15 +65,23 @@ def _dedup_plan(conn):
     doomed = {kind: [] for kind in _DEDUP_KINDS}
     totals = {kind: 0 for kind in _DEDUP_KINDS}
     runs = {}
+    latest = {}
     for row in _stream(conn):
         kind = row["kind"]
+        payload = json.loads(row["payload"])
+        if kind in _SNAPSHOT_KINDS:
+            totals[kind] += 1
+            previous = latest.get(_snapshot_key(kind, payload))
+            if previous is not None:
+                doomed[kind].append(previous)
+            latest[_snapshot_key(kind, payload)] = row["seq"]
+            continue
         if kind not in _DEDUP_KINDS:
-            payload = json.loads(row["payload"])
             if "repo" in payload and "number" in payload:
                 runs.pop(_pr_key(payload), None)
             continue
         totals[kind] += 1
-        key, signature = _run_key_and_signature(kind, row["payload"])
+        key, signature = _pr_key(payload), _pr_signature(payload)
         run = runs.get(key)
         if run is None or run[0] != signature:
             runs[key] = [signature, 1, row["seq"]]
@@ -87,8 +98,6 @@ def _count(conn, statement, cutoff):
 
 
 def _resource_plan(conn, now, retention_days):
-    if retention_days is None:
-        return ResourcePlan(None, None, 0, 0, 0)
     cutoff = timeutil.to_iso(now - timedelta(days=retention_days))
     return ResourcePlan(
         retention_days,
@@ -99,9 +108,24 @@ def _resource_plan(conn, now, retention_days):
     )
 
 
+def _stale_session_files(state_dir, now):
+    cutoff = (now - timedelta(days=_SESSION_FILE_MAX_AGE_DAYS)).timestamp()
+    return [
+        path
+        for pattern in _SESSION_FILE_PATTERNS
+        for path in sorted(state_dir.glob(pattern))
+        if path.is_file() and path.stat().st_mtime < cutoff
+    ]
+
+
 def plan(ctx, resource_retention_days):
     doomed, totals = _dedup_plan(ctx.conn)
-    return Plan(doomed, totals, _resource_plan(ctx.conn, ctx.now, resource_retention_days))
+    return Plan(
+        doomed,
+        totals,
+        _resource_plan(ctx.conn, ctx.now, resource_retention_days),
+        _stale_session_files(ctx.state_dir, ctx.now),
+    )
 
 
 def lock(ctx):
@@ -132,11 +156,17 @@ def _delete_seqs(conn, seqs):
 
 
 def _delete_resources(conn, resources):
-    if resources.cutoff is None:
-        return
     conn.execute("DELETE FROM events WHERE kind = 'resources.sampled' AND ts < ?", (resources.cutoff,))
     conn.execute("DELETE FROM resource_samples WHERE ts < ?", (resources.cutoff,))
     conn.execute("DELETE FROM resource_machine WHERE ts < ?", (resources.cutoff,))
+
+
+def _delete_session_files(state_dir, session_files):
+    for path in session_files:
+        path.unlink(missing_ok=True)
+    for directory in state_dir.glob("background/*"):
+        if directory.is_dir() and not any(directory.iterdir()):
+            directory.rmdir()
 
 
 def _deleted_counts(compact_plan):
@@ -177,6 +207,7 @@ def apply(ctx, compact_plan):
             {"deleted": counts, "bytes_before": bytes_before},
         )
     _vacuum(ctx.conn)
+    _delete_session_files(ctx.state_dir, compact_plan.session_files)
     return Result(counts, bytes_before, _db_bytes(), target, target.stat().st_size)
 
 
@@ -189,8 +220,6 @@ def _dedup_line(kind, compact_plan, verb):
 
 
 def _resource_line(resources, verb):
-    if resources.retention_days is None:
-        return _NO_RETENTION_LINE
     return "resources older than {}d: {} {} events, {} samples, {} machine rows".format(
         resources.retention_days, verb, resources.events_count, resources.samples, resources.machine
     )
@@ -202,6 +231,9 @@ def report_lines(compact_plan, dry_run):
     lines = [title]
     lines.extend(_dedup_line(kind, compact_plan, verb) for kind in _DEDUP_KINDS)
     lines.append(_resource_line(compact_plan.resources, verb))
+    lines.append(
+        "session files older than {}d: {} {}".format(_SESSION_FILE_MAX_AGE_DAYS, verb, len(compact_plan.session_files))
+    )
     return lines
 
 

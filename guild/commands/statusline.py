@@ -50,8 +50,7 @@ def _read_pct(path):
 
 def record_compact_pct(state_dir, pct):
     state_dir.mkdir(parents=True, exist_ok=True)
-    with (state_dir / "compaction-pct").open("a") as handle:
-        handle.write("{}\n".format(pct))
+    (state_dir / "compaction-pct").write_text("{}\n".format(pct))
 
 
 def latest_compact_pct(state_dir):
