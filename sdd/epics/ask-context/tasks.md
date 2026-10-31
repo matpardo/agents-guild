@@ -92,3 +92,14 @@ updated: 2026-10-31
 - [x] `--recommend` is stored, validated and shown in `guild asks`, the detail and the web card; events without it rebuild as null.
 - [x] A jargon-heavy question or context prints a warning and the ask is still created.
 - [x] The detail has no recent events; `dig in` is closed by default on the web.
+
+## T09 — Multi-line answers
+
+**Depends on:** T08
+**Status:** [x] done
+
+**What:** the answer of an ask renders paragraphs, breaks and bold like the context, in `guild asks <id>`, `guild asks --all`, `guild asks --answered`, the web detail and the web answered list.
+
+**Acceptance:**
+- [x] A multi-line answer keeps its lines in the CLI detail and lists.
+- [x] The web detail and answered list build line breaks for it.

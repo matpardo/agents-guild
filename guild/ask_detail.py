@@ -194,7 +194,7 @@ def _closing_lines(model):
         return ['  → guild answer {} "..."'.format(model["id"])]
     if model["state"] != "answered":
         return []
-    lines = ["  answer: {}".format(model["answer"])]
+    lines = _text_block("answer", model["answer"])
     if model["answered"] is not None:
         lines.append("  answered: {}".format(model["answered"]))
     return lines

@@ -301,9 +301,9 @@ ref and exactly one task in progress, `task:<quest>/<tid>` is added and
 `auto-ref: task:<quest>/<tid>` is printed. With no ref and no single in-progress
 task the ask is refused. `--context` stays required to create an ask.
 
-`--recommend` states the option the agent recommends and why. `--context` and
-`--recommend` render paragraphs (blank line), line breaks and `**bold**` in the
-CLI and the web; nothing else is interpreted.
+`--recommend` states the option the agent recommends and why. `--context`,
+`--recommend` and the answer render paragraphs (blank line), line breaks and
+`**bold**` in the CLI and the web; nothing else is interpreted.
 
 `guild asks <id>` expands the ask in two tiers. First what decides it: question,
 context, options, recommendation, and the task with its state, the card with its

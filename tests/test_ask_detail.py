@@ -242,9 +242,9 @@ class CliTests(AskDetailBase):
 
     def test_answered_ask_shows_answer_instead_of_hint(self):
         self.ask("task:demo/T01")
-        self.run_cli(["answer", "1", "five"], None, None)
+        self.run_cli(["answer", "1", "five\nsix\n\nseven"], None, None)
         code, out, err = self.run_cli(["asks", "1"], None, None)
-        self.assertIn("  answer: five", out)
+        self.assertIn("  answer:\n    five\n    six\n\n    seven\n", out)
         self.assertIn("  answered: ", out)
         self.assertNotIn("guild answer", out)
 
