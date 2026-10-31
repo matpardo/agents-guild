@@ -1,11 +1,10 @@
 import json
 from datetime import timedelta
 
-from guild import config, merge_queue, pr_asks, resolve, sanitize, timeutil
+from guild import config, merge_queue, pr_asks, resolve, sanitize, task_holders, timeutil
 from guild.commands import drift as drift_commands
 from guild.commands import merge_queue as merge_queue_commands
 from guild.commands import pr as pr_commands
-from guild.commands import quest as quest_commands
 from guild.commands import raid as raid_commands
 
 
@@ -278,7 +277,7 @@ def _evaluate_next_task(conn, now, project, party):
     disagreements = []
     blocked = []
     for item in _queued_tasks(conn, project, party):
-        if quest_commands.task_adventurer(conn, item["quest_row"], item["tid"]) is not None:
+        if task_holders.task_adventurer(conn, item["quest_row"], item["tid"]) is not None:
             blocked.append("{}/{}: held by an adventurer".format(item["quest"], item["tid"]))
             continue
         if item["epic"] is not None and item["deps"]:

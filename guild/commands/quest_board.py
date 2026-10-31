@@ -1,5 +1,4 @@
-from guild import config, resolve, timeutil
-from guild.commands import quest as quest_commands
+from guild import config, resolve, task_holders, timeutil
 
 _HIDDEN_EPIC_STATUSES = ("done", "archived")
 
@@ -32,7 +31,7 @@ def _open_quest_models(conn, project):
                     {
                         "tid": task_row["tid"],
                         "title": task_row["title"],
-                        "adventurer": quest_commands.adventurer_holder(
+                        "adventurer": task_holders.adventurer_holder(
                             conn, project, quest_row["epic"] or quest_row["slug"], task_row["tid"]
                         ),
                     }
@@ -73,7 +72,7 @@ def _free_task_rows(ctx, project, epic):
     for row in rows:
         if row["tid"] in covered or row["tid"] in claimed:
             continue
-        if quest_commands.adventurer_holder(ctx.conn, project, epic, row["tid"]) is not None:
+        if task_holders.adventurer_holder(ctx.conn, project, epic, row["tid"]) is not None:
             continue
         if resolve.resolve_task_done(ctx.conn, project, epic, row["tid"])[0]:
             continue

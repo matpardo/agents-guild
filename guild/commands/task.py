@@ -1,7 +1,6 @@
-from guild import db, events, identity, pii, timeutil
+from guild import db, events, identity, pii, task_holders, timeutil
 from guild.commands import drift as drift_commands
 from guild.commands import next as next_commands
-from guild.commands import quest as quest_commands
 from guild.errors import GuildError
 
 
@@ -52,7 +51,7 @@ def add(ctx, quest, tid, title, reason):
         if existing is not None:
             raise GuildError("task '{}/{}' already exists".format(quest, tid), 1)
         if quest_row["epic"] is not None:
-            quest_commands.reject_taken_tasks(
+            task_holders.reject_taken_tasks(
                 ctx.conn, ctx.now, quest_row["project"], quest_row["epic"], [{"tid": tid}], binding["party"], False
             )
         payload = {"quest": quest, "tid": tid, "title": title}
@@ -79,7 +78,7 @@ def start(ctx, quest, tid, summary):
         task_row = _load_task(ctx, quest, tid)
         if task_row["state"] == "done":
             raise GuildError("task '{}/{}' is already done".format(quest, tid), 1)
-        adventurer_id = quest_commands.task_adventurer(ctx.conn, quest_row, tid)
+        adventurer_id = task_holders.task_adventurer(ctx.conn, quest_row, tid)
         if adventurer_id is not None:
             raise GuildError("task '{}/{}' is held by adventurer {}".format(quest, tid, adventurer_id), 1)
         events.record(

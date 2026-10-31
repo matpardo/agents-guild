@@ -1,5 +1,4 @@
-from guild import config, db, events, identity, refs, timeutil
-from guild.commands import quest as quest_commands
+from guild import config, db, events, identity, refs, task_holders, timeutil
 from guild.errors import GuildError
 
 _TASK_AREA_PREFIX = "task:"
@@ -14,14 +13,14 @@ def _task_adventurer(ctx, project, area):
     if not area.startswith(_TASK_AREA_PREFIX):
         return None
     epic, tid = refs.parse_task_ref(area[len(_TASK_AREA_PREFIX) :])
-    return quest_commands.adventurer_holder(ctx.conn, project, epic, tid)
+    return task_holders.adventurer_holder(ctx.conn, project, epic, tid)
 
 
 def _task_open_quest(ctx, project, area):
     if not area.startswith(_TASK_AREA_PREFIX):
         return None
     epic, tid = refs.parse_task_ref(area[len(_TASK_AREA_PREFIX) :])
-    return quest_commands.open_quest_holder(ctx.conn, project, epic, tid)
+    return task_holders.open_quest_holder(ctx.conn, project, epic, tid)
 
 
 def _require_task_unheld(ctx, project, area):
