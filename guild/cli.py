@@ -1428,6 +1428,30 @@ def _add_main_parser(subparsers):
     green.set_defaults(handler=_handle_main_green)
 
 
+HOOK_NAMES = (
+    "session-start",
+    "prompt-submit",
+    "pre-push",
+    "pre-pr-owner",
+    "pre-answer",
+    "post-tool-use",
+    "pre-edit",
+    "pre-commit",
+    "notification",
+    "stop",
+    "subagent-start",
+    "subagent-stop",
+    "pre-compact",
+)
+_HOOK_HELP = "internal: Claude Code and git hook entry points"
+
+
+def _build_hook_parser():
+    parser = argparse.ArgumentParser(prog="guild hook", description=_HOOK_HELP)
+    parser.add_argument("hook_name", choices=HOOK_NAMES)
+    return parser
+
+
 def build_parser():
     parser = argparse.ArgumentParser(
         prog="guild",
@@ -1631,25 +1655,8 @@ def build_parser():
     statusline.add_argument("--ctx", type=int, help="context used, percent")
     statusline.set_defaults(handler=_handle_statusline)
 
-    hook = subparsers.add_parser("hook", help="internal: Claude Code and git hook entry points")
-    hook.add_argument(
-        "hook_name",
-        choices=[
-            "session-start",
-            "prompt-submit",
-            "pre-push",
-            "pre-pr-owner",
-            "pre-answer",
-            "post-tool-use",
-            "pre-edit",
-            "pre-commit",
-            "notification",
-            "stop",
-            "subagent-start",
-            "subagent-stop",
-            "pre-compact",
-        ],
-    )
+    hook = subparsers.add_parser("hook", help=_HOOK_HELP)
+    hook.add_argument("hook_name", choices=HOOK_NAMES)
 
     seed = subparsers.add_parser("seed", help="internal: load state from a JSON file")
     seed.add_argument("file")
@@ -1846,6 +1853,8 @@ def _dispatch_hook(args):
 
 def main(argv):
     os.umask(0o077)
+    if argv[:1] == ["hook"]:
+        return _dispatch_hook(_build_hook_parser().parse_args(argv[1:]))
     parser = build_parser()
     args = parser.parse_args(argv)
     if args.command == "hook":

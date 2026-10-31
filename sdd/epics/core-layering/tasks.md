@@ -67,3 +67,14 @@ updated: 2026-10-31
 - `quest incomplete`, `adventurer done` and `adventurer dismiss` record their event once when called twice concurrently.
 - `tests/test_write_races.py` covers each case with a competing write landing before the transaction.
 - The full suite, `ruff check` and `ruff format --check` pass.
+
+## T06 — Parse hook calls without the full command parser
+
+**Depends on:** —
+**Status:** [x] done
+
+**What:** `guild hook <name>` is parsed by a parser that only knows the hook names, so a hook run no longer builds the full parser of every command. One hook run drops from about 190 ms to about 140 ms, and Claude Code runs several per tool call.
+
+**Acceptance:**
+- [x] `main(["hook", <name>])` never calls `build_parser`; an unknown hook name is still a usage error.
+- [x] The full parser accepts the same hook names, from one shared tuple.
