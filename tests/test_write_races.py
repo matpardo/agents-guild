@@ -254,6 +254,84 @@ class QuestDoneRaceTests(WriteRaceCase):
         self.assertEqual(self.rows("SELECT COUNT(*) FROM events WHERE kind = 'quest.done'"), [(1,)])
 
 
+class PartyResumeRaceTests(WriteRaceCase):
+    def test_resume_refused_when_party_closed_first(self):
+        with competing_write_before_transaction(
+            lambda: self.human_cli(["party", "close", "alpha", "--pending", "none"])
+        ):
+            code, out, err = self.cli("sess-4", ["party", "resume", "alpha"])
+        self.assertEqual(code, 1)
+        self.assertIn("is closed", err)
+        self.assertEqual(self.rows("SELECT state FROM parties WHERE name = 'alpha'"), [("closed",)])
+
+    def test_second_resume_refused_and_first_stays_leader(self):
+        with competing_write_before_transaction(lambda: self.cli("sess-3", ["party", "resume", "alpha"])):
+            code, out, err = self.cli("sess-4", ["party", "resume", "alpha"])
+        self.assertEqual(code, 1)
+        self.assertIn("resumed by another session", err)
+        self.assertEqual(self.rows("SELECT generation FROM parties WHERE name = 'alpha'"), [(2,)])
+        self.assertEqual(
+            self.rows("SELECT session_id FROM leaders WHERE party = 'alpha' AND generation = 2"), [("sess-3",)]
+        )
+
+
+class QuestReleaseRaceTests(WriteRaceCase):
+    def test_release_refused_when_task_started_first(self):
+        self.add_quest("sess-1", "demo", "T01")
+        with competing_write_before_transaction(lambda: self.cli("sess-1", ["task", "start", "demo/T01"])):
+            code, out, err = self.cli("sess-1", ["quest", "release", "demo"])
+        self.assertEqual(code, 1)
+        self.assertIn("T01 is active", err)
+        self.assertEqual(self.rows("SELECT COUNT(*) FROM events WHERE kind = 'quest.released'"), [(0,)])
+
+    def test_release_recorded_once_when_released_first(self):
+        self.add_quest("sess-1", "demo", "T01")
+        with competing_write_before_transaction(lambda: self.cli("sess-1", ["quest", "release", "demo"])):
+            code, out, err = self.cli("sess-1", ["quest", "release", "demo"])
+        self.assertEqual(code, 1)
+        self.assertIn("already open", err)
+        self.assertEqual(self.rows("SELECT COUNT(*) FROM events WHERE kind = 'quest.released'"), [(1,)])
+
+
+class QuestIncompleteRaceTests(WriteRaceCase):
+    def test_incomplete_recorded_once_when_marked_first(self):
+        self.add_quest("sess-1", "demo", "T01")
+        self.cli("sess-1", ["task", "done", "demo/T01"])
+        self.cli("sess-1", ["quest", "done", "demo"])
+        with competing_write_before_transaction(
+            lambda: self.cli("sess-1", ["quest", "incomplete", "demo", "--reason", "first"])
+        ):
+            code, out, err = self.cli("sess-1", ["quest", "incomplete", "demo", "--reason", "second"])
+        self.assertEqual(code, 1)
+        self.assertIn("already marked incomplete", err)
+        self.assertEqual(self.rows("SELECT COUNT(*) FROM events WHERE kind = 'quest.marked_incomplete'"), [(1,)])
+
+
+class AdventurerRaceTests(WriteRaceCase):
+    def setUp(self):
+        super().setUp()
+        self.add_open_quest("jobs", "T01")
+        code, out, err = self.cli(
+            "adv-1", ["adventurer", "start", "fix", "--reason", "test reason", "--task", "jobs/T01"]
+        )
+        self.assertEqual(code, 0, err)
+
+    def test_done_recorded_once_when_done_first(self):
+        with competing_write_before_transaction(lambda: self.cli("adv-1", ["adventurer", "done", "--pending", "none"])):
+            code, out, err = self.cli("adv-1", ["adventurer", "done", "--pending", "none"])
+        self.assertEqual(code, 1)
+        self.assertIn("not an active adventurer", err)
+        self.assertEqual(self.rows("SELECT COUNT(*) FROM events WHERE kind = 'adventurer.done'"), [(1,)])
+
+    def test_dismiss_recorded_once_when_dismissed_first(self):
+        self.cli("adv-1", ["adventurer", "done", "--pending", "none"])
+        with competing_write_before_transaction(lambda: self.human_cli(["adventurer", "dismiss", "1"])):
+            code, out, err = self.human_cli(["adventurer", "dismiss", "1"])
+        self.assertEqual(code, 1)
+        self.assertIn("not done", err)
+        self.assertEqual(self.rows("SELECT COUNT(*) FROM events WHERE kind = 'adventurer.dismissed'"), [(1,)])
+
+
 if __name__ == "__main__":
     import unittest
 

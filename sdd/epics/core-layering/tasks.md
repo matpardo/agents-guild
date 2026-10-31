@@ -54,3 +54,16 @@ updated: 2026-10-31
 - `tests/test_event_payload_validation.py` parses `guild/reducers.py` and fails when the declared keys of any kind differ from the keys its reducer and helpers read with `payload["key"]`.
 - Legacy stored events stay replayable by `guild rebuild`.
 - The full suite, `ruff check` and `ruff format --check` pass.
+
+## T05 — Close the remaining check-then-write gaps
+
+**Depends on:** T01
+**Status:** [x] done
+
+**What:** move the state checks of `party resume`, `quest release`, `quest incomplete`, `adventurer done` and `adventurer dismiss` inside `db.writing`, so a write landing between the read and `BEGIN IMMEDIATE` is refused instead of overwriting state or recording a duplicate event.
+
+- `party resume` re-reads the party inside the transaction and refuses with `GuildError` when it was closed or its generation changed, so a second resume no longer ends in an `IntegrityError` on `leaders(party, generation)` and the first resumer stays leader.
+- `quest release` re-runs the open, state and blocker checks inside the transaction, so a task started in between blocks the release and a double release records one event.
+- `quest incomplete`, `adventurer done` and `adventurer dismiss` record their event once when called twice concurrently.
+- `tests/test_write_races.py` covers each case with a competing write landing before the transaction.
+- The full suite, `ruff check` and `ruff format --check` pass.
