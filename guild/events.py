@@ -2,11 +2,15 @@ import json
 import uuid
 
 from guild import reducers, sanitize
+from guild.errors import GuildError
 from guild.timeutil import to_iso
 
 
 def record(conn, now, origin, party, session_id, project, kind, visibility, payload):
     payload = sanitize.sanitize_payload(payload)
+    missing = [key for key in reducers.required_keys(kind) if key not in payload]
+    if missing:
+        raise GuildError("event {} lacks payload keys: {}".format(kind, ", ".join(missing)), 1)
     event_id = str(uuid.uuid4())
     ts = to_iso(now)
     conn.execute(

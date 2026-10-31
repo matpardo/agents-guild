@@ -1,5 +1,7 @@
 import json
 
+from guild.errors import GuildError
+
 
 def _party_started(conn, event):
     payload = event["payload"]
@@ -939,6 +941,127 @@ _REDUCERS.update(
         )
     }
 )
+
+
+_REQUIRED_KEYS = {
+    "party.started": ("party", "session_name"),
+    "party.resumed": ("party", "generation", "session_name"),
+    "party.closed": ("party", "generation"),
+    "party.handed_off": ("party", "handoff_path", "generation"),
+    "party.parked": ("party", "reason"),
+    "party.unparked": ("party",),
+    "handoff.pruned": ("party", "generation"),
+    "leader.located": ("cwd", "permission_mode", "party", "generation"),
+    "leader.window_launched": ("party", "generation", "window_id"),
+    "quest.added": ("slug", "project", "party", "epic", "title", "tasks"),
+    "quest.done": ("slug",),
+    "quest.taken": ("party", "slug"),
+    "quest.released": ("slug",),
+    "quest.marked_incomplete": (),
+    "task.added": ("quest", "tid", "title"),
+    "task.started": ("summary", "quest", "tid"),
+    "task.blocked": ("reason", "quest", "tid"),
+    "task.done": ("summary", "quest", "tid"),
+    "task.moved": ("to_quest", "from_quest", "tid"),
+    "epic.synced": ("project", "epic", "sdd_path", "tasks"),
+    "tracker.synced": ("project", "cards"),
+    "finding.recorded": ("project", "class", "repo", "number", "party"),
+    "pr.tracked": (
+        "lifecycle",
+        "repo",
+        "number",
+        "party",
+        "task_quest",
+        "task_tid",
+        "what",
+        "waits",
+        "branch",
+        "title",
+        "gh_state",
+        "gh_draft",
+        "seeded",
+    ),
+    "pr.set": ("lifecycle", "repo", "number", "waits"),
+    "pr.untracked": ("repo", "number"),
+    "pr.synced": (
+        "lifecycle",
+        "gh_state",
+        "gh_draft",
+        "branch",
+        "title",
+        "checks_failing",
+        "checks_passing",
+        "synced_at",
+        "repo",
+        "number",
+    ),
+    "pr.comments_acknowledged": ("repo", "number"),
+    "ask.created": ("id", "party", "question", "context", "refs", "options"),
+    "ask.answered": ("answer", "id"),
+    "ask.dismissed": ("id",),
+    "notice.created": ("id", "party", "scope", "text", "until_condition", "expires_at"),
+    "notice.closed": ("id",),
+    "notice.seen": ("id",),
+    "notice.unseen": ("id",),
+    "idea.created": ("id", "title", "description", "requester", "deadline", "project"),
+    "idea.edited": ("fields", "id"),
+    "idea.deleted": ("id",),
+    "idea.linked": ("id", "party"),
+    "idea.unlinked": ("id", "party"),
+    "adventurer.started": ("id", "job", "task"),
+    "adventurer.done": ("pending", "id"),
+    "adventurer.promoted": ("party", "id"),
+    "adventurer.dismissed": ("id",),
+    "claim.created": ("project", "area", "party", "expires_at"),
+    "claim.released": ("project", "area"),
+    "raid.joined": ("raid", "party", "expires_at"),
+    "raid.left": ("raid", "party"),
+    "raid.paused": ("raid", "party"),
+    "base.paused": ("repo",),
+    "base.resumed": ("repo",),
+    "raid.resumed": ("raid",),
+    "merge_queue.pinned": ("first_repo", "first_number", "second_repo", "second_number", "author"),
+    "merge_queue.unpinned": ("first_repo", "first_number", "second_repo", "second_number"),
+    "main.status_synced": ("repo", "red", "reason"),
+    "main.marked": ("repo", "red", "reason"),
+    "session.waiting": ("wait", "message"),
+    "session.stopped": (),
+    "session.working": (),
+    "cost.sampled": (
+        "day",
+        "model",
+        "quest",
+        "tid",
+        "input_tokens",
+        "cache_creation_tokens",
+        "cache_read_tokens",
+        "output_tokens",
+    ),
+    "lifecycle.ran": (),
+    "resources.sampled": ("items", "machine"),
+    "db.compacted": (),
+}
+
+_REQUIRED_KEYS.update(
+    {
+        kind: ()
+        for kind in (
+            "dispatch.paused",
+            "dispatch.resumed",
+            "dispatch.decided",
+            "dispatch.launched",
+            "dispatch.launch_failed",
+            "dispatch.bound",
+            "pr.fix_requested",
+        )
+    }
+)
+
+
+def required_keys(kind):
+    if kind not in _REQUIRED_KEYS:
+        raise GuildError("unknown event kind: {}".format(kind), 1)
+    return _REQUIRED_KEYS[kind]
 
 
 def apply(conn, event):
