@@ -43,11 +43,15 @@ def _validate_fields(ctx, fields, project):
             _validate_text(ctx, name, fields[name], project)
 
 
-def _record(ctx, kind, payload):
+def _append(ctx, kind, payload):
     actor_party, _ = identity.resolve_actor(ctx.conn, ctx.session_id)
     project = config.resolve_project(ctx.cwd, config.load_all_projects(ctx.projects_dir))
+    events.record(ctx.conn, ctx.now, ctx.origin, actor_party, ctx.session_id, project, kind, "local", payload)
+
+
+def _record(ctx, kind, payload):
     with db.writing(ctx.conn):
-        events.record(ctx.conn, ctx.now, ctx.origin, actor_party, ctx.session_id, project, kind, "local", payload)
+        _append(ctx, kind, payload)
 
 
 def _require_idea(ctx, idea_id):
@@ -119,23 +123,73 @@ def unlink_for_party(ctx, idea_id, party):
     return "idea #{} unlinked from party '{}'".format(idea_id, party)
 
 
-def _resolve_party(ctx, party):
+def _require_active_adventurer(ctx, adventurer):
+    row = ctx.conn.execute("SELECT state FROM adventurers WHERE id = ?", (adventurer,)).fetchone()
+    if row is None:
+        raise GuildError("unknown adventurer {}".format(adventurer), 1)
+    if row["state"] != "active":
+        raise GuildError("adventurer {} is {}".format(adventurer, row["state"]), 1)
+
+
+def link_for_adventurer(ctx, idea_id, adventurer):
+    with db.writing(ctx.conn):
+        _require_idea(ctx, idea_id)
+        _require_active_adventurer(ctx, adventurer)
+        if any(row["id"] == adventurer for row in linked_adventurers(ctx, idea_id)):
+            raise GuildError("idea #{} is already linked to adventurer {}".format(idea_id, adventurer), 1)
+        _append(ctx, "idea.adventurer_linked", {"id": idea_id, "adventurer": adventurer})
+    return "idea #{} linked to adventurer {}".format(idea_id, adventurer)
+
+
+def unlink_for_adventurer(ctx, idea_id, adventurer):
+    with db.writing(ctx.conn):
+        _require_idea(ctx, idea_id)
+        link_row = next((row for row in linked_adventurers(ctx, idea_id) if row["id"] == adventurer), None)
+        if link_row is None:
+            raise GuildError("idea #{} is not linked to adventurer {}".format(idea_id, adventurer), 1)
+        if link_row["has_prs"]:
+            raise GuildError(
+                "idea #{} stays linked to adventurer {}: the adventurer already tracks a PR".format(
+                    idea_id, adventurer
+                ),
+                1,
+            )
+        _append(ctx, "idea.adventurer_unlinked", {"id": idea_id, "adventurer": adventurer})
+    return "idea #{} unlinked from adventurer {}".format(idea_id, adventurer)
+
+
+def _resolve_holder(ctx, party, adventurer):
     if ctx.session_id is None:
-        if party is None:
-            raise GuildError("pass --party <name>: no session to take the party from", 1)
-        return party
+        if (party is None) == (adventurer is None):
+            raise GuildError("pass --party <name> or --adventurer <id>: no session to take the holder from", 1)
+        return ("party", party) if party is not None else ("adventurer", adventurer)
+    own_adventurer = identity.resolve_adventurer(ctx.conn, ctx.session_id)
+    if own_adventurer is not None:
+        if party is not None:
+            raise GuildError("a session acts only for its own adventurer {}".format(own_adventurer["id"]), 1)
+        if adventurer is not None and adventurer != own_adventurer["id"]:
+            raise GuildError("a session acts only for its own adventurer {}".format(own_adventurer["id"]), 1)
+        return ("adventurer", own_adventurer["id"])
     own_party = identity.require_binding(ctx.conn, ctx.session_id)["party"]
+    if adventurer is not None:
+        raise GuildError("a session acts only for its own party '{}'".format(own_party), 1)
     if party is not None and party != own_party:
         raise GuildError("a session acts only for its own party '{}'".format(own_party), 1)
-    return own_party
+    return ("party", own_party)
 
 
-def link(ctx, idea_id, party):
-    return link_for_party(ctx, idea_id, _resolve_party(ctx, party))
+def link(ctx, idea_id, party, adventurer):
+    kind, holder = _resolve_holder(ctx, party, adventurer)
+    if kind == "adventurer":
+        return link_for_adventurer(ctx, idea_id, holder)
+    return link_for_party(ctx, idea_id, holder)
 
 
-def unlink(ctx, idea_id, party):
-    return unlink_for_party(ctx, idea_id, _resolve_party(ctx, party))
+def unlink(ctx, idea_id, party, adventurer):
+    kind, holder = _resolve_holder(ctx, party, adventurer)
+    if kind == "adventurer":
+        return unlink_for_adventurer(ctx, idea_id, holder)
+    return unlink_for_party(ctx, idea_id, holder)
 
 
 def linked_parties(ctx, idea_id):
@@ -148,11 +202,27 @@ def linked_parties(ctx, idea_id):
     ).fetchall()
 
 
+def linked_adventurers(ctx, idea_id):
+    return ctx.conn.execute(
+        "SELECT idea_adventurer_links.adventurer AS id, COALESCE(adventurers.state, 'dismissed') AS state,"
+        " EXISTS (SELECT 1 FROM prs WHERE prs.adventurer = idea_adventurer_links.adventurer) AS has_prs"
+        " FROM idea_adventurer_links LEFT JOIN adventurers ON adventurers.id = idea_adventurer_links.adventurer"
+        " WHERE idea_adventurer_links.idea_id = ?"
+        " ORDER BY idea_adventurer_links.linked_at ASC, idea_adventurer_links.adventurer ASC",
+        (idea_id,),
+    ).fetchall()
+
+
 def _worked_by(ctx, idea_id):
     parties = linked_parties(ctx, idea_id)
-    if not parties:
+    adventurers = linked_adventurers(ctx, idea_id)
+    if not parties and not adventurers:
         return ["not linked yet"]
     labels = [row["name"] + (" (closed)" if row["state"] == "closed" else "") for row in parties]
+    labels.extend(
+        identity.adventurer_label(row["id"]) + ("" if row["state"] == "active" else " ({})".format(row["state"]))
+        for row in adventurers
+    )
     return ["worked by: " + ", ".join(labels)]
 
 

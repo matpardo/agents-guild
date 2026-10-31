@@ -218,6 +218,10 @@ def _run_idea_action(action, idea_id, payload):
     try:
         if action == "delete":
             return idea_commands.delete(ctx, idea_id)
+        if action == "link" and "adventurer" in payload:
+            return idea_commands.link_for_adventurer(ctx, idea_id, payload["adventurer"])
+        if action == "unlink" and "adventurer" in payload:
+            return idea_commands.unlink_for_adventurer(ctx, idea_id, payload["adventurer"])
         if action == "link":
             return idea_commands.link_for_party(ctx, idea_id, payload["party"])
         if action == "unlink":
@@ -471,6 +475,15 @@ class BoardRequestHandler(http_server.BaseHTTPRequestHandler):
             if key in payload and not isinstance(payload[key], str) and payload[key] is not None:
                 raise _RequestRejected(400, "{} must be a string or null".format(key))
 
+    def _check_idea_holder(self, payload):
+        if ("party" in payload) == ("adventurer" in payload):
+            raise _RequestRejected(400, "pass exactly one of party or adventurer")
+        if "party" in payload and not isinstance(payload["party"], str):
+            raise _RequestRejected(400, "party must be a string")
+        adventurer = payload.get("adventurer")
+        if "adventurer" in payload and (not isinstance(adventurer, int) or isinstance(adventurer, bool)):
+            raise _RequestRejected(400, "adventurer must be an integer")
+
     def _check_quest_payload(self, payload):
         for key in ("project", "slug", "title", "epic"):
             if not isinstance(payload.get(key), str):
@@ -489,7 +502,9 @@ class BoardRequestHandler(http_server.BaseHTTPRequestHandler):
             self._check_idea_payload(action, payload)
         if action == "create-quest":
             self._check_quest_payload(payload)
-        if action in ("link-idea", "unlink-idea", "take-quest") and not isinstance(payload.get("party"), str):
+        if action in ("link-idea", "unlink-idea"):
+            self._check_idea_holder(payload)
+        if action == "take-quest" and not isinstance(payload.get("party"), str):
             raise _RequestRejected(400, "party must be a string")
         if action == "move" and not isinstance(payload.get("to"), str):
             raise _RequestRejected(400, "to must be a string")

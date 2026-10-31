@@ -571,6 +571,7 @@ def _idea_edited(conn, event):
 def _idea_deleted(conn, event):
     conn.execute("DELETE FROM ideas WHERE id = ?", (event["payload"]["id"],))
     conn.execute("DELETE FROM idea_links WHERE idea_id = ?", (event["payload"]["id"],))
+    conn.execute("DELETE FROM idea_adventurer_links WHERE idea_id = ?", (event["payload"]["id"],))
 
 
 def _idea_linked(conn, event):
@@ -584,6 +585,21 @@ def _idea_linked(conn, event):
 def _idea_unlinked(conn, event):
     payload = event["payload"]
     conn.execute("DELETE FROM idea_links WHERE idea_id = ? AND party = ?", (payload["id"], payload["party"]))
+
+
+def _idea_adventurer_linked(conn, event):
+    payload = event["payload"]
+    conn.execute(
+        "INSERT OR IGNORE INTO idea_adventurer_links (idea_id, adventurer, linked_at) VALUES (?, ?, ?)",
+        (payload["id"], payload["adventurer"], event["ts"]),
+    )
+
+
+def _idea_adventurer_unlinked(conn, event):
+    payload = event["payload"]
+    conn.execute(
+        "DELETE FROM idea_adventurer_links WHERE idea_id = ? AND adventurer = ?", (payload["id"], payload["adventurer"])
+    )
 
 
 def _claim_created(conn, event):
@@ -723,6 +739,12 @@ def _adventurer_promoted(conn, event):
         "UPDATE prs SET party = ? WHERE adventurer = ? AND party = ''",
         (payload["party"], payload["id"]),
     )
+    conn.execute(
+        "INSERT OR IGNORE INTO idea_links (idea_id, party, linked_at)"
+        " SELECT idea_id, ?, linked_at FROM idea_adventurer_links WHERE adventurer = ?",
+        (payload["party"], payload["id"]),
+    )
+    conn.execute("DELETE FROM idea_adventurer_links WHERE adventurer = ?", (payload["id"],))
 
 
 def _close_open_quest_task(conn, event, task):
@@ -897,6 +919,8 @@ _REDUCERS = {
     "idea.deleted": _idea_deleted,
     "idea.linked": _idea_linked,
     "idea.unlinked": _idea_unlinked,
+    "idea.adventurer_linked": _idea_adventurer_linked,
+    "idea.adventurer_unlinked": _idea_adventurer_unlinked,
     "adventurer.started": _adventurer_started,
     "adventurer.done": _adventurer_done,
     "adventurer.promoted": _adventurer_promoted,
@@ -1008,6 +1032,8 @@ _REQUIRED_KEYS = {
     "idea.deleted": ("id",),
     "idea.linked": ("id", "party"),
     "idea.unlinked": ("id", "party"),
+    "idea.adventurer_linked": ("adventurer", "id"),
+    "idea.adventurer_unlinked": ("adventurer", "id"),
     "adventurer.started": ("id", "job", "task"),
     "adventurer.done": ("pending", "id"),
     "adventurer.promoted": ("party", "id"),

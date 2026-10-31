@@ -144,8 +144,10 @@ def adventurer_report(ctx, adventurer, pending):
     if adventurer["task"] is not None:
         lines.append("task: {}".format(adventurer["task"]))
     lines.extend(_pr_section(prs))
+    linked = ideas.linked_ideas_for_adventurer(ctx, adventurer["id"])
+    lines.extend("idea #{}: {}".format(row["id"], row["title"]) for row in linked)
     label = identity.adventurer_label(adventurer["id"])
-    generated = _generated_lines(ctx, label, [ctx.session_id], set())
+    generated = _generated_lines(ctx, label, [ctx.session_id], {row["id"] for row in linked})
     lines.extend(generated)
     lines.extend(_closed_task_quest_line(ctx, adventurer, generated))
     lines.extend(_open_work_warning(ctx, label, prs))

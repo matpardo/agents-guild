@@ -939,6 +939,12 @@ def _adventurer_lines(ctx, repo_clones, painter):
             lines.append(painter.paint("    " + STOPPED_WITHOUT_REPORT, "red"))
         if row["state"] == "done":
             lines.extend(painter.wrap("pending: {}".format(sanitize.strip_control_sequences(row["pending"])), "    "))
+        for idea in ideas.linked_ideas_for_adventurer(ctx, row["id"]):
+            lines.append(
+                painter.paint(
+                    "    ideas: #{} {}".format(idea["id"], sanitize.strip_control_sequences(idea["title"])), "dim"
+                )
+            )
         for pr_row in _adventurer_pr_rows(ctx.conn, row["id"]):
             lines.extend(_pr_lines(ctx, repo_clones, painter, pr_row, "    "))
     lines.append("")
@@ -1241,6 +1247,10 @@ def _idea_model(ctx, row):
             {"name": party["name"], "state": party["state"], "has_prs": bool(party["has_prs"])}
             for party in idea_commands.linked_parties(ctx, row["id"])
         ],
+        "adventurers": [
+            {"id": adventurer["id"], "state": adventurer["state"], "has_prs": bool(adventurer["has_prs"])}
+            for adventurer in idea_commands.linked_adventurers(ctx, row["id"])
+        ],
     }
 
 
@@ -1257,6 +1267,10 @@ def _adventurer_model(ctx, repo_clones, row, live_ids, projects_by_name):
         "dates": timeutil.dates_label(row["started_at"], row["done_at"]),
         "live": row["session_id"] in live_ids,
         "stopped_without_report": _adventurer_stopped(row, live_ids),
+        "ideas": [
+            {"id": idea["id"], "title": sanitize.strip_control_sequences(idea["title"])}
+            for idea in ideas.linked_ideas_for_adventurer(ctx, row["id"])
+        ],
         "prs": [
             _pr_model(ctx, repo_clones, pr_row, project_config) for pr_row in _adventurer_pr_rows(ctx.conn, row["id"])
         ],

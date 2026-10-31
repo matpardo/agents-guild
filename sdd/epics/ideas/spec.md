@@ -24,7 +24,7 @@ Ideas arrive while other work is in flight. Today they go on paper or in chat an
 - Add, edit, delete and list from the CLI and the web, by the human and by sessions.
 - The board lists ideas by deadline ascending, no deadline last, and marks the overdue ones.
 - Agents delete an idea once they turn it into code, SDD, a card or a quest.
-- An idea references the parties working on it and a party references its ideas, through one link entity, from the CLI and the web.
+- An idea references the parties and adventurers working on it, and each of them references its ideas, through link entities, from the CLI and the web.
 - `README.md` and `GUILD.md` change with the code.
 
 ## Out of scope
