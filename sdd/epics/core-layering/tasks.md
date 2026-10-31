@@ -2,7 +2,7 @@
 epic: core-layering
 type: tasks
 title: Core write consistency and module layering
-status: active
+status: done
 updated: 2026-10-31
 ---
 
@@ -41,4 +41,16 @@ updated: 2026-10-31
 - `tests/test_layering.py` fails when a module outside `guild/commands/`, `guild/cli.py` and `guild/webserver.py` imports `guild.commands`, and names the module and what it imports.
 - Callers and tests use the core modules directly, with no re-export left in the command modules.
 - Command behavior and signatures are unchanged.
+- The full suite, `ruff check` and `ruff format --check` pass.
+
+## T04 — Validate event payloads on record
+
+**Depends on:** —
+**Status:** [x] done
+
+**What:** declare the payload keys each event kind requires next to its reducer in `guild/reducers.py` and make `events.record` refuse an unknown kind or a payload lacking a required key before the event is written; `guild rebuild` replays stored events without validation.
+
+- A payload missing a required key, or an unknown kind, raises `GuildError` naming the kind and writes no event row.
+- `tests/test_event_payload_validation.py` parses `guild/reducers.py` and fails when the declared keys of any kind differ from the keys its reducer and helpers read with `payload["key"]`.
+- Legacy stored events stay replayable by `guild rebuild`.
 - The full suite, `ruff check` and `ruff format --check` pass.

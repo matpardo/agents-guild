@@ -2,7 +2,7 @@
 epic: core-layering
 type: spec
 title: Core write consistency and module layering
-status: active
+status: done
 owner: matpardo
 created: 2026-10-31
 updated: 2026-10-31
@@ -32,10 +32,10 @@ Commands read state and validate it before opening the write transaction, so two
 
 ## Success criteria
 
-- [ ] Every command that checks ownership, exclusivity or state before a write has a test where a competing write lands just before the transaction and the command is refused.
-- [ ] No import cycle among `guild/commands` modules.
-- [ ] No core module imports `guild.commands`, guarded by a test.
-- [ ] `events.record` rejects an event whose payload lacks a required key.
+- [x] Every command that checks ownership, exclusivity or state before a write has a test where a competing write lands just before the transaction and the command is refused.
+- [x] No import cycle among `guild/commands` modules.
+- [x] No core module imports `guild.commands`, guarded by a test.
+- [x] `events.record` rejects an event whose payload lacks a required key.
 
 ## Security and data
 
