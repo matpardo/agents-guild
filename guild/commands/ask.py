@@ -146,20 +146,20 @@ def answer(ctx, ask_id, text):
         raise GuildError(
             "ask answer runs from the human terminal or the web board, not inside a Claude Code session", 1
         )
-    row = ctx.conn.execute(
-        "SELECT asks.id AS id, asks.state AS state, parties.project AS project FROM asks"
-        " LEFT JOIN parties ON parties.name = asks.party WHERE asks.id = ?",
-        (ask_id,),
-    ).fetchone()
-    if row is None:
-        raise GuildError("unknown ask #{}".format(ask_id), 1)
-    if row["state"] != "open":
-        raise GuildError("ask #{} is not open".format(ask_id), 1)
-    actor_party, unbound = identity.resolve_actor(ctx.conn, ctx.session_id)
-    project = row["project"]
-    patterns = pii.project_patterns(ctx.projects_dir, project)
-    pii.validate_field(text, "answer", pii.ANSWER_MAX_LENGTH, patterns)
     with db.writing(ctx.conn):
+        row = ctx.conn.execute(
+            "SELECT asks.id AS id, asks.state AS state, parties.project AS project FROM asks"
+            " LEFT JOIN parties ON parties.name = asks.party WHERE asks.id = ?",
+            (ask_id,),
+        ).fetchone()
+        if row is None:
+            raise GuildError("unknown ask #{}".format(ask_id), 1)
+        if row["state"] != "open":
+            raise GuildError("ask #{} is not open".format(ask_id), 1)
+        actor_party, unbound = identity.resolve_actor(ctx.conn, ctx.session_id)
+        project = row["project"]
+        patterns = pii.project_patterns(ctx.projects_dir, project)
+        pii.validate_field(text, "answer", pii.ANSWER_MAX_LENGTH, patterns)
         events.record(
             ctx.conn,
             ctx.now,
@@ -179,14 +179,14 @@ def dismiss(ctx, ask_id):
         raise GuildError(
             "ask dismiss runs from the human terminal or the web board, not inside a Claude Code session", 1
         )
-    row = ctx.conn.execute("SELECT id, state FROM asks WHERE id = ?", (ask_id,)).fetchone()
-    if row is None:
-        raise GuildError("unknown ask #{}".format(ask_id), 1)
-    if row["state"] != "open":
-        raise GuildError("ask #{} is not open".format(ask_id), 1)
-    actor_party, _ = identity.resolve_actor(ctx.conn, ctx.session_id)
-    project = config.resolve_project(ctx.cwd, config.load_all_projects(ctx.projects_dir))
     with db.writing(ctx.conn):
+        row = ctx.conn.execute("SELECT id, state FROM asks WHERE id = ?", (ask_id,)).fetchone()
+        if row is None:
+            raise GuildError("unknown ask #{}".format(ask_id), 1)
+        if row["state"] != "open":
+            raise GuildError("ask #{} is not open".format(ask_id), 1)
+        actor_party, _ = identity.resolve_actor(ctx.conn, ctx.session_id)
+        project = config.resolve_project(ctx.cwd, config.load_all_projects(ctx.projects_dir))
         events.record(
             ctx.conn,
             ctx.now,

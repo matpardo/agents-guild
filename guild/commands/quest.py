@@ -177,8 +177,7 @@ def unfinished_work(conn, slug, project, epic):
     return problems
 
 
-def done(ctx, slug, accept_drift, force):
-    binding = identity.require_binding(ctx.conn, ctx.session_id)
+def _require_finishable_quest(ctx, slug, binding, force):
     row = ctx.conn.execute("SELECT party, project, epic, state FROM quests WHERE slug = ?", (slug,)).fetchone()
     if row is None:
         raise GuildError("unknown quest '{}'".format(slug), 1)
@@ -187,10 +186,17 @@ def done(ctx, slug, accept_drift, force):
     if row["state"] != "active":
         raise GuildError("quest '{}' is already {}".format(slug, row["state"]), 1)
     _gate_unfinished_tasks(ctx.conn, slug, force)
+    return row
+
+
+def done(ctx, slug, accept_drift, force):
+    binding = identity.require_binding(ctx.conn, ctx.session_id)
+    row = _require_finishable_quest(ctx, slug, binding, force)
     stale_notes = [] if row["epic"] is None else refresh_sdd_snapshot(ctx, row["project"])
-    findings = _gate_drift(ctx, row["project"], row["epic"], binding["party"], accept_drift, stale_notes)
-    snapshot = achievement.build(ctx.conn, slug, ctx.now, findings)
     with db.writing(ctx.conn):
+        row = _require_finishable_quest(ctx, slug, binding, force)
+        findings = _gate_drift(ctx, row["project"], row["epic"], binding["party"], accept_drift, stale_notes)
+        snapshot = achievement.build(ctx.conn, slug, ctx.now, findings)
         events.record(
             ctx.conn,
             ctx.now,
@@ -280,6 +286,8 @@ def _record_added(ctx, party, project, slug, title, epic, tasks, followups_of, r
         pii.validate_reason(reason, ctx.projects_dir, project)
         payload["reason"] = reason
     with db.writing(ctx.conn):
+        if epic is not None:
+            reject_taken_tasks(ctx.conn, ctx.now, project, epic, tasks, "" if party is None else party, False)
         events.record(
             ctx.conn,
             ctx.now,
@@ -301,7 +309,6 @@ def add_open(ctx, project, slug, title, epic, tids):
     if not tids:
         raise GuildError("select at least one task", 1)
     tasks = _resolve_epic_tasks(ctx.conn, project, epic, ",".join(tids))
-    reject_taken_tasks(ctx.conn, ctx.now, project, epic, tasks, "", False)
     return _record_added(ctx, None, project, slug, title, epic, tasks, None, None)
 
 
@@ -329,7 +336,6 @@ def add(ctx, slug, title, epic, tasks_csv, titles_csv, no_epic, followups_of, op
         tasks = _free_tasks(tasks_csv, titles_csv)
     if not free:
         tasks = _resolve_epic_tasks(ctx.conn, project, epic, tasks_csv or "")
-        reject_taken_tasks(ctx.conn, ctx.now, project, epic, tasks, "" if open_quest else party, False)
     return _record_added(ctx, party, project, slug, title, epic, tasks, followups_of, reason)
 
 
@@ -341,12 +347,12 @@ def _load_quest(conn, slug):
 
 
 def _take(ctx, slug, party, project):
-    row = _load_quest(ctx.conn, slug)
-    if row["party"] is not None or row["state"] != "active":
-        raise GuildError("quest '{}' is not open".format(slug), 1)
-    if row["project"] != project:
-        raise GuildError("quest '{}' belongs to project '{}'".format(slug, row["project"]), 1)
     with db.writing(ctx.conn):
+        row = _load_quest(ctx.conn, slug)
+        if row["party"] is not None or row["state"] != "active":
+            raise GuildError("quest '{}' is not open".format(slug), 1)
+        if row["project"] != project:
+            raise GuildError("quest '{}' belongs to project '{}'".format(slug, row["project"]), 1)
         events.record(
             ctx.conn,
             ctx.now,
