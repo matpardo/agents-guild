@@ -21,6 +21,13 @@ def _require_owner(binding, quest_row):
         raise GuildError("quest '{}' is owned by party '{}'".format(quest_row["slug"], quest_row["party"]), 1)
 
 
+def _load_owned_quest(ctx, quest):
+    quest_row = _load_quest(ctx, quest)
+    binding = identity.require_binding(ctx.conn, ctx.session_id)
+    _require_owner(binding, quest_row)
+    return quest_row, binding
+
+
 def _load_task(ctx, quest, tid):
     row = ctx.conn.execute(
         "SELECT quest, tid, state FROM quest_tasks WHERE quest = ? AND tid = ?", (quest, tid)
@@ -37,23 +44,21 @@ def _with_sdd_hint(message, quest_row, hint_template, tid):
 
 
 def add(ctx, quest, tid, title, reason):
-    quest_row = _load_quest(ctx, quest)
-    binding = identity.require_binding(ctx.conn, ctx.session_id)
-    _require_owner(binding, quest_row)
-    if quest_row["state"] != "active":
-        raise GuildError("quest '{}' is done".format(quest), 1)
-    existing = ctx.conn.execute("SELECT tid FROM quest_tasks WHERE quest = ? AND tid = ?", (quest, tid)).fetchone()
-    if existing is not None:
-        raise GuildError("task '{}/{}' already exists".format(quest, tid), 1)
-    if quest_row["epic"] is not None:
-        quest_commands.reject_taken_tasks(
-            ctx.conn, ctx.now, quest_row["project"], quest_row["epic"], [{"tid": tid}], binding["party"], False
-        )
-    payload = {"quest": quest, "tid": tid, "title": title}
-    if reason is not None:
-        pii.validate_reason(reason, ctx.projects_dir, quest_row["project"])
-        payload["reason"] = reason
     with db.writing(ctx.conn):
+        quest_row, binding = _load_owned_quest(ctx, quest)
+        if quest_row["state"] != "active":
+            raise GuildError("quest '{}' is done".format(quest), 1)
+        existing = ctx.conn.execute("SELECT tid FROM quest_tasks WHERE quest = ? AND tid = ?", (quest, tid)).fetchone()
+        if existing is not None:
+            raise GuildError("task '{}/{}' already exists".format(quest, tid), 1)
+        if quest_row["epic"] is not None:
+            quest_commands.reject_taken_tasks(
+                ctx.conn, ctx.now, quest_row["project"], quest_row["epic"], [{"tid": tid}], binding["party"], False
+            )
+        payload = {"quest": quest, "tid": tid, "title": title}
+        if reason is not None:
+            pii.validate_reason(reason, ctx.projects_dir, quest_row["project"])
+            payload["reason"] = reason
         events.record(
             ctx.conn,
             ctx.now,
@@ -69,16 +74,14 @@ def add(ctx, quest, tid, title, reason):
 
 
 def start(ctx, quest, tid, summary):
-    quest_row = _load_quest(ctx, quest)
-    binding = identity.require_binding(ctx.conn, ctx.session_id)
-    _require_owner(binding, quest_row)
-    task_row = _load_task(ctx, quest, tid)
-    if task_row["state"] == "done":
-        raise GuildError("task '{}/{}' is already done".format(quest, tid), 1)
-    adventurer_id = quest_commands.task_adventurer(ctx.conn, quest_row, tid)
-    if adventurer_id is not None:
-        raise GuildError("task '{}/{}' is held by adventurer {}".format(quest, tid, adventurer_id), 1)
     with db.writing(ctx.conn):
+        quest_row, binding = _load_owned_quest(ctx, quest)
+        task_row = _load_task(ctx, quest, tid)
+        if task_row["state"] == "done":
+            raise GuildError("task '{}/{}' is already done".format(quest, tid), 1)
+        adventurer_id = quest_commands.task_adventurer(ctx.conn, quest_row, tid)
+        if adventurer_id is not None:
+            raise GuildError("task '{}/{}' is held by adventurer {}".format(quest, tid, adventurer_id), 1)
         events.record(
             ctx.conn,
             ctx.now,
@@ -98,13 +101,11 @@ def start(ctx, quest, tid, summary):
 
 
 def block(ctx, quest, tid, reason):
-    quest_row = _load_quest(ctx, quest)
-    binding = identity.require_binding(ctx.conn, ctx.session_id)
-    _require_owner(binding, quest_row)
-    task_row = _load_task(ctx, quest, tid)
-    if task_row["state"] == "done":
-        raise GuildError("task '{}/{}' is already done".format(quest, tid), 1)
     with db.writing(ctx.conn):
+        quest_row, binding = _load_owned_quest(ctx, quest)
+        task_row = _load_task(ctx, quest, tid)
+        if task_row["state"] == "done":
+            raise GuildError("task '{}/{}' is already done".format(quest, tid), 1)
         events.record(
             ctx.conn,
             ctx.now,
@@ -120,13 +121,11 @@ def block(ctx, quest, tid, reason):
 
 
 def done(ctx, quest, tid, summary):
-    quest_row = _load_quest(ctx, quest)
-    binding = identity.require_binding(ctx.conn, ctx.session_id)
-    _require_owner(binding, quest_row)
-    task_row = _load_task(ctx, quest, tid)
-    if task_row["state"] == "done":
-        raise GuildError("task '{}/{}' is already done".format(quest, tid), 1)
     with db.writing(ctx.conn):
+        quest_row, binding = _load_owned_quest(ctx, quest)
+        task_row = _load_task(ctx, quest, tid)
+        if task_row["state"] == "done":
+            raise GuildError("task '{}/{}' is already done".format(quest, tid), 1)
         events.record(
             ctx.conn,
             ctx.now,
@@ -203,19 +202,18 @@ def _move(ctx, quest_row, tids_csv, target):
     _require_move_target(quest_row, target_row, target)
     for tid in tids:
         _require_movable(ctx, quest_row, target, tid)
-    with db.writing(ctx.conn):
-        for tid in tids:
-            events.record(
-                ctx.conn,
-                ctx.now,
-                ctx.origin,
-                quest_row["party"],
-                ctx.session_id,
-                quest_row["project"],
-                "task.moved",
-                "local",
-                {"from_quest": quest_row["slug"], "to_quest": target, "tid": tid, "to_party": target_row["party"]},
-            )
+    for tid in tids:
+        events.record(
+            ctx.conn,
+            ctx.now,
+            ctx.origin,
+            quest_row["party"],
+            ctx.session_id,
+            quest_row["project"],
+            "task.moved",
+            "local",
+            {"from_quest": quest_row["slug"], "to_quest": target, "tid": tid, "to_party": target_row["party"]},
+        )
     return "\n".join(
         "task '{}/{}' moved to '{}' (party {})".format(quest_row["slug"], tid, target, target_row["party"])
         for tid in tids
@@ -223,11 +221,11 @@ def _move(ctx, quest_row, tids_csv, target):
 
 
 def move(ctx, quest, tids_csv, target):
-    quest_row = _load_quest(ctx, quest)
-    binding = identity.require_binding(ctx.conn, ctx.session_id)
-    _require_owner(binding, quest_row)
-    return _move(ctx, quest_row, tids_csv, target)
+    with db.writing(ctx.conn):
+        quest_row, _ = _load_owned_quest(ctx, quest)
+        return _move(ctx, quest_row, tids_csv, target)
 
 
 def move_for_owner(ctx, quest, tids_csv, target):
-    return _move(ctx, _load_quest(ctx, quest), tids_csv, target)
+    with db.writing(ctx.conn):
+        return _move(ctx, _load_quest(ctx, quest), tids_csv, target)

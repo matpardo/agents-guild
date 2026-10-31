@@ -24,30 +24,38 @@ def _task_open_quest(ctx, project, area):
     return quest_commands.open_quest_holder(ctx.conn, project, epic, tid)
 
 
-def claim(ctx, area, ttl, agent_type):
-    _validate_area(area)
-    binding = identity.require_binding(ctx.conn, ctx.session_id)
-    project = config.require_project(ctx.cwd, ctx.projects_dir)
+def _require_task_unheld(ctx, project, area):
     adventurer_id = _task_adventurer(ctx, project, area)
     if adventurer_id is not None:
         raise GuildError("area '{}' is held by adventurer {}".format(area, adventurer_id), 1)
     open_slug = _task_open_quest(ctx, project, area)
     if open_slug is not None:
         raise GuildError("area '{}' is in open quest {}".format(area, open_slug), 1)
+
+
+def _require_not_claimed_by_other(ctx, project, area, party):
     row = ctx.conn.execute(
         "SELECT party, expires_at FROM claims WHERE project = ? AND area = ?", (project, area)
     ).fetchone()
-    if row is not None and not timeutil.is_expired(ctx.now, row["expires_at"]):
-        if row["party"] != binding["party"]:
-            raise GuildError(
-                "area '{}' is claimed by party '{}' until {}".format(area, row["party"], row["expires_at"]),
-                1,
-            )
+    if row is None or timeutil.is_expired(ctx.now, row["expires_at"]) or row["party"] == party:
+        return
+    raise GuildError(
+        "area '{}' is claimed by party '{}' until {}".format(area, row["party"], row["expires_at"]),
+        1,
+    )
+
+
+def claim(ctx, area, ttl, agent_type):
+    _validate_area(area)
+    binding = identity.require_binding(ctx.conn, ctx.session_id)
+    project = config.require_project(ctx.cwd, ctx.projects_dir)
     expires_at = timeutil.expires_at_iso(ctx.now, ttl)
     payload = {"project": project, "area": area, "party": binding["party"], "expires_at": expires_at}
     if agent_type is not None:
         payload["claimed_by_agent"] = agent_type
     with db.writing(ctx.conn):
+        _require_task_unheld(ctx, project, area)
+        _require_not_claimed_by_other(ctx, project, area, binding["party"])
         events.record(
             ctx.conn,
             ctx.now,
@@ -82,10 +90,11 @@ def check(ctx, area):
 def release(ctx, area):
     binding = identity.require_binding(ctx.conn, ctx.session_id)
     project = config.require_project(ctx.cwd, ctx.projects_dir)
-    row = ctx.conn.execute("SELECT party FROM claims WHERE project = ? AND area = ?", (project, area)).fetchone()
-    if row is None or row["party"] != binding["party"]:
-        raise GuildError("party '{}' does not hold claim on '{}'".format(binding["party"], area), 1)
-    release_for_party(ctx, project, binding["party"], area)
+    with db.writing(ctx.conn):
+        row = ctx.conn.execute("SELECT party FROM claims WHERE project = ? AND area = ?", (project, area)).fetchone()
+        if row is None or row["party"] != binding["party"]:
+            raise GuildError("party '{}' does not hold claim on '{}'".format(binding["party"], area), 1)
+        _record_released(ctx, project, binding["party"], area)
     return "area '{}' released".format(area)
 
 
@@ -107,16 +116,20 @@ def held_areas(ctx, project, party):
     return [row["area"] for row in rows if not timeutil.is_expired(ctx.now, row["expires_at"])]
 
 
+def _record_released(ctx, project, party, area):
+    events.record(
+        ctx.conn,
+        ctx.now,
+        ctx.origin,
+        party,
+        ctx.session_id,
+        project,
+        "claim.released",
+        "guild",
+        {"project": project, "area": area},
+    )
+
+
 def release_for_party(ctx, project, party, area):
     with db.writing(ctx.conn):
-        events.record(
-            ctx.conn,
-            ctx.now,
-            ctx.origin,
-            party,
-            ctx.session_id,
-            project,
-            "claim.released",
-            "guild",
-            {"project": project, "area": area},
-        )
+        _record_released(ctx, project, party, area)

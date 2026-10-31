@@ -93,9 +93,9 @@ def start(ctx, job, task, health_job, reason):
         health_jobs.require_job(config.load_project(ctx.projects_dir, project), health_job)
     _validate_text(ctx, project, "adventurer job", job, pii.ADVENTURER_JOB_MAX_LENGTH)
     pii.validate_reason(reason, ctx.projects_dir, project)
-    _validate_task(ctx, project, task)
-    adventurer_id = next_id(ctx.conn, "adventurers")
     with db.writing(ctx.conn):
+        _validate_task(ctx, project, task)
+        adventurer_id = next_id(ctx.conn, "adventurers")
         events.record(
             ctx.conn,
             ctx.now,
