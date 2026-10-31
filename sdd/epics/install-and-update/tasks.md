@@ -3,7 +3,7 @@ epic: install-and-update
 type: tasks
 title: Versioned install and self-update
 status: active
-updated: 2026-10-28
+updated: 2026-10-31
 ---
 
 # Tasks: Versioned install and self-update
@@ -119,3 +119,10 @@ updated: 2026-10-28
 **Status:** [x] done
 
 **What:** Every install moved off the systemd timers, so the code that removed them is gone: `install.sh` and `uninstall.sh` no longer touch systemd, and `guild doctor` no longer warns about leftover timer or dispatcher units. Install and uninstall now only link files and wire `~/.claude/settings.json`.
+
+## T17 — Join the web ticker on shutdown
+
+**Depends on:** T15
+**Status:** [x] done
+
+**What:** `guild web` waits for its due-jobs ticker thread to finish before it returns, so no job writes into the state directory after the server has stopped.

@@ -710,17 +710,18 @@ def start(port):
 
 def _start_due_jobs_ticker():
     stop_event = threading.Event()
-    threading.Thread(
+    thread = threading.Thread(
         target=due_jobs.tick_until_stopped,
         args=(stop_event, _DUE_JOBS_TICK_SECONDS, paths.state_dir(), Path.home(), due_jobs.spawn_detached),
         daemon=True,
-    ).start()
-    return stop_event
+    )
+    thread.start()
+    return stop_event, thread
 
 
 def serve_forever(port):
     server = start(port)
-    ticker_stop = _start_due_jobs_ticker()
+    ticker_stop, ticker_thread = _start_due_jobs_ticker()
     actual_port = server.server_address[1]
     print("guild web: http://127.0.0.1:{}/#t={}".format(actual_port, server.session_token), flush=True)
     try:
@@ -729,5 +730,6 @@ def serve_forever(port):
         pass
     finally:
         ticker_stop.set()
+        ticker_thread.join()
         server.server_close()
     return 0

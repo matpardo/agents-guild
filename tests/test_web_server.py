@@ -231,6 +231,20 @@ class ServeForeverTests(GuildTestCase):
         self.assertEqual(exit_code, 0)
         self.assertRegex(stdout.getvalue(), r"guild web: http://127\.0\.0\.1:\d+/#t=[A-Za-z0-9_-]{40,}\n")
 
+    def test_waits_for_the_due_jobs_ticker_before_returning(self):
+        finished = threading.Event()
+
+        def slow_ticker(stop_event, interval_seconds, state_dir, cwd, spawner):
+            stop_event.wait()
+            threading.Event().wait(0.3)
+            finished.set()
+
+        with mock.patch("guild.webserver.due_jobs.tick_until_stopped", side_effect=slow_ticker):
+            with mock.patch("http.server.ThreadingHTTPServer.serve_forever", side_effect=KeyboardInterrupt):
+                with contextlib.redirect_stdout(io.StringIO()):
+                    webserver.serve_forever(0)
+        self.assertTrue(finished.is_set())
+
 
 class CliWiringTests(GuildTestCase):
     def test_web_command_delegates_to_webserver(self):
