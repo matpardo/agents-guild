@@ -18,3 +18,15 @@ updated: 2026-10-31
 - A test per command lands a competing write just before the transaction and expects the command to be refused with its existing error.
 - Duplicate-safe commands (primary key rejects the second write, or the outcome is idempotent) are left unchanged.
 - The full suite, `ruff check` and `ruff format --check` pass.
+
+## T02 — Break the claim, quest and sync import cycle
+
+**Depends on:** —
+**Status:** [x] done
+
+**What:** move the task holder queries (`adventurer_holder`, `task_adventurer`, `open_quest_holder`, `reject_taken_tasks` and their helpers) from the quest command into the core module `guild/task_holders.py`, so `claim` no longer imports `quest` and the claim, quest and sync import loop is gone.
+
+- `guild/task_holders.py` imports nothing from `guild.commands`, and every caller uses it directly with no re-export left in the quest command.
+- `tests/test_import_cycles.py` fails on any import cycle among `guild` modules and names the modules in it.
+- Command behavior and signatures are unchanged.
+- The full suite, `ruff check` and `ruff format --check` pass.

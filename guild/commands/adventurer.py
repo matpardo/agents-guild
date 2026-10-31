@@ -2,9 +2,21 @@ import glob
 import os
 from pathlib import Path
 
-from guild import config, db, events, final_report, health_jobs, identity, pii, refs, resume, timeutil, tmux_windows
+from guild import (
+    config,
+    db,
+    events,
+    final_report,
+    health_jobs,
+    identity,
+    pii,
+    refs,
+    resume,
+    task_holders,
+    timeutil,
+    tmux_windows,
+)
 from guild.commands import party as party_commands
-from guild.commands import quest as quest_commands
 from guild.commands import sync as sync_commands
 from guild.errors import GuildError
 from guild.ids import next_id
@@ -57,7 +69,7 @@ def _validate_task(ctx, project, task):
     epic, tid = refs.parse_task_ref(task)
     if not _is_open_free_quest_task(ctx.conn, project, epic, tid):
         _require_synced_epic(ctx.conn, project, epic)
-    quest_commands.reject_taken_tasks(ctx.conn, ctx.now, project, epic, [{"tid": tid}], "", True)
+    task_holders.reject_taken_tasks(ctx.conn, ctx.now, project, epic, [{"tid": tid}], "", True)
 
 
 def _validate_text(ctx, project, name, value, limit):
