@@ -1119,7 +1119,8 @@ realmDoctorLines: [],
       appendAll(wrapper, renderRefDetail(ref));
     });
     if (model.answer !== null) {
-      wrapper.appendChild(detailLine([detailText("span", "answer: " + model.answer, "Answer given to the ask")]));
+      wrapper.appendChild(detailLine([detailText("span", "answer:", "Answer given to the ask")]));
+      wrapper.appendChild(renderAskText(model.answer));
     }
     wrapper.appendChild(renderDigIn(model));
     return wrapper;
@@ -1261,7 +1262,10 @@ realmDoctorLines: [],
     head.appendChild(textEl("span", ask.party));
     head.appendChild(textEl("strong", ask.question));
     article.appendChild(head);
-    article.appendChild(textEl("p", "answer: " + ask.answer));
+    if (ask.answer !== null) {
+      article.appendChild(textEl("strong", "answer:"));
+      article.appendChild(renderAskText(ask.answer));
+    }
     if (ask.dates !== null) {
       article.appendChild(classedText("p", ask.dates, "muted"));
     }

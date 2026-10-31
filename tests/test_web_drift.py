@@ -1334,3 +1334,45 @@ class WebAskTextBehaviorTests(unittest.TestCase):
         self.assertTrue([node for node in shown if node["className"] == "ask-recommend"])
         hidden = self._asks_tree("ctx", None)
         self.assertFalse([node for node in hidden if node["className"] == "ask-recommend"])
+
+
+def _render_opened(board, out_id, responses, open_summaries):
+    return node_harness.request(
+        _HARNESS_NAME,
+        {
+            "src": str(_APP_JS_PATH),
+            "data": board,
+            "hash": _view_hash("all", "all"),
+            "outId": out_id,
+            "mode": "tree",
+            "responses": responses,
+            "open": open_summaries,
+        },
+    )
+
+
+@unittest.skipIf(shutil.which("node") is None, "node not installed")
+class WebMultilineAnswerBehaviorTests(unittest.TestCase):
+    def _breaks(self, rendered):
+        return sum(1 for node in _flatten(json.loads(rendered)) if node["tag"] == "br")
+
+    def test_answered_list_keeps_answer_line_breaks(self):
+        answered_model = {
+            "asks": [
+                {"id": 5, "party": "alpha", "question": "Q", "answer": "one\ntwo", "answered_at": None, "dates": None}
+            ],
+            "total": 1,
+            "page": 1,
+            "page_count": 1,
+        }
+        rendered = _render_opened(
+            _BOARD, "answered-asks", {"/api/asks/answered?page=1": answered_model}, ["answered asks"]
+        )
+        self.assertEqual(self._breaks(rendered), 1)
+
+    def test_ask_detail_keeps_answer_line_breaks(self):
+        detail_model = {"refs": [], "origin": None, "resume": None, "answer": "one\ntwo\nthree"}
+        rendered = _render_opened(
+            dict(_BOARD, asks=[_ask(context="ctx", recommend=None)]), "asks", {"/api/asks/3": detail_model}, ["detail"]
+        )
+        self.assertEqual(self._breaks(rendered), 2)

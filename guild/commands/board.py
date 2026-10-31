@@ -383,7 +383,8 @@ def _all_ask_lines(painter, row):
         )
     ]
     if row["state"] == "answered":
-        lines.extend(painter.wrap("answer: {}".format(row["answer"]), "     "))
+        lines.append("     answer:")
+        lines.extend(_ask_text_lines(painter, row["answer"]))
     return lines + [painter.paint("     " + _ask_dates(row), "dim")]
 
 
