@@ -168,6 +168,8 @@ def done(ctx, pending, lifecycle_runner):
     ).fetchall()
     stale = bool(sync_commands.refresh_prs(ctx, open_prs, lifecycle_runner))
     with db.writing(ctx.conn):
+        if identity.resolve_adventurer(ctx.conn, ctx.session_id) is None:
+            raise GuildError("session is not an active adventurer", 1)
         events.record(
             ctx.conn,
             ctx.now,
@@ -213,12 +215,12 @@ def promote(ctx, name, reason):
 
 
 def dismiss(ctx, adventurer_id):
-    row = ctx.conn.execute("SELECT project, state FROM adventurers WHERE id = ?", (adventurer_id,)).fetchone()
-    if row is None:
-        raise GuildError("unknown adventurer {}".format(adventurer_id), 1)
-    if row["state"] != "done":
-        raise GuildError("adventurer {} is {}, not done".format(adventurer_id, row["state"]), 1)
     with db.writing(ctx.conn):
+        row = ctx.conn.execute("SELECT project, state FROM adventurers WHERE id = ?", (adventurer_id,)).fetchone()
+        if row is None:
+            raise GuildError("unknown adventurer {}".format(adventurer_id), 1)
+        if row["state"] != "done":
+            raise GuildError("adventurer {} is {}, not done".format(adventurer_id, row["state"]), 1)
         events.record(
             ctx.conn,
             ctx.now,

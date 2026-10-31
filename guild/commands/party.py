@@ -141,6 +141,11 @@ def resume(ctx, name, session_name, permission_mode):
     generation = row["generation"] + 1
     resolved_session_name = session_name or session_info.read_session_name(ctx.sessions_dir, session_id)
     with db.writing(ctx.conn):
+        current = ctx.conn.execute("SELECT generation, state FROM parties WHERE name = ?", (name,)).fetchone()
+        if current["state"] == "closed":
+            raise GuildError("party '{}' is closed".format(name), 1)
+        if current["generation"] != row["generation"]:
+            raise GuildError("party '{}' was resumed by another session".format(name), 1)
         events.record(
             ctx.conn,
             ctx.now,

@@ -139,9 +139,9 @@ def incomplete(ctx, slug, reason):
         raise GuildError("quest '{}' is not done: only done quests can be marked incomplete".format(slug), 1)
     if not reason.strip():
         raise GuildError("--reason must not be blank", 1)
-    if _already_marked_incomplete(ctx.conn, slug):
-        raise GuildError("quest '{}' is already marked incomplete".format(slug), 1)
     with db.writing(ctx.conn):
+        if _already_marked_incomplete(ctx.conn, slug):
+            raise GuildError("quest '{}' is already marked incomplete".format(slug), 1)
         events.record(
             ctx.conn,
             ctx.now,
@@ -321,14 +321,15 @@ def release_blockers(ctx, row):
 
 
 def _release(ctx, row):
-    if row["party"] is None:
-        raise GuildError("quest '{}' is already open".format(row["slug"]), 1)
-    if row["state"] != "active":
-        raise GuildError("quest '{}' is already {}".format(row["slug"], row["state"]), 1)
-    blockers = release_blockers(ctx, row)
-    if blockers:
-        raise GuildError("quest '{}' cannot be released: {}".format(row["slug"], "; ".join(blockers)), 1)
     with db.writing(ctx.conn):
+        current = _load_quest(ctx.conn, row["slug"])
+        if current["party"] is None:
+            raise GuildError("quest '{}' is already open".format(row["slug"]), 1)
+        if current["state"] != "active":
+            raise GuildError("quest '{}' is already {}".format(row["slug"], current["state"]), 1)
+        blockers = release_blockers(ctx, current)
+        if blockers:
+            raise GuildError("quest '{}' cannot be released: {}".format(row["slug"], "; ".join(blockers)), 1)
         events.record(
             ctx.conn,
             ctx.now,
