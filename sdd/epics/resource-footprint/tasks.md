@@ -168,3 +168,15 @@ updated: 2026-10-04
 **Acceptance:**
 - [x] `guild resources collect` stores the load and the core count in the machine row; old events replay with null values.
 - [x] The `machine` line and the web pill show `cpu <load>/core (load <load1> on <n> cores, 15m <load15>)`.
+
+## T15 — Compact keeps the database bounded
+
+**Depends on:** T11
+**Status:** [x] done
+
+**What:** `guild compact` keeps only the newest epic and tracker snapshot per key, since each one replaces the previous. Resource samples are pruned past `resource_retention_days`, 90 when absent. Per-session state files untouched for 30 days are deleted. The compaction point file holds only the latest value.
+
+**Acceptance:**
+- [x] Differing tracker snapshots leave only the newest per project; a rebuild yields the same projections and the same sync freshness.
+- [x] Without configured retention, samples older than 90 days are deleted.
+- [x] Stale `ctx`, `ctx-baseline` and `background` files are deleted and fresh ones kept; a dry run deletes nothing.

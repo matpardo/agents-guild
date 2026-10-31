@@ -30,6 +30,11 @@ class ThresholdTests(GuildTestCase):
         statusline_commands.record_compact_pct(paths.state_dir(), 85)
         self.assertEqual(self._value({}, {"handoff_threshold": 70})["value"], 70)
 
+    def test_compaction_record_keeps_only_the_latest_value(self):
+        statusline_commands.record_compact_pct(paths.state_dir(), 30)
+        statusline_commands.record_compact_pct(paths.state_dir(), 85)
+        self.assertEqual((paths.state_dir() / "compaction-pct").read_text().split(), ["85"])
+
     def test_margin_follows_the_latest_compaction(self):
         statusline_commands.record_compact_pct(paths.state_dir(), 30)
         statusline_commands.record_compact_pct(paths.state_dir(), 85)

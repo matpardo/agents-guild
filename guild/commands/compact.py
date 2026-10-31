@@ -2,7 +2,9 @@ from guild import compact, config, paths
 
 
 def _resource_retention_days():
-    return config.load_global(paths.global_config_path()).get("resource_retention_days")
+    return config.load_global(paths.global_config_path()).get(
+        "resource_retention_days", config.DEFAULT_RESOURCE_RETENTION_DAYS
+    )
 
 
 def run(ctx, dry_run):
