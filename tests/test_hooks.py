@@ -6,9 +6,8 @@ import subprocess
 import time
 from unittest import mock
 
-from guild import ctx_pressure, db, events, notify, paths, pii, timeutil
+from guild import ctx_pressure, db, events, notify, paths, pii, statusline_state, timeutil
 from guild.commands import memory as memory_commands
-from guild.commands import statusline as statusline_commands
 from tests.testutil import GuildTestCase
 
 
@@ -237,7 +236,7 @@ class CtxNudgeTests(GuildTestCase):
         repo_dir = self.register_project("acme", ["acme/app"])
         self.run_cli(["party", "start", "alpha", "--reason", "test reason"], "sess-1", repo_dir)
         self._set_handoff_threshold(80)
-        statusline_commands.record_ctx(paths.state_dir(), "sess-1", 81)
+        statusline_state.record_ctx(paths.state_dir(), "sess-1", 81)
         payload = {"session_id": "sess-1", "cwd": str(repo_dir)}
 
         code, out, err = self.run_hook("prompt-submit", payload)
@@ -250,21 +249,21 @@ class CtxNudgeTests(GuildTestCase):
         repo_dir = self.register_project("acme", ["acme/app"])
         self.run_cli(["party", "start", "alpha", "--reason", "test reason"], "sess-1", repo_dir)
         self._set_handoff_threshold(80)
-        statusline_commands.record_ctx(paths.state_dir(), "sess-1", 50)
+        statusline_state.record_ctx(paths.state_dir(), "sess-1", 50)
         code, out, err = self.run_hook("prompt-submit", {"session_id": "sess-1", "cwd": str(repo_dir)})
         self.assertNotIn("Context at", out)
 
     def test_nudge_falls_back_to_the_default_threshold(self):
         repo_dir = self.register_project("acme", ["acme/app"])
         self.run_cli(["party", "start", "alpha", "--reason", "test reason"], "sess-1", repo_dir)
-        statusline_commands.record_ctx(paths.state_dir(), "sess-1", ctx_pressure.DEFAULT_HANDOFF_THRESHOLD)
+        statusline_state.record_ctx(paths.state_dir(), "sess-1", ctx_pressure.DEFAULT_HANDOFF_THRESHOLD)
         code, out, err = self.run_hook("prompt-submit", {"session_id": "sess-1", "cwd": str(repo_dir)})
         self.assertIn("Context at", out)
 
     def test_no_nudge_below_the_default_threshold(self):
         repo_dir = self.register_project("acme", ["acme/app"])
         self.run_cli(["party", "start", "alpha", "--reason", "test reason"], "sess-1", repo_dir)
-        statusline_commands.record_ctx(paths.state_dir(), "sess-1", ctx_pressure.DEFAULT_HANDOFF_THRESHOLD - 1)
+        statusline_state.record_ctx(paths.state_dir(), "sess-1", ctx_pressure.DEFAULT_HANDOFF_THRESHOLD - 1)
         code, out, err = self.run_hook("prompt-submit", {"session_id": "sess-1", "cwd": str(repo_dir)})
         self.assertNotIn("Context at", out)
 
@@ -308,7 +307,7 @@ class CompactNudgeTests(GuildTestCase):
 
     def test_compact_nudges_below_threshold(self):
         repo_dir = self._bound()
-        statusline_commands.record_ctx(paths.state_dir(), "sess-1", 25)
+        statusline_state.record_ctx(paths.state_dir(), "sess-1", 25)
         out = self._start(repo_dir, "compact")
         self.assertIn("Context was compacted. " + self.PLAIN, out)
 
@@ -316,42 +315,42 @@ class CompactNudgeTests(GuildTestCase):
         return self.run_hook("pre-compact", {"session_id": session_id, "cwd": str(self.root), "trigger": "auto"})
 
     def test_pre_compact_records_the_session_pct(self):
-        statusline_commands.record_ctx(paths.state_dir(), "sess-1", 27)
-        statusline_commands.record_ctx(paths.state_dir(), "sess-9", 84)
+        statusline_state.record_ctx(paths.state_dir(), "sess-1", 27)
+        statusline_state.record_ctx(paths.state_dir(), "sess-9", 84)
         self._pre_compact("sess-1")
         self._pre_compact("sess-9")
-        self.assertEqual(84, statusline_commands.latest_compact_pct(paths.state_dir()))
+        self.assertEqual(84, statusline_state.latest_compact_pct(paths.state_dir()))
 
     def test_pre_compact_after_a_long_silence_records_nothing(self):
-        statusline_commands.record_ctx(paths.state_dir(), "sess-1", 21)
+        statusline_state.record_ctx(paths.state_dir(), "sess-1", 21)
         stale = time.time() - 55 * 60
         os.utime(paths.state_dir() / "ctx" / "sess-1", (stale, stale))
         self._pre_compact("sess-1")
-        self.assertIsNone(statusline_commands.latest_compact_pct(paths.state_dir()))
+        self.assertIsNone(statusline_state.latest_compact_pct(paths.state_dir()))
 
     def test_pre_compact_without_a_pct_records_nothing(self):
         code, out, err = self._pre_compact("sess-1")
         self.assertEqual("", out)
-        self.assertIsNone(statusline_commands.latest_compact_pct(paths.state_dir()))
+        self.assertIsNone(statusline_state.latest_compact_pct(paths.state_dir()))
 
     def test_compact_session_start_records_nothing(self):
         repo_dir = self._bound()
-        statusline_commands.record_ctx(paths.state_dir(), "sess-1", 27)
+        statusline_state.record_ctx(paths.state_dir(), "sess-1", 27)
         self._start(repo_dir, "compact")
-        self.assertIsNone(statusline_commands.latest_compact_pct(paths.state_dir()))
+        self.assertIsNone(statusline_state.latest_compact_pct(paths.state_dir()))
 
     def test_ctx_nudge_follows_the_margin(self):
         repo_dir = self._bound()
         (self.config_home / "guild" / "guild.json").write_text('{"handoff_margin": 10}')
-        statusline_commands.record_compact_pct(paths.state_dir(), 40)
-        statusline_commands.record_ctx(paths.state_dir(), "sess-1", 36)
+        statusline_state.record_compact_pct(paths.state_dir(), 40)
+        statusline_state.record_ctx(paths.state_dir(), "sess-1", 36)
         code, out, err = self.run_hook("prompt-submit", {"session_id": "sess-1", "cwd": str(repo_dir)})
         self.assertIn("Context at 36%", out)
 
     def test_fresh_session_above_a_low_compaction_threshold_is_not_nudged(self):
         repo_dir = self._bound()
         (self.config_home / "guild" / "guild.json").write_text('{"handoff_margin": 10}')
-        statusline_commands.record_compact_pct(paths.state_dir(), 12)
+        statusline_state.record_compact_pct(paths.state_dir(), 12)
         self.run_cli(["statusline", "--session", "sess-1", "--ctx", "12"], "sess-1", repo_dir)
         code, out, err = self.run_hook("prompt-submit", {"session_id": "sess-1", "cwd": str(repo_dir)})
         self.assertNotIn("Context at", out)
@@ -384,13 +383,13 @@ class CompactNudgeTests(GuildTestCase):
     def test_threshold_nudge_names_respawn_with_window(self):
         repo_dir = self._bound()
         self._record_window(1)
-        statusline_commands.record_ctx(paths.state_dir(), "sess-1", 85)
+        statusline_state.record_ctx(paths.state_dir(), "sess-1", 85)
         code, out, err = self.run_hook("prompt-submit", {"session_id": "sess-1", "cwd": str(repo_dir)})
         self.assertIn("Context at 85%. " + self.RESPAWN, out)
 
     def test_threshold_nudge_plain_without_window(self):
         repo_dir = self._bound()
-        statusline_commands.record_ctx(paths.state_dir(), "sess-1", 85)
+        statusline_state.record_ctx(paths.state_dir(), "sess-1", 85)
         code, out, err = self.run_hook("prompt-submit", {"session_id": "sess-1", "cwd": str(repo_dir)})
         self.assertIn("Context at 85%. " + self.PLAIN, out)
 

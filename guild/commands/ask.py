@@ -1,21 +1,6 @@
-import re
-
-from guild import config, db, events, identity, pii, polling, refs, session_info
+from guild import cards, config, db, events, identity, pii, polling, refs, session_info
 from guild.errors import GuildError
 from guild.ids import next_id
-
-
-def card_known(ctx, project, project_config, key):
-    if project is not None:
-        row = ctx.conn.execute("SELECT key FROM cards WHERE project = ? AND key = ?", (project, key)).fetchone()
-        if row is not None:
-            return True
-    if project_config is None:
-        return False
-    key_ref = (project_config.get("sdd") or {}).get("key_ref")
-    if key_ref is None:
-        return False
-    return re.fullmatch(key_ref, key) is not None
 
 
 def _validate_refs(ctx, project, project_config, ref_list):
@@ -30,7 +15,7 @@ def _validate_refs(ctx, project, project_config, ref_list):
             if row is None:
                 raise GuildError("ask ref '{}' does not match a tracked PR".format(raw), 1)
         elif parsed.startswith("card:"):
-            if not card_known(ctx, project, project_config, parsed[len("card:") :]):
+            if not cards.card_known(ctx, project, project_config, parsed[len("card:") :]):
                 raise GuildError("ask ref '{}' does not match a known card".format(raw), 1)
         else:
             quest, tid = parsed[len("task:") :].split("/", 1)

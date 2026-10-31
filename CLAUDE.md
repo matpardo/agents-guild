@@ -12,6 +12,7 @@ Guild is a Python 3.10 stdlib-only CLI (`guild/`) with a browser board (`guild/w
 
 - Every feature works in both the CLI and the web. A web write action goes through `sendPost` in `guild/web/app.js`, which sends the `X-Guild-Token` header, and calls the same `guild/commands` function the CLI uses.
 - Docs change in the same PR as the code: `README.md` for users, `GUILD.md` for the agent rules every session loads. A command or flag that changes agent behavior updates `GUILD.md`.
+- Core modules (everything outside `guild/commands/`, `guild/cli.py` and `guild/webserver.py`) never import `guild.commands`; shared logic lives in core modules. `tests/test_layering.py` guards it.
 - Guild is local and optional. Never write a client project or a private name in code, docs, commits or PRs. Never put `guild`, `ask #N`, `notice #N`, party, raid or quest in text that leaves the local CLI (`tests/test_no_traces.py` guards the output).
 
 ## Tests

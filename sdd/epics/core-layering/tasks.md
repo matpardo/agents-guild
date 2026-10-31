@@ -30,3 +30,15 @@ updated: 2026-10-31
 - `tests/test_import_cycles.py` fails on any import cycle among `guild` modules and names the modules in it.
 - Command behavior and signatures are unchanged.
 - The full suite, `ruff check` and `ruff format --check` pass.
+
+## T03 — Keep core modules free of command imports
+
+**Depends on:** T02
+**Status:** [x] done
+
+**What:** move the queries that core modules took from command modules into core modules (`raid_members`, `notices`, `ideas`, `cards`, `transcripts`, `statusline_state`, `main_status`, `pr_records`, `work_queue` and `scoped_queue` in `merge_queue`), so the hook path no longer imports command modules.
+
+- `tests/test_layering.py` fails when a module outside `guild/commands/`, `guild/cli.py` and `guild/webserver.py` imports `guild.commands`, and names the module and what it imports.
+- Callers and tests use the core modules directly, with no re-export left in the command modules.
+- Command behavior and signatures are unchanged.
+- The full suite, `ruff check` and `ruff format --check` pass.

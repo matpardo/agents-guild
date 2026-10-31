@@ -3,7 +3,7 @@ import os
 import shlex
 from unittest import mock
 
-from guild import db, paths, resume
+from guild import db, paths, resume, transcripts
 from guild.cli import _build_context
 from guild.commands import revive
 from guild.errors import GuildError
@@ -88,14 +88,14 @@ class ResumeHelperTests(GuildTestCase):
 class TranscriptTests(GuildTestCase):
     def test_find_transcript_by_session_id(self):
         _write_transcript(self.claude_projects_dir, "-x", "s1", [{"cwd": "/a"}])
-        found = revive.find_transcript(self.claude_projects_dir, "s1")
+        found = transcripts.find_transcript(self.claude_projects_dir, "s1")
         self.assertEqual(found.name, "s1.jsonl")
 
     def test_find_transcript_missing_returns_none(self):
-        self.assertIsNone(revive.find_transcript(self.claude_projects_dir, "nope"))
+        self.assertIsNone(transcripts.find_transcript(self.claude_projects_dir, "nope"))
 
     def test_find_transcript_without_session_id_returns_none(self):
-        self.assertIsNone(revive.find_transcript(self.claude_projects_dir, None))
+        self.assertIsNone(transcripts.find_transcript(self.claude_projects_dir, None))
 
     def test_read_location_stops_after_both_found(self):
         _write_transcript(
@@ -104,12 +104,12 @@ class TranscriptTests(GuildTestCase):
             "s1",
             [{"type": "summary"}, {"cwd": "/a", "permissionMode": "plan"}, {"cwd": "/later"}],
         )
-        path = revive.find_transcript(self.claude_projects_dir, "s1")
+        path = transcripts.find_transcript(self.claude_projects_dir, "s1")
         self.assertEqual(revive.read_location(path), ("/a", "plan"))
 
     def test_read_location_collects_across_lines(self):
         _write_transcript(self.claude_projects_dir, "-x", "s1", [{"cwd": "/a"}, {"permissionMode": "default"}])
-        path = revive.find_transcript(self.claude_projects_dir, "s1")
+        path = transcripts.find_transcript(self.claude_projects_dir, "s1")
         self.assertEqual(revive.read_location(path), ("/a", "default"))
 
     def test_read_location_ignores_garbage_lines(self):

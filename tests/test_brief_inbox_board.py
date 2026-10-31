@@ -2,9 +2,8 @@ import json
 import os
 import sqlite3
 
-from guild import ctx_pressure, db, events, paths, timeutil
+from guild import ctx_pressure, db, events, paths, statusline_state, timeutil
 from guild.commands import inbox as inbox_commands
-from guild.commands import statusline as statusline_commands
 from tests.testutil import GuildTestCase
 
 
@@ -522,7 +521,7 @@ class BoardSessionStatusTests(GuildTestCase):
         self.assertRegex(out, r"\n  status: waiting-input \d+s\n")
 
     def _context_high(self):
-        statusline_commands.record_ctx(paths.state_dir(), "sess-1", ctx_pressure.DEFAULT_HANDOFF_THRESHOLD + 6)
+        statusline_state.record_ctx(paths.state_dir(), "sess-1", ctx_pressure.DEFAULT_HANDOFF_THRESHOLD + 6)
 
     def test_needs_you_counts_context_high_parties(self):
         self._context_high()
@@ -550,15 +549,15 @@ class BoardSessionStatusTests(GuildTestCase):
         self.assertIn("\n  context: 86% (handoff at 80%) → run guild handoff\n", out)
 
     def test_context_line_below_the_threshold_asks_for_nothing(self):
-        statusline_commands.record_ctx(paths.state_dir(), "sess-1", ctx_pressure.DEFAULT_HANDOFF_THRESHOLD - 1)
+        statusline_state.record_ctx(paths.state_dir(), "sess-1", ctx_pressure.DEFAULT_HANDOFF_THRESHOLD - 1)
         code, out, err = self.run_cli(["board"], None, None)
         self.assertIn("\n  context: 79% (handoff at 80%)\n", out)
         self.assertIn("NEEDS YOU · nothing", out)
 
     def test_context_line_names_the_compaction_source(self):
         (self.config_home / "guild" / "guild.json").write_text('{"handoff_margin": 10}')
-        statusline_commands.record_compact_pct(paths.state_dir(), 85)
-        statusline_commands.record_ctx(paths.state_dir(), "sess-1", 42)
+        statusline_state.record_compact_pct(paths.state_dir(), 85)
+        statusline_state.record_ctx(paths.state_dir(), "sess-1", 42)
         code, out, err = self.run_cli(["board"], None, None)
         self.assertIn("\n  context: 42% (handoff at 76%, compaction 85% − 10%)\n", out)
 
@@ -580,7 +579,7 @@ class BoardSessionStatusTests(GuildTestCase):
         data = json.loads(config_file.read_text())
         data["handoff_threshold"] = 40
         config_file.write_text(json.dumps(data))
-        statusline_commands.record_ctx(paths.state_dir(), "sess-1", 45)
+        statusline_state.record_ctx(paths.state_dir(), "sess-1", 45)
         code, out, err = self.run_cli(["board"], None, None)
         self.assertIn("\n  context: 45% (handoff at 40%) → run guild handoff\n", out)
 

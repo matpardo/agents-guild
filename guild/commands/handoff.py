@@ -7,6 +7,7 @@ from guild import (
     handoff_prune,
     identity,
     names,
+    notices,
     party_status,
     paths,
     pii,
@@ -18,7 +19,6 @@ from guild import (
 from guild.commands import claim as claim_commands
 from guild.commands import memory as memory_commands
 from guild.commands import next as next_commands
-from guild.commands import notice as notice_commands
 from guild.errors import GuildError
 
 _AUTO_LEARNED = "none (automatic handoff)"
@@ -60,7 +60,7 @@ def _ask_lines(conn, party):
 
 
 def _notice_lines(conn, now, party):
-    rows = [row for row in notice_commands.active_notices(conn, now) if row["party"] == party]
+    rows = [row for row in notices.active_notices(conn, now) if row["party"] == party]
     return ["- #{} ({}): {}".format(row["id"], timeutil.issued_label(row["created_at"]), row["text"]) for row in rows]
 
 

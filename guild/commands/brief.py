@@ -1,9 +1,8 @@
-from guild import config, identity, localbase, pii, render
+from guild import config, identity, localbase, notices, pii, raid_members, render
 from guild.commands import claim as claim_commands
 from guild.commands import drift as drift_commands
 from guild.commands import inbox as inbox_commands
 from guild.commands import notice as notice_commands
-from guild.commands import raid as raid_commands
 from guild.identity import UNBOUND_HINT
 
 
@@ -21,7 +20,7 @@ def _base_warning_lines(ctx, project_name):
 
 
 def targeting_lines(rows, project, raid_member_of):
-    matched = notice_commands.targeting(rows, project, True, raid_member_of)
+    matched = notices.targeting(rows, project, True, raid_member_of)
     lines = [
         notice_commands.format_notice_line(
             row["id"], row["party"], row["created_at"], row["text"], bool(row["unbound"])
@@ -55,7 +54,7 @@ def render_brief(ctx):
     if ctx.session_id is None:
         return ["brief is the per-session view for agents; from a terminal use `guild board` and `guild asks`"]
     binding = identity.resolve_binding(ctx.conn, ctx.session_id)
-    active = notice_commands.active_notices(ctx.conn, ctx.now)
+    active = notices.active_notices(ctx.conn, ctx.now)
     adventurer = identity.resolve_adventurer(ctx.conn, ctx.session_id)
     if binding is None:
         project = _resolve_project(ctx)
@@ -88,7 +87,7 @@ def render_brief(ctx):
     total_open_asks = ctx.conn.execute("SELECT COUNT(*) AS n FROM asks WHERE state = 'open'").fetchone()["n"]
     lines.append("open asks: {} mine, {} total".format(my_open_asks, total_open_asks))
 
-    raids = raid_commands.member_raids(ctx.conn, ctx.now, binding["party"])
+    raids = raid_members.member_raids(ctx.conn, ctx.now, binding["party"])
     raid_member_of = {row["raid"] for row in raids}
     lines.extend(targeting_lines(active, binding["project"], raid_member_of))
 

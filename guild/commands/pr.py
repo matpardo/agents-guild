@@ -1,6 +1,5 @@
-from guild import config, db, events, identity, merge_queue, polling, refs, sanitize
+from guild import config, db, events, identity, main_status, merge_queue, polling, pr_records, refs, sanitize
 from guild.adapters import github
-from guild.commands import main_status as main_status_commands
 from guild.commands import merge_queue as merge_queue_commands
 from guild.errors import GuildError
 
@@ -314,9 +313,9 @@ def ready_check(ctx, ref, refresh_failed):
     row = _load_pr(ctx.conn, repo, number)
     if row["lifecycle"] in _CLOSED_LIFECYCLES:
         raise GuildError("PR '{}' is {}: nothing left to merge".format(ref, row["lifecycle"]), 1)
-    records = merge_queue_commands.open_pr_records(ctx.conn)
-    red_rows = main_status_commands.red_rows(ctx.conn)
-    queue = merge_queue.compute(records, merge_queue_commands.load_pins(ctx.conn), red_rows)["queue"]
+    records = pr_records.open_pr_records(ctx.conn)
+    red_rows = main_status.red_rows(ctx.conn)
+    queue = merge_queue.compute(records, pr_records.load_pins(ctx.conn), red_rows)["queue"]
     ref_text = "{}#{}".format(repo, number)
     entry = next(entry for entry in queue if entry["ref"] == ref_text)
     gates = merge_queue_commands.gates(entry, red_rows)

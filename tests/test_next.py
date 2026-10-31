@@ -3,9 +3,8 @@ import sqlite3
 from datetime import timedelta
 from unittest import mock
 
-from guild import party_status, timeutil
+from guild import party_status, pr_records, timeutil, work_queue
 from guild.cli import _build_context
-from guild.commands import next as next_commands
 from tests.testutil import GuildTestCase
 
 
@@ -454,7 +453,7 @@ class HasWorkTests(NextTestCase):
     def _has_work(self):
         ctx = _build_context("sess-1", self.repo_dir)
         binding = {"party": "alpha", "project": "acme", "generation": 1}
-        return next_commands.has_work(ctx, binding)
+        return work_queue.has_work(ctx, binding)
 
     def _event_count(self):
         conn = sqlite3.connect(str(self.data_home / "guild" / "guild.db"))
@@ -509,7 +508,7 @@ class HasWorkTests(NextTestCase):
 class NextTaskItemTests(NextTestCase):
     def _item(self, project="acme"):
         ctx = _build_context("sess-1", self.repo_dir)
-        item = next_commands.next_task_item(ctx, {"party": "alpha", "project": project})
+        item = work_queue.next_task_item(ctx, {"party": "alpha", "project": project})
         ctx.conn.close()
         return item
 
@@ -825,13 +824,13 @@ class WipOneTests(NextTestCase):
         self._update_pr("comments_after_head = 1, ci_label = 1, checks_passing = 1")
         ctx = _build_context("sess-1", self.repo_dir)
         binding = {"party": "alpha", "project": "acme"}
-        self.assertTrue(next_commands.has_work(ctx, binding))
+        self.assertTrue(work_queue.has_work(ctx, binding))
         party_row = ctx.conn.execute("SELECT * FROM parties WHERE name = 'alpha'").fetchone()
         self.assertEqual(party_status.derive(ctx, party_row)["status"], "queued")
 
     def test_wip_queue_not_loaded_without_ready_own_pr(self):
         self._track("draft", ["--task", "demo/T01"])
-        with mock.patch.object(next_commands.merge_queue_commands, "load_scoped_queue") as loader:
+        with mock.patch.object(pr_records, "load_scoped_queue") as loader:
             self._next(["next"])
         loader.assert_not_called()
 

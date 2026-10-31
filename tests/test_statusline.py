@@ -1,15 +1,14 @@
-from guild import paths
-from guild.commands import statusline as statusline_commands
+from guild import paths, statusline_state
 from tests.testutil import GuildTestCase
 
 
 class RecordAndReadCtxTests(GuildTestCase):
     def test_read_ctx_returns_none_when_never_recorded(self):
-        self.assertIsNone(statusline_commands.read_ctx(paths.state_dir(), "sess-1"))
+        self.assertIsNone(statusline_state.read_ctx(paths.state_dir(), "sess-1"))
 
     def test_read_ctx_returns_recorded_value(self):
-        statusline_commands.record_ctx(paths.state_dir(), "sess-1", 42)
-        self.assertEqual(statusline_commands.read_ctx(paths.state_dir(), "sess-1"), 42)
+        statusline_state.record_ctx(paths.state_dir(), "sess-1", 42)
+        self.assertEqual(statusline_state.read_ctx(paths.state_dir(), "sess-1"), 42)
 
 
 class StatuslineTests(GuildTestCase):
@@ -127,9 +126,9 @@ class StatuslineBlockedTests(GuildTestCase):
 class UnsafeSessionIdTests(GuildTestCase):
     def test_traversal_session_id_stays_inside_the_state_dir(self):
         state_dir = paths.state_dir()
-        statusline_commands.record_ctx(state_dir, "../../escaped", 42)
-        statusline_commands.record_baseline_once(state_dir, "../../escaped", 42)
-        self.assertEqual(statusline_commands.read_ctx(state_dir, "../../escaped"), 42)
+        statusline_state.record_ctx(state_dir, "../../escaped", 42)
+        statusline_state.record_baseline_once(state_dir, "../../escaped", 42)
+        self.assertEqual(statusline_state.read_ctx(state_dir, "../../escaped"), 42)
         self.assertFalse((state_dir.parent / "escaped").exists())
         self.assertFalse((state_dir.parent.parent / "escaped").exists())
         self.assertEqual(len(list((state_dir / "ctx").iterdir())), 1)

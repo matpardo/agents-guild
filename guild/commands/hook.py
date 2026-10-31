@@ -19,7 +19,10 @@ from guild import (
     localbase,
     names,
     paths,
+    pr_records,
+    raid_members,
     session_status,
+    statusline_state,
     timeutil,
     tmux_windows,
 )
@@ -32,8 +35,6 @@ from guild.commands import memory as memory_commands
 from guild.commands import merge_queue as merge_queue_commands
 from guild.commands import next as next_commands
 from guild.commands import party as party_commands
-from guild.commands import raid as raid_commands
-from guild.commands import statusline as statusline_commands
 from guild.commands import task_brief
 from guild.errors import GuildError
 from guild.identity import UNBOUND_HINT
@@ -131,7 +132,7 @@ def _membership_warning_lines(ctx, binding):
     if binding is None:
         return []
     lines = []
-    for row in raid_commands.member_raids(ctx.conn, ctx.now, binding["party"]):
+    for row in raid_members.member_raids(ctx.conn, ctx.now, binding["party"]):
         if row["expires_at"] is None:
             continue
         remaining = timeutil.from_iso(row["expires_at"]) - ctx.now
@@ -160,7 +161,7 @@ def _pause_lines(ctx, binding):
     if binding is None:
         return []
     lines = []
-    for row in raid_commands.paused_member_raids(ctx.conn, ctx.now, binding["party"]):
+    for row in raid_members.paused_member_raids(ctx.conn, ctx.now, binding["party"]):
         marker = _pause_marker_path(ctx, row["raid"], row["paused_at"])
         if marker.exists():
             continue
@@ -323,15 +324,15 @@ def _compact_nudge_lines(ctx, binding, source):
 
 
 def _idle_compaction(ctx):
-    silence = ctx.now.timestamp() - statusline_commands.ctx_recorded_at(ctx.state_dir, ctx.session_id)
+    silence = ctx.now.timestamp() - statusline_state.ctx_recorded_at(ctx.state_dir, ctx.session_id)
     return silence >= _IDLE_COMPACTION_SECONDS
 
 
 def pre_compact(ctx):
-    pct = statusline_commands.read_ctx(ctx.state_dir, ctx.session_id)
+    pct = statusline_state.read_ctx(ctx.state_dir, ctx.session_id)
     if pct is None or _idle_compaction(ctx):
         return
-    statusline_commands.record_compact_pct(ctx.state_dir, pct)
+    statusline_state.record_compact_pct(ctx.state_dir, pct)
 
 
 def _nudge_text(ctx, binding, lead):
@@ -503,7 +504,7 @@ def _file_cap_warning(ctx, target_dir, branch, paths):
     cap = project_data.get("max_open_prs_per_file")
     if cap is None:
         return None
-    external = merge_queue_commands.external_blocked_refs(ctx.conn)
+    external = pr_records.external_blocked_refs(ctx.conn)
     lines = []
     for path in sorted(paths):
         rows = merge_queue_commands.file_pr_rows(ctx.conn, external, repo, path, branch)
@@ -1031,8 +1032,8 @@ def _matching_shared_area(relative_path, shared_areas):
 
 def _shared_area_deny_reason(ctx, binding, holder_party, holder_expires_at, matched_glob):
     local_time = timeutil.from_iso(holder_expires_at).astimezone().strftime("%H:%M")
-    caller_raids = raid_commands.member_raid_names(ctx.conn, ctx.now, binding["party"])
-    holder_raids = raid_commands.member_raid_names(ctx.conn, ctx.now, holder_party)
+    caller_raids = raid_members.member_raid_names(ctx.conn, ctx.now, binding["party"])
+    holder_raids = raid_members.member_raid_names(ctx.conn, ctx.now, holder_party)
     shared_raids = set(caller_raids) & set(holder_raids)
     if shared_raids:
         raid_name = sorted(shared_raids)[0]
