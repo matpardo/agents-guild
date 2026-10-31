@@ -1,4 +1,4 @@
-from guild import cards, config, db, events, identity, pii, polling, refs, session_info
+from guild import ask_legibility, cards, config, db, events, identity, pii, polling, refs, session_info
 from guild.errors import GuildError
 from guild.ids import next_id
 
@@ -86,7 +86,7 @@ def _resolve_auto_ref(ref_list, in_progress):
     return ref_list + [auto_ref], auto_ref
 
 
-def create(ctx, question, context_text, ref_list, option_list):
+def create(ctx, question, context_text, ref_list, option_list, recommend):
     actor_party = identity.require_actor(ctx.conn, ctx.session_id)
     in_progress = _in_progress_tasks(ctx.conn, actor_party)
     ref_list, auto_ref = _resolve_auto_ref(ref_list, in_progress)
@@ -96,6 +96,8 @@ def create(ctx, question, context_text, ref_list, option_list):
     patterns = pii.project_patterns(ctx.projects_dir, project)
     pii.validate_field(question, "ask question", pii.ASK_QUESTION_MAX_LENGTH, patterns)
     pii.validate_field(context_text, "ask context", pii.ASK_CONTEXT_MAX_LENGTH, patterns)
+    if recommend is not None:
+        pii.validate_field(recommend, "ask recommend", pii.ASK_RECOMMEND_MAX_LENGTH, patterns)
     project_config = None if project is None else config.load_project(ctx.projects_dir, project)
     normalized_refs = _validate_refs(ctx, project, project_config, ref_list)
     ask_id = next_id(ctx.conn, "asks")
@@ -116,12 +118,14 @@ def create(ctx, question, context_text, ref_list, option_list):
                 "context": context_text,
                 "refs": normalized_refs,
                 "options": option_list,
+                "recommend": recommend,
                 "snapshot": _origin_snapshot(ctx, actor_party, project, in_progress),
             },
         )
     lines = ["ask #{} created".format(ask_id)]
     if auto_ref is not None:
         lines.append("auto-ref: {}".format(auto_ref))
+    lines.extend(ask_legibility.warning_lines(question, context_text))
     lines.extend([pii.BROADCAST_REMINDER, pii.LOCAL_ONLY_REMINDER])
     return "\n".join(lines)
 

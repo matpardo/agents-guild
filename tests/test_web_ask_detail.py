@@ -31,6 +31,7 @@ class AskDetailEndpointTests(WebServerTestCase):
                 "question",
                 "context",
                 "options",
+                "recommend",
                 "created_at",
                 "created",
                 "answer",
@@ -39,7 +40,6 @@ class AskDetailEndpointTests(WebServerTestCase):
                 "refs",
                 "origin",
                 "resume",
-                "events",
             },
         )
         self.assertEqual((model["id"], model["party"], model["state"]), (1, "alpha", "open"))
@@ -94,6 +94,11 @@ class AskDetailControlSourceTests(unittest.TestCase):
     def test_links_only_for_https_urls(self):
         self.assertIn('url.indexOf("https://") !== 0', self.block)
         self.assertNotIn("link(ref.url", self.block.replace("detailLink(ref.url", ""))
+
+    def test_dig_in_is_a_details_closed_by_default_and_events_are_gone(self):
+        self.assertIn('el("details")', self.block)
+        self.assertNotIn("dig.open", self.block)
+        self.assertNotIn("recent events", self.block)
 
     def test_render_ask_mounts_the_control(self):
         self.assertIn("article.appendChild(renderAskDetailControl(ask));", self.source)

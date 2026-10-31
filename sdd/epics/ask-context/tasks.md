@@ -3,7 +3,7 @@ epic: ask-context
 type: tasks
 title: Asks that carry the context to decide them
 status: done
-updated: 2026-10-04
+updated: 2026-10-31
 ---
 
 # Tasks: Asks that carry the context to decide them
@@ -80,3 +80,15 @@ updated: 2026-10-04
 **Status:** [x] done — #72
 
 **What:** `guild asks <id>`, `guild asks --all` and the web detail show creation, answer and event times as local `YYYY-MM-DD HH:MM`; the models keep the ISO fields and add `created`, `answered` and per-event `time` labels.
+
+## T08 — Legible asks
+
+**Depends on:** T07
+**Status:** [x] done
+
+**What:** `guild ask` takes `--recommend` (at most 300 characters), prints a warning, without refusing, when question or context carry many ids or paths, and `--context` and `--recommend` render paragraphs, breaks and bold in the CLI and the web. `guild asks <id>` and the web detail show what decides the ask first and the paths, origin and resume command under `dig in`; the recent events and the duplicate epics and cards lines are gone.
+
+**Acceptance:**
+- [x] `--recommend` is stored, validated and shown in `guild asks`, the detail and the web card; events without it rebuild as null.
+- [x] A jargon-heavy question or context prints a warning and the ask is still created.
+- [x] The detail has no recent events; `dig in` is closed by default on the web.

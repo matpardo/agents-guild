@@ -31,7 +31,6 @@ class AskLocalTimeTests(GuildTestCase):
         self.assertEqual(code, 0, err)
         self.assertIn("· created 2026-10-04 09:15", out)
         self.assertIn("  answered: 2026-10-04 14:30", out)
-        self.assertIn("  2026-10-04 09:15  ask.created  #1", out)
         self.assertNotIn("+00:00", out)
 
     def test_all_listing_shows_local_answer_time(self):
@@ -58,4 +57,3 @@ class AskLocalTimeTests(GuildTestCase):
         conn.close()
         self.assertEqual(model["created"], "2026-10-04 09:15")
         self.assertEqual(model["answered"], "2026-10-04 14:30")
-        self.assertEqual(model["events"][0]["time"], "2026-10-04 09:15")

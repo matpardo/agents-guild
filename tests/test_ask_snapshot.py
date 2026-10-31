@@ -165,6 +165,11 @@ class SnapshotReducerTests(AskSnapshotBase):
         row = conn.execute("SELECT snapshot FROM asks WHERE id = 1").fetchone()
         self.assertIsNone(row["snapshot"])
 
+    def test_event_without_recommend_rebuilds_with_null(self):
+        conn = self._created(1, {})
+        row = conn.execute("SELECT recommend FROM asks WHERE id = 1").fetchone()
+        self.assertIsNone(row["recommend"])
+
     def test_rebuild_replays_the_snapshot(self):
         self.run_cli(["task", "start", "demo/T01"], "sess-1", self.repo_dir)
         self.ask()

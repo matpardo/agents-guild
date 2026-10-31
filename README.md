@@ -181,11 +181,11 @@ guild pr wait <owner/repo>#<n> [--timeout <dur>]   # block until a comment or re
 guild finding list                              # finding classes of the project with PR counts
 guild finding record <owner/repo>#<n> --class <slug>   # count a recurring audit/review finding class once per PR; with finding_guard_threshold set, one project notice asks for an architecture guard when the class repeats that many times
 
-guild ask "<question, at most 300 chars>" --context "<at most 2000 chars>" [--ref <ref> ...] [--option "..."]   # refs: pr:<owner/repo>#<n>, task:<quest>/<tid>, card:<KEY>; with exactly one task in progress and no task:/card: ref it is added for you
+guild ask "<question, at most 300 chars>" --context "<at most 2000 chars>" [--ref <ref> ...] [--option "..."] [--recommend "<option and why, at most 300 chars>"]   # prints a warning, and still creates the ask, when question or context carry many ids or paths; refs: pr:<owner/repo>#<n>, task:<quest>/<tid>, card:<KEY>; with exactly one task in progress and no task:/card: ref it is added for you
 guild ask wait <id> [--timeout <dur>]   # block until the ask is answered or dismissed; exit 0 on either, 1 on an unknown id, 3 on timeout (default 2h)
 guild answer <id> "<text>"
 guild dismiss <id>                  # both refuse inside a Claude Code session: run them from the human terminal or the web board
-guild asks [<id> | --all [--party <name>] [--since <dur>] | --answered [--page <n>] [--party <name>] [--since <dur>]]   # open asks; <id> shows task, card, PR, SDD paths, resume command and recent events; --all adds answered and dismissed with answers
+guild asks [<id> | --all [--party <name>] [--since <dur>] | --answered [--page <n>] [--party <name>] [--since <dur>]]   # open asks; <id> shows recommendation, task, card, PR, then SDD paths and resume command under `dig in`; --all adds answered and dismissed with answers
 
 guild notice create "<text>" --to project:<name>|guild|raid:<name> --ttl <dur> [--until pr:<owner/repo>#<n>:merged|closed]
 guild notice close <id>
@@ -301,12 +301,17 @@ ref and exactly one task in progress, `task:<quest>/<tid>` is added and
 `auto-ref: task:<quest>/<tid>` is printed. With no ref and no single in-progress
 task the ask is refused. `--context` stays required to create an ask.
 
-`guild asks <id>` expands the ask: the task with its SDD spec and tasks paths
-(from the project `sdd` block: the filesystem path with `root`, or
-`git:<ref>:<path>` with `git_repo`/`git_ref`), the card with its status and
-tracker link (`tracker.browse_url`), the PR with URL, lifecycle and checks, the
-origin snapshot, the command that resumes the asking session and the party's last
-10 events. Asks created before snapshots print `origin: not recorded`. The same
+`--recommend` states the option the agent recommends and why. `--context` and
+`--recommend` render paragraphs (blank line), line breaks and `**bold**` in the
+CLI and the web; nothing else is interpreted.
+
+`guild asks <id>` expands the ask in two tiers. First what decides it: question,
+context, options, recommendation, and the task with its state, the card with its
+status and tracker link (`tracker.browse_url`), the PR with URL, lifecycle and
+checks. Then `dig in`: the task SDD spec and tasks paths (from the project `sdd`
+block: the filesystem path with `root`, or `git:<ref>:<path>` with
+`git_repo`/`git_ref`), the origin snapshot and the command that resumes the
+asking session; on the web `dig in` is closed by default. Asks created before snapshots print `origin: not recorded`. The same
 detail is served at `GET /api/asks/<id>` and opens from the `detail` control of
 each ask on the web board.
 

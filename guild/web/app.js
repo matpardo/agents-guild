@@ -126,6 +126,35 @@ realmDoctorLines: [],
     return node;
   }
 
+  function appendBold(parent, line) {
+    var pattern = /\*\*(.+?)\*\*/g;
+    var last = 0;
+    var match = pattern.exec(line);
+    while (match !== null) {
+      parent.appendChild(document.createTextNode(line.slice(last, match.index)));
+      parent.appendChild(textEl("strong", match[1]));
+      last = match.index + match[0].length;
+      match = pattern.exec(line);
+    }
+    parent.appendChild(document.createTextNode(line.slice(last)));
+  }
+
+  function renderAskText(text) {
+    var container = el("div");
+    container.className = "ask-text";
+    text.split("\n\n").forEach(function (paragraph) {
+      var node = el("p");
+      paragraph.split("\n").forEach(function (line, index) {
+        if (index > 0) {
+          node.appendChild(el("br"));
+        }
+        appendBold(node, line);
+      });
+      container.appendChild(node);
+    });
+    return container;
+  }
+
   function classedText(tag, value, className) {
     var node = textEl(tag, value);
     node.className = className;
@@ -993,6 +1022,14 @@ realmDoctorLines: [],
         detailText("span", ref.epic ? " epic: " + ref.epic : "", "SDD epic the task belongs to"),
       ]),
     ];
+    return lines;
+  }
+
+  function renderTaskPaths(ref) {
+    var lines = [];
+    if (ref.missing || ref.kind !== "task") {
+      return lines;
+    }
     if (ref.spec) {
       lines.push(detailLine([detailText("span", "spec: ", "Path of the epic spec"), detailText("code", ref.spec, "Path of the epic spec")]));
     }
@@ -1054,12 +1091,25 @@ realmDoctorLines: [],
       detailLine([detailText("strong", "origin (at creation)", "State of the asking party when the ask was created")]),
       detailLine([detailText("span", "session: " + session, "Session that created the ask")]),
       detailLine([detailText("span", "in progress: " + (tasks.join(", ") || "none"), "Tasks in progress at creation")]),
-      detailLine([detailText("span", "epics: " + (origin.epics.join(", ") || "none") + "  cards: " + (origin.cards.join(", ") || "none"), "Epics and cards linked at creation")]),
     ];
     if (origin.handoff_path) {
       lines.push(detailLine([detailText("span", "handoff: ", "Latest handoff file of the party"), detailText("code", origin.handoff_path, "Latest handoff file of the party")]));
     }
     return lines;
+  }
+
+  function renderDigIn(model) {
+    var dig = el("details");
+    dig.className = "ask-dig-in";
+    dig.appendChild(detailText("summary", "dig in", "Spec paths, origin session and resume command"));
+    model.refs.forEach(function (ref) {
+      appendAll(dig, renderTaskPaths(ref));
+    });
+    appendAll(dig, renderOriginDetail(model.origin));
+    if (model.resume) {
+      dig.appendChild(detailLine([detailText("span", "resume: ", "Command that reopens the asking session"), detailText("code", model.resume, "Command that reopens the asking session")]));
+    }
+    return dig;
   }
 
   function renderAskDetail(model) {
@@ -1068,17 +1118,10 @@ realmDoctorLines: [],
     model.refs.forEach(function (ref) {
       appendAll(wrapper, renderRefDetail(ref));
     });
-    appendAll(wrapper, renderOriginDetail(model.origin));
-    if (model.resume) {
-      wrapper.appendChild(detailLine([detailText("span", "resume: ", "Command that reopens the asking session"), detailText("code", model.resume, "Command that reopens the asking session")]));
-    }
     if (model.answer !== null) {
       wrapper.appendChild(detailLine([detailText("span", "answer: " + model.answer, "Answer given to the ask")]));
     }
-    wrapper.appendChild(detailLine([detailText("strong", "recent events", "Latest events of the asking party")]));
-    model.events.forEach(function (event) {
-      wrapper.appendChild(detailLine([detailText("code", event.time + " " + event.kind + " " + event.summary, "Event timestamp, kind and subject")]));
-    });
+    wrapper.appendChild(renderDigIn(model));
     return wrapper;
   }
 
@@ -1116,7 +1159,7 @@ realmDoctorLines: [],
     var details = el("details");
     details.className = "ask-detail-control";
     details.open = askDetails.open[ask.id] === true;
-    details.appendChild(detailText("summary", "detail", "Task, card, PR, origin session and recent events behind this ask"));
+    details.appendChild(detailText("summary", "detail", "Task, card and PR behind this ask, and a dig in section with the origin session"));
     var container = el("div");
     details.appendChild(container);
     if (details.open) {
@@ -1147,6 +1190,13 @@ realmDoctorLines: [],
     if (ask.options.length > 0) {
       article.appendChild(textEl("p", "options: " + ask.options.join(" | ")));
     }
+    if (ask.recommend !== null) {
+      var recommend = el("div");
+      recommend.className = "ask-recommend";
+      recommend.appendChild(textEl("strong", "recommend:"));
+      recommend.appendChild(renderAskText(ask.recommend));
+      article.appendChild(recommend);
+    }
     article.appendChild(textEl("p", "refs: " + ask.refs.join(", ")));
     if (ask.dates !== null) {
       article.appendChild(classedText("p", ask.dates, "muted"));
@@ -1156,7 +1206,7 @@ realmDoctorLines: [],
     var details = el("details");
     details.open = contextOpen(ask.id);
     details.appendChild(textEl("summary", "context"));
-    details.appendChild(textEl("p", ask.context));
+    details.appendChild(renderAskText(ask.context));
     details.addEventListener("toggle", function () {
       state.openContexts[ask.id] = details.open;
     });

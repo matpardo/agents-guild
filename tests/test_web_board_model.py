@@ -203,6 +203,7 @@ class BoardModelShapeTests(BoardModelTestCase):
                 "question",
                 "context",
                 "options",
+                "recommend",
                 "refs",
                 "blocked",
                 "total_refs",
