@@ -196,8 +196,8 @@ guild notices
 guild idea add "<title>" --description "<text>" [--requester <text>] [--deadline YYYY-MM-DD] [--project <name>]
 guild idea edit <id> [--title ..] [--description ..] [--requester ..|--no-requester] [--deadline ..|--no-deadline] [--project ..|--no-project]
 guild idea delete <id>
-guild idea link <id> [--party <name>]     # a session links its own party; the human terminal needs --party
-guild idea unlink <id> [--party <name>]   # refused once the party tracks a PR
+guild idea link <id> [--party <name> | --adventurer <id>]     # a session links itself (party or adventurer); the human terminal needs one flag
+guild idea unlink <id> [--party <name> | --adventurer <id>]   # refused once the party or adventurer tracks a PR
 guild ideas [<id> | --project <name>]   # sorted by deadline, no deadline last; overdue marked; <id> shows one in full
 
 guild adventurer start "<job>" --task <epic>/<tid> --reason "<why>"   # this session becomes an adventurer; no permission prompt; --task required
@@ -1286,12 +1286,15 @@ a deadline (`YYYY-MM-DD`) and a registered project. The human and any session
 can add, edit and delete ideas; they are local and never broadcast. `guild
 ideas` lists them by deadline ascending with the ones without deadline last
 (ties by creation), and marks `overdue` the ones whose deadline is before
-today. When a party starts work from an idea it runs `guild idea link <id>`;
-`guild idea unlink <id>` drops the link, and is refused once the party tracks a PR. A session links only its own party;
-from the human terminal `--party <name>` is required. The party must exist and
-not be closed, and linking twice is refused. `guild ideas` and `guild ideas
-<id>` show `worked by: <party>, ...` (closed parties marked `(closed)`) and each
-party block in `guild board` lists its `ideas`. Once the work is done the
+today. When a party or an adventurer starts work from an idea it runs `guild idea link <id>`
+(an adventurer session is detected on its own);
+`guild idea unlink <id>` drops the link, and is refused once the party or adventurer tracks a PR. A session links only itself;
+from the human terminal `--party <name>` or `--adventurer <id>` is required. The party must exist and
+not be closed, the adventurer must be active, and linking twice is refused. `guild ideas` and `guild ideas
+<id>` show `worked by: <party>, adventurer <id>, ...` (closed parties marked `(closed)`, adventurers that
+are not active marked with their state), each party block in `guild board` lists its `ideas`, and so does each
+adventurer. The `adventurer done` final report lists the linked ideas. Promoting an adventurer moves its links to
+the new party; a done or dismissed adventurer keeps its links. The web ideas section links and unlinks adventurers too. Once the work is done the
 session runs `guild idea delete <id>`, which also removes the links: a deleted
 idea stays in the event log and `guild rebuild` deletes it again. Idea ids are local; do not copy
 them into PRs, commits or cards. Title, description and requester go through

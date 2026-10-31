@@ -16,7 +16,7 @@ function mk(tag) {
   Object.defineProperty(o, "firstChild", { get() { return o.children[0] || null; } });
   return o;
 }
-const tree = (n) => ({ tag: n.tag, className: n.className || "", type: n.type || "", placeholder: n.placeholder || "", title: n.title || "", text: n._text, children: n.children.map(tree) });
+const tree = (n) => ({ tag: n.tag, className: n.className || "", type: n.type || "", value: n.value, placeholder: n.placeholder || "", title: n.title || "", text: n._text, children: n.children.map(tree) });
 const tick = () => new Promise((resolve) => setImmediate(resolve));
 async function render({ src, data, hash, outId, mode }) {
   const byId = {};

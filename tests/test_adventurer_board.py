@@ -28,6 +28,14 @@ class AdventurerBoardTests(AdventurerTestCase):
         self.assertEqual(code, 0, err)
         return out
 
+    def test_model_carries_linked_ideas_both_ways(self):
+        self.start("adv-1", "fix typo", "--task", "demo-epic/T02")
+        self.cli(["idea", "add", "Dark mode", "--description", "d"], None)
+        self.cli(["idea", "link", "1"], "adv-1")
+        model = self._model()
+        self.assertEqual(model["adventurers"][0]["ideas"], [{"id": 1, "title": "Dark mode"}])
+        self.assertEqual(model["ideas"][0]["adventurers"], [{"id": 1, "state": "active", "has_prs": False}])
+
     def test_active_adventurer_is_listed_with_liveness_and_prs(self):
         self.write_gh_fixture("view_acme-app_7", dict(OPEN_VIEW))
         self.start("adv-1", "fix typo", "--task", "demo-epic/T02")

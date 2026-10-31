@@ -38,7 +38,7 @@ async function run({ src, scenario }) {
     querySelectorAll: (selector) => Object.values(byId).reduce((found, root) => walk(root, selector, found), []),
   };
   const idea = { id: 1, title: "Dark mode", description: "night owls", requester: null, deadline: null,
-    project: null, overdue: false, parties: [] };
+    project: null, overdue: false, parties: [], adventurers: [] };
   let board = { generated_at: "now", parties: [], raids: [], asks: [], blocked: [], notices: [], projects: [],
     memory: [], merge_queues: [], drift: [], ready_for_you: [], ideas: [], adventurers: [], health_jobs: [], project_names: [], bases: [], quest_boards: [], realm: null, new_notice_count: 0 };
   const intervals = [];

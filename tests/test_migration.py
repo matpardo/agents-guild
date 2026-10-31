@@ -371,6 +371,15 @@ class MigrationTests(GuildTestCase):
         self.assertEqual(raid_members_columns, {"raid", "party", "expires_at"})
         self.assertEqual(conn.execute("SELECT COUNT(*) AS n FROM raid_members").fetchone()["n"], 0)
 
+    def test_old_schema_db_gains_idea_adventurer_links_table(self):
+        db_path = self.data_home / "guild.db"
+        _make_old_schema_db(db_path)
+
+        conn = db.connect(db_path)
+
+        columns = {row["name"] for row in conn.execute("PRAGMA table_info(idea_adventurer_links)").fetchall()}
+        self.assertEqual(columns, {"idea_id", "adventurer", "linked_at"})
+
     def test_raid_members_lead_column_is_dropped_and_rows_kept(self):
         db_path = self.data_home / "guild.db"
         legacy = sqlite3.connect(str(db_path))

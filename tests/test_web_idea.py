@@ -85,6 +85,37 @@ class WebIdeaLinkTests(WebWriteTestCase):
         self.assertEqual(response.status, 200, payload)
         self.assertEqual(self._board()["ideas"][0]["parties"], [])
 
+    def _start_adventurer(self):
+        self.run_cli(
+            ["quest", "add", "chore", "--open", "--no-epic", "--title", "chore", "--tasks", "T01", "--titles", "one"],
+            None,
+            self.repo_dir,
+        )
+        code, out, err = self.run_cli(
+            ["adventurer", "start", "fix typo", "--task", "chore/T01", "--reason", "test reason"],
+            "adv-1",
+            self.repo_dir,
+        )
+        self.assertEqual(code, 0, err)
+
+    def test_adventurer_link_and_unlink(self):
+        self._start_adventurer()
+        response, payload = self._link("link", adventurer=1)
+        self.assertEqual(response.status, 200, payload)
+        board = self._board()
+        self.assertEqual(board["ideas"][0]["adventurers"], [{"id": 1, "state": "active", "has_prs": False}])
+        self.assertEqual(board["adventurers"][0]["ideas"], [{"id": 1, "title": "Dark mode"}])
+        response, payload = self._link("unlink", adventurer=1)
+        self.assertEqual(response.status, 200, payload)
+        self.assertEqual(self._board()["ideas"][0]["adventurers"], [])
+
+    def test_adventurer_refusals_are_422_and_bad_payloads_400(self):
+        self.assertEqual(self._link("link", adventurer=9)[0].status, 422)
+        self.assertEqual(self._link("link", adventurer="1")[0].status, 400)
+        self.assertEqual(self._link("link", adventurer=True)[0].status, 400)
+        self.assertEqual(self._link("link", adventurer=1, party="alpha")[0].status, 400)
+        self.assertEqual(self._link("unlink", adventurer=None)[0].status, 400)
+
     def test_unlink_is_422_once_the_party_tracks_a_pr(self):
         self._link("link", party="alpha")
         self.write_gh_fixture(

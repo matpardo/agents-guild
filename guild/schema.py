@@ -11,6 +11,7 @@ PROJECTION_TABLES = (
     "notices",
     "ideas",
     "idea_links",
+    "idea_adventurer_links",
     "adventurers",
     "claims",
     "raid_members",
@@ -210,6 +211,14 @@ _CREATE_STATEMENTS = (
         party TEXT NOT NULL,
         linked_at TEXT NOT NULL,
         PRIMARY KEY (idea_id, party)
+    )
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS idea_adventurer_links (
+        idea_id INTEGER NOT NULL,
+        adventurer INTEGER NOT NULL,
+        linked_at TEXT NOT NULL,
+        PRIMARY KEY (idea_id, adventurer)
     )
     """,
     """

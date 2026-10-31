@@ -292,7 +292,7 @@ realmDoctorLines: [],
       hotFiles: "Files touched by as many open PRs as max_open_prs_per_file allows; expect merge conflicts.",
       findingClasses: "Review finding classes with the number of distinct PRs; at the threshold the class should become an architecture guard.",
       syncFreshness: "How long ago the SDD and the tracker were last synced successfully.",
-      ideaLinkedForGood: "Linked for good: the party tracks a PR.",
+      ideaLinkedForGood: "Linked for good: the holder tracks a PR.",
       noticeNew: "You have not marked this notice as seen yet.",
       noticeFlagged: "Non-human text matching an instruction or command pattern; shown as a caution, never blocked.",
       issued: "When the notice was issued, in local time.",
@@ -1639,40 +1639,72 @@ realmDoctorLines: [],
     return parts.join(" · ");
   }
 
+  function ideaSummary(idea) {
+    return "#" + idea.id + " " + idea.title;
+  }
+
   function ideaPartyLabel(party) {
     return party.state === "closed" ? party.name + " (closed)" : party.name;
   }
 
-  function renderIdeaParty(idea, party, busy) {
+  function ideaAdventurerLabel(adventurer) {
+    var label = "adventurer " + adventurer.id;
+    return adventurer.state === "active" ? label : label + " (" + adventurer.state + ")";
+  }
+
+  function renderIdeaHolder(idea, label, unlinkPayload, hasPrs, busy) {
     var item = el("span");
     item.className = "idea-party";
-    var label = textEl("span", ideaPartyLabel(party));
-    item.appendChild(label);
-    if (party.has_prs) {
-      explain(label, "ui", "ideaLinkedForGood");
+    var text = textEl("span", label);
+    item.appendChild(text);
+    if (hasPrs) {
+      explain(text, "ui", "ideaLinkedForGood");
       return item;
     }
     item.appendChild(
       ideaActionButton("Unlink", busy, function () {
-        postIdea("/api/ideas/" + idea.id + "/unlink", { party: party.name }, idea.id, function () {});
+        postIdea("/api/ideas/" + idea.id + "/unlink", unlinkPayload, idea.id, function () {});
       })
     );
     return item;
   }
 
-  function renderIdeaLinkSelect(idea, partyNames, busy) {
-    var linked = idea.parties.map(function (party) {
+  function ideaHolderChoices(idea, partyNames, adventurerIds) {
+    var linkedParties = idea.parties.map(function (party) {
       return party.name;
     });
-    var choices = partyNames.filter(function (name) {
-      return linked.indexOf(name) === -1;
+    var linkedAdventurers = idea.adventurers.map(function (adventurer) {
+      return adventurer.id;
     });
+    var parties = partyNames
+      .filter(function (name) {
+        return linkedParties.indexOf(name) === -1;
+      })
+      .map(function (name) {
+        return { value: "party:" + name, label: name };
+      });
+    var adventurers = adventurerIds
+      .filter(function (id) {
+        return linkedAdventurers.indexOf(id) === -1;
+      })
+      .map(function (id) {
+        return { value: "adventurer:" + id, label: "adventurer " + id };
+      });
+    return parties.concat(adventurers);
+  }
+
+  function renderIdeaLinkSelect(idea, choices, busy) {
     var select = el("select");
     select.dataset.focusKey = "idea-" + idea.id + "-link";
-    choices.forEach(function (name) {
-      select.appendChild(option(name));
+    choices.forEach(function (choice) {
+      var opt = option(choice.value);
+      opt.textContent = choice.label;
+      select.appendChild(opt);
     });
-    if (choices.indexOf(state.ideaLinkChoices[idea.id]) !== -1) {
+    var values = choices.map(function (choice) {
+      return choice.value;
+    });
+    if (values.indexOf(state.ideaLinkChoices[idea.id]) !== -1) {
       select.value = state.ideaLinkChoices[idea.id];
     }
     select.disabled = busy || choices.length === 0;
@@ -1682,28 +1714,48 @@ realmDoctorLines: [],
     return select;
   }
 
-  function renderIdeaLinks(idea, partyNames) {
+  function ideaLinkPayload(choice) {
+    var separator = choice.indexOf(":");
+    var kind = choice.slice(0, separator);
+    var holder = choice.slice(separator + 1);
+    return kind === "adventurer" ? { adventurer: Number(holder) } : { party: holder };
+  }
+
+  function renderIdeaLinks(idea, partyNames, adventurerIds) {
     var busy = state.ideaBusy[idea.id] === true;
     var links = el("div");
     links.className = "notice-actions idea-links";
-    if (idea.parties.length > 0) {
+    var linked = idea.parties.length + idea.adventurers.length;
+    if (linked > 0) {
       links.appendChild(textEl("span", "worked by:"));
     }
-    if (idea.parties.length === 0) {
+    if (linked === 0) {
       links.appendChild(classedText("span", "not linked yet", "muted"));
     }
     appendAll(
       links,
       idea.parties.map(function (party) {
-        return renderIdeaParty(idea, party, busy);
+        return renderIdeaHolder(idea, ideaPartyLabel(party), { party: party.name }, party.has_prs, busy);
       })
     );
-    var select = renderIdeaLinkSelect(idea, partyNames, busy);
+    appendAll(
+      links,
+      idea.adventurers.map(function (adventurer) {
+        return renderIdeaHolder(
+          idea,
+          ideaAdventurerLabel(adventurer),
+          { adventurer: adventurer.id },
+          adventurer.has_prs,
+          busy
+        );
+      })
+    );
+    var select = renderIdeaLinkSelect(idea, ideaHolderChoices(idea, partyNames, adventurerIds), busy);
     links.appendChild(select);
     links.appendChild(
       ideaActionButton("Link", select.disabled, function () {
-        var party = state.ideaLinkChoices[idea.id] || select.value;
-        postIdea("/api/ideas/" + idea.id + "/link", { party: party }, idea.id, function () {
+        var choice = state.ideaLinkChoices[idea.id] || select.value;
+        postIdea("/api/ideas/" + idea.id + "/link", ideaLinkPayload(choice), idea.id, function () {
           delete state.ideaLinkChoices[idea.id];
         });
       })
@@ -1711,12 +1763,12 @@ realmDoctorLines: [],
     return links;
   }
 
-  function renderIdeaView(article, idea, partyNames) {
+  function renderIdeaView(article, idea, partyNames, adventurerIds) {
     var busy = state.ideaBusy[idea.id] === true;
     article.appendChild(textEl("h3", "#" + idea.id + " " + idea.title));
     article.appendChild(classedText("p", ideaMeta(idea), "muted"));
     article.appendChild(classedText("p", idea.description, "idea-description"));
-    article.appendChild(renderIdeaLinks(idea, partyNames));
+    article.appendChild(renderIdeaLinks(idea, partyNames, adventurerIds));
     var actions = el("div");
     actions.className = "notice-actions";
     actions.appendChild(
@@ -1763,18 +1815,18 @@ realmDoctorLines: [],
     article.appendChild(actions);
   }
 
-  function renderIdea(idea, projectNames, partyNames) {
+  function renderIdea(idea, projectNames, partyNames, adventurerIds) {
     var article = el("article");
     article.className = idea.overdue ? "card idea idea-overdue" : "card idea";
     if (state.ideaDrafts[idea.id] === undefined) {
-      renderIdeaView(article, idea, partyNames);
+      renderIdeaView(article, idea, partyNames, adventurerIds);
       return article;
     }
     renderIdeaEdit(article, idea, projectNames);
     return article;
   }
 
-  function renderIdeas(ideas, projectNames, partyNames) {
+  function renderIdeas(ideas, projectNames, partyNames, adventurerIds) {
     var section = document.getElementById("ideas");
     clear(section);
     var details = el("details");
@@ -1790,7 +1842,7 @@ realmDoctorLines: [],
     appendAll(
       details,
       ideas.map(function (idea) {
-        return renderIdea(idea, projectNames, partyNames);
+        return renderIdea(idea, projectNames, partyNames, adventurerIds);
       })
     );
     section.appendChild(details);
@@ -1830,6 +1882,9 @@ realmDoctorLines: [],
     }
     if (adventurer.stopped_without_report) {
       article.appendChild(classedText("span", STOPPED_WITHOUT_REPORT_TEXT, "pill stopped-without-report"));
+    }
+    if (adventurer.ideas.length > 0) {
+      article.appendChild(textEl("p", "ideas: " + adventurer.ideas.map(ideaSummary).join(", ")));
     }
     if (adventurer.state === "done") {
       article.appendChild(textEl("p", "pending: " + adventurer.pending));
@@ -3035,12 +3090,7 @@ realmDoctorLines: [],
     }
 
     if (party.ideas.length > 0) {
-      var ideasText = party.ideas
-        .map(function (idea) {
-          return "#" + idea.id + " " + idea.title;
-        })
-        .join(", ");
-      details.appendChild(textEl("p", "ideas: " + ideasText));
+      details.appendChild(textEl("p", "ideas: " + party.ideas.map(ideaSummary).join(", ")));
     }
 
     appendAll(details, party.quests.map(renderQuest));
@@ -3783,6 +3833,16 @@ realmDoctorLines: [],
     renderFn.apply(null, args);
   }
 
+  function activeAdventurerIds(adventurers) {
+    return adventurers
+      .filter(function (adventurer) {
+        return adventurer.state === "active";
+      })
+      .map(function (adventurer) {
+        return adventurer.id;
+      });
+  }
+
   function activePartyNames(parties) {
     return parties
       .filter(function (party) {
@@ -4067,7 +4127,12 @@ realmDoctorLines: [],
     renderSection("asks", [filtered.asks, filtered.blocked, filtered.parties], renderAsks, onlyIfChanged);
     renderSection("ready", [filtered.ready_for_you], renderReadyForYou, onlyIfChanged);
     renderSection("notices", [filtered.notices, filtered.projects, filtered.raids], renderNotices, onlyIfChanged);
-    renderSection("ideas", [filtered.ideas, data.project_names, activePartyNames(data.parties)], renderIdeas, onlyIfChanged);
+    renderSection(
+      "ideas",
+      [filtered.ideas, data.project_names, activePartyNames(data.parties), activeAdventurerIds(data.adventurers)],
+      renderIdeas,
+      onlyIfChanged
+    );
     renderSection("adventurers", [filtered.adventurers], renderAdventurers, onlyIfChanged);
     renderSection("health-jobs", [filtered.health_jobs], renderHealthJobs, onlyIfChanged);
     renderSection("memory", [filtered.memory], renderMemory, onlyIfChanged);

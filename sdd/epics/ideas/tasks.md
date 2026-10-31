@@ -3,7 +3,7 @@ epic: ideas
 type: tasks
 title: Ideas backlog
 status: done
-updated: 2026-10-24
+updated: 2026-10-31
 ---
 
 # Tasks: Ideas backlog
@@ -83,3 +83,16 @@ updated: 2026-10-24
 - [x] `guild idea unlink` fails with a message naming the idea and the party while the party tracks a PR, for a session and for the human `--party` path; the link survives.
 - [x] After `guild pr untrack` the unlink works.
 - [x] The board model carries `has_prs` per linked party and the web shows no `Unlink` for it.
+
+## T08 — Let adventurers link the ideas they work on
+
+**Depends on:** T07
+**Status:** [x] done
+
+**What:** An adventurer session runs `guild idea link <id>` and `unlink` for itself, the human passes `--adventurer <id>`, and the web links and unlinks adventurers through the same functions. The link shows in `guild ideas`, the board (CLI and web) and the `adventurer done` final report; promoting an adventurer moves its links to the party.
+
+**Acceptance:**
+- [x] `guild idea link|unlink` from an adventurer session acts for its own adventurer; a session cannot act for another party or adventurer.
+- [x] The adventurer must be active to be linked; unlink is refused once the adventurer tracks a PR.
+- [x] `guild ideas`, the board and the web show the adventurer next to the parties; the final report lists the idea.
+- [x] `guild adventurer promote` moves the links to the new party.

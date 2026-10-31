@@ -508,6 +508,7 @@ def _adventurer(**overrides):
         "live": False,
         "stopped_without_report": True,
         "prs": [],
+        "ideas": [],
         "reason": None,
         "dates": "created 2026-10-24 10:00",
     }
@@ -536,6 +537,10 @@ class WebAdventurerBehaviorTests(unittest.TestCase):
         for expected in ("adventurer 1 fix typo", "acme", "task demo/T02", "stopped", "stopped without report"):
             self.assertIn(expected, out)
         self.assertNotIn("Dismiss", out)
+
+    def test_adventurer_card_lists_its_ideas(self):
+        out = self._text([_adventurer(ideas=[{"id": 1, "title": "Dark mode"}])])
+        self.assertIn("ideas: #1 Dark mode", out)
 
     def test_reason_and_start_time_show_only_when_present(self):
         out = self._text([_adventurer(reason="one PR job")])
@@ -642,6 +647,7 @@ class WebNoticeAndRaidBehaviorTests(unittest.TestCase):
             "dates": "created 2026-10-01 10:00",
             "overdue": True,
             "parties": [],
+            "adventurers": [],
         }
         return dict(idea, **overrides)
 
@@ -676,6 +682,43 @@ class WebNoticeAndRaidBehaviorTests(unittest.TestCase):
 
         walk(tree)
         self.assertIn(["c"], selects)
+
+    def test_idea_shows_linked_adventurers_with_state_and_unlink(self):
+        idea = self._idea(
+            adventurers=[
+                {"id": 3, "state": "active", "has_prs": False},
+                {"id": 4, "state": "done", "has_prs": False},
+                {"id": 5, "state": "active", "has_prs": True},
+            ]
+        )
+        board = dict(self._board(False), ideas=[idea])
+        out = self._rendered(board, "ideas")
+        for expected in ("worked by:", "adventurer 3", "adventurer 4 (done)", "adventurer 5"):
+            self.assertIn(expected, out)
+        self.assertNotIn("not linked yet", out)
+        unlinks = [n for n in self._tree_nodes(_render(board, "all", "all", "ideas", "tree")) if n["text"] == "Unlink"]
+        self.assertEqual(len(unlinks), 2)
+
+    def _link_options(self, board):
+        nodes = self._tree_nodes(_render(board, "all", "all", "ideas", "tree"))
+        return [(n["value"], n["text"]) for n in nodes if n["tag"] == "option"]
+
+    def test_link_select_offers_active_adventurers_not_yet_linked(self):
+        idea = self._idea(adventurers=[{"id": 3, "state": "active", "has_prs": False}])
+        board = dict(
+            self._board(False),
+            ideas=[idea],
+            adventurers=[_adventurer(id=3), _adventurer(id=7), _adventurer(id=8, state="done", pending="x")],
+        )
+        options = self._link_options(board)
+        self.assertIn(("adventurer:7", "adventurer 7"), options)
+        self.assertIn(("party:c", "c"), options)
+        self.assertNotIn("adventurer:3", [value for value, _ in options])
+        self.assertNotIn("adventurer:8", [value for value, _ in options])
+
+    def test_link_posts_the_adventurer_as_a_number(self):
+        self.assertIn("{ adventurer: Number(holder) }", _APP_JS)
+        self.assertIn("{ party: holder }", _APP_JS)
 
     def test_party_tracking_a_pr_has_no_unlink_while_another_keeps_it(self):
         idea = self._idea(
