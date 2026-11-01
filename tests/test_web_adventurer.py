@@ -1,4 +1,5 @@
 import json
+import os
 
 from tests.test_web_write import WebWriteTestCase
 
@@ -31,7 +32,8 @@ class WebAdventurerDismissTests(WebWriteTestCase):
         self.assertEqual(response.status, 200, payload)
         self.assertEqual(self._adventurers(), [])
 
-    def test_active_or_unknown_adventurer_is_422(self):
+    def test_active_with_live_session_or_unknown_adventurer_is_422(self):
+        self.write_session(os.getpid(), "adv-1", "adv")
         self.assertEqual(self._dismiss(1)[0].status, 422)
         self.assertEqual(self._dismiss(9)[0].status, 422)
 

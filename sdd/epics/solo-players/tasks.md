@@ -68,3 +68,14 @@ updated: 2026-11-01
 
 **Acceptance:**
 - [x] An open fixes-main PR of the repo makes the player `fixing` with the PR ref, a merged, closed, non-fixes-main or other-repo PR does not, and the tick does not launch it.
+
+## T07 — Show a solo player as stalled when its session is gone
+
+**Depends on:** T02
+**Status:** [x] done
+
+**What:** a solo player whose active adventurer has no live session is `stalled` instead of `running`, and its row reads `stalled: session gone, run guild adventurer dismiss <id>` on the board, `guild solo list` and the web. `guild adventurer dismiss` now also accepts an active adventurer whose session is gone, so the player becomes launchable again.
+
+**Acceptance:**
+- [x] An active adventurer with a live session is `running`, with a dead session `stalled` carrying its id, and the tick does not launch it.
+- [x] Dismissing a stalled adventurer makes the player `due` again; dismissing one with a live session is refused.

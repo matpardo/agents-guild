@@ -12,6 +12,7 @@ from guild import (
     pii,
     refs,
     resume,
+    session_info,
     task_holders,
     timeutil,
     tmux_windows,
@@ -219,10 +220,14 @@ def promote(ctx, name, reason):
 
 def dismiss(ctx, adventurer_id):
     with db.writing(ctx.conn):
-        row = ctx.conn.execute("SELECT project, state FROM adventurers WHERE id = ?", (adventurer_id,)).fetchone()
+        row = ctx.conn.execute(
+            "SELECT project, state, session_id FROM adventurers WHERE id = ?", (adventurer_id,)
+        ).fetchone()
         if row is None:
             raise GuildError("unknown adventurer {}".format(adventurer_id), 1)
-        if row["state"] != "done":
+        if row["state"] == "active" and row["session_id"] in session_info.live_session_ids(ctx.sessions_dir):
+            raise GuildError("adventurer {} is active and its session is alive".format(adventurer_id), 1)
+        if row["state"] not in ("done", "active"):
             raise GuildError("adventurer {} is {}, not done".format(adventurer_id, row["state"]), 1)
         events.record(
             ctx.conn,

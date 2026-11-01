@@ -17,6 +17,7 @@ Decisión del dev, 2026-11-01: guild ships built-in per-repo solo players, `red-
 - a 1h cooldown after a report;
 - a launch debounce: a launch younger than the cooldown keeps the player cooling;
 - a red-main player stays `fixing`, and is not launched, while a PR of its repo tracked as fixing main is open;
+- a player whose active adventurer lost its session is `stalled` and is not launched until the human dismisses that adventurer;
 - a project notice for each launch by the tick;
 - launches only from the human terminal, never from inside a session.
 

@@ -164,6 +164,7 @@ class SoloPlayersTriggerTests(SoloPlayersTestCase):
     def test_active_adventurer_means_running(self):
         self.red("ci down")
         self.cli(["adventurer", "start", "--job", "red-main-acme-app", "--reason", "test reason"], "adv-1")
+        self.write_session(os.getpid(), "adv-1", "adv")
         self.assertEqual(self.players()[("acme/app", "red-main")]["state"], "running")
 
     def test_report_within_cooldown_means_cooling_and_keeps_last_pending(self):
@@ -190,6 +191,60 @@ class SoloPlayersTriggerTests(SoloPlayersTestCase):
         row = self.players()[("acme/app", "dependabot")]
         self.assertEqual(row["state"], "due")
         self.assertEqual(row["trigger"], "2 unmergeable dependabot PRs, dependabot update run failing")
+
+
+class SoloPlayersStalledTests(SoloPlayersTestCase):
+    def start_job(self):
+        self.red("ci down")
+        self.cli(["adventurer", "start", "--job", "red-main-acme-app", "--reason", "test reason"], "adv-1")
+
+    def red_row(self):
+        return self.players()[("acme/app", "red-main")]
+
+    def test_active_adventurer_with_live_session_is_running(self):
+        self.start_job()
+        self.write_session(os.getpid(), "adv-1", "adv")
+        row = self.red_row()
+        self.assertEqual(row["state"], "running")
+        self.assertIsNone(row["stalled_adventurer"])
+
+    def test_active_adventurer_with_dead_session_is_stalled_with_its_id(self):
+        self.start_job()
+        row = self.red_row()
+        self.assertEqual(row["state"], "stalled")
+        self.assertEqual(row["stalled_adventurer"], 1)
+
+    def test_dismissed_adventurer_is_not_stalled_and_player_is_due_again(self):
+        self.start_job()
+        code, out, err = self.cli(["adventurer", "dismiss", "1"], None)
+        self.assertEqual(code, 0, err)
+        self.assertEqual(self.red_row()["state"], "due")
+
+    def test_dismiss_refuses_an_active_adventurer_with_a_live_session(self):
+        self.start_job()
+        self.write_session(os.getpid(), "adv-1", "adv")
+        code, out, err = self.cli(["adventurer", "dismiss", "1"], None)
+        self.assertNotEqual(code, 0)
+        self.assertEqual(self.red_row()["state"], "running")
+
+    def test_text_board_and_list_show_the_dismiss_hint_without_launch_command(self):
+        self.start_job()
+        out = self.cli(["board"], None)[1]
+        self.assertIn("acme/app stalled: session gone, run guild adventurer dismiss 1 main red: ci down", out)
+        self.assertNotIn("guild solo launch acme/app red-main", out)
+        self.assertIn(
+            "acme/app red-main stalled: session gone, run guild adventurer dismiss 1",
+            self.cli(["solo", "list"], None)[1],
+        )
+
+    def test_tick_does_not_launch_a_stalled_player(self):
+        self.start_job()
+        tmux = FakeTmux(True, [], [])
+        with mock.patch("guild.tmux_windows.Tmux", return_value=tmux):
+            code, out, err = self.cli(["solo", "tick"], None)
+        self.assertEqual(code, 0, err)
+        self.assertEqual(out.strip(), "")
+        self.assertEqual(tmux.windows, [])
 
 
 class SoloPlayersFixingTests(SoloPlayersTestCase):

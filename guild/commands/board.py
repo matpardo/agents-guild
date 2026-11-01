@@ -971,7 +971,7 @@ def _health_job_lines(painter, projects_by_name, ctx):
 
 
 def _solo_player_lines(painter, projects_by_name, ctx):
-    rows = solo_players.models(ctx.conn, ctx.now, projects_by_name)
+    rows = solo_players.models(ctx.conn, ctx.now, projects_by_name, session_info.live_session_ids(ctx.sessions_dir))
     if not rows:
         return []
     lines = [painter.paint("SOLO PLAYERS · {}".format(len(rows)), "bold")]
@@ -982,7 +982,7 @@ def _solo_player_lines(painter, projects_by_name, ctx):
                 row["class"],
                 row["repo"],
                 row["state"],
-                solo_players.waits_on_text(row),
+                solo_players.state_detail(row),
                 row["trigger"] or "no trigger",
             )
         )
@@ -1497,7 +1497,7 @@ def board_model(ctx):
             _adventurer_model(ctx, repo_clones, row, live_ids, projects_by_name) for row in _adventurer_rows(ctx.conn)
         ],
         "health_jobs": health_jobs.models(ctx, projects_by_name),
-        "solo_players": solo_players.models(ctx.conn, ctx.now, projects_by_name),
+        "solo_players": solo_players.models(ctx.conn, ctx.now, projects_by_name, live_ids),
         "memory": [
             _memory_item_model(item) for item in memory_commands.all_items(None) if item["party"] in live_party_names
         ],

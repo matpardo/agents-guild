@@ -95,13 +95,18 @@ def _fix_prs(conn, repo, job):
     return ["{}#{}".format(repo, row["number"]) for row in rows]
 
 
-def _state(conn, now, project, health_job, trigger, fix_prs, last_done, last_launch):
-    running = conn.execute(
-        "SELECT 1 FROM adventurers WHERE project = ? AND health_job = ? AND state = 'active'",
+def _active_adventurer(conn, project, health_job):
+    return conn.execute(
+        "SELECT id, session_id FROM adventurers WHERE project = ? AND health_job = ? AND state = 'active'",
         (project, health_job),
     ).fetchone()
-    if running is not None:
+
+
+def _state(now, active, live_ids, trigger, fix_prs, last_done, last_launch):
+    if active is not None and active["session_id"] in live_ids:
         return "running"
+    if active is not None:
+        return "stalled"
     if fix_prs:
         return "fixing"
     if trigger is None:
@@ -113,18 +118,21 @@ def _state(conn, now, project, health_job, trigger, fix_prs, last_done, last_lau
     return "due"
 
 
-def waits_on_text(row):
-    if not row["waits_on"]:
-        return ""
-    return ": waits on {}".format(", ".join(row["waits_on"]))
+def state_detail(row):
+    if row["stalled_adventurer"] is not None:
+        return ": session gone, run guild adventurer dismiss {}".format(row["stalled_adventurer"])
+    if row["waits_on"]:
+        return ": waits on {}".format(", ".join(row["waits_on"]))
+    return ""
 
 
-def models(conn, now, projects_by_name):
+def models(conn, now, projects_by_name, live_ids):
     result = []
     for project in sorted(projects_by_name):
         for player in _players(projects_by_name[project]):
             health_job = health_job_name(player["repo"], player["job"])
             trigger = _TRIGGERS[player["job"]](conn, player["repo"])
+            active = _active_adventurer(conn, project, health_job)
             fix_prs = _fix_prs(conn, player["repo"], player["job"])
             last_done, last_pending = _last_report(conn, project, health_job)
             result.append(
@@ -136,9 +144,8 @@ def models(conn, now, projects_by_name):
                     "name": player.get("name", player["job"]),
                     "health_job": health_job,
                     "trigger": trigger,
-                    "state": _state(
-                        conn, now, project, health_job, trigger, fix_prs, last_done, _last_launch(conn, health_job)
-                    ),
+                    "state": _state(now, active, live_ids, trigger, fix_prs, last_done, _last_launch(conn, health_job)),
+                    "stalled_adventurer": None if active is None or active["session_id"] in live_ids else active["id"],
                     "waits_on": fix_prs,
                     "last_done": last_done,
                     "last_pending": last_pending,
