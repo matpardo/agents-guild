@@ -40,9 +40,9 @@ def create(ctx, text, to, ttl, until):
     if until is not None:
         until_condition = json.dumps(refs.parse_until(until))
     actor_party, unbound = identity.resolve_actor(ctx.conn, ctx.session_id)
-    _reject_duplicate(ctx, actor_party, to, text)
-    notice_id = next_id(ctx.conn, "notices")
     with db.writing(ctx.conn):
+        _reject_duplicate(ctx, actor_party, to, text)
+        notice_id = next_id(ctx.conn, "notices")
         events.record(
             ctx.conn,
             ctx.now,
@@ -66,30 +66,34 @@ def create(ctx, text, to, ttl, until):
     return "notice #{} created\n{}".format(notice_id, pii.BROADCAST_REMINDER)
 
 
-def create_announcing(ctx, actor_party, text, to, ttl, announces):
+def append_announcing(ctx, actor_party, text, to, ttl, announces):
     notice_id = next_id(ctx.conn, "notices")
     expires_at = timeutil.expires_at_iso(ctx.now, ttl)
-    with db.writing(ctx.conn):
-        events.record(
-            ctx.conn,
-            ctx.now,
-            ctx.origin,
-            actor_party,
-            ctx.session_id,
-            None,
-            "notice.created",
-            "guild",
-            {
-                "id": notice_id,
-                "party": actor_party,
-                "scope": to,
-                "text": text,
-                "until_condition": None,
-                "expires_at": expires_at,
-                "announces": announces,
-            },
-        )
+    events.record(
+        ctx.conn,
+        ctx.now,
+        ctx.origin,
+        actor_party,
+        ctx.session_id,
+        None,
+        "notice.created",
+        "guild",
+        {
+            "id": notice_id,
+            "party": actor_party,
+            "scope": to,
+            "text": text,
+            "until_condition": None,
+            "expires_at": expires_at,
+            "announces": announces,
+        },
+    )
     return notice_id
+
+
+def create_announcing(ctx, actor_party, text, to, ttl, announces):
+    with db.writing(ctx.conn):
+        return append_announcing(ctx, actor_party, text, to, ttl, announces)
 
 
 def announced(conn, announces):
@@ -97,22 +101,26 @@ def announced(conn, announces):
     return row is not None
 
 
-def _record_notice_event(ctx, kind, notice_id):
+def _append_notice_event(ctx, kind, notice_id):
     binding = identity.resolve_binding(ctx.conn, ctx.session_id)
     actor_party = binding["party"] if binding is not None else None
     project = config.resolve_project(ctx.cwd, config.load_all_projects(ctx.projects_dir))
+    events.record(
+        ctx.conn,
+        ctx.now,
+        ctx.origin,
+        actor_party,
+        ctx.session_id,
+        project,
+        kind,
+        "guild",
+        {"id": notice_id},
+    )
+
+
+def _record_notice_event(ctx, kind, notice_id):
     with db.writing(ctx.conn):
-        events.record(
-            ctx.conn,
-            ctx.now,
-            ctx.origin,
-            actor_party,
-            ctx.session_id,
-            project,
-            kind,
-            "guild",
-            {"id": notice_id},
-        )
+        _append_notice_event(ctx, kind, notice_id)
 
 
 def _require_live_notice(ctx, notice_id):
@@ -124,13 +132,18 @@ def _require_live_notice(ctx, notice_id):
     return row
 
 
-def close(ctx, notice_id):
+def _require_active_notice(ctx, notice_id):
     row = ctx.conn.execute("SELECT id, state FROM notices WHERE id = ?", (notice_id,)).fetchone()
     if row is None:
         raise GuildError("unknown notice #{}".format(notice_id), 1)
     if row["state"] != "active":
         raise GuildError("notice #{} is not active".format(notice_id), 1)
-    _record_notice_event(ctx, "notice.closed", notice_id)
+
+
+def close(ctx, notice_id):
+    with db.writing(ctx.conn):
+        _require_active_notice(ctx, notice_id)
+        _append_notice_event(ctx, "notice.closed", notice_id)
     return "notice #{} closed".format(notice_id)
 
 

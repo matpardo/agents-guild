@@ -173,33 +173,30 @@ def _current_fields(row):
     }
 
 
-def _record_pr_set(ctx, actor, project, repo, number, fields):
-    with db.writing(ctx.conn):
-        events.record(
-            ctx.conn,
-            ctx.now,
-            ctx.origin,
-            actor,
-            ctx.session_id,
-            project,
-            "pr.set",
-            "guild",
-            dict(fields, repo=repo, number=number),
-        )
-
-
-def _relink(ctx, actor, project, row, task_ref, card):
-    fields = _current_fields(row)
-    fields.update(_link_fields(ctx, row, task_ref, card))
-    _record_pr_set(ctx, actor, project, row["repo"], row["number"], fields)
+def _append_pr_set(ctx, actor, project, repo, number, fields):
+    events.record(
+        ctx.conn,
+        ctx.now,
+        ctx.origin,
+        actor,
+        ctx.session_id,
+        project,
+        "pr.set",
+        "guild",
+        dict(fields, repo=repo, number=number),
+    )
 
 
 def relink_as_human(ctx, ref, task_ref, card):
     if task_ref is None and card is None:
         raise GuildError("relink needs a task or a card", 1)
     repo, number = refs.parse_pr_ref(ref)
-    row = _load_pr(ctx.conn, repo, number)
-    _relink(ctx, None, merge_queue_commands._project_for_repo(ctx, repo), row, task_ref, card)
+    project = merge_queue_commands._project_for_repo(ctx, repo)
+    with db.writing(ctx.conn):
+        row = _load_pr(ctx.conn, repo, number)
+        fields = _current_fields(row)
+        fields.update(_link_fields(ctx, row, task_ref, card))
+        _append_pr_set(ctx, None, project, repo, number, fields)
     return "PR '{}#{}' updated".format(repo, number)
 
 
@@ -235,10 +232,11 @@ def untrack(ctx, ref):
 
 def _set_blocked_external_as_human(ctx, ref, reason):
     repo, number = refs.parse_pr_ref(ref)
-    row = _load_pr(ctx.conn, repo, number)
-    fields = _current_fields(row)
-    fields["blocked_external"] = reason
-    _record_pr_set(ctx, None, merge_queue_commands._project_for_repo(ctx, repo), repo, number, fields)
+    project = merge_queue_commands._project_for_repo(ctx, repo)
+    with db.writing(ctx.conn):
+        fields = _current_fields(_load_pr(ctx.conn, repo, number))
+        fields["blocked_external"] = reason
+        _append_pr_set(ctx, None, project, repo, number, fields)
     return "PR '{}#{}' updated".format(repo, number)
 
 
@@ -287,20 +285,23 @@ def set_(
         )
     repo, number = refs.parse_pr_ref(ref)
     binding = identity.require_binding(ctx.conn, ctx.session_id)
-    row = _load_pr(ctx.conn, repo, number)
     project = config.require_project(ctx.cwd, ctx.projects_dir)
-    fields = _current_fields(row)
-    fields["lifecycle"] = lifecycle if lifecycle is not None else row["lifecycle"]
-    fields["waits"] = waits if waits is not None else row["waits"]
-    fields["needs_ask_answer"] = _flag_value(needs_ask_answer, row["needs_ask_answer"])
-    fields["needs_human_pr_review"] = _flag_value(needs_human_pr_review, row["needs_human_pr_review"])
-    fields["fixes_main"] = _flag_value(fixes_main, row["fixes_main"])
-    fields["fixes_flaky"] = _flag_value(fixes_flaky, row["fixes_flaky"])
-    fields["blocked_external"] = _blocked_external_value(blocked_external, no_blocked_external, row["blocked_external"])
-    if task_ref is not None or card is not None:
-        _require_owner(ctx, row)
-        fields.update(_link_fields(ctx, row, task_ref, card))
-    _record_pr_set(ctx, binding["party"], project, repo, number, fields)
+    with db.writing(ctx.conn):
+        row = _load_pr(ctx.conn, repo, number)
+        fields = _current_fields(row)
+        fields["lifecycle"] = lifecycle if lifecycle is not None else row["lifecycle"]
+        fields["waits"] = waits if waits is not None else row["waits"]
+        fields["needs_ask_answer"] = _flag_value(needs_ask_answer, row["needs_ask_answer"])
+        fields["needs_human_pr_review"] = _flag_value(needs_human_pr_review, row["needs_human_pr_review"])
+        fields["fixes_main"] = _flag_value(fixes_main, row["fixes_main"])
+        fields["fixes_flaky"] = _flag_value(fixes_flaky, row["fixes_flaky"])
+        fields["blocked_external"] = _blocked_external_value(
+            blocked_external, no_blocked_external, row["blocked_external"]
+        )
+        if task_ref is not None or card is not None:
+            _require_owner(ctx, row)
+            fields.update(_link_fields(ctx, row, task_ref, card))
+        _append_pr_set(ctx, binding["party"], project, repo, number, fields)
     new_lifecycle = fields["lifecycle"]
     message = "PR '{}#{}' updated".format(repo, number)
     if new_lifecycle == "ready" and row["gh_draft"]:

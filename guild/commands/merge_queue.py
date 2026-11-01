@@ -111,25 +111,24 @@ def _project_for_repo(ctx, repo):
     return project["name"]
 
 
-def _record_pin_event(ctx, kind, actor, first, second):
-    with db.writing(ctx.conn):
-        events.record(
-            ctx.conn,
-            ctx.now,
-            ctx.origin,
-            actor,
-            ctx.session_id,
-            _project_for_repo(ctx, first["repo"]),
-            kind,
-            "guild",
-            {
-                "first_repo": first["repo"],
-                "first_number": first["number"],
-                "second_repo": second["repo"],
-                "second_number": second["number"],
-                "author": actor,
-            },
-        )
+def _append_pin_event(ctx, kind, actor, first, second):
+    events.record(
+        ctx.conn,
+        ctx.now,
+        ctx.origin,
+        actor,
+        ctx.session_id,
+        _project_for_repo(ctx, first["repo"]),
+        kind,
+        "guild",
+        {
+            "first_repo": first["repo"],
+            "first_number": first["number"],
+            "second_repo": second["repo"],
+            "second_number": second["number"],
+            "author": actor,
+        },
+    )
 
 
 def _pin_rows(ctx, first_text, second_text):
@@ -143,29 +142,31 @@ def _pin_rows(ctx, first_text, second_text):
 
 
 def pin(ctx, first_text, second_text):
-    first, second = _pin_rows(ctx, first_text, second_text)
-    _require_open(first)
-    _require_open(second)
-    actor = _actor_party(ctx)
-    _require_authority(ctx, actor, first, second)
-    first_ref = pr_records.ref_text(first["repo"], first["number"])
-    second_ref = pr_records.ref_text(second["repo"], second["number"])
-    if _existing_pin(ctx.conn, first, second) is not None:
-        raise GuildError("'{}' is already pinned before '{}'".format(first_ref, second_ref), 1)
-    _reject_cycle(ctx.conn, first_ref, second_ref)
-    _record_pin_event(ctx, "merge_queue.pinned", actor, first, second)
+    with db.writing(ctx.conn):
+        first, second = _pin_rows(ctx, first_text, second_text)
+        _require_open(first)
+        _require_open(second)
+        actor = _actor_party(ctx)
+        _require_authority(ctx, actor, first, second)
+        first_ref = pr_records.ref_text(first["repo"], first["number"])
+        second_ref = pr_records.ref_text(second["repo"], second["number"])
+        if _existing_pin(ctx.conn, first, second) is not None:
+            raise GuildError("'{}' is already pinned before '{}'".format(first_ref, second_ref), 1)
+        _reject_cycle(ctx.conn, first_ref, second_ref)
+        _append_pin_event(ctx, "merge_queue.pinned", actor, first, second)
     return "pinned '{}' before '{}'".format(first_ref, second_ref)
 
 
 def unpin(ctx, first_text, second_text):
-    first, second = _pin_rows(ctx, first_text, second_text)
-    first_ref = pr_records.ref_text(first["repo"], first["number"])
-    second_ref = pr_records.ref_text(second["repo"], second["number"])
-    if _existing_pin(ctx.conn, first, second) is None:
-        raise GuildError("no pin of '{}' before '{}'".format(first_ref, second_ref), 1)
-    actor = _actor_party(ctx)
-    _require_authority(ctx, actor, first, second)
-    _record_pin_event(ctx, "merge_queue.unpinned", actor, first, second)
+    with db.writing(ctx.conn):
+        first, second = _pin_rows(ctx, first_text, second_text)
+        first_ref = pr_records.ref_text(first["repo"], first["number"])
+        second_ref = pr_records.ref_text(second["repo"], second["number"])
+        if _existing_pin(ctx.conn, first, second) is None:
+            raise GuildError("no pin of '{}' before '{}'".format(first_ref, second_ref), 1)
+        actor = _actor_party(ctx)
+        _require_authority(ctx, actor, first, second)
+        _append_pin_event(ctx, "merge_queue.unpinned", actor, first, second)
     return "unpinned '{}' before '{}'".format(first_ref, second_ref)
 
 

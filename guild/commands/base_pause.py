@@ -19,31 +19,33 @@ def _actor_party(ctx):
     return identity.require_binding(ctx.conn, ctx.session_id)["party"]
 
 
-def _record(ctx, kind, repo):
-    project = _owning_project(ctx, repo)
-    with db.writing(ctx.conn):
-        events.record(
-            ctx.conn,
-            ctx.now,
-            ctx.origin,
-            _actor_party(ctx),
-            ctx.session_id,
-            project,
-            kind,
-            "local",
-            {"repo": repo},
-        )
+def _append(ctx, kind, repo, project):
+    events.record(
+        ctx.conn,
+        ctx.now,
+        ctx.origin,
+        _actor_party(ctx),
+        ctx.session_id,
+        project,
+        kind,
+        "local",
+        {"repo": repo},
+    )
 
 
 def pause(ctx, repo):
-    if repo in paused_repos(ctx.conn):
-        raise GuildError("base of {} is already paused".format(repo), 1)
-    _record(ctx, "base.paused", repo)
+    project = _owning_project(ctx, repo)
+    with db.writing(ctx.conn):
+        if repo in paused_repos(ctx.conn):
+            raise GuildError("base of {} is already paused".format(repo), 1)
+        _append(ctx, "base.paused", repo, project)
     return "base of {} paused".format(repo)
 
 
 def resume(ctx, repo):
-    if repo not in paused_repos(ctx.conn):
-        raise GuildError("base of {} is not paused".format(repo), 1)
-    _record(ctx, "base.resumed", repo)
+    project = _owning_project(ctx, repo)
+    with db.writing(ctx.conn):
+        if repo not in paused_repos(ctx.conn):
+            raise GuildError("base of {} is not paused".format(repo), 1)
+        _append(ctx, "base.resumed", repo, project)
     return "base of {} resumed".format(repo)
