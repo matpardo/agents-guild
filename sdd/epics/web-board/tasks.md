@@ -168,3 +168,13 @@ updated: 2026-10-04
 **Status:** [x] done
 
 **What:** `GET /api/session` is gone (404); `guild web` prints `http://127.0.0.1:<port>/#t=<token>`, each page reads the token from the fragment, keeps it in `sessionStorage` for the tab, strips it from the address bar and sends it in `X-Guild-Token` on every `/api` request, and every `/api` GET without a valid token answers 403, so a local process that only sends the right `Host` can no longer get the write token. Unexpected errors in a read or a write answer a generic JSON 500, and a deeply nested JSON body answers 400.
+
+## T24 — Complete project fixtures in web tests
+
+**Depends on:** —
+**Status:** [x] done
+
+**What:** the notice and raid web behavior tests pass a full project model, so the node harness renders without `TypeError` traces on stderr.
+
+**Acceptance:**
+- [x] `python3 -m unittest tests.test_web_drift` prints no `TypeError`.
