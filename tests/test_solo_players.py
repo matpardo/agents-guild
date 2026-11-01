@@ -450,6 +450,77 @@ class SoloPlayersTickTests(SoloPlayersTestCase):
         self.assertEqual(len(after), 1)
 
 
+class SoloPlayersBackoffTests(SoloPlayersTestCase):
+    def setUp(self):
+        super().setUp()
+        self.red("ci broke")
+        with mock.patch("guild.tmux_windows.Tmux", return_value=FakeTmux(True, [], [])):
+            self.cli(["solo", "tick"], None)
+        self.finish_job("red-main-acme-app", "could not fix")
+
+    def age(self, hours):
+        old = timeutil.to_iso(timeutil.utcnow() - timedelta(hours=hours))
+        conn = self.db()
+        conn.execute("UPDATE adventurers SET done_at = ?", (old,))
+        conn.execute("UPDATE solo_launches SET launched_at = ?", (old,))
+        conn.commit()
+
+    def row(self):
+        return self.players()[("acme/app", "red-main")]
+
+    def test_launch_records_the_trigger(self):
+        self.assertEqual(self.db().execute("SELECT trigger FROM solo_launches").fetchone()[0], "main red: ci broke")
+
+    def test_same_trigger_two_hours_later_is_still_cooling_with_retry_time(self):
+        self.age(2)
+        row = self.row()
+        self.assertEqual(row["state"], "cooling")
+        self.assertIsNotNone(row["retry_at"])
+        out = self.cli(["board"], None)[1]
+        self.assertIn("cooling: same trigger, retry after {}".format(row["retry_at"]), out)
+
+    def test_same_trigger_twenty_five_hours_later_is_due(self):
+        self.age(25)
+        row = self.row()
+        self.assertEqual(row["state"], "due")
+        self.assertIsNone(row["retry_at"])
+
+    def test_different_trigger_two_hours_later_is_due(self):
+        self.age(2)
+        self.red("another failure")
+        self.assertEqual(self.row()["state"], "due")
+
+    def test_cooldown_under_one_hour_stays_cooling_for_a_different_trigger(self):
+        self.red("another failure")
+        row = self.row()
+        self.assertEqual(row["state"], "cooling")
+        self.assertIsNone(row["retry_at"])
+
+    def test_legacy_launch_event_without_trigger_replays_as_a_different_trigger(self):
+        conn = self.db()
+        conn.execute(
+            "UPDATE events SET payload = ? WHERE kind = 'solo.launched'",
+            (json.dumps({"repo": "acme/app", "job": "red-main"}),),
+        )
+        conn.commit()
+        self.assertEqual(self.cli(["rebuild"], None)[0], 0)
+        self.assertIsNone(self.db().execute("SELECT trigger FROM solo_launches").fetchone()[0])
+        self.age(2)
+        self.assertEqual(self.row()["state"], "due")
+
+    def test_manual_launch_without_trigger_records_none(self):
+        self.cli(["main", "green", "acme/app"], None)
+        with mock.patch("guild.tmux_windows.Tmux", return_value=FakeTmux(True, [], [])):
+            self.assertEqual(self.cli(["solo", "launch", "acme/app", "red-main"], None)[0], 0)
+        self.assertIsNone(self.db().execute("SELECT trigger FROM solo_launches").fetchone()[0])
+
+    def test_trigger_survives_rebuild(self):
+        before = [tuple(r) for r in self.db().execute("SELECT * FROM solo_launches").fetchall()]
+        self.assertEqual(self.cli(["rebuild"], None)[0], 0)
+        after = [tuple(r) for r in self.db().execute("SELECT * FROM solo_launches").fetchall()]
+        self.assertEqual(before, after)
+
+
 class DependabotSyncTests(SoloPlayersTestCase):
     def setUp(self):
         super().setUp()

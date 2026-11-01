@@ -306,7 +306,8 @@ _CREATE_STATEMENTS = (
     """
     CREATE TABLE IF NOT EXISTS solo_launches (
         health_job TEXT PRIMARY KEY,
-        launched_at TEXT NOT NULL
+        launched_at TEXT NOT NULL,
+        trigger TEXT
     )
     """,
     """
@@ -426,6 +427,7 @@ _COLUMN_MIGRATIONS = (
     ("prs", "card", "TEXT"),
     ("prs", "adventurer", "INTEGER"),
     ("adventurers", "health_job", "TEXT"),
+    ("solo_launches", "trigger", "TEXT"),
     ("asks", "snapshot", "TEXT"),
     ("asks", "answered_at", "TEXT"),
     ("asks", "recommend", "TEXT"),
