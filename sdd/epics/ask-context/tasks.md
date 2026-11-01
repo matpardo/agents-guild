@@ -120,8 +120,19 @@ updated: 2026-10-31
 **Depends on:** T08
 **Status:** [x] done
 
-**What:** in the CLI, a `**bold**` span that wraps onto another line stays bold on every line, and the board dims the context, recommendation and answer text around the bold spans.
+**What:** in the CLI, a `**bold**` span that wraps onto another line stays bold on every line, and the board dims the context text around the bold spans; recommendation and answer stay undimmed.
 
 **Acceptance:**
 - [x] A bold span split by a wrap is styled on both lines with its markers removed.
 - [x] An unclosed `**` stays literal.
+
+## T12 — Ask styling on the web
+
+**Depends on:** T08
+**Status:** [x] done
+
+**What:** the web board styles the ask recommendation with an accent border, gives ask text paragraphs compact margins and mutes the `dig in` summary.
+
+**Acceptance:**
+- [x] The recommendation stands out from the rest of the card.
+- [x] Multi-line context, recommendation and answer read as compact paragraphs.
