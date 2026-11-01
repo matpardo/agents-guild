@@ -312,6 +312,21 @@ main {
   border-left: 4px solid var(--accent);
 }
 
+.ask-recommend {
+  border-left: 3px solid var(--accent);
+  padding: 0.25rem 0.5rem;
+  margin: 0.5rem 0;
+}
+
+.ask-text p {
+  margin: 0.25rem 0;
+}
+
+.ask-dig-in > summary {
+  color: var(--muted);
+  cursor: pointer;
+}
+
 .answered-pager {
   display: flex;
   gap: 0.5rem;
