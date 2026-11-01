@@ -6,6 +6,7 @@ from guild import names, session_info
 _SUBAGENT_TTL_SECONDS = 2 * 60 * 60
 _PR_PREFIX = "pr-"
 _SUBAGENT_PREFIX = "subagent-"
+WAITING_ON_OWN_WORK = "waiting-on-own-background-work"
 
 
 def _session_dir(state_dir, session_id):
@@ -40,7 +41,10 @@ def subagent_key(agent_id):
 
 def _subagent_finished(entry):
     try:
-        meta = json.loads(Path(entry.read_text()).read_text())
+        marker = entry.read_text()
+        if marker == WAITING_ON_OWN_WORK:
+            return False
+        meta = json.loads(Path(marker).read_text())
     except (json.JSONDecodeError, OSError):
         return False
     return isinstance(meta, dict) and meta.get("finished") is True
