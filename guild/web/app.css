@@ -33,6 +33,8 @@
   --lifecycle-closed-bg: #f0f0f2;
   --status-stopped-fg: #5b2a9e;
   --status-stopped-bg: #ece0fa;
+  --purple-fg: #ffffff;
+  --purple-bg: #6b3fa0;
   --role-member-fg: #1d4f9a;
   --role-member-bg: #dce8fb;
   --role-solo-fg: #4a4a52;
@@ -75,6 +77,8 @@
     --lifecycle-closed-bg: #26272e;
     --status-stopped-fg: #d3b5ff;
     --status-stopped-bg: #3a2660;
+    --purple-fg: #14151a;
+    --purple-bg: #b48ce8;
     --role-member-fg: #a9c8ff;
     --role-member-bg: #1c2f52;
     --role-solo-fg: #c4c4cc;
@@ -763,17 +767,18 @@ main.history-main {
   color: var(--role-solo-fg);
 }
 
-.status-waiting-permission {
+.status-waiting-permission,
+.status-waiting-input {
   background: var(--danger);
   color: var(--bg);
 }
 
-.status-waiting-ask,
-.status-waiting-input {
+.status-waiting-ask {
   background: var(--lifecycle-converging-bg);
   color: var(--lifecycle-converging-fg);
 }
 
+.status-waiting-sub-agents,
 .status-waiting-background {
   background: var(--role-solo-bg);
   color: var(--role-solo-fg);
@@ -795,8 +800,8 @@ main.history-main {
 }
 
 .status-parked {
-  background: var(--lifecycle-converging-bg);
-  color: var(--lifecycle-converging-fg);
+  background: var(--purple-bg);
+  color: var(--purple-fg);
 }
 
 .status-blocked {

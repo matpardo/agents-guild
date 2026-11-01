@@ -59,20 +59,24 @@ def _is_live(entry, now):
     return not _subagent_finished(entry)
 
 
-def labels(state_dir, session_id, now):
+def _live_entries(state_dir, session_id, now):
     directory = _session_dir(state_dir, session_id)
     if not directory.is_dir():
         return []
-    pr_labels = []
-    subagents = 0
+    live = []
     for entry in sorted(directory.iterdir()):
         if not _is_live(entry, now):
             entry.unlink(missing_ok=True)
             continue
-        if entry.name.startswith(_PR_PREFIX):
-            pr_labels.append(entry.read_text())
-            continue
-        subagents += 1
-    if subagents:
-        pr_labels.append("{} subagents".format(subagents))
-    return pr_labels
+        live.append(entry)
+    return live
+
+
+def pr_labels(state_dir, session_id, now):
+    entries = _live_entries(state_dir, session_id, now)
+    return [entry.read_text() for entry in entries if entry.name.startswith(_PR_PREFIX)]
+
+
+def subagent_count(state_dir, session_id, now):
+    entries = _live_entries(state_dir, session_id, now)
+    return len([entry for entry in entries if entry.name.startswith(_SUBAGENT_PREFIX)])

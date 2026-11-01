@@ -62,9 +62,13 @@ def derive(ctx, party_row):
     if ask_since is not None and session_state != "working":
         return _result("waiting-ask", ask_since, None)
     if session_state in ("waiting-input", "stopped"):
-        background_labels = background.labels(ctx.state_dir, party_row["leader_session_id"], ctx.now)
-        if background_labels:
-            return _result("waiting-background", session_row["since"], ", ".join(background_labels))
+        leader_session_id = party_row["leader_session_id"]
+        subagents = background.subagent_count(ctx.state_dir, leader_session_id, ctx.now)
+        if subagents:
+            return _result("waiting-sub-agents", session_row["since"], "{} subagents".format(subagents))
+        pr_labels = background.pr_labels(ctx.state_dir, leader_session_id, ctx.now)
+        if pr_labels:
+            return _result("waiting-background", session_row["since"], ", ".join(pr_labels))
     if session_state == "waiting-input":
         return _result("waiting-input", session_row["since"], session_row["detail"])
     if session_state == "stopped":

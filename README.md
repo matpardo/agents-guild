@@ -2712,11 +2712,11 @@ Without a hooks manager, add the same call to the repository's
   is recorded.
 
 - `subagent-start` and `subagent-stop`: mark and unmark a running subagent
-  of the session (`agent_id` from stdin) for the `waiting-background` status;
+  of the session (`agent_id` from stdin) for the `waiting-sub-agents` status;
   `session-start` clears the session's subagent marks on `startup` and `resume`.
   A subagent that stops while its own transcript (`agent_transcript_path`)
   shows a background command with no finished notification stays marked, so
-  the leader keeps showing `waiting-background` until the subagent wakes and
+  the leader keeps showing `waiting-sub-agents` until the subagent wakes and
   stops with nothing pending.
 - `notification` and `stop`: record the session status (see "Session
   status"). They print nothing, ignore unbound sessions and exit 0 whatever
@@ -2749,7 +2749,8 @@ status is ignored.
 | 4 | no live leader otherwise | `idle` |
 | 5 | live leader blocked on a permission prompt or an elicitation dialog | `waiting-permission` |
 | 6 | live leader, open ask and session not working | `waiting-ask` |
-| 7 | live leader idle or stopped while it has background work: a running `guild pr wait` or a live subagent | `waiting-background` (detail `pr <ref>`, `N subagents`) |
+| 7a | live leader idle or stopped while it has a live subagent | `waiting-sub-agents` (detail `N subagents`) |
+| 7b | live leader idle or stopped while a `guild pr wait` runs and no subagent is live | `waiting-background` (detail `pr <ref>`) |
 | 8 | live leader waiting on an idle prompt | `waiting-input` |
 | 9 | live leader stopped | `stopped-with-work` when `guild next` would still return work, otherwise `done` |
 | 10 | live leader that never reported a status (for example a session started before the `Notification`/`Stop` hooks were wired) | `unknown` |

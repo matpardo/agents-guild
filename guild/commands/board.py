@@ -68,7 +68,8 @@ _FLAG_STYLES = (
 _STATUS_STYLES = {
     "waiting-permission": "red",
     "waiting-ask": "yellow",
-    "waiting-input": "yellow",
+    "waiting-input": "red",
+    "waiting-sub-agents": "dim",
     "waiting-background": "dim",
     "stopped-with-work": "cyan",
     "working": "green",
@@ -76,7 +77,7 @@ _STATUS_STYLES = {
     "unknown": "dim",
     "idle": "dim",
     "queued": "cyan",
-    "parked": "yellow",
+    "parked": "magenta",
     "blocked": "red",
     "closed": "dim",
 }
