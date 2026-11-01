@@ -133,3 +133,14 @@ updated: 2026-10-25
 **Status:** [x] done
 
 **What:** `pyproject.toml` declares ruff and coverage in a `dev` dependency group by exact version and pins uv with `required-version`; `uv.lock` holds the sha256 of every published file and replaces `requirements-lint.txt`. CI installs uv through `astral-sh/setup-uv` (pinned by commit SHA, version read from `pyproject.toml`), runs `uv sync --locked` and the lint through `uv run`; Dependabot watches the `uv` ecosystem. A machine without pip or `ensurepip` can lint.
+
+## T19 — uv 0.13.5 and a 7-day cooldown
+
+**Depends on:** T18
+**Status:** [x] done
+
+**What:** `required-version` in `pyproject.toml` pins uv `==0.13.5`, the version Dependabot's `uv` job accepts, and `.github/dependabot.yml` waits 7 days after a release instead of 14 (ADR `20261101_seven-day-dependency-cooldown.md`).
+
+**Acceptance:**
+- [x] Both Dependabot ecosystems use `default-days: 7`.
+- [x] README and the agent rules state 7 days.
