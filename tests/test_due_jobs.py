@@ -27,6 +27,9 @@ class DueJobsTests(GuildTestCase):
         self.assertEqual([call[0] for call in self.calls], [job[0] for job in due_jobs.JOBS.values()])
         self.assertTrue(all(call[1] == self.root for call in self.calls))
 
+    def test_solo_tick_is_a_background_job(self):
+        self.assertEqual(due_jobs.JOBS["solo-tick"], (("solo", "tick"), 600, True))
+
     def test_ticker_spawns_due_jobs_until_stopped(self):
         stop_event = threading.Event()
 
@@ -66,7 +69,7 @@ class DueJobsTests(GuildTestCase):
         self._spawn_due(1000.0 + 601)
         self.assertEqual(
             [call[0] for call in self.calls],
-            [job[0] for name, job in due_jobs.JOBS.items() if name.startswith("sync")],
+            [job[0] for name, job in due_jobs.JOBS.items() if name.startswith(("sync", "solo"))],
         )
 
     def test_stamp_is_touched_before_spawning(self):
@@ -86,6 +89,14 @@ class DueJobsTests(GuildTestCase):
         with mock.patch("guild.due_jobs.subprocess.Popen", side_effect=FileNotFoundError("nope")) as popen:
             _REAL_SPAWN(_SYNC_GH, self.root, True)
         self.assertEqual(popen.call_count, 1)
+
+    def test_spawn_detached_drops_the_session_id_from_the_environment(self):
+        with mock.patch.dict("os.environ", {"CLAUDE_CODE_SESSION_ID": "sess-1", "KEEP": "1"}):
+            with mock.patch("guild.due_jobs.subprocess.Popen") as popen:
+                _REAL_SPAWN(_SYNC_GH, self.root, False)
+        env = popen.call_args.kwargs["env"]
+        self.assertNotIn("CLAUDE_CODE_SESSION_ID", env)
+        self.assertEqual(env["KEEP"], "1")
 
     def test_spawn_detached_lowers_priority_only_when_asked(self):
         with mock.patch("guild.due_jobs.subprocess.Popen") as popen:

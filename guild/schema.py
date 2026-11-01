@@ -22,6 +22,7 @@ PROJECTION_TABLES = (
     "merge_queue_pins",
     "main_status",
     "dependabot_status",
+    "solo_launches",
     "session_status",
     "cost_samples",
     "resource_samples",
@@ -300,6 +301,12 @@ _CREATE_STATEMENTS = (
         unmergeable INTEGER NOT NULL,
         run_failed INTEGER NOT NULL,
         updated_at TEXT NOT NULL
+    )
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS solo_launches (
+        health_job TEXT PRIMARY KEY,
+        launched_at TEXT NOT NULL
     )
     """,
     """

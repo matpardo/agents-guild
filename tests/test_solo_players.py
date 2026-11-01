@@ -245,6 +245,90 @@ class SoloPlayersLaunchTests(SoloPlayersTestCase):
         self.assertNotIn("new-window", tmux.verbs())
 
 
+class SoloPlayersTickTests(SoloPlayersTestCase):
+    def tick(self, tmux, session_id=None):
+        with mock.patch("guild.tmux_windows.Tmux", return_value=tmux):
+            return self.cli(["solo", "tick"], session_id)
+
+    def launched_windows(self, tmux):
+        return [call[call.index("-n") + 1] for call in tmux.calls if call[0] in ("new-session", "new-window")]
+
+    def launch_events(self):
+        return self.db().execute("SELECT payload FROM events WHERE kind = 'solo.launched'").fetchall()
+
+    def test_tick_launches_a_due_player_once_with_a_notice(self):
+        self.red("ci broke")
+        tmux = FakeTmux(True, [], [])
+        code, out, err = self.tick(tmux)
+        self.assertEqual(code, 0, err)
+        self.assertEqual(self.launched_windows(tmux), ["solo-red-main-acme-app"])
+        self.assertEqual(len(self.launch_events()), 1)
+        notice = self.db().execute("SELECT scope, text FROM notices").fetchone()
+        self.assertEqual(notice["scope"], "project:acme")
+        self.assertEqual(notice["text"], "solo player mender (cleric) launched on acme/app: main red: ci broke")
+
+    def test_second_tick_is_debounced_even_without_the_window(self):
+        self.red("ci broke")
+        self.tick(FakeTmux(True, [], []))
+        tmux = FakeTmux(True, [], [])
+        self.tick(tmux)
+        self.assertEqual(self.launched_windows(tmux), [])
+        self.assertEqual(len(self.launch_events()), 1)
+        self.assertEqual(self.players()[("acme/app", "red-main")]["state"], "cooling")
+
+    def test_manual_launch_also_debounces_the_tick(self):
+        self.red("ci broke")
+        self.launch_manually()
+        tmux = FakeTmux(True, [], [])
+        self.tick(tmux)
+        self.assertEqual(self.launched_windows(tmux), [])
+
+    def launch_manually(self):
+        with mock.patch("guild.tmux_windows.Tmux", return_value=FakeTmux(True, [], [])):
+            self.assertEqual(self.cli(["solo", "launch", "acme/app", "red-main"], None)[0], 0)
+
+    def test_tick_skips_when_the_window_exists(self):
+        self.red("ci broke")
+        tmux = FakeTmux(True, ["guild"], ["solo-red-main-acme-app"])
+        code, out, err = self.tick(tmux)
+        self.assertEqual(code, 0, err)
+        self.assertNotIn("new-window", tmux.verbs())
+        self.assertEqual(self.launch_events(), [])
+
+    def test_tick_without_tmux_prints_a_failure_and_records_nothing(self):
+        self.red("ci broke")
+        code, out, err = self.tick(FakeTmux(False, [], []))
+        self.assertEqual(code, 0, err)
+        self.assertIn("solo player mender not launched: tmux not found", out)
+        self.assertEqual(self.launch_events(), [])
+
+    def test_tick_refuses_inside_a_session(self):
+        self.red("ci broke")
+        tmux = FakeTmux(True, [], [])
+        code, out, err = self.tick(tmux, "sess-1")
+        self.assertEqual(code, 1)
+        self.assertEqual(tmux.calls, [])
+
+    def test_tick_ignores_idle_cooling_and_running_players(self):
+        tmux = FakeTmux(True, [], [])
+        self.tick(tmux)
+        self.red("ci broke")
+        self.finish_job("red-main-acme-app", "none")
+        self.cli(["adventurer", "start", "--job", "dependabot-acme-app", "--reason", "test reason"], "adv-2")
+        self.db().execute("INSERT OR REPLACE INTO dependabot_status VALUES ('acme/app', 1, 0, 'x')")
+        self.tick(tmux)
+        self.assertEqual(self.launched_windows(tmux), [])
+
+    def test_launch_events_survive_rebuild(self):
+        self.red("ci broke")
+        self.tick(FakeTmux(True, [], []))
+        before = self.db().execute("SELECT * FROM solo_launches").fetchall()
+        self.assertEqual(self.cli(["rebuild"], None)[0], 0)
+        after = self.db().execute("SELECT * FROM solo_launches").fetchall()
+        self.assertEqual([tuple(r) for r in before], [tuple(r) for r in after])
+        self.assertEqual(len(after), 1)
+
+
 class DependabotSyncTests(SoloPlayersTestCase):
     def setUp(self):
         super().setUp()

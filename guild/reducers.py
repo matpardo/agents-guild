@@ -1,5 +1,6 @@
 import json
 
+from guild import solo_players
 from guild.errors import GuildError
 
 
@@ -709,6 +710,14 @@ def _dependabot_synced(conn, event):
     )
 
 
+def _solo_launched(conn, event):
+    payload = event["payload"]
+    conn.execute(
+        "INSERT OR REPLACE INTO solo_launches (health_job, launched_at) VALUES (?, ?)",
+        (solo_players.health_job_name(payload["repo"], payload["job"]), event["ts"]),
+    )
+
+
 def _main_marked(conn, event):
     _record_main_status(conn, event, "manual")
 
@@ -946,6 +955,7 @@ _REDUCERS = {
     "merge_queue.unpinned": _merge_queue_unpinned,
     "main.status_synced": _main_status_synced,
     "dependabot.synced": _dependabot_synced,
+    "solo.launched": _solo_launched,
     "main.marked": _main_marked,
     "session.waiting": _session_waiting,
     "session.stopped": _session_stopped,
@@ -1060,6 +1070,7 @@ _REQUIRED_KEYS = {
     "merge_queue.unpinned": ("first_repo", "first_number", "second_repo", "second_number"),
     "main.status_synced": ("repo", "red", "reason"),
     "dependabot.synced": ("repo", "unmergeable", "run_failed"),
+    "solo.launched": ("repo", "job"),
     "main.marked": ("repo", "red", "reason"),
     "session.waiting": ("wait", "message"),
     "session.stopped": (),

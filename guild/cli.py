@@ -537,6 +537,14 @@ def _handle_solo_launch(ctx, args):
     return 0
 
 
+def _handle_solo_tick(ctx, args):
+    from guild import tmux_windows
+    from guild.commands import solo as solo_commands
+
+    _print(solo_commands.tick(ctx, tmux_windows.Tmux()))
+    return 0
+
+
 def _handle_adventurer_done(ctx, args):
     from guild import lifecycle
     from guild.commands import adventurer as adventurer_commands
@@ -1452,6 +1460,9 @@ def _add_solo_parser(subparsers):
     launch.add_argument("repo", help="repo of the solo player, owner/name")
     launch.add_argument("job", help="solo player job: red-main or dependabot")
     launch.set_defaults(handler=_handle_solo_launch)
+
+    tick = actions.add_parser("tick", help="launch every due solo player (background job, human terminal only)")
+    tick.set_defaults(handler=_handle_solo_tick)
 
 
 def _add_main_parser(subparsers):

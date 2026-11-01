@@ -23,6 +23,7 @@ JOBS = {
     "sync-tracker": (("sync", "--source", "tracker", "--all-projects"), 10 * _MINUTE, False),
     "sync-bases": (("sync", "--source", "bases"), _MINUTE, False),
     "resources-collect": (("resources", "collect"), 2 * _HOUR, True),
+    "solo-tick": (("solo", "tick"), 10 * _MINUTE, True),
     "compact": (("compact",), _DAY, True),
 }
 
@@ -39,6 +40,7 @@ def spawn_detached(argv, cwd, low_priority):
             stdin=subprocess.DEVNULL,
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
+            env={key: value for key, value in os.environ.items() if key != "CLAUDE_CODE_SESSION_ID"},
             start_new_session=True,
             preexec_fn=_lower_priority if low_priority else None,
         )
