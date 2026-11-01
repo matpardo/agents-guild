@@ -579,6 +579,68 @@ def _sync_main_status(ctx, projects, failures):
             _sync_repo_main_status(ctx, project, clone["repo"], base, failures)
 
 
+_UNMERGEABLE_STATES = ("BEHIND", "DIRTY")
+_FAILING_STATUS_STATES = ("FAILURE", "ERROR")
+_UPDATE_RUN_SEPARATOR = " in "
+
+
+def _pr_unmergeable(pr):
+    if pr["mergeable"] == "CONFLICTING" or pr["mergeStateStatus"] in _UNMERGEABLE_STATES:
+        return True
+    return any(
+        check.get("conclusion") in _FAILING_CONCLUSIONS or check.get("state") in _FAILING_STATUS_STATES
+        for check in pr["statusCheckRollup"]
+    )
+
+
+def _update_run_failed(runs):
+    latest = {}
+    for run in runs:
+        if run["conclusion"] == "":
+            continue
+        latest.setdefault(run["name"].split(_UPDATE_RUN_SEPARATOR, 1)[0], run["conclusion"])
+    return any(conclusion == "failure" for conclusion in latest.values())
+
+
+def _recorded_dependabot_status(ctx, repo):
+    row = ctx.conn.execute("SELECT unmergeable, run_failed FROM dependabot_status WHERE repo = ?", (repo,)).fetchone()
+    if row is None:
+        return 0, False
+    return row["unmergeable"], bool(row["run_failed"])
+
+
+def _sync_repo_dependabot(ctx, project, repo, failures):
+    try:
+        prs = github.dependabot_prs(ctx.cwd, repo)
+        runs = github.dependabot_runs(ctx.cwd, repo)
+    except github.GhCommandError as error:
+        failures.append("{}: dependabot check failed: {}".format(repo, error))
+        return
+    unmergeable = sum(1 for pr in prs if _pr_unmergeable(pr))
+    run_failed = _update_run_failed(runs)
+    if _recorded_dependabot_status(ctx, repo) == (unmergeable, run_failed):
+        return
+    with db.writing(ctx.conn):
+        events.record(
+            ctx.conn,
+            ctx.now,
+            ctx.origin,
+            None,
+            ctx.session_id,
+            project["name"],
+            "dependabot.synced",
+            "guild",
+            {"repo": repo, "unmergeable": unmergeable, "run_failed": run_failed},
+        )
+
+
+def _sync_dependabot(ctx, projects, failures):
+    for project in projects:
+        repos = sorted({player["repo"] for player in project.get("solo_players", []) if player["job"] == "dependabot"})
+        for repo in repos:
+            _sync_repo_dependabot(ctx, project, repo, failures)
+
+
 def _prune_handoffs(ctx, failures):
     try:
         handoff_prune.prune(ctx, paths.handoffs_dir())
@@ -637,6 +699,7 @@ def _sync_gh(ctx, lifecycle_runner):
     _fast_forward_merged_bases_mutating_git(ctx, projects, merged_repos)
     _check_migration_clashes(ctx, projects, failures)
     _sync_main_status(ctx, projects, failures)
+    _sync_dependabot(ctx, projects, failures)
     _close_met_notices(ctx)
     lifecycle_commands.run_sync_triggers(ctx, projects, triggers, lifecycle_runner)
     _prune_handoffs(ctx, failures)

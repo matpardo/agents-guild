@@ -132,28 +132,31 @@ def _first_path(project_data):
     return str(Path(*parts))
 
 
-def launch(ctx, job_name, tmux):
-    if ctx.session_id is not None:
-        raise GuildError("adventurer launch runs from the human terminal, not inside a Claude Code session", 1)
-    project = config.require_project(ctx.cwd, ctx.projects_dir)
-    project_data = config.load_project(ctx.projects_dir, project)
-    job = health_jobs.require_job(project_data, job_name)
+def launch_window(project_data, job, window_name, tmux):
     cwd = _first_path(project_data)
     if not os.path.isdir(cwd):
         raise GuildError("project path '{}' does not exist".format(cwd), 1)
     if not tmux.installed():
         raise GuildError("tmux not found: install tmux (e.g. sudo apt install tmux)", 1)
     session_is_up = tmux_windows.session_exists(tmux)
-    window_name = "health-" + job_name
     if session_is_up and window_name in tmux_windows.window_names(tmux):
         raise GuildError("window '{}' already exists".format(window_name), 1)
-    command = resume.health_command(job_name, job["command"])
+    command = resume.health_command(job["name"], job["command"])
     window_id = tmux_windows.create_window(tmux, window_name, cwd, command, session_is_up)
     if window_id is None:
         raise GuildError("tmux could not create the window", 1)
     tmux_windows.pin_window_name(tmux, window_id)
     tmux_windows.set_session_options(tmux)
-    return "launched {} in {}: tmux attach -t {}".format(job_name, cwd, tmux_windows.SESSION)
+    return "launched {} in {}: tmux attach -t {}".format(job["name"], cwd, tmux_windows.SESSION)
+
+
+def launch(ctx, job_name, tmux):
+    if ctx.session_id is not None:
+        raise GuildError("adventurer launch runs from the human terminal, not inside a Claude Code session", 1)
+    project = config.require_project(ctx.cwd, ctx.projects_dir)
+    project_data = config.load_project(ctx.projects_dir, project)
+    job = health_jobs.require_job(project_data, job_name)
+    return launch_window(project_data, job, "health-" + job_name, tmux)
 
 
 def done(ctx, pending, lifecycle_runner):

@@ -244,6 +244,36 @@ def _validate_health_jobs_config(data):
         raise GuildError("project config 'health_jobs' names must be unique", 1)
 
 
+_SOLO_PLAYER_JOBS = ("red-main", "dependabot")
+
+
+def _validate_solo_player(player, repos):
+    if not isinstance(player, dict) or not {"repo", "job"} <= set(player) <= {"repo", "job", "name"}:
+        raise GuildError("entries must be objects with 'repo', 'job' and optionally 'name'", 1)
+    if player["job"] not in _SOLO_PLAYER_JOBS:
+        raise GuildError("'job' must be one of: {}".format(", ".join(_SOLO_PLAYER_JOBS)), 1)
+    if player["repo"] not in repos:
+        raise GuildError("'repo' must be one of the project's github.repos", 1)
+    if "name" in player and (not isinstance(player["name"], str) or not player["name"].strip()):
+        raise GuildError("'name' must be a non-empty string", 1)
+
+
+def _validate_solo_players_config(data):
+    players = data.get("solo_players")
+    if players is None:
+        return
+    if not isinstance(players, list):
+        raise GuildError("project config 'solo_players' must be a list", 1)
+    for player in players:
+        try:
+            _validate_solo_player(player, data["github"]["repos"])
+        except GuildError as error:
+            raise GuildError("project config 'solo_players': {}".format(error.message), 1) from error
+    identities = [(player["repo"], player["job"]) for player in players]
+    if len(set(identities)) != len(identities):
+        raise GuildError("project config 'solo_players' (repo, job) pairs must be unique", 1)
+
+
 def validate_project_config(data):
     for key in _REQUIRED_KEYS:
         if key not in data:
@@ -269,6 +299,7 @@ def validate_project_config(data):
     _validate_human_ready_config(data)
     _validate_handoff_retention_config(data)
     _validate_health_jobs_config(data)
+    _validate_solo_players_config(data)
     _validate_max_open_prs_config(data, "max_open_prs")
     _validate_max_open_prs_config(data, "max_open_prs_per_party")
     _validate_max_open_prs_config(data, "max_open_prs_per_file")

@@ -25,6 +25,7 @@ from guild import (
     sanitize,
     session_info,
     session_status,
+    solo_players,
     timeutil,
     work_queue,
 )
@@ -969,6 +970,26 @@ def _health_job_lines(painter, projects_by_name, ctx):
     return [painter.paint("HEALTH JOBS · {}".format(len(pending)), "bold"), *pending, ""]
 
 
+def _solo_player_lines(painter, projects_by_name, ctx):
+    rows = solo_players.models(ctx.conn, ctx.now, projects_by_name)
+    if not rows:
+        return []
+    lines = [painter.paint("SOLO PLAYERS · {}".format(len(rows)), "bold")]
+    for row in rows:
+        lines.append(
+            "  {} [{}] {} {} {}".format(row["name"], row["class"], row["repo"], row["state"], row["trigger"] or "idle")
+        )
+        lines.append(
+            "    last done {} · last pending {}".format(
+                row["last_done"] or "never", sanitize.strip_control_sequences(row["last_pending"] or "none")
+            )
+        )
+        if row["state"] in ("due", "idle"):
+            lines.append("    {}".format(row["launch"]))
+    lines.append("")
+    return lines
+
+
 def _count_on_local_day(counts, iso_text):
     if iso_text is None:
         return
@@ -1152,6 +1173,7 @@ def render_board(ctx, party_filter, raid_filter, color, width):
     if party_filter is None and raid_filter is None:
         lines.extend(_adventurer_lines(ctx, repo_clones, painter))
         lines.extend(_health_job_lines(painter, projects_by_name, ctx))
+        lines.extend(_solo_player_lines(painter, projects_by_name, ctx))
     lines.extend(_bases_lines(ctx, _bases_projects(projects_by_name, party_rows, party_filter, raid_filter)))
     lines.extend(_project_lines(ctx, painter, party_rows, projects_by_name))
     lines.extend(_quest_board_lines(ctx, painter, projects_by_name))
@@ -1468,6 +1490,7 @@ def board_model(ctx):
             _adventurer_model(ctx, repo_clones, row, live_ids, projects_by_name) for row in _adventurer_rows(ctx.conn)
         ],
         "health_jobs": health_jobs.models(ctx, projects_by_name),
+        "solo_players": solo_players.models(ctx.conn, ctx.now, projects_by_name),
         "memory": [
             _memory_item_model(item) for item in memory_commands.all_items(None) if item["party"] in live_party_names
         ],
