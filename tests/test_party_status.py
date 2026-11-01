@@ -245,6 +245,12 @@ class PartyStatusTests(GuildTestCase):
         result = self._derive()
         self.assertEqual((result["status"], result["detail"]), ("waiting-background", "1 subagents"))
 
+    def test_idle_with_waiting_subagent_is_waiting_background(self):
+        self._waiting("idle", "")
+        self._background(background.subagent_key("a1"), background.WAITING_ON_OWN_WORK)
+        result = self._derive()
+        self.assertEqual((result["status"], result["detail"]), ("waiting-background", "1 subagents"))
+
     def test_open_ask_beats_background(self):
         self._ask()
         self._session("session.stopped", {})

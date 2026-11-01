@@ -77,3 +77,10 @@ updated: 2026-10-04
 **Status:** [x] done
 
 **What:** a subagent marker is dropped once Claude Code's own subagent meta file says it finished, and an elicitation dialog maps to `waiting-permission` so background work cannot hide it.
+
+## T10 — A subagent waiting on its own background work stays live
+
+**Depends on:** T09
+**Status:** [x] done
+
+**What:** `subagent-stop` reads the subagent's own transcript; when a background command it launched has no finished notification, the marker is kept with a waiting content that stays live regardless of the meta file, so an idle leader shows `waiting-background` instead of `waiting-input` until the subagent wakes and stops with nothing pending.

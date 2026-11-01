@@ -60,6 +60,21 @@ class BackgroundTests(unittest.TestCase):
         self.assertEqual(self._labels(), [])
         self.assertFalse((self.state_dir / "background" / "sess-1" / key).exists())
 
+    def test_waiting_marker_stays_live_when_meta_says_finished(self):
+        meta = self.state_dir / "meta.json"
+        meta.write_text(json.dumps({"finished": True}))
+        key = background.subagent_key("a1")
+        background.mark(self.state_dir, "sess-1", key, background.WAITING_ON_OWN_WORK)
+        self.assertEqual(self._labels(), ["1 subagents"])
+
+    def test_stale_waiting_marker_expires(self):
+        key = background.subagent_key("a1")
+        background.mark(self.state_dir, "sess-1", key, background.WAITING_ON_OWN_WORK)
+        marker = self.state_dir / "background" / "sess-1" / key
+        old = self.now.timestamp() - 3 * 60 * 60
+        os.utime(marker, (old, old))
+        self.assertEqual(self._labels(), [])
+
     def test_unfinished_subagent_meta_stays_live(self):
         self._subagent_with_meta(json.dumps({"agentType": "x"}))
         self.assertEqual(self._labels(), ["1 subagents"])

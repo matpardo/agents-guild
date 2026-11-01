@@ -25,6 +25,7 @@ from guild import (
     statusline_state,
     timeutil,
     tmux_windows,
+    transcripts,
 )
 from guild.adapters import github
 from guild.commands import adventurer as adventurer_commands
@@ -226,10 +227,14 @@ def subagent_start(ctx, agent_id, transcript_path):
     background.mark(ctx.state_dir, ctx.session_id, background.subagent_key(agent_id), meta_path)
 
 
-def subagent_stop(ctx, agent_id):
+def subagent_stop(ctx, agent_id, agent_transcript_path):
     if agent_id is None or _session_actor(ctx) is None:
         return
-    background.clear(ctx.state_dir, ctx.session_id, background.subagent_key(agent_id))
+    key = background.subagent_key(agent_id)
+    if transcripts.pending_background_ids(agent_transcript_path):
+        background.mark(ctx.state_dir, ctx.session_id, key, background.WAITING_ON_OWN_WORK)
+        return
+    background.clear(ctx.state_dir, ctx.session_id, key)
 
 
 _BLOCKING_WAITS = ("permission", "elicitation")

@@ -1936,7 +1936,7 @@ def _run_stateful_hook(hook_name, stdin_data):
             hook_commands.subagent_start(ctx, stdin_data.get("agent_id"), stdin_data.get("transcript_path"))
             text = None
         elif hook_name == "subagent-stop":
-            hook_commands.subagent_stop(ctx, stdin_data.get("agent_id"))
+            hook_commands.subagent_stop(ctx, stdin_data.get("agent_id"), stdin_data.get("agent_transcript_path"))
             text = None
         elif hook_name == "pre-compact":
             hook_commands.pre_compact(ctx)

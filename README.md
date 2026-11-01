@@ -2714,6 +2714,10 @@ Without a hooks manager, add the same call to the repository's
 - `subagent-start` and `subagent-stop`: mark and unmark a running subagent
   of the session (`agent_id` from stdin) for the `waiting-background` status;
   `session-start` clears the session's subagent marks on `startup` and `resume`.
+  A subagent that stops while its own transcript (`agent_transcript_path`)
+  shows a background command with no finished notification stays marked, so
+  the leader keeps showing `waiting-background` until the subagent wakes and
+  stops with nothing pending.
 - `notification` and `stop`: record the session status (see "Session
   status"). They print nothing, ignore unbound sessions and exit 0 whatever
   the stdin carries.

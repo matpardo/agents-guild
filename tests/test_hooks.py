@@ -6,7 +6,7 @@ import subprocess
 import time
 from unittest import mock
 
-from guild import ctx_pressure, db, events, notify, paths, pii, statusline_state, timeutil
+from guild import background, ctx_pressure, db, events, notify, paths, pii, statusline_state, timeutil
 from guild.commands import memory as memory_commands
 from tests.testutil import GuildTestCase
 
@@ -1202,6 +1202,30 @@ class SubagentHookTests(GuildTestCase):
         self.run_hook("subagent-start", self._payload(agent_id="a1"))
         self.assertTrue(self.marker.exists())
         self.run_hook("subagent-stop", self._payload(agent_id="a1"))
+        self.assertFalse(self.marker.exists())
+
+    def _write_agent_transcript(self, entries):
+        path = paths.state_dir() / "agent.jsonl"
+        path.write_text("\n".join(json.dumps(entry) for entry in entries) + "\n")
+        return str(path)
+
+    def _launch_entry(self):
+        text = "Command running in background with ID: b1. Output is being written to: /x"
+        content = [{"type": "tool_result", "content": text}]
+        return {"type": "user", "message": {"content": content}}
+
+    def test_stop_with_pending_background_keeps_waiting_marker(self):
+        transcript = self._write_agent_transcript([self._launch_entry()])
+        self.run_hook("subagent-start", self._payload(agent_id="a1"))
+        self.run_hook("subagent-stop", self._payload(agent_id="a1", agent_transcript_path=transcript))
+        self.assertEqual(self.marker.read_text(), background.WAITING_ON_OWN_WORK)
+
+    def test_stop_with_completed_background_removes_marker(self):
+        done = "<task-id>b1</task-id><status>completed</status>"
+        done_entry = {"type": "user", "message": {"content": done}}
+        transcript = self._write_agent_transcript([self._launch_entry(), done_entry])
+        self.run_hook("subagent-start", self._payload(agent_id="a1"))
+        self.run_hook("subagent-stop", self._payload(agent_id="a1", agent_transcript_path=transcript))
         self.assertFalse(self.marker.exists())
 
     def test_start_stores_meta_path_from_transcript_path(self):
