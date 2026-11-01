@@ -48,3 +48,13 @@ updated: 2026-11-01
 
 **Acceptance:**
 - [x] A due player launches once from the tick, a repeated tick inside the cooldown does nothing and the project gets a notice.
+
+## T05 — No trigger on idle rows
+
+**Depends on:** T02
+**Status:** [x] done
+
+**What:** the text board shows `no trigger` for a solo player without one, as the web does, instead of repeating its `idle` state.
+
+**Acceptance:**
+- [x] An idle player's board row reads `idle no trigger`.
