@@ -437,6 +437,7 @@ def _solo_player(**overrides):
         "last_done": None,
         "last_pending": None,
         "launch": "guild solo launch acme/app red-main",
+        "waits_on": [],
     }
     return dict(player, **overrides)
 
@@ -465,6 +466,12 @@ class WebSoloPlayerBehaviorTests(unittest.TestCase):
             self.assertIn(state, out)
             self.assertIn("none left", out)
             self.assertNotIn("guild solo launch", out)
+
+    def test_fixing_player_shows_what_it_waits_on_without_launch_command(self):
+        out = self._text([_solo_player(state="fixing", waits_on=["acme/app#12"])])
+        self.assertIn("fixing", out)
+        self.assertIn("fixing: waits on acme/app#12", out)
+        self.assertNotIn("guild solo launch", out)
 
     def test_no_players_render_nothing(self):
         self.assertEqual(self._text([]), "")

@@ -12,12 +12,13 @@ def _player_rows(ctx):
 
 
 def format_row(row):
-    return "  {} [{}] {} {} {} trigger: {} last done: {} last pending: {}".format(
+    return "  {} [{}] {} {} {}{} trigger: {} last done: {} last pending: {}".format(
         row["name"],
         row["class"],
         row["repo"],
         row["job"],
         row["state"],
+        solo_players.waits_on_text(row),
         row["trigger"] or "none",
         row["last_done"] or "never",
         row["last_pending"] or "none",

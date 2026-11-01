@@ -192,6 +192,66 @@ class SoloPlayersTriggerTests(SoloPlayersTestCase):
         self.assertEqual(row["trigger"], "2 unmergeable dependabot PRs, dependabot update run failing")
 
 
+class SoloPlayersFixingTests(SoloPlayersTestCase):
+    def add_pr(self, repo, number, lifecycle, fixes_main):
+        conn = self.db()
+        conn.execute(
+            "INSERT INTO prs (repo, number, party, what, lifecycle, seeded, fixes_main)"
+            " VALUES (?, ?, 'p', 'fix', ?, 0, ?)",
+            (repo, number, lifecycle, fixes_main),
+        )
+        conn.commit()
+
+    def red_state(self):
+        return self.players()[("acme/app", "red-main")]
+
+    def test_open_fixes_main_pr_holds_the_player_with_its_ref(self):
+        self.red("ci down")
+        self.add_pr("acme/app", 12, "ready", 1)
+        row = self.red_state()
+        self.assertEqual(row["state"], "fixing")
+        self.assertEqual(row["waits_on"], ["acme/app#12"])
+
+    def test_merged_or_closed_fixes_main_pr_does_not_hold(self):
+        self.red("ci down")
+        self.add_pr("acme/app", 12, "merged", 1)
+        self.add_pr("acme/app", 13, "closed", 1)
+        self.assertEqual(self.red_state()["state"], "due")
+        self.assertEqual(self.red_state()["waits_on"], [])
+
+    def test_open_pr_without_fixes_main_does_not_hold(self):
+        self.red("ci down")
+        self.add_pr("acme/app", 12, "ready", 0)
+        self.assertEqual(self.red_state()["state"], "due")
+
+    def test_other_repo_pr_does_not_hold(self):
+        self.red("ci down")
+        self.add_pr("other/app", 12, "ready", 1)
+        self.assertEqual(self.red_state()["state"], "due")
+
+    def test_dependabot_player_is_never_fixing(self):
+        self.add_pr("acme/app", 12, "ready", 1)
+        self.assertEqual(self.players()[("acme/app", "dependabot")]["state"], "idle")
+
+    def test_text_board_and_list_show_what_it_waits_on(self):
+        self.red("ci down")
+        self.add_pr("acme/app", 12, "ready", 1)
+        out = self.cli(["board"], None)[1]
+        self.assertIn("mender [cleric] acme/app fixing: waits on acme/app#12 main red: ci down", out)
+        self.assertNotIn("guild solo launch acme/app red-main", out)
+        self.assertIn("acme/app red-main fixing", self.cli(["solo", "list"], None)[1])
+
+    def test_tick_does_not_launch_a_fixing_player(self):
+        self.red("ci down")
+        self.add_pr("acme/app", 12, "ready", 1)
+        tmux = FakeTmux(True, [], [])
+        with mock.patch("guild.tmux_windows.Tmux", return_value=tmux):
+            code, out, err = self.cli(["solo", "tick"], None)
+        self.assertEqual(code, 0, err)
+        self.assertEqual(out.strip(), "")
+        self.assertEqual(tmux.windows, [])
+
+
 class SoloPlayersBoardTests(SoloPlayersTestCase):
     def test_text_board_lists_players_with_launch_command(self):
         self.red("ci down")

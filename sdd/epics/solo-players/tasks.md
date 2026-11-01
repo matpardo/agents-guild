@@ -58,3 +58,13 @@ updated: 2026-11-01
 
 **Acceptance:**
 - [x] An idle player's board row reads `idle no trigger`.
+
+## T06 — Hold a red-main player while its fix PR is open
+
+**Depends on:** T02
+**Status:** [x] done
+
+**What:** a red-main player whose repo has an open PR tracked with `--fixes-main` is `fixing` and shows `fixing: waits on <ref>` on the board, `guild solo list` and the web, so the tick does not launch a second session for a main that stays red until a human merges.
+
+**Acceptance:**
+- [x] An open fixes-main PR of the repo makes the player `fixing` with the PR ref, a merged, closed, non-fixes-main or other-repo PR does not, and the tick does not launch it.

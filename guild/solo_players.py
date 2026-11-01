@@ -84,13 +84,26 @@ def _last_launch(conn, health_job):
     return row["launched_at"]
 
 
-def _state(conn, now, project, health_job, trigger, last_done, last_launch):
+def _fix_prs(conn, repo, job):
+    if job != "red-main":
+        return []
+    rows = conn.execute(
+        "SELECT number FROM prs WHERE repo = ? AND fixes_main = 1 AND lifecycle NOT IN ('merged', 'closed')"
+        " ORDER BY number",
+        (repo,),
+    ).fetchall()
+    return ["{}#{}".format(repo, row["number"]) for row in rows]
+
+
+def _state(conn, now, project, health_job, trigger, fix_prs, last_done, last_launch):
     running = conn.execute(
         "SELECT 1 FROM adventurers WHERE project = ? AND health_job = ? AND state = 'active'",
         (project, health_job),
     ).fetchone()
     if running is not None:
         return "running"
+    if fix_prs:
+        return "fixing"
     if trigger is None:
         return "idle"
     cooldown = timeutil.parse_duration(COOLDOWN)
@@ -100,12 +113,19 @@ def _state(conn, now, project, health_job, trigger, last_done, last_launch):
     return "due"
 
 
+def waits_on_text(row):
+    if not row["waits_on"]:
+        return ""
+    return ": waits on {}".format(", ".join(row["waits_on"]))
+
+
 def models(conn, now, projects_by_name):
     result = []
     for project in sorted(projects_by_name):
         for player in _players(projects_by_name[project]):
             health_job = health_job_name(player["repo"], player["job"])
             trigger = _TRIGGERS[player["job"]](conn, player["repo"])
+            fix_prs = _fix_prs(conn, player["repo"], player["job"])
             last_done, last_pending = _last_report(conn, project, health_job)
             result.append(
                 {
@@ -116,7 +136,10 @@ def models(conn, now, projects_by_name):
                     "name": player.get("name", player["job"]),
                     "health_job": health_job,
                     "trigger": trigger,
-                    "state": _state(conn, now, project, health_job, trigger, last_done, _last_launch(conn, health_job)),
+                    "state": _state(
+                        conn, now, project, health_job, trigger, fix_prs, last_done, _last_launch(conn, health_job)
+                    ),
+                    "waits_on": fix_prs,
                     "last_done": last_done,
                     "last_pending": last_pending,
                     "launch": LAUNCH_COMMAND.format(player["repo"], player["job"]),

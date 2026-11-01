@@ -1442,8 +1442,10 @@ Triggers come from facts the sync stores:
 A solo player is `running` while an adventurer on its health job is active,
 `due` when its trigger is on, nothing runs and the last report (`done`,
 dismissed or not) and the last launch are older than the 1h cooldown, `cooling`
-when the trigger is on but the last report or launch is newer, and `idle`
-without a trigger.
+when the trigger is on but the last report or launch is newer, `fixing` (a
+`red-main` player only) while an open PR of the repo is tracked with
+`--fixes-main`, which holds the player and shows `fixing: waits on <ref>` until
+that PR merges or closes, and `idle` without a trigger.
 
 `guild solo list` and the `SOLO PLAYERS` section of `guild board` (hidden under
 `--party` and `--raid`) and the web `solo players` show name or job, class,
