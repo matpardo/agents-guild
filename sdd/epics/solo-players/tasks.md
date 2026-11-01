@@ -79,3 +79,14 @@ updated: 2026-11-01
 **Acceptance:**
 - [x] An active adventurer with a live session is `running`, with a dead session `stalled` carrying its id, and the tick does not launch it.
 - [x] Dismissing a stalled adventurer makes the player `due` again; dismissing one with a live session is refused.
+
+## T08 — Back off a solo player when its trigger repeats
+
+**Depends on:** T02
+**Status:** [x] done
+
+**What:** each launch records the trigger text it was made for, and a player whose trigger equals the one of its last launch waits 24h instead of 1h, so a trigger it cannot fix does not relaunch it every hour. The row reads `cooling: same trigger, retry after <time>` on the board, `guild solo list` and the web.
+
+**Acceptance:**
+- [x] The same trigger inside 24h of the last report or launch keeps the player cooling with a retry time, after 24h it is due, and a different trigger is due after 1h.
+- [x] A launch recorded without a trigger replays and counts as a different trigger.

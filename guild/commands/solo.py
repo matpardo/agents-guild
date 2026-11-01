@@ -53,7 +53,7 @@ def _launch_player(ctx, project, project_data, repo, job_name, tmux):
             project,
             "solo.launched",
             "guild",
-            {"repo": repo, "job": job_name},
+            {"repo": repo, "job": job_name, "trigger": solo_players.current_trigger(ctx.conn, repo, job_name)},
         )
     return message
 

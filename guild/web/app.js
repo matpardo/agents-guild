@@ -1998,6 +1998,8 @@ realmDoctorLines: [],
     var state = player.state;
     if (player.stalled_adventurer !== null) {
       state += ": session gone, run guild adventurer dismiss " + player.stalled_adventurer;
+    } else if (player.retry_at !== null) {
+      state += ": same trigger, retry after " + player.retry_at;
     } else if (player.waits_on.length > 0) {
       state += ": waits on " + player.waits_on.join(", ");
     }

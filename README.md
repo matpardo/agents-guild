@@ -1452,6 +1452,13 @@ when the trigger is on but the last report or launch is newer, `fixing` (a
 `--fixes-main`, which holds the player and shows `fixing: waits on <ref>` until
 that PR merges or closes, and `idle` without a trigger.
 
+The cooldown is 1h, but when the trigger text equals the one of the last launch
+(for example a Dependabot PR that needs a human) it is 24h, so a player that
+cannot fix its trigger does not relaunch every hour. A different trigger keeps
+the 1h cooldown. A backing-off row reads `cooling: same trigger, retry after
+<time>`. A launch with no trigger (manual, main already green) or a launch
+recorded before the trigger was stored counts as a different trigger.
+
 `guild solo list` and the `SOLO PLAYERS` section of `guild board` (hidden under
 `--party` and `--raid`) and the web `solo players` show name or job, class,
 repo, trigger, state, last report time and last pending text; a due or idle row
@@ -1469,7 +1476,7 @@ Dependabot PR gets a session without a command. It is for the human terminal and
 the background job and refuses inside a Claude Code session. It skips a player
 whose window already exists, prints one line per player it could not launch
 (for example `tmux not found`) and still exits 0. Each launch, manual or not,
-records a `solo.launched` event, and a launch younger than the cooldown keeps
+records a `solo.launched` event with the trigger text it was made for, and a launch younger than the cooldown keeps
 the player `cooling`, so a trigger that stays on while the new session binds,
 or after the human closed its window, does not launch it again. A launch by the
 tick also posts a project notice `solo player <name> (<class>) launched on

@@ -713,8 +713,8 @@ def _dependabot_synced(conn, event):
 def _solo_launched(conn, event):
     payload = event["payload"]
     conn.execute(
-        "INSERT OR REPLACE INTO solo_launches (health_job, launched_at) VALUES (?, ?)",
-        (solo_players.health_job_name(payload["repo"], payload["job"]), event["ts"]),
+        "INSERT OR REPLACE INTO solo_launches (health_job, launched_at, trigger) VALUES (?, ?, ?)",
+        (solo_players.health_job_name(payload["repo"], payload["job"]), event["ts"], payload.get("trigger")),
     )
 
 

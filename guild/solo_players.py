@@ -1,6 +1,7 @@
 from guild import timeutil
 
 COOLDOWN = "1h"
+REPEAT_COOLDOWN = "24h"
 LAUNCH_COMMAND = "guild solo launch {} {}"
 
 _RED_MAIN_PROMPT = (
@@ -78,10 +79,14 @@ def _last_report(conn, project, health_job):
 
 
 def _last_launch(conn, health_job):
-    row = conn.execute("SELECT launched_at FROM solo_launches WHERE health_job = ?", (health_job,)).fetchone()
+    row = conn.execute("SELECT launched_at, trigger FROM solo_launches WHERE health_job = ?", (health_job,)).fetchone()
     if row is None:
-        return None
-    return row["launched_at"]
+        return None, None
+    return row["launched_at"], row["trigger"]
+
+
+def current_trigger(conn, repo, job):
+    return _TRIGGERS[job](conn, repo)
 
 
 def _fix_prs(conn, repo, job):
@@ -102,7 +107,16 @@ def _active_adventurer(conn, project, health_job):
     ).fetchone()
 
 
-def _state(now, active, live_ids, trigger, fix_prs, last_done, last_launch):
+def _retry_at(now, trigger, last_done, last_launch, last_launch_trigger):
+    cooldown = timeutil.parse_duration(REPEAT_COOLDOWN if trigger == last_launch_trigger else COOLDOWN)
+    ends = [timeutil.from_iso(stamp) + cooldown for stamp in (last_done, last_launch) if stamp is not None]
+    pending = [end for end in ends if end > now]
+    if not pending:
+        return None
+    return max(pending)
+
+
+def _state(now, active, live_ids, trigger, fix_prs, last_done, last_launch, last_launch_trigger):
     if active is not None and active["session_id"] in live_ids:
         return "running"
     if active is not None:
@@ -111,16 +125,22 @@ def _state(now, active, live_ids, trigger, fix_prs, last_done, last_launch):
         return "fixing"
     if trigger is None:
         return "idle"
-    cooldown = timeutil.parse_duration(COOLDOWN)
-    for stamp in (last_done, last_launch):
-        if stamp is not None and now - timeutil.from_iso(stamp) < cooldown:
-            return "cooling"
+    if _retry_at(now, trigger, last_done, last_launch, last_launch_trigger) is not None:
+        return "cooling"
     return "due"
+
+
+def _repeat_retry(now, state, trigger, last_done, last_launch, last_launch_trigger):
+    if state != "cooling" or trigger != last_launch_trigger:
+        return None
+    return timeutil.to_iso(_retry_at(now, trigger, last_done, last_launch, last_launch_trigger))
 
 
 def state_detail(row):
     if row["stalled_adventurer"] is not None:
         return ": session gone, run guild adventurer dismiss {}".format(row["stalled_adventurer"])
+    if row["retry_at"] is not None:
+        return ": same trigger, retry after {}".format(row["retry_at"])
     if row["waits_on"]:
         return ": waits on {}".format(", ".join(row["waits_on"]))
     return ""
@@ -135,6 +155,8 @@ def models(conn, now, projects_by_name, live_ids):
             active = _active_adventurer(conn, project, health_job)
             fix_prs = _fix_prs(conn, player["repo"], player["job"])
             last_done, last_pending = _last_report(conn, project, health_job)
+            last_launch, last_launch_trigger = _last_launch(conn, health_job)
+            state = _state(now, active, live_ids, trigger, fix_prs, last_done, last_launch, last_launch_trigger)
             result.append(
                 {
                     "project": project,
@@ -144,7 +166,8 @@ def models(conn, now, projects_by_name, live_ids):
                     "name": player.get("name", player["job"]),
                     "health_job": health_job,
                     "trigger": trigger,
-                    "state": _state(now, active, live_ids, trigger, fix_prs, last_done, _last_launch(conn, health_job)),
+                    "state": state,
+                    "retry_at": _repeat_retry(now, state, trigger, last_done, last_launch, last_launch_trigger),
                     "stalled_adventurer": None if active is None or active["session_id"] in live_ids else active["id"],
                     "waits_on": fix_prs,
                     "last_done": last_done,

@@ -439,6 +439,7 @@ def _solo_player(**overrides):
         "launch": "guild solo launch acme/app red-main",
         "waits_on": [],
         "stalled_adventurer": None,
+        "retry_at": None,
     }
     return dict(player, **overrides)
 
@@ -477,6 +478,11 @@ class WebSoloPlayerBehaviorTests(unittest.TestCase):
     def test_stalled_player_shows_the_dismiss_hint_without_launch_command(self):
         out = self._text([_solo_player(state="stalled", stalled_adventurer=7)])
         self.assertIn("stalled: session gone, run guild adventurer dismiss 7", out)
+        self.assertNotIn("guild solo launch", out)
+
+    def test_backing_off_player_shows_the_retry_time(self):
+        out = self._text([_solo_player(state="cooling", retry_at="2026-11-02T10:00:00+00:00")])
+        self.assertIn("cooling: same trigger, retry after 2026-11-02T10:00:00+00:00", out)
         self.assertNotIn("guild solo launch", out)
 
     def test_no_players_render_nothing(self):
