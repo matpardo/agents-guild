@@ -245,9 +245,9 @@ def _blocked_ref_count(conn, ref_list):
     return count
 
 
-def _ask_text_lines(painter, text):
-    bold = (lambda inner: painter.paint(inner, "bold")) if painter.color else None
-    return ask_legibility.ask_text_lines(text, "       ", max(painter.width, 40), bold)
+def _ask_text_lines(painter, text, plain_style):
+    styles = (plain_style, lambda inner: painter.paint(inner, "bold")) if painter.color else None
+    return ask_legibility.ask_text_lines(text, "       ", max(painter.width, 40), styles)
 
 
 def _ask_detail_lines(painter, conn, row):
@@ -260,13 +260,13 @@ def _ask_detail_lines(painter, conn, row):
             painter.paint(row["question"], "bold"),
         )
     ]
-    lines.extend(_ask_text_lines(painter, row["context"]))
+    lines.extend(_ask_text_lines(painter, row["context"], lambda inner: painter.paint(inner, "dim")))
     option_list = json.loads(row["options"])
     if option_list:
         lines.append("     options: {}".format(" | ".join(option_list)))
     if row["recommend"] is not None:
         lines.append("     recommend:")
-        lines.extend(_ask_text_lines(painter, row["recommend"]))
+        lines.extend(_ask_text_lines(painter, row["recommend"], str))
     lines.append(painter.paint("     refs: {}".format(", ".join(ref_list)), "dim"))
     if blocked_count > 0:
         blocks_text = "blocks: {} of {} refs still open".format(blocked_count, len(ref_list))
@@ -384,7 +384,7 @@ def _all_ask_lines(painter, row):
     ]
     if row["state"] == "answered":
         lines.append("     answer:")
-        lines.extend(_ask_text_lines(painter, row["answer"]))
+        lines.extend(_ask_text_lines(painter, row["answer"], str))
     return lines + [painter.paint("     " + _ask_dates(row), "dim")]
 
 

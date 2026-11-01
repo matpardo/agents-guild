@@ -21,7 +21,6 @@ _JARGON = re.compile(
     r"|`[^`]+`"
     r"|\b[a-z0-9]+(?:_[a-z0-9]+)+\b"
 )
-_BOLD = re.compile(r"\*\*(.+?)\*\*")
 
 
 def jargon_count(text):
@@ -41,15 +40,32 @@ def warning_lines(question, context_text):
     return lines
 
 
-def ask_text_lines(text, indent, width, bold):
+def ask_text_lines(text, indent, width, styles):
     lines = []
     for raw in sanitize.strip_control_sequences(text).split("\n"):
         if not raw.strip():
             lines.append("")
             continue
-        lines.extend(
-            textwrap.wrap(raw, width=width, initial_indent=indent, subsequent_indent=indent, break_on_hyphens=False)
+        wrapped = textwrap.wrap(
+            raw, width=width, initial_indent=indent, subsequent_indent=indent, break_on_hyphens=False
         )
-    if bold is None:
-        return lines
-    return [_BOLD.sub(lambda match: bold(match.group(1)), line) for line in lines]
+        lines.extend(wrapped if styles is None else _styled_lines(wrapped, indent, styles))
+    return lines
+
+
+def _styled_lines(wrapped, indent, styles):
+    plain_style, bold_style = styles
+    bodies = [line[len(indent) :] for line in wrapped]
+    if sum(body.count("**") for body in bodies) % 2:
+        return [indent + plain_style(body) for body in bodies]
+    bold = False
+    lines = []
+    for body in bodies:
+        segments = []
+        for position, part in enumerate(body.split("**")):
+            if position:
+                bold = not bold
+            if part:
+                segments.append((bold_style if bold else plain_style)(part))
+        lines.append(indent + "".join(segments))
+    return lines
