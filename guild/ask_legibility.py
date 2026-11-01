@@ -12,12 +12,12 @@ TEMPLATE = (
 )
 
 _JARGON = re.compile(
-    r"\w+/\w+"
-    r"|\S+\.(?:py|js|md|json|toml|sh)\b"
+    r"\S+\.(?:py|js|md|json|toml|sh)\b"
+    r"|\w+(?:/\w+){2,}"
     r"|#\d+"
     r"|\bT\d{2,}\b"
     r"|\b[A-Z][A-Z0-9]+-\d+\b"
-    r"|\b[0-9a-f]{7,40}\b"
+    r"|\b(?=[0-9a-f]*[a-f])(?=[0-9a-f]*[0-9])[0-9a-f]{7,40}\b"
     r"|`[^`]+`"
     r"|\b[a-z0-9]+(?:_[a-z0-9]+)+\b"
 )
