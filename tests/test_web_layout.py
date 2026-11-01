@@ -30,6 +30,7 @@ class BoardLayoutTests(unittest.TestCase):
                 "memory",
                 "adventurers",
                 "health-jobs",
+                "solo-players",
                 "ideas",
                 "quest-board",
                 "notices",

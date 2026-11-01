@@ -701,6 +701,14 @@ def _main_status_synced(conn, event):
     _record_main_status(conn, event, "gh")
 
 
+def _dependabot_synced(conn, event):
+    payload = event["payload"]
+    conn.execute(
+        "INSERT OR REPLACE INTO dependabot_status (repo, unmergeable, run_failed, updated_at) VALUES (?, ?, ?, ?)",
+        (payload["repo"], payload["unmergeable"], 1 if payload["run_failed"] else 0, event["ts"]),
+    )
+
+
 def _main_marked(conn, event):
     _record_main_status(conn, event, "manual")
 
@@ -937,6 +945,7 @@ _REDUCERS = {
     "merge_queue.pinned": _merge_queue_pinned,
     "merge_queue.unpinned": _merge_queue_unpinned,
     "main.status_synced": _main_status_synced,
+    "dependabot.synced": _dependabot_synced,
     "main.marked": _main_marked,
     "session.waiting": _session_waiting,
     "session.stopped": _session_stopped,
@@ -1050,6 +1059,7 @@ _REQUIRED_KEYS = {
     "merge_queue.pinned": ("first_repo", "first_number", "second_repo", "second_number", "author"),
     "merge_queue.unpinned": ("first_repo", "first_number", "second_repo", "second_number"),
     "main.status_synced": ("repo", "red", "reason"),
+    "dependabot.synced": ("repo", "unmergeable", "run_failed"),
     "main.marked": ("repo", "red", "reason"),
     "session.waiting": ("wait", "message"),
     "session.stopped": (),

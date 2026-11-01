@@ -1994,6 +1994,34 @@ realmDoctorLines: [],
     appendAll(section, pending.map(renderHealthJob));
   }
 
+  function soloPlayerMeta(player) {
+    var parts = [player.class, player.repo, player.state, player.trigger === null ? "no trigger" : player.trigger];
+    parts.push("last done " + (player.last_done === null ? "never" : player.last_done));
+    parts.push("last pending " + (player.last_pending === null ? "none" : player.last_pending));
+    return parts.join(" \u00b7 ");
+  }
+
+  function renderSoloPlayer(player) {
+    var article = el("article");
+    article.className = "card solo-player";
+    article.appendChild(textEl("h3", player.name));
+    article.appendChild(classedText("p", soloPlayerMeta(player), "muted"));
+    if (player.state === "due" || player.state === "idle") {
+      article.appendChild(classedText("code", player.launch, "launch-command"));
+    }
+    return article;
+  }
+
+  function renderSoloPlayers(players) {
+    var section = document.getElementById("solo-players");
+    clear(section);
+    if (players.length === 0) {
+      return;
+    }
+    section.appendChild(textEl("h2", "solo players (" + players.length + ")"));
+    appendAll(section, players.map(renderSoloPlayer));
+  }
+
   function renderMemoryItem(item) {
     var article = el("article");
     article.className = "card memory";
@@ -3216,6 +3244,7 @@ realmDoctorLines: [],
       ideas: data.ideas,
       adventurers: data.adventurers,
       health_jobs: data.health_jobs,
+      solo_players: data.solo_players,
       asks: data.asks.filter(function (ask) {
         return ask.party === state.partyFilter;
       }),
@@ -3272,6 +3301,7 @@ realmDoctorLines: [],
       ideas: data.ideas,
       adventurers: data.adventurers,
       health_jobs: data.health_jobs,
+      solo_players: data.solo_players,
       asks: data.asks.filter(function (ask) {
         return members.indexOf(ask.party) !== -1;
       }),
@@ -3914,13 +3944,13 @@ realmDoctorLines: [],
     "needs-you": ["asks", "ready-for-you", "answered-asks"],
     party: ["asks", "merge-queues", "progress", "daily-tasks", "parties", "memory"],
     raid: ["asks", "merge-queues", "progress", "daily-tasks", "parties", "memory"],
-    adventurers: ["adventurers", "health-jobs"],
+    adventurers: ["adventurers", "health-jobs", "solo-players"],
     ideas: ["ideas"],
     quests: ["quest-board"],
     overview: ["notices", "raids", "drift", "projects", "realm"],
   };
   var ALL_SECTION_IDS = [
-    "asks", "ready-for-you", "answered-asks", "notices", "ideas", "adventurers", "health-jobs",
+    "asks", "ready-for-you", "answered-asks", "notices", "ideas", "adventurers", "health-jobs", "solo-players",
     "memory", "raids", "drift", "projects", "quest-board", "merge-queues", "progress", "daily-tasks", "parties", "realm",
   ];
   var DEFAULT_VIEW = { kind: "needs-you", name: "", hash: "needs-you" };
@@ -4192,6 +4222,7 @@ realmDoctorLines: [],
     );
     renderSection("adventurers", [filtered.adventurers], renderAdventurers, onlyIfChanged);
     renderSection("health-jobs", [filtered.health_jobs], renderHealthJobs, onlyIfChanged);
+    renderSection("solo-players", [filtered.solo_players], renderSoloPlayers, onlyIfChanged);
     renderSection("memory", [filtered.memory], renderMemory, onlyIfChanged);
     renderSection("raids", [filtered.raids], renderRaids, onlyIfChanged);
     renderSection("merge-queues", [filtered.merge_queues], renderMergeQueues, onlyIfChanged);

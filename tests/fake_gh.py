@@ -42,6 +42,12 @@ def respond(directory, args):
         with open(os.path.join(directory, "ready_calls.log"), "a") as log:
             log.write("{} {}\n".format(repo, args[2]))
         return _respond(directory, "ready_{}_{}".format(repo.replace("/", "-"), args[2]))
+    if args[:2] == ["pr", "list"] and "--author" in args:
+        repo = args[args.index("--repo") + 1]
+        return _respond(directory, "dependabot_prs_{}".format(repo.replace("/", "-")))
+    if args[:2] == ["run", "list"]:
+        repo = args[args.index("--repo") + 1]
+        return _respond(directory, "dependabot_runs_{}".format(repo.replace("/", "-")))
     if args[:2] == ["pr", "list"] and "--repo" in args:
         repo = args[args.index("--repo") + 1]
         return _respond(directory, "open_{}".format(repo.replace("/", "-")))

@@ -21,6 +21,7 @@ PROJECTION_TABLES = (
     "pr_files",
     "merge_queue_pins",
     "main_status",
+    "dependabot_status",
     "session_status",
     "cost_samples",
     "resource_samples",
@@ -291,6 +292,14 @@ _CREATE_STATEMENTS = (
         reason TEXT,
         updated_at TEXT NOT NULL,
         PRIMARY KEY (repo, source)
+    )
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS dependabot_status (
+        repo TEXT PRIMARY KEY,
+        unmergeable INTEGER NOT NULL,
+        run_failed INTEGER NOT NULL,
+        updated_at TEXT NOT NULL
     )
     """,
     """

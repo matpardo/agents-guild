@@ -1,4 +1,4 @@
-from guild import timeutil
+from guild import solo_players, timeutil
 from guild.errors import GuildError
 
 LAUNCH_COMMAND = "guild adventurer launch {}"
@@ -6,6 +6,9 @@ LAUNCH_COMMAND = "guild adventurer launch {}"
 
 def require_job(project_data, job_name):
     for job in project_data.get("health_jobs", []):
+        if job["name"] == job_name:
+            return job
+    for job in solo_players.jobs(project_data):
         if job["name"] == job_name:
             return job
     raise GuildError("project '{}' has no health job '{}'".format(project_data["name"], job_name), 1)

@@ -119,6 +119,7 @@ _BOARD = {
     "ideas": [],
     "adventurers": [],
     "health_jobs": [],
+    "solo_players": [],
     "project_names": [],
     "bases": [],
     "memory": [],
@@ -421,6 +422,55 @@ class WebHealthJobBehaviorTests(unittest.TestCase):
 
     def test_there_is_no_launch_post_from_the_web(self):
         self.assertNotIn("/api/health", _APP_JS)
+
+
+def _solo_player(**overrides):
+    player = {
+        "project": "acme",
+        "repo": "acme/app",
+        "job": "red-main",
+        "class": "cleric",
+        "name": "mender",
+        "health_job": "red-main-acme-app",
+        "trigger": "main red: checks failing: lint",
+        "state": "due",
+        "last_done": None,
+        "last_pending": None,
+        "launch": "guild solo launch acme/app red-main",
+    }
+    return dict(player, **overrides)
+
+
+@unittest.skipIf(shutil.which("node") is None, "node not installed")
+class WebSoloPlayerBehaviorTests(unittest.TestCase):
+    def _text(self, players, party_filter="all"):
+        return _render(dict(_BOARD, solo_players=players), party_filter, "all", "solo-players", "text")
+
+    def test_due_player_shows_class_trigger_and_launch_command(self):
+        out = self._text([_solo_player()])
+        for expected in ("mender", "cleric", "acme/app", "due", "main red: checks failing: lint", "never", "none"):
+            self.assertIn(expected, out)
+        self.assertIn("guild solo launch acme/app red-main", out)
+
+    def test_idle_player_shows_no_trigger_and_launch_command(self):
+        out = self._text([_solo_player(trigger=None, state="idle")])
+        self.assertIn("no trigger", out)
+        self.assertIn("guild solo launch acme/app red-main", out)
+
+    def test_running_and_cooling_players_hide_the_launch_command(self):
+        for state in ("running", "cooling"):
+            out = self._text(
+                [_solo_player(state=state, last_done="2026-11-01T00:00:00+00:00", last_pending="none left")]
+            )
+            self.assertIn(state, out)
+            self.assertIn("none left", out)
+            self.assertNotIn("guild solo launch", out)
+
+    def test_no_players_render_nothing(self):
+        self.assertEqual(self._text([]), "")
+
+    def test_players_survive_the_party_filter(self):
+        self.assertIn("mender", self._text([_solo_player()], "a"))
 
 
 @unittest.skipIf(shutil.which("node") is None, "node not installed")

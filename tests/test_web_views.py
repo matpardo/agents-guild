@@ -85,6 +85,7 @@ _PANE_IDS = {
     "ideas",
     "adventurers",
     "health-jobs",
+    "solo-players",
     "memory",
     "raids",
     "drift",
@@ -305,7 +306,7 @@ class WebViewBehaviorTests(unittest.TestCase):
 
     def test_other_views_hide_their_complement(self):
         shown = {
-            "#adventurers": {"adventurers", "health-jobs"},
+            "#adventurers": {"adventurers", "health-jobs", "solo-players"},
             "#ideas": {"ideas"},
             "#quests": {"quest-board"},
             "#overview": {"notices", "raids", "drift", "projects", "realm"},

@@ -522,6 +522,21 @@ def _handle_adventurer_launch(ctx, args):
     return 0
 
 
+def _handle_solo_list(ctx, args):
+    from guild.commands import solo as solo_commands
+
+    _print(solo_commands.list_players(ctx))
+    return 0
+
+
+def _handle_solo_launch(ctx, args):
+    from guild import tmux_windows
+    from guild.commands import solo as solo_commands
+
+    _print(solo_commands.launch(ctx, args.repo, args.job, tmux_windows.Tmux()))
+    return 0
+
+
 def _handle_adventurer_done(ctx, args):
     from guild import lifecycle
     from guild.commands import adventurer as adventurer_commands
@@ -1426,6 +1441,19 @@ def _add_review_md_parser(subparsers):
     parser.set_defaults(handler=_handle_review_md)
 
 
+def _add_solo_parser(subparsers):
+    parser = subparsers.add_parser("solo", help="list or launch the built-in per-repo solo players")
+    actions = parser.add_subparsers(dest="solo_action", required=True, metavar="<subcommand>")
+
+    list_ = actions.add_parser("list", help="print every solo player with its trigger and state")
+    list_.set_defaults(handler=_handle_solo_list)
+
+    launch = actions.add_parser("launch", help="open a tmux window running a solo player (human terminal only)")
+    launch.add_argument("repo", help="repo of the solo player, owner/name")
+    launch.add_argument("job", help="solo player job: red-main or dependabot")
+    launch.set_defaults(handler=_handle_solo_launch)
+
+
 def _add_main_parser(subparsers):
     parser = subparsers.add_parser("main", help="mark a repo main branch red or green by hand")
     actions = parser.add_subparsers(dest="main_action", required=True, metavar="<subcommand>")
@@ -1750,6 +1778,7 @@ _COMMAND_BUILDERS = {
     "ideas": _add_ideas_parser,
     "adventurer": _add_adventurer_parser,
     "adventurers": _add_adventurers_parser,
+    "solo": _add_solo_parser,
     "claim": _add_claim_parser,
     "release": _add_release_parser,
     "claims": _add_claims_parser,

@@ -207,6 +207,8 @@ guild adventurer launch <name>                          # human terminal only: t
 guild adventurer done --pending "<text>"                # ends it; `--pending none` is the explicit empty report
 guild adventurer dismiss <id>                           # removes a done adventurer from the board
 guild adventurers [<id>]                                # active ones, then recent done ones; <id> shows one in full
+guild solo list                                         # solo players of the project config with trigger and state
+guild solo launch <owner/repo> <job>                    # human terminal only: tmux window running a solo player, due or not
 
 guild claim <area> --ttl <dur>          # area, or task:<epic>/<tid> / task:<quest>/<tid>
 guild claim check <area>                # read-only, no event; exit 0 free/yours, exit 1 someone else's
@@ -1407,6 +1409,50 @@ adventurer for that job, the same function as `guild adventurer start --job
 not applied: ...`). `start --job` takes the job name as the adventurer's job
 text and refuses a job text, `--task` or a name missing from `health_jobs`.
 
+### Solo players
+
+`solo_players` in the project config (see "Project config") declares built-in
+fixers of one repo. The identity of a solo player is `(repo, job)`; the job
+comes from a fixed set, and each job carries its prompt and a display class:
+
+| job | class | what its session does |
+|---|---|---|
+| `red-main` | cleric | fixes a red main with TDD, opens a PR tracked with `--fixes-main`, never merges |
+| `dependabot` | artificer | makes open Dependabot PRs mergeable (identity, scope and supply-chain gates, direct fixes on the PR branch) and fixes a failing Dependabot update run through a normal PR; never merges |
+
+`name` is only a label for the board. Each solo player is also a health job
+named `<job>-<owner>-<repo>` (the repo with `/` turned into `-`, for example
+`red-main-acme-app`), so two repos with the same name under different owners
+do not collide. That job has `every` `1h` and the built-in prompt; `guild
+adventurer start --job <that name>` and the `GUILD_ADVENTURER_JOB` binding of
+the `SessionStart` hook accept it. The `HEALTH JOBS` section lists only the jobs
+written in `health_jobs`.
+
+Triggers come from facts the sync stores:
+
+- `red-main`: a `main_status` row of the repo is red and not blocked by billing,
+  whichever source set it (`guild sync --source gh` or `guild main red`).
+- `dependabot`: `guild sync --source gh` found an open Dependabot PR that is
+  not mergeable (failing checks, conflicts, behind or dirty) or a failing latest
+  Dependabot update run (runs with event `dynamic`, the latest completed run
+  per ecosystem). It records `dependabot.synced` only when the counts change.
+
+A solo player is `running` while an adventurer on its health job is active,
+`due` when its trigger is on, nothing runs and the last report (`done`,
+dismissed or not) is older than the 1h cooldown, `cooling` when the trigger is
+on but the last report is newer, and `idle` without a trigger.
+
+`guild solo list` and the `SOLO PLAYERS` section of `guild board` (hidden under
+`--party` and `--raid`) and the web `solo players` show name or job, class,
+repo, trigger, state, last report time and last pending text; a due or idle row
+carries `guild solo launch <owner/repo> <job>` as text to copy. The web has no
+launch button.
+
+`guild solo launch <owner/repo> <job>` is for the human terminal and refuses
+inside a Claude Code session. It opens a tmux window named
+`solo-<job>-<owner>-<repo>` the same way `guild adventurer launch` does, even
+when the player is not due. Nothing launches a solo player by itself yet.
+
 ### Marking notices seen
 
 `guild notice seen <id>` marks an active notice as seen so new messages stand
@@ -2198,6 +2244,10 @@ generation after it too.
   "health_jobs": [
     {"name": "red-main", "command": "/check-main", "every": "1d"},
     {"name": "drift", "command": "/check-drift", "every": "3d"}
+  ],
+  "solo_players": [
+    {"repo": "acme/app", "job": "red-main", "name": "mender"},
+    {"repo": "acme/app", "job": "dependabot"}
   ]
 }
 ```
@@ -2234,6 +2284,7 @@ All keys. The loader rejects a wrong type with a clear error for every key excep
 - `migration_paths` (list of globs, absent: the migration clash check is skipped and no extra `gh` call is made): matched with `fnmatch` against changed file paths, e.g. `db/migrate/*`. See "Migration version clash" under `sync`.
 - `fast_forward_base` (boolean, absent or `false`: no clone is ever modified): `true` makes `sync --source gh` fast-forward the local base branch of merged repos (see "Base branch fast-forward" under `sync`).
 - `health_jobs` (list of `{"name", "command", "every"}`, absent: no jobs): recurring jobs that keep the project healthy (see "Health jobs"). `name` is a unique slug, `command` a non-empty string that does not start with `-`, the prompt or skill the job's session runs first, and `every` a duration like `30m`, `12h` or `3d`. Any other shape fails to load with an error naming `health_jobs`.
+- `solo_players` (list of `{"repo", "job", "name"}`, absent: none): built-in per-repo fixers (see "Solo players"). `job` is `red-main` or `dependabot`, `repo` one of `github.repos`, `name` an optional non-empty display label, and each `(repo, job)` pair appears once. Any other shape fails to load with an error naming `solo_players`.
 - `lifecycle` (object, absent: no command ever runs): commands run on PR lifecycle events (see "Lifecycle commands"). Keys are `on_pr_merged` and `on_pr_closed`, any other key fails to load. Each value has exactly `command` (non-empty list of non-empty strings, never a shell string) and `timeout_minutes` (integer from 1 to 1440, required).
 
 ### SDD parsing rules
