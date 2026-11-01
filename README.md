@@ -205,7 +205,7 @@ guild adventurer start --job <name> --reason "<why>"    # the same for a health 
 guild adventurer promote <party> --reason "<why>"       # the active adventurer becomes the leader of a new party; its PRs move to it
 guild adventurer launch <name>                          # human terminal only: tmux window running a health job in the project's first path
 guild adventurer done --pending "<text>"                # ends it; `--pending none` is the explicit empty report
-guild adventurer dismiss <id>                           # removes a done adventurer from the board
+guild adventurer dismiss <id>                           # removes a done adventurer, or an active one whose session is gone, from the board
 guild adventurers [<id>]                                # active ones, then recent done ones; <id> shows one in full
 guild solo list                                         # solo players of the project config with trigger and state
 guild solo launch <owner/repo> <job>                    # human terminal only: tmux window running a solo player, due or not
@@ -1377,7 +1377,7 @@ local: do not copy them into PRs, commits or cards.
 board` hides it under `--party` and `--raid`): id, job, project, task, live or
 stopped, pending report once done, and their PRs. A done adventurer stays
 listed until `guild adventurer dismiss <id>` (the web Dismiss button calls the
-same function; dismiss refuses an adventurer that is not done). An active
+same function; dismiss refuses an adventurer that is neither done nor active with a session gone). An active
 adventurer whose session is gone carries the flag `stopped without report`.
 The same flag marks an active party whose leader session is gone without a
 `guild handoff` (the party is not `awaiting-leader`), in the CLI board and as a
@@ -1439,7 +1439,12 @@ Triggers come from facts the sync stores:
   Dependabot update run (runs with event `dynamic`, the latest completed run
   per ecosystem). It records `dependabot.synced` only when the counts change.
 
-A solo player is `running` while an adventurer on its health job is active,
+A solo player is `running` while an adventurer on its health job is active and
+its session is alive, `stalled` when that adventurer is active but its session is
+gone (crash, closed window, usage limit; the row reads `stalled: session gone,
+run guild adventurer dismiss <id>`, the tick does not launch it, and dismissing
+that adventurer, allowed once its session is gone, makes the player launchable
+by the normal rules),
 `due` when its trigger is on, nothing runs and the last report (`done`,
 dismissed or not) and the last launch are older than the 1h cooldown, `cooling`
 when the trigger is on but the last report or launch is newer, `fixing` (a

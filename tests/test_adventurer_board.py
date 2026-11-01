@@ -73,9 +73,10 @@ class AdventurerBoardTests(AdventurerTestCase):
 
     def test_dismiss_refusals(self):
         self.start("adv-1", "x", "--task", "demo-epic/T90")
+        self.write_session(os.getpid(), "adv-1", "adv")
         code, out, err = self.cli(["adventurer", "dismiss", "1"], None)
         self.assertEqual(code, 1)
-        self.assertIn("not done", err)
+        self.assertIn("session is alive", err)
         self.assertEqual(self.cli(["adventurer", "dismiss", "9"], None)[0], 1)
         self.cli(["adventurer", "done", "--pending", "none"], "adv-1")
         self.cli(["adventurer", "dismiss", "1"], None)

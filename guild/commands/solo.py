@@ -1,4 +1,4 @@
-from guild import config, db, events, solo_players, tmux_windows
+from guild import config, db, events, session_info, solo_players, tmux_windows
 from guild.commands import adventurer as adventurer_commands
 from guild.commands import notice as notice_commands
 from guild.errors import GuildError
@@ -8,7 +8,7 @@ _LAUNCH_NOTICE_TTL = "2h"
 
 def _player_rows(ctx):
     projects_by_name = {project["name"]: project for project in config.load_all_projects(ctx.projects_dir)}
-    return solo_players.models(ctx.conn, ctx.now, projects_by_name)
+    return solo_players.models(ctx.conn, ctx.now, projects_by_name, session_info.live_session_ids(ctx.sessions_dir))
 
 
 def format_row(row):
@@ -18,7 +18,7 @@ def format_row(row):
         row["repo"],
         row["job"],
         row["state"],
-        solo_players.waits_on_text(row),
+        solo_players.state_detail(row),
         row["trigger"] or "none",
         row["last_done"] or "never",
         row["last_pending"] or "none",

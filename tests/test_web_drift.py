@@ -438,6 +438,7 @@ def _solo_player(**overrides):
         "last_pending": None,
         "launch": "guild solo launch acme/app red-main",
         "waits_on": [],
+        "stalled_adventurer": None,
     }
     return dict(player, **overrides)
 
@@ -471,6 +472,11 @@ class WebSoloPlayerBehaviorTests(unittest.TestCase):
         out = self._text([_solo_player(state="fixing", waits_on=["acme/app#12"])])
         self.assertIn("fixing", out)
         self.assertIn("fixing: waits on acme/app#12", out)
+        self.assertNotIn("guild solo launch", out)
+
+    def test_stalled_player_shows_the_dismiss_hint_without_launch_command(self):
+        out = self._text([_solo_player(state="stalled", stalled_adventurer=7)])
+        self.assertIn("stalled: session gone, run guild adventurer dismiss 7", out)
         self.assertNotIn("guild solo launch", out)
 
     def test_no_players_render_nothing(self):
