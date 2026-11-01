@@ -3,7 +3,8 @@ import sqlite3
 from datetime import timedelta
 from unittest import mock
 
-from guild import db, paths, timeutil
+from guild import context, db, origin, paths, timeutil
+from guild.commands import pr as pr_commands
 from tests.mq_fixtures import TASKS_MD
 from tests.testutil import GuildTestCase
 
@@ -330,6 +331,258 @@ class AdventurerRaceTests(WriteRaceCase):
         self.assertEqual(code, 1)
         self.assertIn("not done", err)
         self.assertEqual(self.rows("SELECT COUNT(*) FROM events WHERE kind = 'adventurer.dismissed'"), [(1,)])
+
+
+class IdeaRaceTests(WriteRaceCase):
+    def setUp(self):
+        super().setUp()
+        code, out, err = self.human_cli(["idea", "add", "Cache", "--description", "warm it"])
+        self.assertEqual(code, 0, err)
+
+    def link_alpha(self):
+        return self.human_cli(["idea", "link", "1", "--party", "alpha"])
+
+    def unlink_alpha(self):
+        return self.human_cli(["idea", "unlink", "1", "--party", "alpha"])
+
+    def track_alpha_pr(self):
+        self.add_quest("sess-1", "demo", "T01")
+        self.write_gh_fixture(
+            "view_acme-app_1", {"state": "OPEN", "isDraft": True, "headRefName": "feature/x", "title": "t"}
+        )
+        code, out, err = self.cli(
+            "sess-1", ["pr", "track", "acme/app#1", "--task", "demo/T01", "--what", "x", "--waits", "y"]
+        )
+        self.assertEqual(code, 0, err)
+
+    def test_add_keeps_both_when_other_idea_added_first(self):
+        with competing_write_before_transaction(lambda: self.human_cli(["idea", "add", "Other", "--description", "d"])):
+            code, out, err = self.human_cli(["idea", "add", "Late", "--description", "d"])
+        self.assertEqual(code, 0, err)
+        self.assertEqual(
+            self.rows("SELECT id, title FROM ideas ORDER BY id"), [(1, "Cache"), (2, "Other"), (3, "Late")]
+        )
+
+    def test_link_refused_when_party_closed_first(self):
+        with competing_write_before_transaction(
+            lambda: self.human_cli(["party", "close", "alpha", "--pending", "none"])
+        ):
+            code, out, err = self.link_alpha()
+        self.assertEqual(code, 1)
+        self.assertIn("is closed", err)
+        self.assertEqual(self.rows("SELECT COUNT(*) FROM events WHERE kind = 'idea.linked'"), [(0,)])
+
+    def test_link_recorded_once_when_linked_first(self):
+        with competing_write_before_transaction(self.link_alpha):
+            code, out, err = self.link_alpha()
+        self.assertEqual(code, 1)
+        self.assertIn("already linked", err)
+        self.assertEqual(self.rows("SELECT COUNT(*) FROM events WHERE kind = 'idea.linked'"), [(1,)])
+
+    def test_unlink_refused_when_party_tracks_a_pr_first(self):
+        self.link_alpha()
+        with competing_write_before_transaction(self.track_alpha_pr):
+            code, out, err = self.unlink_alpha()
+        self.assertEqual(code, 1)
+        self.assertIn("already tracks a PR", err)
+        self.assertEqual(self.rows("SELECT party FROM idea_links WHERE idea_id = 1"), [("alpha",)])
+
+    def test_unlink_recorded_once_when_unlinked_first(self):
+        self.link_alpha()
+        with competing_write_before_transaction(self.unlink_alpha):
+            code, out, err = self.unlink_alpha()
+        self.assertEqual(code, 1)
+        self.assertIn("is not linked", err)
+        self.assertEqual(self.rows("SELECT COUNT(*) FROM events WHERE kind = 'idea.unlinked'"), [(1,)])
+
+    def test_edit_refused_when_deleted_first(self):
+        with competing_write_before_transaction(lambda: self.human_cli(["idea", "delete", "1"])):
+            code, out, err = self.human_cli(["idea", "edit", "1", "--title", "Late"])
+        self.assertEqual(code, 1)
+        self.assertIn("unknown idea #1", err)
+        self.assertEqual(self.rows("SELECT COUNT(*) FROM events WHERE kind = 'idea.edited'"), [(0,)])
+
+    def test_delete_recorded_once_when_deleted_first(self):
+        with competing_write_before_transaction(lambda: self.human_cli(["idea", "delete", "1"])):
+            code, out, err = self.human_cli(["idea", "delete", "1"])
+        self.assertEqual(code, 1)
+        self.assertIn("unknown idea #1", err)
+        self.assertEqual(self.rows("SELECT COUNT(*) FROM events WHERE kind = 'idea.deleted'"), [(1,)])
+
+
+class AskCreateRaceTests(WriteRaceCase):
+    def setUp(self):
+        super().setUp()
+        self.add_quest("sess-1", "demo", "T01")
+
+    def ask(self, question):
+        return self.cli("sess-1", ["ask", question, "--context", "x", "--ref", "task:demo/T01"])
+
+    def test_create_keeps_both_when_other_ask_created_first(self):
+        with competing_write_before_transaction(lambda: self.ask("first?")):
+            code, out, err = self.ask("second?")
+        self.assertEqual(code, 0, err)
+        self.assertEqual(self.rows("SELECT id, question FROM asks ORDER BY id"), [(1, "first?"), (2, "second?")])
+
+
+class NoticeRaceTests(WriteRaceCase):
+    def create(self):
+        return self.cli("sess-1", ["notice", "create", "heads up", "--to", "guild", "--ttl", "1h"])
+
+    def test_create_keeps_both_when_other_text_created_first(self):
+        with competing_write_before_transaction(
+            lambda: self.cli("sess-2", ["notice", "create", "other", "--to", "guild", "--ttl", "1h"])
+        ):
+            code, out, err = self.create()
+        self.assertEqual(code, 0, err)
+        self.assertEqual(self.rows("SELECT id, text FROM notices ORDER BY id"), [(1, "other"), (2, "heads up")])
+
+    def test_create_refused_when_same_text_created_first(self):
+        with competing_write_before_transaction(self.create):
+            code, out, err = self.create()
+        self.assertEqual(code, 1)
+        self.assertIn("same text already active", err)
+        self.assertEqual(self.rows("SELECT COUNT(*) FROM events WHERE kind = 'notice.created'"), [(1,)])
+
+    def test_close_recorded_once_when_closed_first(self):
+        self.create()
+        with competing_write_before_transaction(lambda: self.human_cli(["notice", "close", "1"])):
+            code, out, err = self.human_cli(["notice", "close", "1"])
+        self.assertEqual(code, 1)
+        self.assertIn("is not active", err)
+        self.assertEqual(self.rows("SELECT COUNT(*) FROM events WHERE kind = 'notice.closed'"), [(1,)])
+
+
+class RaidPauseRaceTests(WriteRaceCase):
+    def setUp(self):
+        super().setUp()
+        self.cli("sess-1", ["raid", "join", "ci", "--ttl", "8h"])
+
+    def test_pause_recorded_once_when_paused_first(self):
+        with competing_write_before_transaction(lambda: self.cli("sess-1", ["raid", "pause", "ci"])):
+            code, out, err = self.cli("sess-1", ["raid", "pause", "ci"])
+        self.assertEqual(code, 1)
+        self.assertIn("already paused", err)
+        self.assertEqual(self.rows("SELECT COUNT(*) FROM events WHERE kind = 'raid.paused'"), [(1,)])
+
+    def test_resume_recorded_once_when_resumed_first(self):
+        self.cli("sess-1", ["raid", "pause", "ci"])
+        with competing_write_before_transaction(lambda: self.cli("sess-1", ["raid", "resume", "ci"])):
+            code, out, err = self.cli("sess-1", ["raid", "resume", "ci"])
+        self.assertEqual(code, 1)
+        self.assertIn("is not paused", err)
+        self.assertEqual(self.rows("SELECT COUNT(*) FROM events WHERE kind = 'raid.resumed'"), [(1,)])
+        self.assertEqual(self.rows("SELECT COUNT(*) FROM notices"), [(1,)])
+
+
+class BasePauseRaceTests(WriteRaceCase):
+    def test_pause_recorded_once_when_paused_first(self):
+        with competing_write_before_transaction(lambda: self.human_cli(["base", "pause", "acme/app"])):
+            code, out, err = self.human_cli(["base", "pause", "acme/app"])
+        self.assertEqual(code, 1)
+        self.assertIn("already paused", err)
+        self.assertEqual(self.rows("SELECT COUNT(*) FROM events WHERE kind = 'base.paused'"), [(1,)])
+
+    def test_resume_recorded_once_when_resumed_first(self):
+        self.human_cli(["base", "pause", "acme/app"])
+        with competing_write_before_transaction(lambda: self.human_cli(["base", "resume", "acme/app"])):
+            code, out, err = self.human_cli(["base", "resume", "acme/app"])
+        self.assertEqual(code, 1)
+        self.assertIn("is not paused", err)
+        self.assertEqual(self.rows("SELECT COUNT(*) FROM events WHERE kind = 'base.resumed'"), [(1,)])
+
+
+class PrRaceCase(WriteRaceCase):
+    def setUp(self):
+        super().setUp()
+        self.add_quest("sess-1", "demo", "T01")
+        for number in (1, 2):
+            self.write_gh_fixture(
+                "view_acme-app_{}".format(number),
+                {"state": "OPEN", "isDraft": True, "headRefName": "feature/x", "title": "t"},
+            )
+            code, out, err = self.cli(
+                "sess-1",
+                ["pr", "track", "acme/app#{}".format(number), "--task", "demo/T01", "--what", "x", "--waits", "y"],
+            )
+            self.assertEqual(code, 0, err)
+
+
+class MergeQueuePinRaceTests(PrRaceCase):
+    def pin(self, first, second):
+        return self.human_cli(
+            ["merge-queue", "pin", "acme/app#{}".format(first), "--before", "acme/app#{}".format(second)]
+        )
+
+    def unpin(self, first, second):
+        return self.human_cli(
+            ["merge-queue", "unpin", "acme/app#{}".format(first), "--before", "acme/app#{}".format(second)]
+        )
+
+    def test_pin_refused_when_reverse_pin_lands_first(self):
+        with competing_write_before_transaction(lambda: self.pin(2, 1)):
+            code, out, err = self.pin(1, 2)
+        self.assertEqual(code, 1)
+        self.assertIn("would create a cycle", err)
+        self.assertEqual(self.rows("SELECT first_number, second_number FROM merge_queue_pins"), [(2, 1)])
+
+    def test_pin_recorded_once_when_pinned_first(self):
+        with competing_write_before_transaction(lambda: self.pin(1, 2)):
+            code, out, err = self.pin(1, 2)
+        self.assertEqual(code, 1)
+        self.assertIn("already pinned", err)
+        self.assertEqual(self.rows("SELECT COUNT(*) FROM events WHERE kind = 'merge_queue.pinned'"), [(1,)])
+
+    def test_unpin_recorded_once_when_unpinned_first(self):
+        self.pin(1, 2)
+        with competing_write_before_transaction(lambda: self.unpin(1, 2)):
+            code, out, err = self.unpin(1, 2)
+        self.assertEqual(code, 1)
+        self.assertIn("no pin of", err)
+        self.assertEqual(self.rows("SELECT COUNT(*) FROM events WHERE kind = 'merge_queue.unpinned'"), [(1,)])
+
+
+class PrSetRaceTests(PrRaceCase):
+    def human_ctx(self):
+        conn = db.connect(paths.db_path())
+        self.addCleanup(conn.close)
+        return context.RunContext(
+            conn,
+            None,
+            self.repo_dir,
+            timeutil.utcnow(),
+            origin.current_origin(),
+            paths.claude_sessions_dir(),
+            paths.projects_config_dir(),
+            paths.state_dir(),
+        )
+
+    def waits_and_lifecycle(self):
+        return self.rows("SELECT waits, lifecycle FROM prs WHERE number = 1")
+
+    def test_set_keeps_waits_written_by_concurrent_set(self):
+        with competing_write_before_transaction(
+            lambda: self.cli("sess-1", ["pr", "set", "acme/app#1", "--waits", "fresh"])
+        ):
+            code, out, err = self.cli("sess-1", ["pr", "set", "acme/app#1", "--lifecycle", "converging"])
+        self.assertEqual(code, 0, err)
+        self.assertEqual(self.waits_and_lifecycle(), [("fresh", "converging")])
+
+    def test_block_external_keeps_waits_written_by_concurrent_set(self):
+        ctx = self.human_ctx()
+        with competing_write_before_transaction(
+            lambda: self.cli("sess-1", ["pr", "set", "acme/app#1", "--waits", "fresh"])
+        ):
+            pr_commands.block_external(ctx, "acme/app#1", "legal")
+        self.assertEqual(self.rows("SELECT waits, blocked_external FROM prs WHERE number = 1"), [("fresh", "legal")])
+
+    def test_relink_keeps_waits_written_by_concurrent_set(self):
+        ctx = self.human_ctx()
+        with competing_write_before_transaction(
+            lambda: self.cli("sess-1", ["pr", "set", "acme/app#1", "--waits", "fresh"])
+        ):
+            pr_commands.relink_as_human(ctx, "acme/app#1", None, "ABC-1")
+        self.assertEqual(self.rows("SELECT waits, card FROM prs WHERE number = 1"), [("fresh", "ABC-1")])
 
 
 if __name__ == "__main__":

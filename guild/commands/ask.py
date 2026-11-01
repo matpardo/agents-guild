@@ -100,8 +100,8 @@ def create(ctx, question, context_text, ref_list, option_list, recommend):
         pii.validate_field(recommend, "ask recommend", pii.ASK_RECOMMEND_MAX_LENGTH, patterns)
     project_config = None if project is None else config.load_project(ctx.projects_dir, project)
     normalized_refs = _validate_refs(ctx, project, project_config, ref_list)
-    ask_id = next_id(ctx.conn, "asks")
     with db.writing(ctx.conn):
+        ask_id = next_id(ctx.conn, "asks")
         events.record(
             ctx.conn,
             ctx.now,

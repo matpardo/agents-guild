@@ -85,3 +85,19 @@ updated: 2026-10-31
 **Status:** [x] done
 
 **What:** The core-imports ADR names the parser, not the imports, as the hook start cost. `.playwright-mcp/` is ignored, so browser check snapshots written into a clone no longer leave it dirty and block `update.sh`.
+
+## T08 — Close the check-then-write races in the remaining write commands
+
+**Depends on:** T05
+**Status:** [x] done
+
+**What:** move the state checks of `idea link`, `idea unlink`, `idea edit`, `idea delete`, `notice close`, `raid pause`, `raid resume`, `base pause`, `base resume`, `merge-queue pin`, `merge-queue unpin` and `pr set` (including the human relink and external block paths) inside `db.writing`, and allocate the ids of `notice create`, `idea add` and `ask create` inside it, so a write landing between the read and `BEGIN IMMEDIATE` is refused or re-read instead of overwriting state or recording a duplicate event.
+
+- `idea link` refuses a party closed in between and records one event when called twice; `idea unlink` refuses once the party tracks a PR and records one event when called twice.
+- `idea edit` refuses an idea deleted in between; `idea delete`, `notice close`, `raid pause`, `raid resume`, `base pause`, `base resume` and `merge-queue unpin` record their event once when called twice concurrently.
+- `merge-queue pin` re-runs the cycle check inside the transaction, so two opposite pins landing together keep only the first.
+- `pr set`, the human relink and the external block build their fields from the row read inside the transaction, so a concurrent change to another field is no longer overwritten with stale values.
+- `notice create`, `idea add` and `ask create` call `next_id` inside the transaction, so two different items created concurrently both persist with distinct ids instead of the second ending in an `IntegrityError`; `notice create` also re-runs the same-text check there and refuses with `GuildError`.
+- `pr track` is unchanged: a competing track of the same PR is rejected by the `prs` primary key.
+- `tests/test_write_races.py` covers each case with a competing write landing before the transaction.
+- The full suite, `ruff check` and `ruff format --check` pass.

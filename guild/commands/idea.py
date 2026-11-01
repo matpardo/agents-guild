@@ -70,8 +70,9 @@ def add(ctx, title, description, requester, deadline, project):
         "project": project,
     }
     _validate_fields(ctx, fields, project)
-    idea_id = next_id(ctx.conn, "ideas")
-    _record(ctx, "idea.created", dict(fields, id=idea_id))
+    with db.writing(ctx.conn):
+        idea_id = next_id(ctx.conn, "ideas")
+        _append(ctx, "idea.created", dict(fields, id=idea_id))
     return "idea #{} added".format(idea_id)
 
 
@@ -80,13 +81,16 @@ def edit(ctx, idea_id, fields):
         raise GuildError("nothing to edit: pass at least one field", 1)
     row = _require_idea(ctx, idea_id)
     _validate_fields(ctx, fields, fields.get("project", row["project"]))
-    _record(ctx, "idea.edited", {"id": idea_id, "fields": fields})
+    with db.writing(ctx.conn):
+        _require_idea(ctx, idea_id)
+        _append(ctx, "idea.edited", {"id": idea_id, "fields": fields})
     return "idea #{} edited".format(idea_id)
 
 
 def delete(ctx, idea_id):
-    _require_idea(ctx, idea_id)
-    _record(ctx, "idea.deleted", {"id": idea_id})
+    with db.writing(ctx.conn):
+        _require_idea(ctx, idea_id)
+        _append(ctx, "idea.deleted", {"id": idea_id})
     return "idea #{} deleted".format(idea_id)
 
 
@@ -104,22 +108,26 @@ def _is_linked(ctx, idea_id, party):
 
 
 def link_for_party(ctx, idea_id, party):
-    _require_idea(ctx, idea_id)
-    _require_open_party(ctx, party)
-    if _is_linked(ctx, idea_id, party):
-        raise GuildError("idea #{} is already linked to party '{}'".format(idea_id, party), 1)
-    _record(ctx, "idea.linked", {"id": idea_id, "party": party})
+    with db.writing(ctx.conn):
+        _require_idea(ctx, idea_id)
+        _require_open_party(ctx, party)
+        if _is_linked(ctx, idea_id, party):
+            raise GuildError("idea #{} is already linked to party '{}'".format(idea_id, party), 1)
+        _append(ctx, "idea.linked", {"id": idea_id, "party": party})
     return "idea #{} linked to party '{}'".format(idea_id, party)
 
 
 def unlink_for_party(ctx, idea_id, party):
-    _require_idea(ctx, idea_id)
-    link_row = next((row for row in linked_parties(ctx, idea_id) if row["name"] == party), None)
-    if link_row is None:
-        raise GuildError("idea #{} is not linked to party '{}'".format(idea_id, party), 1)
-    if link_row["has_prs"]:
-        raise GuildError("idea #{} stays linked to party '{}': the party already tracks a PR".format(idea_id, party), 1)
-    _record(ctx, "idea.unlinked", {"id": idea_id, "party": party})
+    with db.writing(ctx.conn):
+        _require_idea(ctx, idea_id)
+        link_row = next((row for row in linked_parties(ctx, idea_id) if row["name"] == party), None)
+        if link_row is None:
+            raise GuildError("idea #{} is not linked to party '{}'".format(idea_id, party), 1)
+        if link_row["has_prs"]:
+            raise GuildError(
+                "idea #{} stays linked to party '{}': the party already tracks a PR".format(idea_id, party), 1
+            )
+        _append(ctx, "idea.unlinked", {"id": idea_id, "party": party})
     return "idea #{} unlinked from party '{}'".format(idea_id, party)
 
 
