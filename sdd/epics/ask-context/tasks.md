@@ -114,3 +114,14 @@ updated: 2026-10-31
 **Acceptance:**
 - [x] `and/or`, `y/o`, `cliente/servidor` and `1234567` count zero.
 - [x] `a/b/c`, `guild/commands/ask.py` and `abc1234` still count one each.
+
+## T11 — CLI bold across wraps and dim context
+
+**Depends on:** T08
+**Status:** [x] done
+
+**What:** in the CLI, a `**bold**` span that wraps onto another line stays bold on every line, and the board dims the context, recommendation and answer text around the bold spans.
+
+**Acceptance:**
+- [x] A bold span split by a wrap is styled on both lines with its markers removed.
+- [x] An unclosed `**` stays literal.
