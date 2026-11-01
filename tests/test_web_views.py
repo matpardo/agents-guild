@@ -340,6 +340,7 @@ _STATE_BOARD = dict(
         _state_party("k", ["r"], "waiting-ask"),
         _state_party("p", [], "waiting-permission"),
         _state_party("i", [], "idle"),
+        _state_party("sa", [], "waiting-sub-agents"),
         dict(
             _state_party("pk", [], "parked"), status={"name": "parked", "label": "parked 3h", "detail": "legal answer"}
         ),
@@ -359,7 +360,7 @@ class WebSidebarStateTests(unittest.TestCase):
 
     def test_party_rows_carry_a_status_badge_class(self):
         classes = [node["className"] for node in self._nodes()]
-        for name in ("working", "queued", "waiting-ask", "waiting-permission", "idle"):
+        for name in ("working", "queued", "waiting-ask", "waiting-permission", "idle", "waiting-sub-agents"):
             with self.subTest(status=name):
                 self.assertIn("status-badge status-" + name, classes)
 
@@ -382,6 +383,10 @@ class WebSidebarStateTests(unittest.TestCase):
         text = self._text()
         self.assertLess(text.index("waiting-ask"), text.index("working"))
         self.assertLess(text.index("working"), text.index("queued"))
+
+    def test_waiting_sub_agents_sorts_before_unlisted_idle(self):
+        links = [node["text"] for node in self._nodes() if node["tag"] == "a" and node["text"] in ("sa", "i", "pk")]
+        self.assertEqual(links, ["sa", "pk", "i"])
 
     def test_solo_group_puts_permission_then_context_high_before_the_rest(self):
         links = [node["text"] for node in self._nodes() if node["tag"] == "a" and node["text"] in ("p", "i", "h")]

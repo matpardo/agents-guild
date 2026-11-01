@@ -238,18 +238,25 @@ class PartyStatusTests(GuildTestCase):
         self.assertEqual(result["status"], "waiting-background")
         self.assertEqual(result["detail"], "pr acme/app#7")
 
-    def test_stopped_with_subagent_is_waiting_background(self):
+    def test_stopped_with_subagent_is_waiting_sub_agents(self):
         self._add_task()
         self._session("session.stopped", {})
         self._background(background.subagent_key("a1"), "a1")
         result = self._derive()
-        self.assertEqual((result["status"], result["detail"]), ("waiting-background", "1 subagents"))
+        self.assertEqual((result["status"], result["detail"]), ("waiting-sub-agents", "1 subagents"))
 
-    def test_idle_with_waiting_subagent_is_waiting_background(self):
+    def test_idle_with_waiting_subagent_is_waiting_sub_agents(self):
         self._waiting("idle", "")
         self._background(background.subagent_key("a1"), background.WAITING_ON_OWN_WORK)
         result = self._derive()
-        self.assertEqual((result["status"], result["detail"]), ("waiting-background", "1 subagents"))
+        self.assertEqual((result["status"], result["detail"]), ("waiting-sub-agents", "1 subagents"))
+
+    def test_subagent_beats_pr_wait(self):
+        self._waiting("idle", "")
+        self._background(background.pr_key(os.getpid()), "pr acme/app#7")
+        self._background(background.subagent_key("a1"), "a1")
+        result = self._derive()
+        self.assertEqual((result["status"], result["detail"]), ("waiting-sub-agents", "1 subagents"))
 
     def test_open_ask_beats_background(self):
         self._ask()

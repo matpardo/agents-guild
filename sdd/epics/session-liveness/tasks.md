@@ -84,3 +84,10 @@ updated: 2026-10-04
 **Status:** [x] done
 
 **What:** `subagent-stop` reads the subagent's own transcript; when a background command it launched has no finished notification, the marker is kept with a waiting content that stays live regardless of the meta file, so an idle leader shows `waiting-background` instead of `waiting-input` until the subagent wakes and stops with nothing pending.
+
+## T11 — waiting-sub-agents status and status colors
+
+**Depends on:** T10
+**Status:** [x] done
+
+**What:** a leader idle or stopped while its own subagents run shows `waiting-sub-agents`, separate from `waiting-background`, which now covers only a running `guild pr wait`; `parked` shows purple and `waiting-input` red.

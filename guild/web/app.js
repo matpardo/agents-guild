@@ -187,7 +187,8 @@ realmDoctorLines: [],
       "waiting-permission": "The leader session is blocked on a Claude Code permission prompt or dialog; respond to it in that session.",
       "waiting-ask": "The party has an open ask and its leader is not working; answer the ask below.",
       "waiting-input": "The leader session is idle and waiting for you to type something in it.",
-      "waiting-background": "The leader is waiting on its own background work (a PR wait or subagents); nothing for you to do.",
+      "waiting-sub-agents": "The leader is waiting on its own subagents; nothing for you to do.",
+      "waiting-background": "The leader is waiting on its own PR wait; nothing for you to do.",
       "stopped-with-work": "The leader session stopped but the party still has unfinished work; resume it.",
       working: "The leader session is running.",
       done: "The leader session stopped and the party has no work left.",
@@ -3963,7 +3964,7 @@ realmDoctorLines: [],
     });
   }
 
-  var ATTENTION_ORDER = ["waiting-permission", "waiting-ask", "ctx-high", "waiting-input", "stopped-with-work", "working", "waiting-background", "queued", "parked", "blocked"];
+  var ATTENTION_ORDER = ["waiting-permission", "waiting-ask", "ctx-high", "waiting-input", "stopped-with-work", "working", "waiting-sub-agents", "waiting-background", "queued", "parked", "blocked"];
 
   function attentionRank(row) {
     var key = row.ctxHigh && row.status.name !== "waiting-permission" && row.status.name !== "waiting-ask" ? "ctx-high" : row.status.name;
