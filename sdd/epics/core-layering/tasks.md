@@ -101,3 +101,16 @@ updated: 2026-10-31
 - `pr track` is unchanged: a competing track of the same PR is rejected by the `prs` primary key.
 - `tests/test_write_races.py` covers each case with a competing write landing before the transaction.
 - The full suite, `ruff check` and `ruff format --check` pass.
+
+## T09 — Build only the parser of the command being run
+
+**Depends on:** T06
+**Status:** [x] done
+
+**What:** `main` built all 50 top-level command parsers on every run, about 100 ms of argparse work. Each command now has its own private builder and `main` builds only the parser of the command named in `argv`. Median of 11 runs of `python3 -m guild`: `whoami` 217 ms to 143 ms, `ideas` 232 ms to 146 ms, `--help` unchanged (full parser).
+
+- Every top-level command has one `_add_<name>_parser` builder, registered in `_COMMAND_BUILDERS` in the former registration order; `build_parser` calls them all.
+- `main(["whoami"])` and any other known command never calls `build_parser`; empty `argv`, `--help`, `-h` and an unknown command still get the full parser, so the command listing and the invalid-choice error are unchanged.
+- For every top-level command, `<name> --help` prints the same text from the single-command parser and from the full parser.
+- The hook fast path is unchanged.
+- The full suite, `ruff check` and `ruff format --check` pass.

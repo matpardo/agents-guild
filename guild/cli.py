@@ -1464,43 +1464,41 @@ def _build_hook_parser():
     return parser
 
 
-def build_parser():
-    parser = argparse.ArgumentParser(
-        prog="guild",
-        description="Guild coordinates parallel Claude Code sessions. See the README Commands section for the full reference.",
-    )
-    subparsers = parser.add_subparsers(dest="command", required=True, metavar="<command>")
-
+def _add_whoami_parser(subparsers):
     whoami = subparsers.add_parser("whoami", help="show the session, party and project you are bound to")
     whoami.set_defaults(handler=_handle_whoami)
 
+
+def _add_doctor_parser(subparsers):
     doctor = subparsers.add_parser(
         "doctor", help="read-only checks of hooks, permission rules, GUILD.md and project configs"
     )
     doctor.add_argument("--scan-prs", action="store_true", help="scan open PRs for guild traces through gh")
     doctor.set_defaults(handler=_handle_doctor)
 
+
+def _add_wire_settings_parser(subparsers):
     wire_settings = subparsers.add_parser(
         "wire-settings", help="merge guild hooks and permission rules into ~/.claude/settings.json"
     )
     wire_settings.set_defaults(handler=_handle_wire_settings)
 
+
+def _add_unwire_settings_parser(subparsers):
     unwire_settings = subparsers.add_parser(
         "unwire-settings", help="remove guild hooks and permission rules from ~/.claude/settings.json"
     )
     unwire_settings.set_defaults(handler=_handle_unwire_settings)
 
+
+def _add_init_project_parser(subparsers):
     init_project = subparsers.add_parser("init-project", help="create a project config from a JSON file")
     init_project.add_argument("name")
     init_project.add_argument("--config", required=True, help="path of the project config JSON")
     init_project.set_defaults(handler=_handle_init_project)
 
-    _add_party_parser(subparsers)
-    _add_quest_parser(subparsers)
-    _add_task_parser(subparsers)
-    _add_pr_parser(subparsers)
-    _add_finding_parser(subparsers)
 
+def _add_ask_parser(subparsers):
     ask = subparsers.add_parser("ask", help="ask the human a decision", description=ask_legibility.TEMPLATE)
     ask.add_argument(
         "question", help="at most {} characters; put details in --context".format(pii.ASK_QUESTION_MAX_LENGTH)
@@ -1518,15 +1516,21 @@ def build_parser():
     )
     ask.set_defaults(handler=_handle_ask)
 
+
+def _add_answer_parser(subparsers):
     answer = subparsers.add_parser("answer", help="answer an open ask")
     answer.add_argument("id", type=int)
     answer.add_argument("text")
     answer.set_defaults(handler=_handle_answer)
 
+
+def _add_dismiss_parser(subparsers):
     dismiss = subparsers.add_parser("dismiss", help="dismiss an open ask")
     dismiss.add_argument("id", type=int)
     dismiss.set_defaults(handler=_handle_dismiss)
 
+
+def _add_asks_parser(subparsers):
     asks = subparsers.add_parser("asks", help="list open asks, or show one in detail")
     asks.add_argument("ask_id", type=int, nargs="?")
     asks.add_argument("--all", action="store_true", help="include answered and dismissed asks")
@@ -1536,63 +1540,66 @@ def build_parser():
     asks.add_argument("--since", help="only asks created within this duration, e.g. 3d")
     asks.set_defaults(handler=_handle_asks)
 
-    _add_notice_parser(subparsers)
 
+def _add_notices_parser(subparsers):
     notices = subparsers.add_parser("notices", help="list notices addressed to you")
     notices.set_defaults(handler=_handle_notices)
 
-    _add_idea_parser(subparsers)
 
+def _add_ideas_parser(subparsers):
     ideas = subparsers.add_parser("ideas", help="list ideas, or show one in detail")
     ideas.add_argument("idea_id", type=int, nargs="?")
     ideas.add_argument("--project", help="only ideas of this project")
     ideas.set_defaults(handler=_handle_ideas)
 
-    _add_adventurer_parser(subparsers)
 
+def _add_adventurers_parser(subparsers):
     adventurers = subparsers.add_parser("adventurers", help="list adventurers, or show one in detail")
     adventurers.add_argument("adventurer_id", type=int, nargs="?")
     adventurers.set_defaults(handler=_handle_adventurers)
 
+
+def _add_claim_parser(subparsers):
     claim = subparsers.add_parser("claim", help="claim a shared area or task, or check a claim")
     claim.add_argument("area")
     claim.add_argument("check_area", nargs="?")
     claim.add_argument("--ttl", help="claim lifetime, e.g. 8h")
     claim.set_defaults(handler=_handle_claim)
 
+
+def _add_release_parser(subparsers):
     release = subparsers.add_parser("release", help="release a claimed area")
     release.add_argument("area")
     release.set_defaults(handler=_handle_release)
 
+
+def _add_claims_parser(subparsers):
     claims = subparsers.add_parser("claims", help="list active claims")
     claims.set_defaults(handler=_handle_claims)
 
-    _add_memory_parser(subparsers)
 
-    _add_realm_parser(subparsers)
-
-    _add_raid_parser(subparsers)
-    _add_base_parser(subparsers)
-
+def _add_raids_parser(subparsers):
     raids = subparsers.add_parser("raids", help="list raids")
     raids.set_defaults(handler=_handle_raids)
 
-    _add_merge_queue_parser(subparsers)
-    _add_review_md_parser(subparsers)
-    _add_main_parser(subparsers)
 
+def _add_board_parser(subparsers):
     board = subparsers.add_parser("board", help="show the human board")
     board_filter = board.add_mutually_exclusive_group()
     board_filter.add_argument("--party", help="only this party")
     board_filter.add_argument("--raid", help="only this raid")
     board.set_defaults(handler=_handle_board)
 
+
+def _add_history_parser(subparsers):
     history = subparsers.add_parser("history", help="read-only: quests, raids and totals over time")
     history.add_argument("--party", help="only this party")
     history.add_argument("--raid", help="only this raid")
     history.add_argument("--project", help="only this project")
     history.set_defaults(handler=_handle_history)
 
+
+def _add_cost_parser(subparsers):
     cost = subparsers.add_parser("cost", help="token usage from Claude Code transcripts")
     cost.add_argument("--since", default=None, help="only usage within this duration, e.g. 3d")
     cost.add_argument(
@@ -1604,10 +1611,14 @@ def build_parser():
     cost.add_argument("--project", default=None, help="only this project")
     cost.set_defaults(handler=_handle_cost)
 
+
+def _add_next_parser(subparsers):
     next_parser = subparsers.add_parser("next", help="show the next action for your party")
     next_parser.add_argument("--all", action="store_true", help="show the full queue without changing state")
     next_parser.set_defaults(handler=_handle_next)
 
+
+def _add_handoff_parser(subparsers):
     handoff = subparsers.add_parser("handoff", help="write the resume state for a fresh session, or prune old handoffs")
     handoff.add_argument("action", nargs="?", choices=["prune"], help="prune: delete old handoff files")
     handoff.add_argument("--in-flight", help="work still running")
@@ -1620,11 +1631,15 @@ def build_parser():
     handoff.add_argument("--party", help="hand off a party whose leader session is gone (terminal only)")
     handoff.set_defaults(handler=_handle_handoff)
 
+
+def _add_sync_parser(subparsers):
     sync = subparsers.add_parser("sync", help="refresh state from GitHub, the SDD or the tracker")
     sync.add_argument("--source", required=True, choices=["gh", "sdd", "tracker", "bases"], help="what to refresh from")
     sync.add_argument("--all-projects", action="store_true", help="every project config (sdd and tracker)")
     sync.set_defaults(handler=_handle_sync)
 
+
+def _add_lifecycle_parser(subparsers):
     lifecycle_parser = subparsers.add_parser("lifecycle", help="run project lifecycle commands")
     lifecycle_actions = lifecycle_parser.add_subparsers(dest="lifecycle_action", required=True, metavar="<subcommand>")
     lifecycle_run = lifecycle_actions.add_parser("run", help="run a project lifecycle command by hand")
@@ -1633,6 +1648,8 @@ def build_parser():
     lifecycle_run.add_argument("--dry-run", action="store_true", help="show what would run")
     lifecycle_run.set_defaults(handler=_handle_lifecycle_run)
 
+
+def _add_resources_parser(subparsers):
     resources = subparsers.add_parser("resources", help="read-only: what each project costs the machine in disk")
     resources.add_argument("--project", help="only this project")
     resources.add_argument("--since", default="1d", help="growth window, e.g. 1d")
@@ -1640,55 +1657,153 @@ def build_parser():
     resources_actions = resources.add_subparsers(dest="resources_action", required=False, metavar="<subcommand>")
     resources_actions.add_parser("collect", help="measure and record disk usage per project")
 
+
+def _add_compact_parser(subparsers):
     compact = subparsers.add_parser(
         "compact", help="back up the database, then drop duplicate sync events and old resource samples"
     )
     compact.add_argument("--dry-run", action="store_true", help="list what would be deleted; no backup, no changes")
     compact.set_defaults(handler=_handle_compact)
 
+
+def _add_drift_parser(subparsers):
     drift = subparsers.add_parser("drift", help="check SDD drift of epics")
     drift_scope = drift.add_mutually_exclusive_group()
     drift_scope.add_argument("--epic", help="check this epic")
     drift_scope.add_argument("--all", action="store_true", help="check every epic")
     drift.set_defaults(handler=_handle_drift)
 
+
+def _add_revive_parser(subparsers):
     revive = subparsers.add_parser("revive", help="relaunch active parties after a reboot")
     revive.add_argument("--party", action="append", default=[], help="relaunch this party; repeatable")
     revive.add_argument("--all", action="store_true", help="relaunch every active party")
     revive.add_argument("--list", action="store_true", help="print copy-paste commands instead of launching")
     revive.set_defaults(handler=_handle_revive)
 
+
+def _add_brief_parser(subparsers):
     brief = subparsers.add_parser("brief", help="show the per-session view, or a budgeted brief for a task")
     brief.add_argument("task", nargs="?")
     brief.set_defaults(handler=_handle_brief)
 
+
+def _add_inbox_parser(subparsers):
     inbox = subparsers.add_parser("inbox", help="show events since you last looked")
     inbox.add_argument("--since-last", action="store_true", help="only events since the last call")
     inbox.set_defaults(handler=_handle_inbox)
 
+
+def _add_statusline_parser(subparsers):
     statusline = subparsers.add_parser("statusline", help="internal: statusline text for Claude Code")
     statusline.add_argument("--session", required=True, help="session id")
     statusline.add_argument("--ctx", type=int, help="context used, percent")
     statusline.set_defaults(handler=_handle_statusline)
 
+
+def _add_hook_parser(subparsers):
     hook = subparsers.add_parser("hook", help=_HOOK_HELP)
     hook.add_argument("hook_name", choices=HOOK_NAMES)
 
+
+def _add_seed_parser(subparsers):
     seed = subparsers.add_parser("seed", help="internal: load state from a JSON file")
     seed.add_argument("file")
     seed.set_defaults(handler=_handle_seed)
 
+
+def _add_rebuild_parser(subparsers):
     rebuild = subparsers.add_parser("rebuild", help="internal: rebuild projections from the event log")
     rebuild.set_defaults(handler=_handle_rebuild)
 
+
+def _add_export_parser(subparsers):
     export = subparsers.add_parser("export", help="export guild-visible data")
     export.add_argument("--visibility", required=True, choices=["guild"], help="visibility to export")
     export.set_defaults(handler=_handle_export)
 
+
+def _add_web_parser(subparsers):
     web = subparsers.add_parser("web", help="serve the local board in a browser")
     web.add_argument("--port", type=int, default=8765, help="port to listen on")
     web.set_defaults(handler=_handle_web)
 
+
+_COMMAND_BUILDERS = {
+    "whoami": _add_whoami_parser,
+    "doctor": _add_doctor_parser,
+    "wire-settings": _add_wire_settings_parser,
+    "unwire-settings": _add_unwire_settings_parser,
+    "init-project": _add_init_project_parser,
+    "party": _add_party_parser,
+    "quest": _add_quest_parser,
+    "task": _add_task_parser,
+    "pr": _add_pr_parser,
+    "finding": _add_finding_parser,
+    "ask": _add_ask_parser,
+    "answer": _add_answer_parser,
+    "dismiss": _add_dismiss_parser,
+    "asks": _add_asks_parser,
+    "notice": _add_notice_parser,
+    "notices": _add_notices_parser,
+    "idea": _add_idea_parser,
+    "ideas": _add_ideas_parser,
+    "adventurer": _add_adventurer_parser,
+    "adventurers": _add_adventurers_parser,
+    "claim": _add_claim_parser,
+    "release": _add_release_parser,
+    "claims": _add_claims_parser,
+    "memory": _add_memory_parser,
+    "realm": _add_realm_parser,
+    "raid": _add_raid_parser,
+    "base": _add_base_parser,
+    "raids": _add_raids_parser,
+    "merge-queue": _add_merge_queue_parser,
+    "review-md": _add_review_md_parser,
+    "main": _add_main_parser,
+    "board": _add_board_parser,
+    "history": _add_history_parser,
+    "cost": _add_cost_parser,
+    "next": _add_next_parser,
+    "handoff": _add_handoff_parser,
+    "sync": _add_sync_parser,
+    "lifecycle": _add_lifecycle_parser,
+    "resources": _add_resources_parser,
+    "compact": _add_compact_parser,
+    "drift": _add_drift_parser,
+    "revive": _add_revive_parser,
+    "brief": _add_brief_parser,
+    "inbox": _add_inbox_parser,
+    "statusline": _add_statusline_parser,
+    "hook": _add_hook_parser,
+    "seed": _add_seed_parser,
+    "rebuild": _add_rebuild_parser,
+    "export": _add_export_parser,
+    "web": _add_web_parser,
+}
+
+
+def _new_parser():
+    parser = argparse.ArgumentParser(
+        prog="guild",
+        description="Guild coordinates parallel Claude Code sessions. See the README Commands section for the full reference.",
+    )
+    subparsers = parser.add_subparsers(dest="command", required=True, metavar="<command>")
+    return parser, subparsers
+
+
+def build_parser():
+    parser, subparsers = _new_parser()
+    for builder in _COMMAND_BUILDERS.values():
+        builder(subparsers)
+    return parser
+
+
+def _build_parser_for(argv):
+    if not argv or argv[0] not in _COMMAND_BUILDERS:
+        return build_parser()
+    parser, subparsers = _new_parser()
+    _COMMAND_BUILDERS[argv[0]](subparsers)
     return parser
 
 
@@ -1871,7 +1986,7 @@ def main(argv):
     os.umask(0o077)
     if argv[:1] == ["hook"]:
         return _dispatch_hook(_build_hook_parser().parse_args(argv[1:]))
-    parser = build_parser()
+    parser = _build_parser_for(argv)
     args = parser.parse_args(argv)
     if args.command == "hook":
         return _dispatch_hook(args)
