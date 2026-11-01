@@ -15,7 +15,7 @@ Core modules never import `guild.commands`. Only modules under `guild/commands/`
 
 ## Consequences
 
-- Core modules no longer pull command modules in, but the hook still imports ten command modules directly, so hook start time did not change (about 84 ms to import before and after). Faster hooks need `guild/commands/hook.py` itself to import less.
+- Core modules no longer pull command modules in, but the hook still imports ten command modules directly, so hook start time did not change (about 84 ms to import before and after). A later profile showed the hook start time was dominated by building the full command parser, not by imports; `guild hook` now parses with a parser of its own (task T06 of `core-layering`).
 - Command modules shrink to argument handling and rendering; `commands/next.py` keeps only rendering and `run`.
 - A new shared query goes into a core module from the start; putting it in a command module and importing it from core fails the suite.
 - Callers and tests refer to the core module, so a move touches every call site once.

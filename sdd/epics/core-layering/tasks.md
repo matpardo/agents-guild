@@ -78,3 +78,10 @@ updated: 2026-10-31
 **Acceptance:**
 - [x] `main(["hook", <name>])` never calls `build_parser`; an unknown hook name is still a usage error.
 - [x] The full parser accepts the same hook names, from one shared tuple.
+
+## T07 — Correct the hook latency note and ignore browser check output
+
+**Depends on:** T06
+**Status:** [x] done
+
+**What:** The core-imports ADR names the parser, not the imports, as the hook start cost. `.playwright-mcp/` is ignored, so browser check snapshots written into a clone no longer leave it dirty and block `update.sh`.
