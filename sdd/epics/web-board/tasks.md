@@ -178,3 +178,14 @@ updated: 2026-10-04
 
 **Acceptance:**
 - [x] `python3 -m unittest tests.test_web_drift` prints no `TypeError`.
+
+## T25 — Separate party, status and detail in the blocked line
+
+**Depends on:** —
+**Status:** [x] done
+
+**What:** a blocked session line on the web reads `party · status age · detail` instead of gluing the three together.
+
+**Acceptance:**
+- [x] Party, status and detail are separated by ` · `.
+- [x] Without a detail there is no trailing separator.

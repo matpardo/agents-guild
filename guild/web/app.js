@@ -1222,8 +1222,10 @@ realmDoctorLines: [],
     var line = el("p");
     line.className = "blocked-session";
     line.appendChild(textEl("strong", entry.party));
+    line.appendChild(document.createTextNode(" · "));
     line.appendChild(explain(textEl("span", entry.label), "blockedWait", entry.wait));
     if (entry.detail) {
+      line.appendChild(document.createTextNode(" · "));
       line.appendChild(textEl("code", entry.detail));
     }
     return line;

@@ -1388,3 +1388,33 @@ class WebMultilineAnswerBehaviorTests(unittest.TestCase):
             dict(_BOARD, asks=[_ask(context="ctx", recommend=None)]), "asks", {"/api/asks/3": detail_model}, ["detail"]
         )
         self.assertEqual(self._breaks(rendered), 2)
+
+
+def _leaf_text(node):
+    if not node["children"]:
+        return node["text"]
+    return node["text"] + "".join(_leaf_text(child) for child in node["children"])
+
+
+@unittest.skipIf(shutil.which("node") is None, "node not installed")
+class WebBlockedLineBehaviorTests(unittest.TestCase):
+    def _line(self, detail):
+        entry = {
+            "party": "alpha",
+            "wait": "permission",
+            "since": None,
+            "detail": detail,
+            "label": "waiting-permission 27m",
+        }
+        tree = json.loads(_render(dict(_BOARD, blocked=[entry]), "all", "all", "asks", "tree"))
+        lines = [node for node in _flatten(tree) if node["className"] == "blocked-session"]
+        return _leaf_text(lines[0])
+
+    def test_party_status_and_detail_are_separated(self):
+        self.assertEqual(
+            self._line("Claude needs your permission"),
+            "alpha · waiting-permission 27m · Claude needs your permission",
+        )
+
+    def test_no_trailing_separator_without_detail(self):
+        self.assertEqual(self._line(None), "alpha · waiting-permission 27m")
