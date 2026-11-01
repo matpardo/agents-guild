@@ -103,3 +103,14 @@ updated: 2026-10-31
 **Acceptance:**
 - [x] A multi-line answer keeps its lines in the CLI detail and lists.
 - [x] The web detail and answered list build line breaks for it.
+
+## T10 — Jargon warning false positives
+
+**Depends on:** T08
+**Status:** [x] done
+
+**What:** the ask warning stops counting plain words (`and/or`, `cliente/servidor`) and plain numbers as ids or paths; paths with two or more slashes or a file extension, and hashes with a letter and a digit, still count.
+
+**Acceptance:**
+- [x] `and/or`, `y/o`, `cliente/servidor` and `1234567` count zero.
+- [x] `a/b/c`, `guild/commands/ask.py` and `abc1234` still count one each.

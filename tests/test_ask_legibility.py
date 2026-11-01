@@ -6,7 +6,8 @@ from guild import ask_legibility
 class JargonCountTests(unittest.TestCase):
     def test_each_token_kind_counts(self):
         for text in (
-            "guild/foo",
+            "a/b/c",
+            "guild/commands/ask.py",
             "foo.py",
             "see #123",
             "task T05",
@@ -16,6 +17,10 @@ class JargonCountTests(unittest.TestCase):
             "my_ident",
         ):
             self.assertEqual(ask_legibility.jargon_count(text), 1, text)
+
+    def test_plain_words_and_numbers_count_zero(self):
+        for text in ("and/or", "y/o", "cliente/servidor", "1234567", "guild/foo"):
+            self.assertEqual(ask_legibility.jargon_count(text), 0, text)
 
     def test_plain_text_counts_zero(self):
         self.assertEqual(ask_legibility.jargon_count("Should we ship this change today?"), 0)
