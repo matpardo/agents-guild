@@ -2,7 +2,7 @@
 epic: solo-players
 type: spec
 title: Built-in per-repo solo players
-status: active
+status: done
 owner: matpardo
 created: 2026-11-01
 updated: 2026-11-01
@@ -25,11 +25,11 @@ Health jobs are free-form commands the project writes itself and the human launc
 - States `idle`, `due`, `running` and `cooling` computed on read, with a 1h cooldown after a report.
 - `guild solo list` and `guild solo launch <owner/repo> <job>`; each player is also a derived health job.
 - A `SOLO PLAYERS` section in the CLI board and the web.
+- `guild solo tick`, a background job that launches every due player, with a launch debounce and a notice.
 - `README.md` and `GUILD.md` change with the code.
 
 ## Out of scope
 
-- Launching a solo player on a timer (follow-up PR).
 - Merging: a solo player never merges.
 
 ## Success criteria
@@ -37,3 +37,4 @@ Health jobs are free-form commands the project writes itself and the human launc
 - [x] An invalid `solo_players` entry fails to load the project config.
 - [x] A red main or an unmergeable Dependabot PR makes the matching player due in the CLI and the web.
 - [x] The human can launch a player from `guild solo launch`, and it refuses inside a session.
+- [x] A due player launches by itself from the `solo-tick` background job, once per cooldown.

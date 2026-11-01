@@ -209,6 +209,7 @@ guild adventurer dismiss <id>                           # removes a done adventu
 guild adventurers [<id>]                                # active ones, then recent done ones; <id> shows one in full
 guild solo list                                         # solo players of the project config with trigger and state
 guild solo launch <owner/repo> <job>                    # human terminal only: tmux window running a solo player, due or not
+guild solo tick                                         # background job: launch every due solo player (human terminal only)
 
 guild claim <area> --ttl <dur>          # area, or task:<epic>/<tid> / task:<quest>/<tid>
 guild claim check <area>                # read-only, no event; exit 0 free/yours, exit 1 someone else's
@@ -909,7 +910,7 @@ unchanged and does not wake.
 
 ### Background jobs
 
-`guild` has no daemon and installs no systemd timers. Six jobs keep the stored
+`guild` has no daemon and installs no systemd timers. Seven jobs keep the stored
 state fresh, and each starts, detached, when it is due and one of these runs:
 a session hook (`session-start`, `prompt-submit`, `stop`), a `pr wait` that
 sees no sync for 30 minutes, or `guild web`, which checks every minute while it
@@ -924,9 +925,10 @@ and no `guild web`, runs nothing.
 | `sync-tracker` | `guild sync --source tracker --all-projects` | 10m |
 | `sync-bases` | `guild sync --source bases` | 1m |
 | `resources-collect` | `guild resources collect` | 2h |
+| `solo-tick` | `guild solo tick` | 10m |
 | `compact` | `guild compact` | 1d |
 
-`resources-collect` and `compact` run at `Nice=19`. The last start of each job
+`resources-collect`, `solo-tick` and `compact` run at `Nice=19`. The last start of each job
 is a stamp file in `$XDG_STATE_HOME/guild/due/`; a job is due when its stamp is
 missing or older than its interval, and the stamp is touched before the start,
 so two hooks never start the same job twice. The `--all-projects` syncs visit
@@ -1439,8 +1441,9 @@ Triggers come from facts the sync stores:
 
 A solo player is `running` while an adventurer on its health job is active,
 `due` when its trigger is on, nothing runs and the last report (`done`,
-dismissed or not) is older than the 1h cooldown, `cooling` when the trigger is
-on but the last report is newer, and `idle` without a trigger.
+dismissed or not) and the last launch are older than the 1h cooldown, `cooling`
+when the trigger is on but the last report or launch is newer, and `idle`
+without a trigger.
 
 `guild solo list` and the `SOLO PLAYERS` section of `guild board` (hidden under
 `--party` and `--raid`) and the web `solo players` show name or job, class,
@@ -1451,7 +1454,19 @@ launch button.
 `guild solo launch <owner/repo> <job>` is for the human terminal and refuses
 inside a Claude Code session. It opens a tmux window named
 `solo-<job>-<owner>-<repo>` the same way `guild adventurer launch` does, even
-when the player is not due. Nothing launches a solo player by itself yet.
+when the player is not due.
+
+`guild solo tick` launches every `due` player the same way and is the
+`solo-tick` background job (see "Background jobs"), so a red main or a stuck
+Dependabot PR gets a session without a command. It is for the human terminal and
+the background job and refuses inside a Claude Code session. It skips a player
+whose window already exists, prints one line per player it could not launch
+(for example `tmux not found`) and still exits 0. Each launch, manual or not,
+records a `solo.launched` event, and a launch younger than the cooldown keeps
+the player `cooling`, so a trigger that stays on while the new session binds,
+or after the human closed its window, does not launch it again. A launch by the
+tick also posts a project notice `solo player <name> (<class>) launched on
+<repo>: <trigger>` for 2h.
 
 ### Marking notices seen
 

@@ -77,7 +77,14 @@ def _last_report(conn, project, health_job):
     return row["done_at"], row["pending"]
 
 
-def _state(conn, now, project, health_job, trigger, last_done):
+def _last_launch(conn, health_job):
+    row = conn.execute("SELECT launched_at FROM solo_launches WHERE health_job = ?", (health_job,)).fetchone()
+    if row is None:
+        return None
+    return row["launched_at"]
+
+
+def _state(conn, now, project, health_job, trigger, last_done, last_launch):
     running = conn.execute(
         "SELECT 1 FROM adventurers WHERE project = ? AND health_job = ? AND state = 'active'",
         (project, health_job),
@@ -86,8 +93,10 @@ def _state(conn, now, project, health_job, trigger, last_done):
         return "running"
     if trigger is None:
         return "idle"
-    if last_done is not None and now - timeutil.from_iso(last_done) < timeutil.parse_duration(COOLDOWN):
-        return "cooling"
+    cooldown = timeutil.parse_duration(COOLDOWN)
+    for stamp in (last_done, last_launch):
+        if stamp is not None and now - timeutil.from_iso(stamp) < cooldown:
+            return "cooling"
     return "due"
 
 
@@ -107,7 +116,7 @@ def models(conn, now, projects_by_name):
                     "name": player.get("name", player["job"]),
                     "health_job": health_job,
                     "trigger": trigger,
-                    "state": _state(conn, now, project, health_job, trigger, last_done),
+                    "state": _state(conn, now, project, health_job, trigger, last_done, _last_launch(conn, health_job)),
                     "last_done": last_done,
                     "last_pending": last_pending,
                     "launch": LAUNCH_COMMAND.format(player["repo"], player["job"]),

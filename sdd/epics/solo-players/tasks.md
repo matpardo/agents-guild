@@ -2,7 +2,7 @@
 epic: solo-players
 type: tasks
 title: Built-in per-repo solo players
-status: active
+status: done
 updated: 2026-11-01
 ---
 
@@ -38,3 +38,13 @@ updated: 2026-11-01
 
 **Acceptance:**
 - [x] Launch opens a `solo-` window even when the player is not due and refuses inside a session.
+
+## T04 — Launch on trigger
+
+**Depends on:** T03
+**Status:** [x] done
+
+**What:** `guild solo tick`, the `solo-tick` background job, the `solo.launched` event with its debounce and the launch notice.
+
+**Acceptance:**
+- [x] A due player launches once from the tick, a repeated tick inside the cooldown does nothing and the project gets a notice.
