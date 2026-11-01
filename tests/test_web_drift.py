@@ -99,6 +99,18 @@ def _render(board, party_filter, raid_filter, out_id, mode):
     )
 
 
+def _project(name):
+    return {
+        "name": name,
+        "max_open_prs": None,
+        "open_prs": 0,
+        "wait": None,
+        "hot_files": [],
+        "finding_classes": [],
+        "freshness": {},
+    }
+
+
 _MISSING = object()
 _BOARD = {
     "generated_at": "now",
@@ -629,7 +641,7 @@ class WebNoticeAndRaidBehaviorTests(unittest.TestCase):
 
     def _board(self, paused):
         raids = [{"name": "r", "members": ["c"], "paused": paused}]
-        return dict(_BOARD, raids=raids, projects=[{"name": "acme"}])
+        return dict(_BOARD, raids=raids, projects=[_project("acme")])
 
     def test_notice_form_lists_project_and_raid_scopes(self):
         out = self._rendered(self._board(False), "notices")
