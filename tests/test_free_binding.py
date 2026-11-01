@@ -62,6 +62,19 @@ class PromoteTests(AdventurerTestCase):
         self.assertEqual(self.rows("SELECT COUNT(*) AS n FROM leaders WHERE party = 'alpha'")[0]["n"], 1)
         self.assertEqual(self.cli(["quest", "add", "q", "--title", "Q", "--no-epic"], "adv-1")[0], 0)
 
+    def test_active_adventurer_pr_refuses_a_task_link(self):
+        code, out, err = self.cli(["pr", "set", "acme/app#2", "--task", "demo-epic/T02"], "adv-1")
+        self.assertEqual(code, 1)
+        self.assertIn("adventurers do one job", err)
+
+    def test_promoted_pr_links_to_a_party_task(self):
+        self.cli(["adventurer", "promote", "alpha", "--reason", "grew to several PRs"], "adv-1")
+        self.cli(["quest", "add", "q", "--title", "Q", "--no-epic", "--tasks", "A", "--titles", "First"], "adv-1")
+        code, out, err = self.cli(["pr", "set", "acme/app#2", "--task", "q/A"], "adv-1")
+        self.assertEqual(code, 0, err)
+        pr = self.rows("SELECT party, adventurer, task_quest, task_tid FROM prs WHERE number = 2")[0]
+        self.assertEqual((pr["party"], pr["adventurer"], pr["task_quest"], pr["task_tid"]), ("alpha", 1, "q", "A"))
+
     def test_promote_without_task_prints_no_task_hint(self):
         self.cli(["adventurer", "done", "--pending", "none"], "adv-1")
         self.start_health_job("adv-2")
