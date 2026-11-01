@@ -138,7 +138,7 @@ def _require_owner(ctx, row):
 
 
 def _link_fields(ctx, row, task_ref, card):
-    if row["adventurer"] is not None:
+    if row["adventurer"] is not None and not row["party"]:
         if task_ref is not None:
             raise GuildError("an adventurer's PR is linked with --card only", 1)
         return {"task_quest": None, "task_tid": None, "card": card}

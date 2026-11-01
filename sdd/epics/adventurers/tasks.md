@@ -182,3 +182,13 @@ updated: 2026-10-24
 - [x] The task and the quest are done after `adventurer done`; `quest board` no longer lists the quest and the final report says `quest <slug> done`.
 - [x] A quest with other open tasks stays active.
 - [x] SDD tasks and party-owned quests do not change.
+
+## T17 — Relink a promoted adventurer's PR to a party task
+
+**Depends on:** —
+**Status:** [x] done
+
+**What:** after an adventurer is promoted, its PRs belong to the new party, so `pr set --task` links them to a task of that party; an active adventurer still cannot link a PR to a task.
+
+**Acceptance:**
+- [x] A promoted adventurer's PR links to a task of the party.
