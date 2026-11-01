@@ -202,6 +202,12 @@ class SoloPlayersBoardTests(SoloPlayersTestCase):
         self.assertIn("guild solo launch acme/app red-main", out)
         self.assertIn("guild solo launch acme/app dependabot", out)
 
+    def test_text_board_says_no_trigger_for_an_idle_player(self):
+        code, out, err = self.cli(["board"], None)
+        self.assertEqual(code, 0, err)
+        self.assertIn("mender [cleric] acme/app idle no trigger", out)
+        self.assertNotIn("idle idle", out)
+
     def test_text_board_without_players_has_no_section(self):
         self.set_players([])
         code, out, err = self.cli(["board"], None)
