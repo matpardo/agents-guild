@@ -21,7 +21,7 @@ Guild is a Python 3.10 stdlib-only CLI (`guild/`) with a browser board (`guild/w
 - Lint: `uv run ruff check .` and `uv run ruff format --check .` must pass (CI runs both; `uv run ruff format .` fixes the second). Dev tools come from the `dev` group in `pyproject.toml`, locked with hashes in `uv.lock`: run them with `uv sync --locked` and `uv run ruff ...`; a ruff bump runs `uv lock` and raises `required-version` in `ruff.toml`. Fix findings in code, never with `noqa` or ignores.
 - `tests/__init__.py` turns commit signing off for test repos.
 - GitHub actions are pinned by full commit SHA (`uses: owner/action@<sha> # vX.Y.Z`), never by tag; `tests/test_ci_pins.py` guards it.
-- Dependabot (`.github/dependabot.yml`) proposes action and ruff bumps monthly, 14 days after a release. A ruff bump fails CI until `required-version` in `ruff.toml` matches: update it in the same branch, never drop it.
+- Dependabot (`.github/dependabot.yml`) proposes action and ruff bumps monthly, 7 days after a release. A ruff bump fails CI until `required-version` in `ruff.toml` matches: update it in the same branch, never drop it.
 - A change to a web filter or a render needs a behavior test in the node harness (`tests/web_drift_harness.js`, driven by `tests/test_web_drift.py`) when `node` exists. Without node those tests skip: say so in the PR.
 
 ## SDD

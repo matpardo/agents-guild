@@ -2981,7 +2981,7 @@ git identity: each test that commits configures its own.
 Every action in a workflow is pinned by its full commit SHA, with the
 release tag beside it; `tests/test_ci_pins.py` fails on a tag or branch ref.
 Dependabot (`.github/dependabot.yml`) opens a monthly pull request for a
-newer action or dev tool, waiting 14 days after each release; a ruff bump also
+newer action or dev tool, waiting 7 days after each release; a ruff bump also
 needs `required-version` in `ruff.toml` raised by hand before CI passes.
 
 Dev tools (dev-only, never a runtime dependency) are managed with
