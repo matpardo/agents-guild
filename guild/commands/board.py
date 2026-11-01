@@ -977,8 +977,13 @@ def _solo_player_lines(painter, projects_by_name, ctx):
     lines = [painter.paint("SOLO PLAYERS · {}".format(len(rows)), "bold")]
     for row in rows:
         lines.append(
-            "  {} [{}] {} {} {}".format(
-                row["name"], row["class"], row["repo"], row["state"], row["trigger"] or "no trigger"
+            "  {} [{}] {} {}{} {}".format(
+                row["name"],
+                row["class"],
+                row["repo"],
+                row["state"],
+                solo_players.waits_on_text(row),
+                row["trigger"] or "no trigger",
             )
         )
         lines.append(

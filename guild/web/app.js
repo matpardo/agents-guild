@@ -1995,7 +1995,8 @@ realmDoctorLines: [],
   }
 
   function soloPlayerMeta(player) {
-    var parts = [player.class, player.repo, player.state, player.trigger === null ? "no trigger" : player.trigger];
+    var state = player.waits_on.length === 0 ? player.state : player.state + ": waits on " + player.waits_on.join(", ");
+    var parts = [player.class, player.repo, state, player.trigger === null ? "no trigger" : player.trigger];
     parts.push("last done " + (player.last_done === null ? "never" : player.last_done));
     parts.push("last pending " + (player.last_pending === null ? "none" : player.last_pending));
     return parts.join(" \u00b7 ");
