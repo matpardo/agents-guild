@@ -1013,6 +1013,7 @@ def _solo_player_lines(painter, projects_by_name, ctx):
                 row["last_done"] or "never", sanitize.strip_control_sequences(row["last_pending"] or "none")
             )
         )
+        lines.extend(solo_players.to_merge_lines(row))
         if row["state"] in ("due", "idle", "paused"):
             lines.append("    {}".format(row["launch"]))
     lines.append("")

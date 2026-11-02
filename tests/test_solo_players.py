@@ -1102,6 +1102,43 @@ class SoloTodoTests(SoloPlayersTestCase):
         self.sync()
         self.assertEqual(self.ready(), [])
 
+    def test_ready_pr_with_unknown_merge_state_keeps_its_place(self):
+        self.sync()
+        self.prs([dict(_READY_PR, mergeable="UNKNOWN")])
+        self.sync()
+        self.assertEqual(self.ready(), [("acme/app", 1, "Bump x")])
+        self.prs([dict(_READY_PR, mergeStateStatus="UNKNOWN")])
+        self.sync()
+        self.assertEqual(self.ready(), [("acme/app", 1, "Bump x")])
+
+    def test_unknown_merge_state_does_not_add_a_pr_that_was_not_ready(self):
+        self.prs([dict(_READY_PR, mergeable="UNKNOWN", mergeStateStatus="UNKNOWN")])
+        self.sync()
+        self.assertEqual(self.ready(), [])
+
+    def test_ready_pr_with_a_definite_bad_state_drops_out(self):
+        for bad in (
+            {"mergeable": "CONFLICTING"},
+            {"mergeStateStatus": "DIRTY"},
+            {"mergeStateStatus": "BLOCKED"},
+            {"mergeable": "UNKNOWN", "mergeStateStatus": "BLOCKED"},
+            {"mergeStateStatus": "UNKNOWN", "mergeable": "CONFLICTING"},
+            {"mergeable": "UNKNOWN", "statusCheckRollup": [{"conclusion": "FAILURE"}]},
+            {"mergeable": "UNKNOWN", "statusCheckRollup": [{"state": "PENDING"}]},
+        ):
+            self.prs([_READY_PR])
+            self.sync()
+            self.prs([dict(_READY_PR, **bad)])
+            self.sync()
+            self.assertEqual(self.ready(), [], bad)
+
+    def test_ready_pr_missing_from_the_list_drops_out_even_if_others_are_unknown(self):
+        self.prs([_READY_PR, dict(_READY_PR, number=2)])
+        self.sync()
+        self.prs([dict(_READY_PR, number=2, mergeable="UNKNOWN")])
+        self.sync()
+        self.assertEqual(self.ready(), [("acme/app", 2, "Bump x")])
+
     def test_unchanged_set_records_no_event(self):
         self.sync()
         self.sync()
@@ -1127,6 +1164,17 @@ class SoloTodoTests(SoloPlayersTestCase):
         out = self.board()
         self.assertIn("READY FOR YOU · 1", out)
         self.assertIn("acme/app#1 Bump x · from dependabot", out)
+
+    def test_board_and_solo_status_list_the_prs_to_merge(self):
+        self.sync()
+        self.assertIn("    to merge: acme/app#1 Bump x", self.board())
+        out = self.cli(["solo", "status"], None)[1]
+        self.assertIn("    to merge: acme/app#1 Bump x", out)
+
+    def test_no_to_merge_line_without_ready_prs(self):
+        self.prs([])
+        self.sync()
+        self.assertNotIn("to merge:", self.board())
 
     def test_ready_for_you_names_the_configured_player(self):
         self.set_players([dict(_DEP, name="bumper")])

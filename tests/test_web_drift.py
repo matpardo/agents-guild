@@ -447,6 +447,7 @@ def _solo_player(**overrides):
         "stalled_adventurer": None,
         "retry_at": None,
         "runs": [],
+        "to_merge": [],
     }
     return dict(player, **overrides)
 
@@ -486,6 +487,18 @@ class WebSoloPlayerBehaviorTests(unittest.TestCase):
         out = self._text([_solo_player(state="stalled", stalled_adventurer=7)])
         self.assertIn("stalled: session gone, run guild adventurer dismiss 7", out)
         self.assertNotIn("guild solo launch", out)
+
+    def test_to_merge_lists_each_ready_pr_with_its_title(self):
+        entries = [
+            {"ref": "acme/app#1", "repo": "acme/app", "title": "Bump x", "url": "https://github.com/acme/app/pull/1"},
+            {"ref": "acme/app#2", "repo": "acme/app", "title": "Bump y", "url": "https://github.com/acme/app/pull/2"},
+        ]
+        out = self._text([_solo_player(job="dependabot", to_merge=entries)])
+        for expected in ("to merge", "acme/app#1", "Bump x", "acme/app#2", "Bump y"):
+            self.assertIn(expected, out)
+
+    def test_to_merge_is_absent_when_the_list_is_empty(self):
+        self.assertNotIn("to merge", self._text([_solo_player(job="dependabot")]))
 
     def test_paused_player_shows_state_and_the_resume_command(self):
         out = self._text([_solo_player(state="paused", launch="guild solo resume acme/app red-main")])

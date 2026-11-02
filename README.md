@@ -1460,6 +1460,12 @@ work other than `none` is a row of NEEDS YOU (`⚑ <name> [<class>] <repo>:
 <pending>`) while its trigger is still active. The web needs-you view shows the
 same rows and counts the ready ones in the `ready` badge.
 
+The solo players view, the board and `guild solo status` also list the PRs to
+merge under the `dependabot` player (`to merge: <repo>#<n> <title>`). A ready PR
+whose merge state GitHub has not computed yet (`UNKNOWN`, which happens right
+after the base branch moves) keeps its place until GitHub reports a definite
+state.
+
 A solo player is `running` while an adventurer on its health job is active and
 its session is alive, `stalled` when that adventurer is active but its session is
 gone (crash, closed window, usage limit; the row reads `stalled: session gone,

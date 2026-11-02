@@ -9,7 +9,7 @@ def _player_rows(ctx):
 
 
 def format_row(row):
-    return "  {} [{}] {} {} {}{} trigger: {} last done: {} last pending: {}".format(
+    line = "  {} [{}] {} {} {}{} trigger: {} last done: {} last pending: {}".format(
         row["name"],
         row["class"],
         row["repo"],
@@ -20,6 +20,7 @@ def format_row(row):
         row["last_done"] or "never",
         row["last_pending"] or "none",
     )
+    return "\n".join([line, *solo_players.to_merge_lines(row)])
 
 
 def _require_known_project(ctx, project):
