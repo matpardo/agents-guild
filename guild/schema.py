@@ -23,6 +23,7 @@ PROJECTION_TABLES = (
     "main_status",
     "dependabot_status",
     "dependabot_announced",
+    "dependabot_ready",
     "solo_launches",
     "solo_messages",
     "solo_pauses",
@@ -310,6 +311,14 @@ _CREATE_STATEMENTS = (
     CREATE TABLE IF NOT EXISTS dependabot_announced (
         repo TEXT NOT NULL,
         number INTEGER NOT NULL,
+        PRIMARY KEY (repo, number)
+    )
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS dependabot_ready (
+        repo TEXT NOT NULL,
+        number INTEGER NOT NULL,
+        title TEXT NOT NULL,
         PRIMARY KEY (repo, number)
     )
     """,

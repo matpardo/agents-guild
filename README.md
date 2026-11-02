@@ -1452,6 +1452,14 @@ NEUTRAL or SKIPPED) once in the solo players channel, posted by guild as the
 launched). It records `dependabot.announced`, so a PR that breaks and turns
 green again is not announced twice.
 
+The channel is a log. The work also shows in the lists that clear by
+themselves: each ready Dependabot PR is a row of READY FOR YOU (`<repo>#<n>
+<title> · from <name>`, after the tracked PRs, unfiltered board only) until it
+merges or stops being ready, and a solo player whose last run ended with pending
+work other than `none` is a row of NEEDS YOU (`⚑ <name> [<class>] <repo>:
+<pending>`) while its trigger is still active. The web needs-you view shows the
+same rows and counts the ready ones in the `ready` badge.
+
 A solo player is `running` while an adventurer on its health job is active and
 its session is alive, `stalled` when that adventurer is active but its session is
 gone (crash, closed window, usage limit; the row reads `stalled: session gone,

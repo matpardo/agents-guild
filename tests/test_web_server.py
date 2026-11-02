@@ -187,6 +187,7 @@ class BoardEndpointTests(WebServerTestCase):
                 "health_jobs",
                 "solo_players",
                 "solo_channel",
+                "solo_pending",
                 "memory",
                 "new_notice_count",
                 "parties",

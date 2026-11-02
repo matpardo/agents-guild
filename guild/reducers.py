@@ -708,6 +708,11 @@ def _dependabot_synced(conn, event):
         "INSERT OR REPLACE INTO dependabot_status (repo, unmergeable, run_failed, updated_at) VALUES (?, ?, ?, ?)",
         (payload["repo"], payload["unmergeable"], 1 if payload["run_failed"] else 0, event["ts"]),
     )
+    conn.execute("DELETE FROM dependabot_ready WHERE repo = ?", (payload["repo"],))
+    conn.executemany(
+        "INSERT INTO dependabot_ready (repo, number, title) VALUES (?, ?, ?)",
+        [(payload["repo"], entry["number"], entry["title"]) for entry in payload.get("ready", [])],
+    )
 
 
 def _dependabot_announced(conn, event):
