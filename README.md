@@ -1472,6 +1472,7 @@ launch button.
 inside a Claude Code session. It opens a tmux window named
 `solo-<job>-<owner>-<repo>` the same way `guild adventurer launch` does, even
 when the player is not due.
+It closes the finished window a player left open before launching, and refuses a running player or a stalled one (dismiss it first).
 
 `guild solo tick` launches every `due` player the same way and is the
 `solo-tick` background job (see "Background jobs"), so a red main or a stuck

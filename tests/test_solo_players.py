@@ -458,6 +458,48 @@ class SoloPlayersTickTests(SoloPlayersTestCase):
         self.assertNotIn("new-window", tmux.verbs())
         self.assertEqual(self.launch_events(), [])
 
+    def manual_launch(self, tmux):
+        with mock.patch("guild.tmux_windows.Tmux", return_value=tmux):
+            return self.cli(["solo", "launch", "acme/app", "red-main"], None)
+
+    def test_manual_launch_closes_the_leftover_window_then_launches(self):
+        tmux = KillingTmux(True, ["guild"], ["solo-red-main-acme-app"], 0)
+        code, out, err = self.manual_launch(tmux)
+        self.assertEqual(code, 0, err)
+        self.assertEqual(tmux.killed, ["guild:=solo-red-main-acme-app"])
+        self.assertLess(tmux.verbs().index("kill-window"), tmux.verbs().index("new-window"))
+        self.assertEqual(self.launched_windows(tmux), ["solo-red-main-acme-app"])
+        self.assertEqual(len(self.launch_events()), 1)
+
+    def test_manual_launch_refuses_a_running_player(self):
+        self.red("ci broke")
+        self.cli(["adventurer", "start", "--job", "red-main-acme-app", "--reason", "test reason"], "adv-1")
+        self.write_session(os.getpid(), "adv-1", "adv")
+        tmux = KillingTmux(True, ["guild"], ["solo-red-main-acme-app"], 0)
+        code, out, err = self.manual_launch(tmux)
+        self.assertEqual(code, 1)
+        self.assertIn("mender is running", err)
+        self.assertNotIn("kill-window", tmux.verbs())
+        self.assertEqual(self.launch_events(), [])
+
+    def test_manual_launch_refuses_a_stalled_player_with_the_dismiss_hint(self):
+        self.red("ci broke")
+        self.cli(["adventurer", "start", "--job", "red-main-acme-app", "--reason", "test reason"], "adv-1")
+        tmux = KillingTmux(True, ["guild"], ["solo-red-main-acme-app"], 0)
+        code, out, err = self.manual_launch(tmux)
+        self.assertEqual(code, 1)
+        self.assertIn("mender is stalled: run guild adventurer dismiss 1", err)
+        self.assertNotIn("kill-window", tmux.verbs())
+        self.assertEqual(self.launch_events(), [])
+
+    def test_manual_launch_fails_when_the_leftover_window_cannot_be_closed(self):
+        tmux = KillingTmux(True, ["guild"], ["solo-red-main-acme-app"], 1)
+        code, out, err = self.manual_launch(tmux)
+        self.assertEqual(code, 1)
+        self.assertIn("could not close the finished window of mender", err)
+        self.assertNotIn("new-window", tmux.verbs())
+        self.assertEqual(self.launch_events(), [])
+
     def test_tick_without_tmux_prints_a_failure_and_records_nothing(self):
         self.red("ci broke")
         code, out, err = self.tick(FakeTmux(False, [], []))

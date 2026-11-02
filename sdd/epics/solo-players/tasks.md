@@ -128,3 +128,16 @@ updated: 2026-11-01
 - [x] The side menu lists "solo players (N)" right after adventurers.
 - [x] An empty channel shows "no messages yet".
 - [x] Last done, retry, run start and message times render as short local dates.
+
+## T12 — Manual launch over a leftover window
+
+**Depends on:** T11
+**Status:** [x] done
+
+**What:** `guild solo launch` refused with "window already exists" when a finished run left its window open. A player that is not running or stalled owns no live session, so an existing window is a leftover: the launch closes it, then launches. A running player is refused, and a stalled one is refused with the dismiss hint.
+
+**Acceptance:**
+- [x] A leftover window is closed, then the player is launched with its event recorded.
+- [x] A running player is refused and its window is untouched.
+- [x] A stalled player is refused with the `guild adventurer dismiss` hint.
+- [x] A window that cannot be closed is an error and launches nothing.
