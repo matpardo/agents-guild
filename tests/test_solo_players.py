@@ -377,6 +377,64 @@ class SoloPlayersBoardTests(SoloPlayersTestCase):
         self.assertEqual(self.cli(["solo", "list"], None)[1].strip(), "no solo players")
 
 
+class SoloPlayersStatusTests(SoloPlayersTestCase):
+    def test_status_without_args_lists_every_player_grouped(self):
+        code, out, err = self.cli(["solo", "status"], None)
+        self.assertEqual(code, 0, err)
+        self.assertEqual(out.splitlines()[0], "acme")
+        self.assertIn("mender [cleric] acme/app red-main idle", out)
+        self.assertIn("dependabot [artificer] acme/app dependabot idle", out)
+
+    def test_status_matches_list(self):
+        self.assertEqual(self.cli(["solo", "status"], None)[1], self.cli(["solo", "list"], None)[1])
+
+    def test_status_project_scope(self):
+        code, out, err = self.cli(["solo", "status", "--project", "acme"], None)
+        self.assertEqual(code, 0, err)
+        self.assertEqual(out.splitlines()[0], "acme")
+
+    def test_status_unknown_project_fails(self):
+        code, out, err = self.cli(["solo", "status", "--project", "nope"], None)
+        self.assertEqual(code, 1)
+        self.assertIn("unknown project", err)
+
+    def test_status_single_player_adds_runs_and_channel(self):
+        for number in range(7):
+            self.finish_job("red-main-acme-app", "run {}".format(number))
+        self.launch_manually()
+        code, out, err = self.cli(["solo", "status", "acme/app", "red-main"], None)
+        self.assertEqual(code, 0, err)
+        self.assertEqual(out.splitlines()[0], "acme")
+        self.assertIn("mender [cleric] acme/app red-main", out)
+        self.assertIn("runs", out)
+        self.assertIn("run 6", out)
+        self.assertEqual(out.count(" done 0s "), 5)
+        self.assertIn("channel", out)
+        self.assertIn("mender (cleric) started on acme/app: manual launch", out)
+
+    def test_status_single_player_channel_keeps_only_its_messages_and_ten(self):
+        self.launch_manually()
+        with mock.patch("guild.tmux_windows.Tmux", return_value=FakeTmux(True, [], [])):
+            self.cli(["solo", "launch", "acme/app", "dependabot"], None)
+        out = self.cli(["solo", "status", "acme/app", "red-main"], None)[1]
+        self.assertIn("mender (cleric) started", out)
+        self.assertNotIn("dependabot (artificer) started", out)
+
+    def test_status_single_player_without_runs_or_messages(self):
+        out = self.cli(["solo", "status", "acme/app", "red-main"], None)[1]
+        self.assertIn("no runs", out)
+        self.assertIn("no messages", out)
+
+    def test_status_unknown_player_fails(self):
+        code, out, err = self.cli(["solo", "status", "acme/app", "nope"], None)
+        self.assertEqual(code, 1)
+        self.assertIn("no solo player", err)
+
+    def test_status_rejects_mixed_scopes(self):
+        self.assertEqual(self.cli(["solo", "status", "acme/app", "red-main", "--project", "acme"], None)[0], 1)
+        self.assertEqual(self.cli(["solo", "status", "acme/app"], None)[0], 1)
+
+
 class SoloPlayersLaunchTests(SoloPlayersTestCase):
     def launch(self, argv, session_id, tmux):
         with mock.patch("guild.tmux_windows.Tmux", return_value=tmux):

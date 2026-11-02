@@ -208,6 +208,7 @@ guild adventurer done --pending "<text>"                # ends it; `--pending no
 guild adventurer dismiss <id>                           # removes a done adventurer, or an active one whose session is gone, from the board
 guild adventurers [<id>]                                # active ones, then recent done ones; <id> shows one in full
 guild solo list [--project <name>]                     # solo players of the project config with trigger and state
+guild solo status [<owner/repo> <job> | --project <name>]    # same rows as list; one player adds its last 5 runs and 10 channel messages
 guild solo launch <owner/repo> <job> | --all | --project <name>  # human terminal only: tmux window running a solo player, due or not
 guild solo tick                                         # background job: launch every due solo player (human terminal only)
 guild solo say "<text>"                                 # solo player session only: post an important message to the channel (max 300 chars)
@@ -1462,11 +1463,15 @@ the 1h cooldown. A backing-off row reads `cooling: same trigger, retry after
 <time>`. A launch with no trigger (manual, main already green) or a launch
 recorded before the trigger was stored counts as a different trigger.
 
-`guild solo list` and the `SOLO PLAYERS` section of `guild board` (hidden under
+`guild solo list` (alias `guild solo status`) and the `SOLO PLAYERS` section of `guild board` (hidden under
 `--party` and `--raid`) and the web `solo players` show name or job, class,
 repo, trigger, state, last report time and last pending text; a due or idle row
 carries `guild solo launch <owner/repo> <job>` as text to copy. The web has no
 launch button.
+
+`guild solo status` takes the scopes of launch: no argument for every player,
+`--project <name>` or `<owner/repo> <job>`; the last form adds the player's last
+5 runs and last 10 channel messages. An unknown project or player is an error.
 
 `guild solo launch <owner/repo> <job>` is for the human terminal and refuses
 inside a Claude Code session. It opens a tmux window named

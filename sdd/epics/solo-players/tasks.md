@@ -3,7 +3,7 @@ epic: solo-players
 type: tasks
 title: Built-in per-repo solo players
 status: done
-updated: 2026-11-01
+updated: 2026-11-02
 ---
 
 # Tasks: Built-in per-repo solo players
@@ -180,3 +180,15 @@ updated: 2026-11-01
 - [x] The solo players menu is collapsed by default and open on a project hash.
 - [x] A tab per project with `aria-selected` on the current one; clicking a tab sets the hash.
 - [x] The panel shows only the selected project, its channel after its players.
+
+## T16 — Solo status command
+
+**Depends on:** T15
+**Status:** [x] done
+
+**What:** `guild solo status` prints solo players with the scopes of `solo launch`: no argument for every player, `--project <name>` or `<owner/repo> <job>`. Rows are grouped by project like `guild solo list`, which stays as an alias. The single-player form adds the player's last 5 runs and last 10 channel messages.
+
+**Acceptance:**
+- [x] Each scope prints the expected rows; the player form adds runs and its own channel messages.
+- [x] An unknown project or player is an error.
+- [x] `guild solo list` still works.

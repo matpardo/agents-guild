@@ -34,3 +34,10 @@ def latest(conn, projects_by_name, project, limit):
         name, job_class, owner = names.get(row["health_job"], (row["health_job"], "", ""))
         result.append({"ts": row["ts"], "name": name, "class": job_class, "project": owner, "text": row["text"]})
     return result[:limit]
+
+
+def latest_of(conn, health_job, limit):
+    rows = conn.execute(
+        "SELECT ts, text FROM solo_messages WHERE health_job = ? ORDER BY id DESC LIMIT ?", (health_job, limit)
+    ).fetchall()
+    return [{"ts": row["ts"], "text": row["text"]} for row in rows]
