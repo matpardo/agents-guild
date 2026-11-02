@@ -83,6 +83,18 @@ def launch(ctx, repo, job_name, tmux):
     project_data = config.load_project(ctx.projects_dir, project)
     if _find_player(project_data, repo, job_name) is None:
         raise GuildError("project '{}' has no solo player '{}' on '{}'".format(project, job_name, repo), 1)
+    row = next(
+        row for row in _player_rows(ctx) if row["project"] == project and (row["repo"], row["job"]) == (repo, job_name)
+    )
+    if row["state"] == "running":
+        raise GuildError("{} is running".format(row["name"]), 1)
+    if row["state"] == "stalled":
+        raise GuildError(
+            "{} is stalled: run guild adventurer dismiss {}".format(row["name"], row["stalled_adventurer"]), 1
+        )
+    if tmux.installed() and _window_is_open(tmux, row["health_job"]):
+        if not tmux_windows.kill_window(tmux, _window_name(row["health_job"])):
+            raise GuildError("could not close the finished window of {}".format(row["name"]), 1)
     return _launch_player(ctx, project, project_data, repo, job_name, tmux)
 
 
