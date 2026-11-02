@@ -24,7 +24,7 @@ def resolve_adventurer(conn, session_id):
     if session_id is None:
         return None
     return conn.execute(
-        "SELECT id, project, job, task FROM adventurers WHERE session_id = ? AND state = 'active' ORDER BY id DESC",
+        "SELECT id, project, job, task, health_job FROM adventurers WHERE session_id = ? AND state = 'active' ORDER BY id DESC",
         (session_id,),
     ).fetchone()
 

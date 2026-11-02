@@ -4,7 +4,7 @@ import sqlite3
 from datetime import timedelta
 from unittest import mock
 
-from guild import config, paths, solo_players, timeutil
+from guild import config, paths, reducers, solo_players, timeutil
 from guild.errors import GuildError
 from tests.test_revive import FakeTmux
 from tests.testutil import GuildTestCase
@@ -98,6 +98,16 @@ class SoloPlayersTestCase(GuildTestCase):
     def finish_job(self, health_job, pending):
         self.cli(["adventurer", "start", "--job", health_job, "--reason", "test reason"], "adv-1")
         self.cli(["adventurer", "done", "--pending", pending], "adv-1")
+
+    def launch_manually(self):
+        with mock.patch("guild.tmux_windows.Tmux", return_value=FakeTmux(True, [], [])):
+            self.assertEqual(self.cli(["solo", "launch", "acme/app", "red-main"], None)[0], 0)
+
+    def channel_texts(self):
+        return [row["text"] for row in self.db().execute("SELECT text FROM solo_messages ORDER BY id").fetchall()]
+
+    def start_player(self, health_job, session_id):
+        self.cli(["adventurer", "start", "--job", health_job, "--reason", "test reason"], session_id)
 
     def age_reports(self, hours):
         old = timeutil.to_iso(timeutil.utcnow() - timedelta(hours=hours))
@@ -393,16 +403,15 @@ class SoloPlayersTickTests(SoloPlayersTestCase):
     def launch_events(self):
         return self.db().execute("SELECT payload FROM events WHERE kind = 'solo.launched'").fetchall()
 
-    def test_tick_launches_a_due_player_once_with_a_notice(self):
+    def test_tick_launches_a_due_player_once_and_posts_to_the_channel(self):
         self.red("ci broke")
         tmux = FakeTmux(True, [], [])
         code, out, err = self.tick(tmux)
         self.assertEqual(code, 0, err)
         self.assertEqual(self.launched_windows(tmux), ["solo-red-main-acme-app"])
         self.assertEqual(len(self.launch_events()), 1)
-        notice = self.db().execute("SELECT scope, text FROM notices").fetchone()
-        self.assertEqual(notice["scope"], "project:acme")
-        self.assertEqual(notice["text"], "solo player mender (cleric) launched on acme/app: main red: ci broke")
+        self.assertEqual(self.db().execute("SELECT * FROM notices").fetchall(), [])
+        self.assertEqual(self.channel_texts(), ["mender (cleric) started on acme/app: main red: ci broke"])
 
     def test_second_tick_is_debounced_even_without_the_window(self):
         self.red("ci broke")
@@ -419,10 +428,6 @@ class SoloPlayersTickTests(SoloPlayersTestCase):
         tmux = FakeTmux(True, [], [])
         self.tick(tmux)
         self.assertEqual(self.launched_windows(tmux), [])
-
-    def launch_manually(self):
-        with mock.patch("guild.tmux_windows.Tmux", return_value=FakeTmux(True, [], [])):
-            self.assertEqual(self.cli(["solo", "launch", "acme/app", "red-main"], None)[0], 0)
 
     def test_tick_closes_the_window_of_a_finished_player_then_launches(self):
         self.red("ci broke")
@@ -632,3 +637,148 @@ class DependabotSyncTests(SoloPlayersTestCase):
         self.sync()
         self.cli(["rebuild"], None)
         self.assertEqual(self.status(), [("acme/app", 1, 0)])
+
+
+class SoloChannelTests(SoloPlayersTestCase):
+    def say(self, text, session_id):
+        return self.cli(["solo", "say", text], session_id)
+
+    def test_say_is_refused_outside_a_session(self):
+        code, out, err = self.say("hello", None)
+        self.assertEqual(code, 1)
+        self.assertEqual(self.channel_texts(), [])
+
+    def test_say_is_refused_for_a_session_that_is_not_an_adventurer(self):
+        code, out, err = self.say("hello", "stranger")
+        self.assertEqual(code, 1)
+        self.assertEqual(self.channel_texts(), [])
+
+    def test_say_is_refused_for_a_non_solo_adventurer(self):
+        self.cli(["adventurer", "start", "fix a thing", "--task", "e/T01", "--reason", "test reason"], "adv-9")
+        code, out, err = self.say("hello", "adv-9")
+        self.assertEqual(code, 1)
+        self.assertIn("solo player", err)
+        self.assertEqual(self.channel_texts(), [])
+
+    def test_say_inside_a_solo_session_posts_the_text(self):
+        self.start_player("red-main-acme-app", "adv-1")
+        code, out, err = self.say("started fixing: lint", "adv-1")
+        self.assertEqual(code, 0, err)
+        self.assertEqual(self.channel_texts(), ["started fixing: lint"])
+
+    def test_say_strips_control_sequences(self):
+        self.start_player("red-main-acme-app", "adv-1")
+        self.say("fix \x1b[31mready\x1b[0m", "adv-1")
+        self.assertEqual(self.channel_texts(), ["fix ready"])
+
+    def test_say_refuses_empty_text(self):
+        self.start_player("red-main-acme-app", "adv-1")
+        self.assertEqual(self.say("  \x1b[0m ", "adv-1")[0], 1)
+        self.assertEqual(self.channel_texts(), [])
+
+    def test_say_caps_at_300_characters_without_truncating(self):
+        self.start_player("red-main-acme-app", "adv-1")
+        self.assertEqual(self.say("x" * 301, "adv-1")[0], 1)
+        self.assertEqual(self.channel_texts(), [])
+        self.assertEqual(self.say("x" * 300, "adv-1")[0], 0)
+        self.assertEqual(self.channel_texts(), ["x" * 300])
+
+    def test_manual_launch_posts_a_manual_message(self):
+        self.launch_manually()
+        self.assertEqual(self.channel_texts(), ["mender (cleric) started on acme/app: manual launch"])
+
+    def test_done_of_a_solo_adventurer_posts_finished(self):
+        self.finish_job("red-main-acme-app", "fix PR waits on merge")
+        self.assertEqual(self.channel_texts(), ["mender finished: fix PR waits on merge"])
+
+    def test_done_of_a_normal_adventurer_posts_nothing(self):
+        self.cli(["adventurer", "start", "fix a thing", "--task", "e/T01", "--reason", "test reason"], "adv-9")
+        self.cli(["adventurer", "done", "--pending", "none"], "adv-9")
+        self.assertEqual(self.channel_texts(), [])
+
+    def test_channel_lists_newest_first_with_a_limit(self):
+        self.start_player("red-main-acme-app", "adv-1")
+        for text in ("one", "two", "three"):
+            self.say(text, "adv-1")
+        code, out, err = self.cli(["solo", "channel", "--limit", "2"], None)
+        self.assertEqual(code, 0, err)
+        lines = out.strip().splitlines()
+        self.assertEqual(len(lines), 2)
+        self.assertIn("mender [cleric] three", lines[0])
+        self.assertIn("mender [cleric] two", lines[1])
+
+    def test_empty_channel_says_so(self):
+        self.assertIn("no messages", self.cli(["solo", "channel", "--limit", "5"], None)[1])
+
+    def test_board_carries_the_latest_twenty_messages(self):
+        from guild.cli import _build_context
+        from guild.commands import board
+
+        self.start_player("red-main-acme-app", "adv-1")
+        for number in range(25):
+            self.say("m{}".format(number), "adv-1")
+        channel = board.board_model(_build_context(None, self.repo_dir))["solo_channel"]
+        self.assertEqual(len(channel), 20)
+        self.assertEqual(channel[0]["text"], "m24")
+        self.assertEqual(
+            sorted(channel[0]),
+            ["class", "name", "text", "ts"],
+        )
+
+    def test_messages_survive_rebuild(self):
+        self.start_player("red-main-acme-app", "adv-1")
+        self.say("keep me", "adv-1")
+        before = [tuple(r) for r in self.db().execute("SELECT * FROM solo_messages").fetchall()]
+        self.assertEqual(self.cli(["rebuild"], None)[0], 0)
+        after = [tuple(r) for r in self.db().execute("SELECT * FROM solo_messages").fetchall()]
+        self.assertEqual(before, after)
+        self.assertEqual(len(after), 1)
+
+    def test_message_payload_requires_repo_job_and_text(self):
+        self.assertEqual(reducers.required_keys("solo.message"), ("repo", "job", "text"))
+
+    def test_built_in_prompts_tell_the_player_to_post_only_important_messages(self):
+        for job in solo_players.JOBS.values():
+            self.assertIn("guild solo say", job["prompt"])
+            self.assertIn("only important", job["prompt"])
+
+
+class SoloRunsTests(SoloPlayersTestCase):
+    def runs(self):
+        return self.players()[("acme/app", "red-main")]["runs"]
+
+    def test_no_runs_before_any_adventurer(self):
+        self.assertEqual(self.runs(), [])
+
+    def test_a_done_run_carries_duration_and_pending(self):
+        self.finish_job("red-main-acme-app", "all good")
+        run = self.runs()[0]
+        self.assertEqual(run["state"], "done")
+        self.assertEqual(run["pending"], "all good")
+        self.assertIsNotNone(run["done_at"])
+        self.assertIsNotNone(run["duration"])
+
+    def test_an_active_run_is_stalled_without_a_live_session_and_running_with_one(self):
+        self.start_player("red-main-acme-app", "adv-1")
+        self.assertEqual(self.runs()[0]["state"], "stalled")
+        self.assertIsNone(self.runs()[0]["done_at"])
+        self.assertIsNone(self.runs()[0]["duration"])
+        with mock.patch("guild.session_info.live_session_ids", return_value={"adv-1"}):
+            self.assertEqual(self.runs()[0]["state"], "running")
+
+    def test_runs_are_newest_first_and_limited_to_five(self):
+        for number in range(7):
+            self.finish_job("red-main-acme-app", "run {}".format(number))
+        runs = self.runs()
+        self.assertEqual(len(runs), 5)
+        self.assertEqual(runs[0]["pending"], "run 6")
+
+    def test_runs_command_prints_one_line_per_run(self):
+        self.finish_job("red-main-acme-app", "all good")
+        code, out, err = self.cli(["solo", "runs", "acme/app", "red-main"], None)
+        self.assertEqual(code, 0, err)
+        self.assertIn("done", out)
+        self.assertIn("all good", out)
+
+    def test_runs_command_refuses_an_unknown_player(self):
+        self.assertEqual(self.cli(["solo", "runs", "acme/app", "nope"], None)[0], 1)

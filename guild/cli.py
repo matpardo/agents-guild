@@ -545,6 +545,27 @@ def _handle_solo_tick(ctx, args):
     return 0
 
 
+def _handle_solo_say(ctx, args):
+    from guild.commands import solo as solo_commands
+
+    _print(solo_commands.say(ctx, args.text))
+    return 0
+
+
+def _handle_solo_channel(ctx, args):
+    from guild.commands import solo as solo_commands
+
+    _print(solo_commands.channel(ctx, args.limit))
+    return 0
+
+
+def _handle_solo_runs(ctx, args):
+    from guild.commands import solo as solo_commands
+
+    _print(solo_commands.runs(ctx, args.repo, args.job))
+    return 0
+
+
 def _handle_adventurer_done(ctx, args):
     from guild import lifecycle
     from guild.commands import adventurer as adventurer_commands
@@ -1463,6 +1484,19 @@ def _add_solo_parser(subparsers):
 
     tick = actions.add_parser("tick", help="launch every due solo player (background job, human terminal only)")
     tick.set_defaults(handler=_handle_solo_tick)
+
+    say = actions.add_parser("say", help="post an important message to the solo channel (solo player session only)")
+    say.add_argument("text", help="message, at most 300 characters")
+    say.set_defaults(handler=_handle_solo_say)
+
+    channel = actions.add_parser("channel", help="print the latest solo player messages, newest first")
+    channel.add_argument("--limit", type=int, default=20, help="how many messages to print (default 20)")
+    channel.set_defaults(handler=_handle_solo_channel)
+
+    runs = actions.add_parser("runs", help="print the recent runs of a solo player")
+    runs.add_argument("repo", help="repo of the solo player, owner/name")
+    runs.add_argument("job", help="solo player job: red-main or dependabot")
+    runs.set_defaults(handler=_handle_solo_runs)
 
 
 def _add_main_parser(subparsers):

@@ -2,13 +2,16 @@ from guild import timeutil
 
 COOLDOWN = "1h"
 REPEAT_COOLDOWN = "24h"
+RUNS_SHOWN = 5
 LAUNCH_COMMAND = "guild solo launch {} {}"
 
 _RED_MAIN_PROMPT = (
     "Main of {repo} is red. Read its failing checks (`gh run list --branch <base> --repo {repo}`, `gh pr checks`),"
     " reproduce the failure locally and fix it with TDD in a worktree. Open a PR and track it with"
     " `guild pr track ... --fixes-main` (add `--fixes-flaky` when the failure is flaky). Mark the PR ready once CI"
-    ' is green. Never merge. End with `guild adventurer done --pending "<text>"`.'
+    ' is green. Never merge. Tell the dev only important things with `guild solo say "<text>"`, no routine'
+    ' progress: `guild solo say "started fixing: <cause>"` when you know the cause, then `guild solo say "fix PR'
+    ' {repo}#<n> ready, waits on merge"` (or `guild solo say "main green, nothing to do"`). End with `guild adventurer done --pending "<text>"`.'
 )
 _DEPENDABOT_PROMPT = (
     "For each open Dependabot PR on {repo} apply these gates: identity (the author is dependabot[bot]), scope (only"
@@ -16,7 +19,9 @@ _DEPENDABOT_PROMPT = (
     " tag; package hashes match the registry) and read the release notes on major bumps. Then push direct fixes on"
     " the PR branch (version strings, hashes, formatter output, a tool `required-version` bump) so the PR becomes"
     " mergeable. Also fix a failing Dependabot update run of {repo} through a normal PR. Never merge. Report what"
-    ' still needs a human. End with `guild adventurer done --pending "<text>"`.'
+    ' still needs a human. Tell the dev only important things with `guild solo say "<text>"`, no routine'
+    ' progress: `guild solo say "{repo}#<n> ready to merge"` for each PR you leave mergeable and `guild solo say'
+    ' "{repo}#<n> needs a human: <why>"`. End with `guild adventurer done --pending "<text>"`.'
 )
 JOBS = {
     "red-main": {"class": "cleric", "prompt": _RED_MAIN_PROMPT},
@@ -30,6 +35,17 @@ def health_job_name(repo, job):
 
 def _players(project_data):
     return project_data.get("solo_players", [])
+
+
+def player_of_health_job(project_data, health_job):
+    for player in _players(project_data):
+        if health_job_name(player["repo"], player["job"]) == health_job:
+            return player
+    return None
+
+
+def player_name(player):
+    return player.get("name", player["job"])
 
 
 def jobs(project_data):
@@ -146,6 +162,36 @@ def state_detail(row):
     return ""
 
 
+def _run_state(row, live_ids):
+    if row["state"] != "active":
+        return row["state"]
+    return "running" if row["session_id"] in live_ids else "stalled"
+
+
+def _run_duration(row):
+    if row["done_at"] is None:
+        return None
+    return int((timeutil.from_iso(row["done_at"]) - timeutil.from_iso(row["started_at"])).total_seconds())
+
+
+def runs(conn, project, health_job, live_ids, limit):
+    rows = conn.execute(
+        "SELECT session_id, state, started_at, done_at, pending FROM adventurers"
+        " WHERE project = ? AND health_job = ? ORDER BY id DESC LIMIT ?",
+        (project, health_job, limit),
+    ).fetchall()
+    return [
+        {
+            "started_at": row["started_at"],
+            "done_at": row["done_at"],
+            "state": _run_state(row, live_ids),
+            "duration": _run_duration(row),
+            "pending": row["pending"],
+        }
+        for row in rows
+    ]
+
+
 def models(conn, now, projects_by_name, live_ids):
     result = []
     for project in sorted(projects_by_name):
@@ -163,7 +209,7 @@ def models(conn, now, projects_by_name, live_ids):
                     "repo": player["repo"],
                     "job": player["job"],
                     "class": JOBS[player["job"]]["class"],
-                    "name": player.get("name", player["job"]),
+                    "name": player_name(player),
                     "health_job": health_job,
                     "trigger": trigger,
                     "state": state,
@@ -172,6 +218,7 @@ def models(conn, now, projects_by_name, live_ids):
                     "waits_on": fix_prs,
                     "last_done": last_done,
                     "last_pending": last_pending,
+                    "runs": runs(conn, project, health_job, live_ids, RUNS_SHOWN),
                     "launch": LAUNCH_COMMAND.format(player["repo"], player["job"]),
                 }
             )

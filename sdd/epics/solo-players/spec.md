@@ -25,7 +25,7 @@ Health jobs are free-form commands the project writes itself and the human launc
 - States `idle`, `due`, `running` and `cooling` computed on read, with a 1h cooldown after a report.
 - `guild solo list` and `guild solo launch <owner/repo> <job>`; each player is also a derived health job.
 - A `SOLO PLAYERS` section in the CLI board and the web.
-- `guild solo tick`, a background job that launches every due player, with a launch debounce and a notice.
+- `guild solo tick`, a background job that launches every due player, with a launch debounce and a channel message.
 - `README.md` and `GUILD.md` change with the code.
 
 ## Out of scope
