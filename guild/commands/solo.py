@@ -46,6 +46,10 @@ def list_players(ctx, project):
     return "\n".join(_grouped_lines(rows, format_row))
 
 
+STATUS_RUNS_SHOWN = 5
+STATUS_MESSAGES_SHOWN = 10
+
+
 def _find_player(project_data, repo, job_name):
     for player in project_data.get("solo_players", []):
         if player["repo"] == repo and player["job"] == job_name:
@@ -215,4 +219,25 @@ def runs(ctx, repo, job_name):
     for row in _player_rows(ctx):
         if row["repo"] == repo and row["job"] == job_name:
             return "\n".join(_format_run(run) for run in row["runs"]) or "no runs"
+    raise GuildError("no solo player '{}' on '{}'".format(job_name, repo), 1)
+
+
+def _player_status(ctx, row):
+    run_lines = [_format_run(run) for run in row["runs"][:STATUS_RUNS_SHOWN]] or ["  no runs"]
+    messages = solo_channel.latest_of(ctx.conn, row["health_job"], STATUS_MESSAGES_SHOWN)
+    message_lines = ["  {} {}".format(message["ts"], message["text"]) for message in messages] or ["  no messages"]
+    return "\n".join(_grouped_lines([row], format_row) + ["runs"] + run_lines + ["channel"] + message_lines)
+
+
+def status(ctx, repo, job_name, project):
+    pair = repo is not None or job_name is not None
+    if pair and project is not None:
+        raise GuildError("solo status takes either '<repo> <job>' or --project <name>", 1)
+    if not pair:
+        return list_players(ctx, project)
+    if repo is None or job_name is None:
+        raise GuildError("solo status takes both '<repo>' and '<job>'", 1)
+    for row in _player_rows(ctx):
+        if row["repo"] == repo and row["job"] == job_name:
+            return _player_status(ctx, row)
     raise GuildError("no solo player '{}' on '{}'".format(job_name, repo), 1)

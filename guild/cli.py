@@ -529,6 +529,13 @@ def _handle_solo_list(ctx, args):
     return 0
 
 
+def _handle_solo_status(ctx, args):
+    from guild.commands import solo as solo_commands
+
+    _print(solo_commands.status(ctx, args.repo, args.job, args.project))
+    return 0
+
+
 def _handle_solo_launch(ctx, args):
     from guild import tmux_windows
     from guild.commands import solo as solo_commands
@@ -1477,6 +1484,12 @@ def _add_solo_parser(subparsers):
     list_ = actions.add_parser("list", help="print every solo player with its trigger and state")
     list_.add_argument("--project", default=None, help="only the solo players of this project")
     list_.set_defaults(handler=_handle_solo_list)
+
+    status = actions.add_parser("status", help="print solo players: all, one project or one player with runs")
+    status.add_argument("repo", nargs="?", default=None, help="repo of the solo player, owner/name")
+    status.add_argument("job", nargs="?", default=None, help="solo player job: red-main or dependabot")
+    status.add_argument("--project", default=None, help="only the solo players of this project")
+    status.set_defaults(handler=_handle_solo_status)
 
     launch = actions.add_parser("launch", help="open a tmux window running a solo player (human terminal only)")
     launch.add_argument("repo", nargs="?", default=None, help="repo of the solo player, owner/name")
