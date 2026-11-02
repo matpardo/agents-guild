@@ -1240,21 +1240,39 @@ realmDoctorLines: [],
     }).length;
   }
 
-  function renderAsks(asks, blocked, parties) {
+  function renderSoloPending(entry) {
+    var line = el("p");
+    line.className = "blocked-session";
+    line.appendChild(textEl("strong", entry.name));
+    line.appendChild(document.createTextNode(" [" + entry.class + "] " + entry.repo + " · "));
+    line.appendChild(textEl("code", entry.pending));
+    return line;
+  }
+
+  function renderAsks(asks, blocked, parties, soloPending) {
     var section = document.getElementById("asks");
     var ctxHigh = ctxHighCount(parties);
     clear(section);
     section.appendChild(
       textEl(
         "h2",
-        "asks (" + asks.length + ") · blocked (" + blocked.length + ") · context high (" + ctxHigh + ")"
+        "asks (" +
+          asks.length +
+          ") · blocked (" +
+          blocked.length +
+          ") · context high (" +
+          ctxHigh +
+          ") · solo (" +
+          soloPending.length +
+          ")"
       )
     );
-    if (asks.length === 0 && blocked.length === 0 && ctxHigh === 0) {
+    if (asks.length === 0 && blocked.length === 0 && ctxHigh === 0 && soloPending.length === 0) {
       section.appendChild(textEl("p", "nothing needs you"));
       return;
     }
     appendAll(section, blocked.map(renderBlocked));
+    appendAll(section, soloPending.map(renderSoloPending));
     appendAll(section, asks.map(renderAsk));
   }
 
@@ -2640,7 +2658,7 @@ realmDoctorLines: [],
     row.className = "ready-item";
     row.appendChild(link(item.url, item.ref));
     row.appendChild(textEl("span", item.title));
-    row.appendChild(textEl("span", item.party));
+    row.appendChild(textEl("span", item.party === null ? "from " + item.from : item.party));
     if (item.review_first) {
       var pill = textEl("span", "review first");
       pill.className = "pill lifecycle-ready";
@@ -3357,6 +3375,7 @@ realmDoctorLines: [],
       health_jobs: data.health_jobs,
       solo_players: data.solo_players,
       solo_channel: data.solo_channel,
+      solo_pending: [],
       asks: data.asks.filter(function (ask) {
         return ask.party === state.partyFilter;
       }),
@@ -3415,6 +3434,7 @@ realmDoctorLines: [],
       health_jobs: data.health_jobs,
       solo_players: data.solo_players,
       solo_channel: data.solo_channel,
+      solo_pending: [],
       asks: data.asks.filter(function (ask) {
         return members.indexOf(ask.party) !== -1;
       }),
@@ -4361,7 +4381,12 @@ realmDoctorLines: [],
     }
     renderSection("bases", [data.bases], renderBases, onlyIfChanged);
     renderSection("sidebar", [sidebarModel(data), view.hash], renderSidebar, onlyIfChanged);
-    renderSection("asks", [filtered.asks, filtered.blocked, filtered.parties], renderAsks, onlyIfChanged);
+    renderSection(
+      "asks",
+      [filtered.asks, filtered.blocked, filtered.parties, filtered.solo_pending],
+      renderAsks,
+      onlyIfChanged
+    );
     renderSection("ready", [filtered.ready_for_you], renderReadyForYou, onlyIfChanged);
     renderSection("notices", [filtered.notices, filtered.projects, filtered.raids], renderNotices, onlyIfChanged);
     renderSection(

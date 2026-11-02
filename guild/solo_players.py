@@ -1,4 +1,4 @@
-from guild import timeutil
+from guild import sanitize, timeutil
 
 COOLDOWN = "1h"
 REPEAT_COOLDOWN = "24h"
@@ -242,3 +242,37 @@ def models(conn, now, projects_by_name, live_ids):
                 }
             )
     return result
+
+
+def ready_to_merge(conn, projects_by_name):
+    names = {}
+    for project in sorted(projects_by_name):
+        for player in _players(projects_by_name[project]):
+            if player["job"] == "dependabot":
+                names.setdefault(player["repo"], player_name(player))
+    rows = conn.execute("SELECT repo, number, title FROM dependabot_ready ORDER BY repo, number").fetchall()
+    return [
+        {
+            "ref": "{}#{}".format(row["repo"], row["number"]),
+            "title": row["title"],
+            "url": "https://github.com/{}/pull/{}".format(row["repo"], row["number"]),
+            "name": names[row["repo"]],
+        }
+        for row in rows
+        if row["repo"] in names
+    ]
+
+
+def needs_human(conn, now, projects_by_name, live_ids):
+    return [
+        {
+            "name": model["name"],
+            "class": model["class"],
+            "repo": model["repo"],
+            "pending": sanitize.collapse_to_single_line(sanitize.strip_control_sequences(model["last_pending"])),
+        }
+        for model in models(conn, now, projects_by_name, live_ids)
+        if model["trigger"] is not None
+        and model["last_pending"] is not None
+        and model["last_pending"].strip().lower() not in ("", "none")
+    ]

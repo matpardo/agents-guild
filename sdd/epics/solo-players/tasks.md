@@ -217,3 +217,17 @@ updated: 2026-11-02
 - [x] A ready PR is announced once; not mergeable, failing, pending, unknown or check-less PRs are not.
 - [x] A repo without a `dependabot` player is not announced.
 - [x] A rebuild keeps the announcements.
+
+## T19 — Solo player work in the to-do lists
+
+**Depends on:** T18
+**Status:** [x] done
+
+**What:** `dependabot.synced` carries the ready set (`dependabot_ready`). Each ready Dependabot PR is a row of READY FOR YOU (CLI board and web, unfiltered view only, counted in the `ready` badge). A solo player whose last run ended with pending work other than `none` while its trigger is active is a row of NEEDS YOU. Both clear by themselves; no nudge, no mark-done.
+
+**Acceptance:**
+- [x] Sync stores the ready set; a merged PR drops out on the next sync; an unchanged set records no event.
+- [x] A rebuild replays the ready set; an event without `ready` replays as empty.
+- [x] READY FOR YOU lists the solo rows after the tracked PRs and counts them; party and raid filters hide them.
+- [x] NEEDS YOU shows a solo item only while the trigger is active and the pending text is not `none`.
+- [x] The web renders both and counts the ready rows in the badge.

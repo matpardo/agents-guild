@@ -1061,6 +1061,121 @@ class DependabotAnnounceTests(SoloPlayersTestCase):
         self.assertIn("needs a human", prompt)
 
 
+class SoloTodoTests(SoloPlayersTestCase):
+    def setUp(self):
+        super().setUp()
+        self.write_gh_fixture("dependabot_runs_acme-app", [])
+        self.prs([_READY_PR])
+
+    def prs(self, prs):
+        self.write_gh_fixture("dependabot_prs_acme-app", prs)
+
+    def sync(self):
+        return self.cli(["sync", "--source", "gh"], "sess-1")
+
+    def ready(self):
+        rows = self.db().execute("SELECT repo, number, title FROM dependabot_ready ORDER BY number").fetchall()
+        return [tuple(row) for row in rows]
+
+    def synced_events(self):
+        return len(self.db().execute("SELECT 1 FROM events WHERE kind = 'dependabot.synced'").fetchall())
+
+    def board(self):
+        code, out, err = self.cli(["board"], None)
+        self.assertEqual(code, 0, err)
+        return out
+
+    def test_sync_stores_the_ready_set(self):
+        self.prs(
+            [_READY_PR, dict(_READY_PR, number=2, title="Bump y"), dict(_READY_PR, number=3, mergeable="CONFLICTING")]
+        )
+        self.sync()
+        self.assertEqual(self.ready(), [("acme/app", 1, "Bump x"), ("acme/app", 2, "Bump y")])
+
+    def test_merged_pr_drops_out_on_the_next_sync(self):
+        self.prs([_READY_PR, dict(_READY_PR, number=2)])
+        self.sync()
+        self.prs([dict(_READY_PR, number=2)])
+        self.sync()
+        self.assertEqual(self.ready(), [("acme/app", 2, "Bump x")])
+        self.prs([])
+        self.sync()
+        self.assertEqual(self.ready(), [])
+
+    def test_unchanged_set_records_no_event(self):
+        self.sync()
+        self.sync()
+        self.assertEqual(self.synced_events(), 1)
+
+    def test_rebuild_replays_the_set(self):
+        self.sync()
+        self.cli(["rebuild"], None)
+        self.assertEqual(self.ready(), [("acme/app", 1, "Bump x")])
+
+    def test_old_event_without_ready_replays_as_empty(self):
+        conn = self.db()
+        conn.execute("INSERT INTO dependabot_ready (repo, number, title) VALUES ('acme/app', 1, 'x')")
+        conn.commit()
+        reducers._dependabot_synced(
+            conn, {"ts": "t", "payload": {"repo": "acme/app", "unmergeable": 0, "run_failed": False}}
+        )
+        conn.commit()
+        self.assertEqual(self.ready(), [])
+
+    def test_ready_for_you_lists_solo_prs_after_tracked_ones(self):
+        self.sync()
+        out = self.board()
+        self.assertIn("READY FOR YOU · 1", out)
+        self.assertIn("acme/app#1 Bump x · from dependabot", out)
+
+    def test_ready_for_you_names_the_configured_player(self):
+        self.set_players([dict(_DEP, name="bumper")])
+        self.sync()
+        self.assertIn("acme/app#1 Bump x · from bumper", self.board())
+
+    def test_party_filter_hides_solo_rows(self):
+        self.sync()
+        self.cli(["party", "start", "p1", "--reason", "t"], "lead-1")
+        out = self.cli(["board", "--party", "p1"], None)[1]
+        self.assertNotIn("from dependabot", out)
+
+    def test_needs_you_shows_pending_only_while_trigger_active(self):
+        self.prs([dict(_READY_PR, mergeable="CONFLICTING")])
+        self.sync()
+        self.finish_job("dependabot-acme-app", "PR 4 needs a human")
+        out = self.board()
+        self.assertIn("1 solo", out)
+        self.assertIn("⚑ dependabot [artificer] acme/app: PR 4 needs a human", out)
+        self.prs([_READY_PR])
+        self.sync()
+        self.assertNotIn("⚑", self.board())
+
+    def test_needs_you_hides_none_pending(self):
+        self.prs([dict(_READY_PR, mergeable="CONFLICTING")])
+        self.sync()
+        self.finish_job("dependabot-acme-app", "None")
+        out = self.board()
+        self.assertNotIn("⚑", out)
+        self.assertIn("NEEDS YOU · nothing", out)
+
+    def test_web_model_carries_the_solo_rows(self):
+        from guild.cli import _build_context
+        from guild.commands import board
+
+        self.prs([_READY_PR, dict(_READY_PR, number=2, mergeable="CONFLICTING")])
+        self.sync()
+        self.finish_job("dependabot-acme-app", "PR 2 needs a human")
+        model = board.board_model(_build_context(None, self.repo_dir))
+        self.assertEqual(
+            [(item["ref"], item["party"], item["from"]) for item in model["ready_for_you"]],
+            [("acme/app#1", None, "dependabot")],
+        )
+        self.assertEqual(
+            model["solo_pending"],
+            [{"name": "dependabot", "class": "artificer", "repo": "acme/app", "pending": "PR 2 needs a human"}],
+        )
+
+
 class SoloChannelTests(SoloPlayersTestCase):
     def say(self, text, session_id):
         return self.cli(["solo", "say", text], session_id)

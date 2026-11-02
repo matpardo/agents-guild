@@ -125,6 +125,7 @@ _BOARD = {
     "health_jobs": [],
     "solo_players": [],
     "solo_channel": [],
+    "solo_pending": [],
     "project_names": [],
     "bases": [],
     "memory": [],
@@ -1415,6 +1416,57 @@ class WebReadyForYouBehaviorTests(unittest.TestCase):
         notes = item["children"][-1]
         self.assertEqual((notes["tag"], notes["className"]), ("div", "ready-notes"))
         self.assertIn("note: CI label x not on the PR", json.dumps(notes))
+
+
+class WebSoloTodoBehaviorTests(unittest.TestCase):
+    _SOLO_READY = {
+        "ref": "o/r#9",
+        "title": "Bump z",
+        "url": "https://github.com/o/r/pull/9",
+        "party": None,
+        "from": "bumper",
+        "scope": None,
+        "scopes": [],
+        "review_first": False,
+        "checks": "",
+        "notes": [],
+    }
+    _SOLO_PENDING = {"name": "bumper", "class": "artificer", "repo": "o/r", "pending": "PR 9 needs a human"}
+
+    def _text(self, out_id, party_filter, raid_filter, **overrides):
+        return _render(dict(_BOARD, **overrides), party_filter, raid_filter, out_id, "text")
+
+    @unittest.skipIf(shutil.which("node") is None, "node not installed")
+    def test_ready_row_shows_the_player_name(self):
+        text = self._text("ready-for-you", "all", "all", ready_for_you=[self._SOLO_READY])
+        self.assertIn("o/r#9", text)
+        self.assertIn("from bumper", text)
+
+    @unittest.skipIf(shutil.which("node") is None, "node not installed")
+    def test_ready_row_is_hidden_by_party_and_raid_filters(self):
+        for party_filter, raid_filter in (("a", "all"), ("all", "r")):
+            with self.subTest(party=party_filter, raid=raid_filter):
+                text = self._text("ready-for-you", party_filter, raid_filter, ready_for_you=[self._SOLO_READY])
+                self.assertNotIn("o/r#9", text)
+
+    @unittest.skipIf(shutil.which("node") is None, "node not installed")
+    def test_ready_badge_counts_the_solo_row(self):
+        text = self._text("sidebar", "all", "all", ready_for_you=[self._SOLO_READY])
+        self.assertIn("1 ready", text)
+
+    @unittest.skipIf(shutil.which("node") is None, "node not installed")
+    def test_needs_you_lists_the_pending_item(self):
+        text = self._text("asks", "all", "all", solo_pending=[self._SOLO_PENDING])
+        self.assertIn("solo (1)", text)
+        self.assertIn("[artificer] o/r", text)
+        self.assertIn("PR 9 needs a human", text)
+        self.assertNotIn("nothing needs you", text)
+
+    @unittest.skipIf(shutil.which("node") is None, "node not installed")
+    def test_needs_you_hides_the_pending_item_in_a_party_view(self):
+        text = self._text("asks", "a", "all", solo_pending=[self._SOLO_PENDING])
+        self.assertNotIn("PR 9 needs a human", text)
+        self.assertIn("nothing needs you", text)
 
 
 _QUEST_BOARD = {

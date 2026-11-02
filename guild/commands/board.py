@@ -304,7 +304,7 @@ def _sorted_open_asks(conn, party_names):
     return rows
 
 
-def _needs_you_heading(ask_count, blocked_count, ctx_high_count):
+def _needs_you_heading(ask_count, blocked_count, ctx_high_count, solo_count):
     parts = []
     if ask_count:
         parts.append("{} {}".format(ask_count, "open ask" if ask_count == 1 else "open asks"))
@@ -312,6 +312,8 @@ def _needs_you_heading(ask_count, blocked_count, ctx_high_count):
         parts.append("{} blocked".format(blocked_count))
     if ctx_high_count:
         parts.append("{} context high".format(ctx_high_count))
+    if solo_count:
+        parts.append("{} solo".format(solo_count))
     return "NEEDS YOU · {}".format(" · ".join(parts))
 
 
@@ -336,15 +338,30 @@ def _ctx_high_parties(ctx, party_names):
     return names_over_threshold
 
 
+def _solo_needs_human(ctx, party_names):
+    if party_names is not None:
+        return []
+    projects_by_name = {project["name"]: project for project in config.load_all_projects(ctx.projects_dir)}
+    live_ids = session_info.live_session_ids(ctx.sessions_dir)
+    return solo_players.needs_human(ctx.conn, ctx.now, projects_by_name, live_ids)
+
+
+def _solo_line(painter, entry):
+    text = "  ⚑ {} [{}] {}: {}".format(entry["name"], entry["class"], entry["repo"], entry["pending"])
+    return painter.paint(text, "red")
+
+
 def render_asks(ctx, party_names, color, width, detailed):
     painter = _Painter(color, width)
     rows = _sorted_open_asks(ctx.conn, party_names)
     blocked = session_status.blocked_rows(ctx.conn, party_names)
     ctx_high = _ctx_high_parties(ctx, party_names)
-    if not rows and not blocked and not ctx_high:
+    solo = _solo_needs_human(ctx, party_names)
+    if not rows and not blocked and not ctx_high and not solo:
         return [painter.paint("NEEDS YOU · nothing", "green"), ""]
-    lines = [painter.paint(_needs_you_heading(len(rows), len(blocked), len(ctx_high)), "bold")]
+    lines = [painter.paint(_needs_you_heading(len(rows), len(blocked), len(ctx_high), len(solo)), "bold")]
     lines.extend(_blocked_line(ctx, painter, row) for row in blocked)
+    lines.extend(_solo_line(painter, entry) for entry in solo)
     if detailed:
         for row in rows:
             lines.extend(_ask_detail_lines(painter, ctx.conn, row))
@@ -1137,6 +1154,28 @@ def _ready_item_lines(painter, item):
     return lines
 
 
+def _solo_ready_items(ctx, party_filter, raid_filter):
+    if party_filter is not None or raid_filter is not None:
+        return []
+    projects_by_name = {project["name"]: project for project in config.load_all_projects(ctx.projects_dir)}
+    return solo_players.ready_to_merge(ctx.conn, projects_by_name)
+
+
+def _solo_ready_model(entry):
+    return {
+        "ref": entry["ref"],
+        "title": entry["title"],
+        "url": entry["url"],
+        "party": None,
+        "from": entry["name"],
+        "scope": None,
+        "scopes": [],
+        "review_first": False,
+        "checks": "",
+        "notes": [],
+    }
+
+
 def _ready_for_you_lines(ctx, painter, party_filter, raid_filter):
     party_rows = ctx.conn.execute("SELECT name FROM parties WHERE state != 'closed'").fetchall()
     scopes = merge_queue_commands.board_scopes(ctx.conn, ctx.now, {row["name"] for row in party_rows})
@@ -1145,11 +1184,14 @@ def _ready_for_you_lines(ctx, painter, party_filter, raid_filter):
         items = [item for item in items if item["party"] == party_filter]
     if raid_filter is not None:
         items = [item for item in items if "raid:{}".format(raid_filter) in item["scopes"]]
-    if not items:
+    solo = _solo_ready_items(ctx, party_filter, raid_filter)
+    if not items and not solo:
         return [painter.paint("READY FOR YOU · nothing", "green"), ""]
-    lines = [painter.paint("READY FOR YOU · {}".format(len(items)), "bold")]
+    lines = [painter.paint("READY FOR YOU · {}".format(len(items) + len(solo)), "bold")]
     for item in items:
         lines.extend(_ready_item_lines(painter, item))
+    for entry in solo:
+        lines.extend(painter.wrap("{} {} · from {}".format(entry["ref"], entry["title"], entry["name"]), "  "))
     lines.append("")
     return lines
 
@@ -1515,7 +1557,9 @@ def board_model(ctx):
         "drift": [drift_commands.board_findings(ctx, project_name) for project_name in project_names],
         "raids": _raid_models(ctx.conn, ctx.now),
         "merge_queues": merge_queue_commands.board_models(ctx.projects_dir, ctx.now, scopes),
-        "ready_for_you": merge_queue_commands.ready_for_you(ctx.conn, ctx.projects_dir, scopes),
+        "ready_for_you": merge_queue_commands.ready_for_you(ctx.conn, ctx.projects_dir, scopes)
+        + [_solo_ready_model(entry) for entry in solo_players.ready_to_merge(ctx.conn, projects_by_name)],
+        "solo_pending": solo_players.needs_human(ctx.conn, ctx.now, projects_by_name, live_ids),
         "projects": _project_models(ctx, party_rows, projects_by_name),
         "bases": _bases_model(ctx, [projects_by_name[name] for name in sorted(projects_by_name)]),
         "project_names": sorted(projects_by_name),

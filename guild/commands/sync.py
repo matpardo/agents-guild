@@ -608,9 +608,13 @@ def _update_run_failed(runs):
 
 def _recorded_dependabot_status(ctx, repo):
     row = ctx.conn.execute("SELECT unmergeable, run_failed FROM dependabot_status WHERE repo = ?", (repo,)).fetchone()
+    ready = ctx.conn.execute(
+        "SELECT number, title FROM dependabot_ready WHERE repo = ? ORDER BY number", (repo,)
+    ).fetchall()
+    ready_set = [{"number": entry["number"], "title": entry["title"]} for entry in ready]
     if row is None:
-        return 0, False
-    return row["unmergeable"], bool(row["run_failed"])
+        return 0, False, ready_set
+    return row["unmergeable"], bool(row["run_failed"]), ready_set
 
 
 def _pr_ready(pr):
@@ -621,16 +625,24 @@ def _pr_ready(pr):
     )
 
 
-def _announce_ready_prs(ctx, project, repo, prs):
+def _ready_title(pr):
+    return sanitize.collapse_to_single_line(sanitize.strip_control_sequences(pr["title"]))[:_ANNOUNCE_TITLE_MAX]
+
+
+def _ready_prs(prs):
+    return sorted(
+        ({"number": pr["number"], "title": _ready_title(pr)} for pr in prs if _pr_ready(pr)),
+        key=lambda entry: entry["number"],
+    )
+
+
+def _announce_ready_prs(ctx, project, repo, ready):
     player = {"repo": repo, "job": "dependabot"}
-    for pr in prs:
-        if not _pr_ready(pr):
-            continue
-        key = (repo, pr["number"])
+    for entry in ready:
+        key = (repo, entry["number"])
         if ctx.conn.execute("SELECT 1 FROM dependabot_announced WHERE repo = ? AND number = ?", key).fetchone():
             continue
-        title = sanitize.collapse_to_single_line(sanitize.strip_control_sequences(pr["title"]))[:_ANNOUNCE_TITLE_MAX]
-        text = "{}#{} ready to merge: {}".format(repo, pr["number"], title)
+        text = "{}#{} ready to merge: {}".format(repo, entry["number"], entry["title"])
         with db.writing(ctx.conn):
             solo_channel.post(ctx.conn, ctx.now, ctx.origin, ctx.session_id, project["name"], player, text)
             events.record(
@@ -642,7 +654,7 @@ def _announce_ready_prs(ctx, project, repo, prs):
                 project["name"],
                 "dependabot.announced",
                 "guild",
-                {"repo": repo, "number": pr["number"]},
+                {"repo": repo, "number": entry["number"]},
             )
 
 
@@ -653,10 +665,11 @@ def _sync_repo_dependabot(ctx, project, repo, failures):
     except github.GhCommandError as error:
         failures.append("{}: dependabot check failed: {}".format(repo, error))
         return
-    _announce_ready_prs(ctx, project, repo, prs)
+    ready = _ready_prs(prs)
+    _announce_ready_prs(ctx, project, repo, ready)
     unmergeable = sum(1 for pr in prs if _pr_unmergeable(pr))
     run_failed = _update_run_failed(runs)
-    if _recorded_dependabot_status(ctx, repo) == (unmergeable, run_failed):
+    if _recorded_dependabot_status(ctx, repo) == (unmergeable, run_failed, ready):
         return
     with db.writing(ctx.conn):
         events.record(
@@ -668,7 +681,7 @@ def _sync_repo_dependabot(ctx, project, repo, failures):
             project["name"],
             "dependabot.synced",
             "guild",
-            {"repo": repo, "unmergeable": unmergeable, "run_failed": run_failed},
+            {"repo": repo, "unmergeable": unmergeable, "run_failed": run_failed, "ready": ready},
         )
 
 
