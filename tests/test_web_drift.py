@@ -484,7 +484,7 @@ class WebSoloPlayerBehaviorTests(unittest.TestCase):
 
     def test_backing_off_player_shows_the_retry_time(self):
         out = self._text([_solo_player(state="cooling", retry_at="2026-11-02T10:00:00+00:00")])
-        self.assertIn("cooling: same trigger, retry after 2026-11-02T10:00:00+00:00", out)
+        self.assertRegex(out, r"cooling: same trigger, retry after \d{4}-\d{2}-\d{2} \d{2}:\d{2}")
         self.assertNotIn("guild solo launch", out)
 
     def _channel_text(self, channel, players):
@@ -493,8 +493,34 @@ class WebSoloPlayerBehaviorTests(unittest.TestCase):
     def test_channel_feed_shows_time_name_class_and_text(self):
         message = {"ts": "2026-11-02T09:30:00+00:00", "name": "mender", "class": "cleric", "text": "fix PR ready"}
         out = self._channel_text([message], [_solo_player()])
-        for expected in ("2026-11-02", "mender", "cleric", "fix PR ready"):
+        for expected in ("mender", "cleric", "fix PR ready"):
             self.assertIn(expected, out)
+
+    def test_empty_channel_shows_heading_and_placeholder(self):
+        out = self._channel_text([], [_solo_player()])
+        self.assertIn("channel", out)
+        self.assertIn("no messages yet", out)
+
+    def test_filled_channel_has_no_placeholder(self):
+        message = {"ts": "2026-11-02T09:30:00+00:00", "name": "mender", "class": "", "text": "hi"}
+        self.assertNotIn("no messages yet", self._channel_text([message], [_solo_player()]))
+
+    def test_dates_use_the_short_local_format(self):
+        message = {"ts": "2026-11-02T09:30:00+00:00", "name": "mender", "class": "", "text": "hi"}
+        run = {
+            "started_at": "2026-11-02T08:00:00+00:00",
+            "done_at": None,
+            "state": "running",
+            "duration": None,
+            "pending": None,
+        }
+        player = _solo_player(
+            last_done="2026-11-01T10:00:00+00:00", retry_at="2026-11-02T10:00:00+00:00", state="cooling", runs=[run]
+        )
+        out = self._channel_text([message], [player])
+        self.assertNotIn("+00:00", out)
+        self.assertNotRegex(out, r"\d{4}-\d{2}-\d{2}T")
+        self.assertGreaterEqual(len(re.findall(r"\d{4}-\d{2}-\d{2} \d{2}:\d{2}", out)), 4)
 
     def test_channel_text_stays_literal(self):
         message = {"ts": "t", "name": "mender", "class": "cleric", "text": "<img src=x onerror=alert(1)>"}

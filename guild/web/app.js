@@ -1994,17 +1994,31 @@ realmDoctorLines: [],
     appendAll(section, pending.map(renderHealthJob));
   }
 
+  function shortLocalDate(iso) {
+    var date = new Date(iso);
+    if (isNaN(date.getTime())) {
+      return iso;
+    }
+    function pad(value) {
+      return String(value).padStart(2, "0");
+    }
+    return (
+      date.getFullYear() + "-" + pad(date.getMonth() + 1) + "-" + pad(date.getDate()) +
+      " " + pad(date.getHours()) + ":" + pad(date.getMinutes())
+    );
+  }
+
   function soloPlayerMeta(player) {
     var state = player.state;
     if (player.stalled_adventurer !== null) {
       state += ": session gone, run guild adventurer dismiss " + player.stalled_adventurer;
     } else if (player.retry_at !== null) {
-      state += ": same trigger, retry after " + player.retry_at;
+      state += ": same trigger, retry after " + shortLocalDate(player.retry_at);
     } else if (player.waits_on.length > 0) {
       state += ": waits on " + player.waits_on.join(", ");
     }
     var parts = [player.class, player.repo, state, player.trigger === null ? "no trigger" : player.trigger];
-    parts.push("last done " + (player.last_done === null ? "never" : player.last_done));
+    parts.push("last done " + (player.last_done === null ? "never" : shortLocalDate(player.last_done)));
     parts.push("last pending " + (player.last_pending === null ? "none" : player.last_pending));
     return parts.join(" \u00b7 ");
   }
@@ -2024,7 +2038,7 @@ realmDoctorLines: [],
   }
 
   function soloRunLine(run) {
-    var parts = [run.started_at, run.state];
+    var parts = [shortLocalDate(run.started_at), run.state];
     if (run.duration !== null) {
       parts.push(Math.round(run.duration / 60) + "m");
     }
@@ -2048,7 +2062,7 @@ realmDoctorLines: [],
 
   function soloChannelLine(message) {
     var who = message.class === "" ? message.name : message.name + " [" + message.class + "]";
-    return classedText("p", message.ts + " \u00b7 " + who + " \u00b7 " + message.text, "solo-message");
+    return classedText("p", shortLocalDate(message.ts) + " \u00b7 " + who + " \u00b7 " + message.text, "solo-message");
   }
 
   function renderSoloPlayers(players, channel) {
@@ -2058,6 +2072,10 @@ realmDoctorLines: [],
       return;
     }
     section.appendChild(textEl("h2", "solo players (" + players.length + ")"));
+    section.appendChild(textEl("h3", "channel"));
+    if (channel.length === 0) {
+      section.appendChild(classedText("p", "no messages yet", "muted"));
+    }
     appendAll(section, channel.map(soloChannelLine));
     appendAll(section, players.map(renderSoloPlayer));
   }
@@ -3986,7 +4004,8 @@ realmDoctorLines: [],
     "needs-you": ["asks", "ready-for-you", "answered-asks"],
     party: ["asks", "merge-queues", "progress", "daily-tasks", "parties", "memory"],
     raid: ["asks", "merge-queues", "progress", "daily-tasks", "parties", "memory"],
-    adventurers: ["adventurers", "health-jobs", "solo-players"],
+    adventurers: ["adventurers", "health-jobs"],
+    "solo-players": ["solo-players"],
     ideas: ["ideas"],
     quests: ["quest-board"],
     overview: ["notices", "raids", "drift", "projects", "realm"],
@@ -4100,6 +4119,7 @@ realmDoctorLines: [],
       adventurers: data.adventurers.filter(function (adventurer) {
         return adventurer.state === "active";
       }).length,
+      soloPlayers: data.solo_players.length,
       ideas: data.ideas.length,
       openQuests: data.quest_boards.reduce(function (total, project) {
         return total + project.open_quests.length;
@@ -4208,6 +4228,9 @@ realmDoctorLines: [],
       top.appendChild(solo);
     }
     top.appendChild(sidebarItem(sidebarLink("adventurers", "adventurers (" + model.adventurers + ")", currentHash)));
+    top.appendChild(
+      sidebarItem(sidebarLink("solo-players", "solo players (" + model.soloPlayers + ")", currentHash))
+    );
     top.appendChild(sidebarItem(sidebarLink("ideas", "ideas (" + model.ideas + ")", currentHash)));
     top.appendChild(sidebarItem(sidebarLink("quests", "quest board (" + model.openQuests + ")", currentHash)));
     top.appendChild(sidebarItem(sidebarLink("overview", "overview (" + model.newNotices + " new)", currentHash)));

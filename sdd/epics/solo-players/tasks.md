@@ -115,3 +115,16 @@ updated: 2026-11-01
 - [x] A launch, manual or by the tick, and the done of a solo adventurer post a channel message and no notice; the done of a normal adventurer posts nothing.
 - [x] The channel lists newest first with a limit, survives a rebuild, and the web renders feed and runs with text only.
 - [x] Runs show running, stalled or done with duration and pending.
+
+## T11 — Own view in the web side menu
+
+**Depends on:** T10
+**Status:** [x] done
+
+**What:** decisión del dev, 2026-11-02: solo players leave the adventurers view and get `#solo-players` in the web side menu, labelled with the number of configured players. The channel feed always shows its heading and a "no messages yet" placeholder when empty, and the section dates use a short local format.
+
+**Acceptance:**
+- [x] The `#solo-players` view shows the solo players section and `#adventurers` does not.
+- [x] The side menu lists "solo players (N)" right after adventurers.
+- [x] An empty channel shows "no messages yet".
+- [x] Last done, retry, run start and message times render as short local dates.
