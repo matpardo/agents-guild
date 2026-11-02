@@ -186,6 +186,7 @@ class BoardEndpointTests(WebServerTestCase):
                 "adventurers",
                 "health_jobs",
                 "solo_players",
+                "solo_channel",
                 "memory",
                 "new_notice_count",
                 "parties",

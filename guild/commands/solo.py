@@ -1,9 +1,6 @@
-from guild import config, db, events, session_info, solo_players, tmux_windows
+from guild import config, db, events, identity, sanitize, session_info, solo_channel, solo_players, tmux_windows
 from guild.commands import adventurer as adventurer_commands
-from guild.commands import notice as notice_commands
 from guild.errors import GuildError
-
-_LAUNCH_NOTICE_TTL = "2h"
 
 
 def _player_rows(ctx):
@@ -43,6 +40,8 @@ def _launch_player(ctx, project, project_data, repo, job_name, tmux):
     health_job = solo_players.health_job_name(repo, job_name)
     job = next(job for job in solo_players.jobs(project_data) if job["name"] == health_job)
     message = adventurer_commands.launch_window(project_data, job, _window_name(health_job), tmux)
+    player = _find_player(project_data, repo, job_name)
+    trigger = solo_players.current_trigger(ctx.conn, repo, job_name)
     with db.writing(ctx.conn):
         events.record(
             ctx.conn,
@@ -53,7 +52,18 @@ def _launch_player(ctx, project, project_data, repo, job_name, tmux):
             project,
             "solo.launched",
             "guild",
-            {"repo": repo, "job": job_name, "trigger": solo_players.current_trigger(ctx.conn, repo, job_name)},
+            {"repo": repo, "job": job_name, "trigger": trigger},
+        )
+        solo_channel.post(
+            ctx.conn,
+            ctx.now,
+            ctx.origin,
+            None,
+            project,
+            player,
+            "{} ({}) started on {}: {}".format(
+                solo_players.player_name(player), solo_players.JOBS[job_name]["class"], repo, trigger or "manual launch"
+            ),
         )
     return message
 
@@ -74,11 +84,6 @@ def launch(ctx, repo, job_name, tmux):
     if _find_player(project_data, repo, job_name) is None:
         raise GuildError("project '{}' has no solo player '{}' on '{}'".format(project, job_name, repo), 1)
     return _launch_player(ctx, project, project_data, repo, job_name, tmux)
-
-
-def _announce_launch(ctx, row):
-    text = "solo player {} ({}) launched on {}: {}".format(row["name"], row["class"], row["repo"], row["trigger"])
-    notice_commands.create_announcing(ctx, None, text, "project:" + row["project"], _LAUNCH_NOTICE_TTL, None)
 
 
 def _window_is_open(tmux, health_job):
@@ -106,6 +111,50 @@ def tick(ctx, tmux):
             lines.append(_launch_player(ctx, row["project"], project_data, row["repo"], row["job"], tmux))
         except GuildError as error:
             lines.append("solo player {} not launched: {}".format(row["name"], error.message))
-            continue
-        _announce_launch(ctx, row)
     return "\n".join(lines)
+
+
+def _solo_adventurer(ctx):
+    adventurer = identity.resolve_adventurer(ctx.conn, ctx.session_id)
+    if adventurer is None or adventurer["health_job"] is None:
+        raise GuildError("solo say runs inside a solo player session", 1)
+    project_data = config.load_project(ctx.projects_dir, adventurer["project"])
+    player = solo_players.player_of_health_job(project_data, adventurer["health_job"])
+    if player is None:
+        raise GuildError("solo say runs inside a solo player session", 1)
+    return adventurer, player
+
+
+def say(ctx, text):
+    adventurer, player = _solo_adventurer(ctx)
+    clean = sanitize.strip_control_sequences(text).strip()
+    if clean == "":
+        raise GuildError("solo say text must not be empty", 1)
+    if len(clean) > solo_channel.MESSAGE_MAX_LENGTH:
+        raise GuildError("solo say text must be at most {} characters".format(solo_channel.MESSAGE_MAX_LENGTH), 1)
+    with db.writing(ctx.conn):
+        solo_channel.post(ctx.conn, ctx.now, ctx.origin, ctx.session_id, adventurer["project"], player, clean)
+    return "posted"
+
+
+def _projects_by_name(ctx):
+    return {project["name"]: project for project in config.load_all_projects(ctx.projects_dir)}
+
+
+def channel(ctx, limit):
+    messages = solo_channel.latest(ctx.conn, _projects_by_name(ctx), limit)
+    if not messages:
+        return "no messages"
+    return "\n".join("  {} {} [{}] {}".format(m["ts"], m["name"], m["class"], m["text"]) for m in messages)
+
+
+def _format_run(run):
+    duration = "-" if run["duration"] is None else "{}s".format(run["duration"])
+    return "  {} {} {} {}".format(run["started_at"], run["state"], duration, run["pending"] or "")
+
+
+def runs(ctx, repo, job_name):
+    for row in _player_rows(ctx):
+        if row["repo"] == repo and row["job"] == job_name:
+            return "\n".join(_format_run(run) for run in row["runs"]) or "no runs"
+    raise GuildError("no solo player '{}' on '{}'".format(job_name, repo), 1)

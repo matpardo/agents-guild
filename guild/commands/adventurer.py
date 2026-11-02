@@ -13,6 +13,8 @@ from guild import (
     refs,
     resume,
     session_info,
+    solo_channel,
+    solo_players,
     task_holders,
     timeutil,
     tmux_windows,
@@ -160,6 +162,17 @@ def launch(ctx, job_name, tmux):
     return launch_window(project_data, job, "health-" + job_name, tmux)
 
 
+def _post_solo_finished(ctx, adventurer, pending):
+    if adventurer["health_job"] is None:
+        return
+    project_data = config.load_project(ctx.projects_dir, adventurer["project"])
+    player = solo_players.player_of_health_job(project_data, adventurer["health_job"])
+    if player is None:
+        return
+    text = "{} finished: {}".format(solo_players.player_name(player), pending)
+    solo_channel.post(ctx.conn, ctx.now, ctx.origin, ctx.session_id, adventurer["project"], player, text)
+
+
 def done(ctx, pending, lifecycle_runner):
     adventurer = identity.resolve_adventurer(ctx.conn, ctx.session_id)
     if adventurer is None:
@@ -185,6 +198,7 @@ def done(ctx, pending, lifecycle_runner):
             "local",
             {"id": adventurer["id"], "pending": pending},
         )
+        _post_solo_finished(ctx, adventurer, pending)
     lines = ["adventurer {} done".format(adventurer["id"]), final_report.adventurer_report(ctx, adventurer, pending)]
     if stale:
         lines.append(final_report.STALE_PR_NOTE)

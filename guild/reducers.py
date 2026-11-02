@@ -718,6 +718,14 @@ def _solo_launched(conn, event):
     )
 
 
+def _solo_message(conn, event):
+    payload = event["payload"]
+    conn.execute(
+        "INSERT INTO solo_messages (health_job, ts, text) VALUES (?, ?, ?)",
+        (solo_players.health_job_name(payload["repo"], payload["job"]), event["ts"], payload["text"]),
+    )
+
+
 def _main_marked(conn, event):
     _record_main_status(conn, event, "manual")
 
@@ -956,6 +964,7 @@ _REDUCERS = {
     "main.status_synced": _main_status_synced,
     "dependabot.synced": _dependabot_synced,
     "solo.launched": _solo_launched,
+    "solo.message": _solo_message,
     "main.marked": _main_marked,
     "session.waiting": _session_waiting,
     "session.stopped": _session_stopped,
@@ -1071,6 +1080,7 @@ _REQUIRED_KEYS = {
     "main.status_synced": ("repo", "red", "reason"),
     "dependabot.synced": ("repo", "unmergeable", "run_failed"),
     "solo.launched": ("repo", "job"),
+    "solo.message": ("repo", "job", "text"),
     "main.marked": ("repo", "red", "reason"),
     "session.waiting": ("wait", "message"),
     "session.stopped": (),

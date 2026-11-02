@@ -102,3 +102,16 @@ updated: 2026-11-01
 - [x] A `due` player with an existing window has it closed, then is launched with its event recorded.
 - [x] A running player's window is untouched and nothing launches.
 - [x] A window that cannot be closed prints a failure line and launches nothing.
+
+## T10 — Add a solo players channel and run log
+
+**Depends on:** T09
+**Status:** [x] done
+
+**What:** decisión del dev, 2026-11-02: the dev sees solo players at work through two read-only views. The channel (`solo.message` event, `solo_messages` table) holds only important messages: each launch (replacing the project notice), the finish of a solo adventurer, and what a player posts with `guild solo say`. `guild solo channel` and the board `solo_channel` key show it, and the web renders it as a feed. The run log reads the `adventurers` table: `guild solo runs`, and the last 5 runs per player in the board JSON and the web.
+
+**Acceptance:**
+- [x] `say` is refused outside a solo player session, strips control sequences and refuses empty or over-300 text.
+- [x] A launch, manual or by the tick, and the done of a solo adventurer post a channel message and no notice; the done of a normal adventurer posts nothing.
+- [x] The channel lists newest first with a limit, survives a rebuild, and the web renders feed and runs with text only.
+- [x] Runs show running, stalled or done with duration and pending.

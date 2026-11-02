@@ -120,6 +120,7 @@ _BOARD = {
     "adventurers": [],
     "health_jobs": [],
     "solo_players": [],
+    "solo_channel": [],
     "project_names": [],
     "bases": [],
     "memory": [],
@@ -440,6 +441,7 @@ def _solo_player(**overrides):
         "waits_on": [],
         "stalled_adventurer": None,
         "retry_at": None,
+        "runs": [],
     }
     return dict(player, **overrides)
 
@@ -484,6 +486,57 @@ class WebSoloPlayerBehaviorTests(unittest.TestCase):
         out = self._text([_solo_player(state="cooling", retry_at="2026-11-02T10:00:00+00:00")])
         self.assertIn("cooling: same trigger, retry after 2026-11-02T10:00:00+00:00", out)
         self.assertNotIn("guild solo launch", out)
+
+    def _channel_text(self, channel, players):
+        return _render(dict(_BOARD, solo_players=players, solo_channel=channel), "all", "all", "solo-players", "text")
+
+    def test_channel_feed_shows_time_name_class_and_text(self):
+        message = {"ts": "2026-11-02T09:30:00+00:00", "name": "mender", "class": "cleric", "text": "fix PR ready"}
+        out = self._channel_text([message], [_solo_player()])
+        for expected in ("2026-11-02", "mender", "cleric", "fix PR ready"):
+            self.assertIn(expected, out)
+
+    def test_channel_text_stays_literal(self):
+        message = {"ts": "t", "name": "mender", "class": "cleric", "text": "<img src=x onerror=alert(1)>"}
+        board = dict(_BOARD, solo_players=[_solo_player()], solo_channel=[message])
+        tree = _render(board, "all", "all", "solo-players", "tree")
+        self.assertIn("<img src=x onerror=alert(1)>", tree)
+        self.assertNotIn('"tag":"img"', tree)
+
+    def test_channel_has_no_input(self):
+        message = {"ts": "t", "name": "mender", "class": "cleric", "text": "hi"}
+        board = dict(_BOARD, solo_players=[_solo_player()], solo_channel=[message])
+        tree = _render(board, "all", "all", "solo-players", "tree")
+        self.assertNotIn('"tag":"input"', tree)
+        self.assertNotIn('"tag":"textarea"', tree)
+
+    def test_runs_render_in_a_details_with_literal_pending(self):
+        run = {
+            "started_at": "2026-11-02T08:00:00+00:00",
+            "done_at": "2026-11-02T08:20:00+00:00",
+            "state": "done",
+            "duration": 1200,
+            "pending": "<img src=x onerror=alert(1)>",
+        }
+        running = {
+            "started_at": "2026-11-02T09:00:00+00:00",
+            "done_at": None,
+            "state": "running",
+            "duration": None,
+            "pending": None,
+        }
+        board = dict(_BOARD, solo_players=[_solo_player(runs=[running, run])])
+        tree = _render(board, "all", "all", "solo-players", "tree")
+        self.assertIn('"tag":"details"', tree)
+        self.assertIn("<img src=x onerror=alert(1)>", tree)
+        self.assertNotIn('"tag":"img"', tree)
+        text = _render(board, "all", "all", "solo-players", "text")
+        for expected in ("runs", "running", "done", "20m"):
+            self.assertIn(expected, text)
+
+    def test_player_without_runs_has_no_details(self):
+        tree = _render(dict(_BOARD, solo_players=[_solo_player()]), "all", "all", "solo-players", "tree")
+        self.assertNotIn('"tag":"details"', tree)
 
     def test_no_players_render_nothing(self):
         self.assertEqual(self._text([]), "")

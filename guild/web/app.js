@@ -2017,16 +2017,48 @@ realmDoctorLines: [],
     if (player.state === "due" || player.state === "idle") {
       article.appendChild(classedText("code", player.launch, "launch-command"));
     }
+    if (player.runs.length > 0) {
+      article.appendChild(renderSoloRuns(player.runs));
+    }
     return article;
   }
 
-  function renderSoloPlayers(players) {
+  function soloRunLine(run) {
+    var parts = [run.started_at, run.state];
+    if (run.duration !== null) {
+      parts.push(Math.round(run.duration / 60) + "m");
+    }
+    if (run.pending !== null) {
+      parts.push(run.pending);
+    }
+    return parts.join(" \u00b7 ");
+  }
+
+  function renderSoloRuns(runs) {
+    var details = el("details");
+    details.appendChild(textEl("summary", "runs (" + runs.length + ")"));
+    appendAll(
+      details,
+      runs.map(function (run) {
+        return classedText("p", soloRunLine(run), "muted");
+      })
+    );
+    return details;
+  }
+
+  function soloChannelLine(message) {
+    var who = message.class === "" ? message.name : message.name + " [" + message.class + "]";
+    return classedText("p", message.ts + " \u00b7 " + who + " \u00b7 " + message.text, "solo-message");
+  }
+
+  function renderSoloPlayers(players, channel) {
     var section = document.getElementById("solo-players");
     clear(section);
     if (players.length === 0) {
       return;
     }
     section.appendChild(textEl("h2", "solo players (" + players.length + ")"));
+    appendAll(section, channel.map(soloChannelLine));
     appendAll(section, players.map(renderSoloPlayer));
   }
 
@@ -3253,6 +3285,7 @@ realmDoctorLines: [],
       adventurers: data.adventurers,
       health_jobs: data.health_jobs,
       solo_players: data.solo_players,
+      solo_channel: data.solo_channel,
       asks: data.asks.filter(function (ask) {
         return ask.party === state.partyFilter;
       }),
@@ -3310,6 +3343,7 @@ realmDoctorLines: [],
       adventurers: data.adventurers,
       health_jobs: data.health_jobs,
       solo_players: data.solo_players,
+      solo_channel: data.solo_channel,
       asks: data.asks.filter(function (ask) {
         return members.indexOf(ask.party) !== -1;
       }),
@@ -4230,7 +4264,7 @@ realmDoctorLines: [],
     );
     renderSection("adventurers", [filtered.adventurers], renderAdventurers, onlyIfChanged);
     renderSection("health-jobs", [filtered.health_jobs], renderHealthJobs, onlyIfChanged);
-    renderSection("solo-players", [filtered.solo_players], renderSoloPlayers, onlyIfChanged);
+    renderSection("solo-players", [filtered.solo_players, filtered.solo_channel], renderSoloPlayers, onlyIfChanged);
     renderSection("memory", [filtered.memory], renderMemory, onlyIfChanged);
     renderSection("raids", [filtered.raids], renderRaids, onlyIfChanged);
     renderSection("merge-queues", [filtered.merge_queues], renderMergeQueues, onlyIfChanged);

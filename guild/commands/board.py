@@ -25,6 +25,7 @@ from guild import (
     sanitize,
     session_info,
     session_status,
+    solo_channel,
     solo_players,
     timeutil,
     work_queue,
@@ -1498,6 +1499,7 @@ def board_model(ctx):
         ],
         "health_jobs": health_jobs.models(ctx, projects_by_name),
         "solo_players": solo_players.models(ctx.conn, ctx.now, projects_by_name, live_ids),
+        "solo_channel": solo_channel.latest(ctx.conn, projects_by_name, solo_channel.BOARD_LIMIT),
         "memory": [
             _memory_item_model(item) for item in memory_commands.all_items(None) if item["party"] in live_party_names
         ],

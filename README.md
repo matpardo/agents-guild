@@ -210,6 +210,9 @@ guild adventurers [<id>]                                # active ones, then rece
 guild solo list                                         # solo players of the project config with trigger and state
 guild solo launch <owner/repo> <job>                    # human terminal only: tmux window running a solo player, due or not
 guild solo tick                                         # background job: launch every due solo player (human terminal only)
+guild solo say "<text>"                                 # solo player session only: post an important message to the channel (max 300 chars)
+guild solo channel [--limit N]                          # latest solo channel messages, newest first (default 20)
+guild solo runs <owner/repo> <job>                      # last runs of a solo player: start, state, duration, pending
 
 guild claim <area> --ttl <dur>          # area, or task:<epic>/<tid> / task:<quest>/<tid>
 guild claim check <area>                # read-only, no event; exit 0 free/yours, exit 1 someone else's
@@ -1479,9 +1482,22 @@ again, prints one line per player it could not launch
 (for example `tmux not found`) and still exits 0. Each launch, manual or not,
 records a `solo.launched` event with the trigger text it was made for, and a launch younger than the cooldown keeps
 the player `cooling`, so a trigger that stays on while the new session binds,
-or after the human closed its window, does not launch it again. A launch by the
-tick also posts a project notice `solo player <name> (<class>) launched on
-<repo>: <trigger>` for 2h.
+or after the human closed its window, does not launch it again. A launch,
+manual or by the tick, posts `<name> (<class>) started on <repo>: <trigger>`
+(`manual launch` when no trigger is on) to the solo channel and no longer posts
+a project notice, so launches do not interrupt other sessions.
+
+The solo channel holds only important messages: the launch line, `<name>
+finished: <pending>` when its adventurer ends, and what the player posts with
+`guild solo say "<text>"`. `say` runs only inside a session bound as the
+adventurer of a solo player, strips control sequences and refuses empty text
+or text over 300 characters. `guild solo channel --limit N` prints the latest
+messages newest first. The web shows the latest 20 as a read-only feed at the
+top of the solo players section (the board JSON key `solo_channel`).
+`guild solo runs <owner/repo> <job>` prints the last runs of a player, read
+from its adventurers: start time, `running`, `stalled` or `done`, duration and
+pending report. The web lists the last 5 per player under a collapsible
+`runs`; the board JSON carries them as `runs` on each player.
 
 ### Marking notices seen
 
