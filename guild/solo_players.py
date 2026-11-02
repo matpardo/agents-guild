@@ -4,6 +4,7 @@ COOLDOWN = "1h"
 REPEAT_COOLDOWN = "24h"
 RUNS_SHOWN = 5
 LAUNCH_COMMAND = "guild solo launch {} {}"
+RESUME_COMMAND = "guild solo resume {} {}"
 
 _RED_MAIN_PROMPT = (
     "Main of {repo} is red. Read its failing checks (`gh run list --branch <base> --repo {repo}`, `gh pr checks`),"
@@ -116,11 +117,15 @@ def _fix_prs(conn, repo, job):
     return ["{}#{}".format(repo, row["number"]) for row in rows]
 
 
-def _active_adventurer(conn, project, health_job):
+def active_adventurer(conn, project, health_job):
     return conn.execute(
         "SELECT id, session_id FROM adventurers WHERE project = ? AND health_job = ? AND state = 'active'",
         (project, health_job),
     ).fetchone()
+
+
+def is_paused(conn, health_job):
+    return conn.execute("SELECT 1 FROM solo_pauses WHERE health_job = ?", (health_job,)).fetchone() is not None
 
 
 def _retry_at(now, trigger, last_done, last_launch, last_launch_trigger):
@@ -132,11 +137,13 @@ def _retry_at(now, trigger, last_done, last_launch, last_launch_trigger):
     return max(pending)
 
 
-def _state(now, active, live_ids, trigger, fix_prs, last_done, last_launch, last_launch_trigger):
+def _state(now, active, live_ids, paused, trigger, fix_prs, last_done, last_launch, last_launch_trigger):
     if active is not None and active["session_id"] in live_ids:
         return "running"
     if active is not None:
         return "stalled"
+    if paused:
+        return "paused"
     if fix_prs:
         return "fixing"
     if trigger is None:
@@ -198,11 +205,21 @@ def models(conn, now, projects_by_name, live_ids):
         for player in _players(projects_by_name[project]):
             health_job = health_job_name(player["repo"], player["job"])
             trigger = _TRIGGERS[player["job"]](conn, player["repo"])
-            active = _active_adventurer(conn, project, health_job)
+            active = active_adventurer(conn, project, health_job)
             fix_prs = _fix_prs(conn, player["repo"], player["job"])
             last_done, last_pending = _last_report(conn, project, health_job)
             last_launch, last_launch_trigger = _last_launch(conn, health_job)
-            state = _state(now, active, live_ids, trigger, fix_prs, last_done, last_launch, last_launch_trigger)
+            state = _state(
+                now,
+                active,
+                live_ids,
+                is_paused(conn, health_job),
+                trigger,
+                fix_prs,
+                last_done,
+                last_launch,
+                last_launch_trigger,
+            )
             result.append(
                 {
                     "project": project,
@@ -219,7 +236,9 @@ def models(conn, now, projects_by_name, live_ids):
                     "last_done": last_done,
                     "last_pending": last_pending,
                     "runs": runs(conn, project, health_job, live_ids, RUNS_SHOWN),
-                    "launch": LAUNCH_COMMAND.format(player["repo"], player["job"]),
+                    "launch": (RESUME_COMMAND if state == "paused" else LAUNCH_COMMAND).format(
+                        player["repo"], player["job"]
+                    ),
                 }
             )
     return result

@@ -536,6 +536,21 @@ def _handle_solo_status(ctx, args):
     return 0
 
 
+def _handle_solo_stop(ctx, args):
+    from guild import tmux_windows
+    from guild.commands import solo as solo_commands
+
+    _print(solo_commands.stop(ctx, args.repo, args.job, args.all, args.project, tmux_windows.Tmux()))
+    return 0
+
+
+def _handle_solo_resume(ctx, args):
+    from guild.commands import solo as solo_commands
+
+    _print(solo_commands.resume(ctx, args.repo, args.job, args.all, args.project))
+    return 0
+
+
 def _handle_solo_launch(ctx, args):
     from guild import tmux_windows
     from guild.commands import solo as solo_commands
@@ -1497,6 +1512,16 @@ def _add_solo_parser(subparsers):
     launch.add_argument("--all", action="store_true", help="launch every configured solo player")
     launch.add_argument("--project", default=None, help="launch every solo player of this project")
     launch.set_defaults(handler=_handle_solo_launch)
+
+    stop = actions.add_parser("stop", help="stop and pause solo players (human terminal only)")
+    resume = actions.add_parser("resume", help="resume paused solo players (human terminal only)")
+    for parser_, verb in ((stop, "stop"), (resume, "resume")):
+        parser_.add_argument("repo", nargs="?", default=None, help="repo of the solo player, owner/name")
+        parser_.add_argument("job", nargs="?", default=None, help="solo player job: red-main or dependabot")
+        parser_.add_argument("--all", action="store_true", help="{} every configured solo player".format(verb))
+        parser_.add_argument("--project", default=None, help="{} every solo player of this project".format(verb))
+    stop.set_defaults(handler=_handle_solo_stop)
+    resume.set_defaults(handler=_handle_solo_resume)
 
     tick = actions.add_parser("tick", help="launch every due solo player (background job, human terminal only)")
     tick.set_defaults(handler=_handle_solo_tick)

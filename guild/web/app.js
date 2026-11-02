@@ -2030,7 +2030,7 @@ realmDoctorLines: [],
     article.className = "card solo-player";
     article.appendChild(textEl("h3", player.name));
     article.appendChild(classedText("p", soloPlayerMeta(player), "muted"));
-    if (player.state === "due" || player.state === "idle") {
+    if (player.state === "due" || player.state === "idle" || player.state === "paused") {
       article.appendChild(classedText("code", player.launch, "launch-command"));
     }
     if (player.runs.length > 0) {

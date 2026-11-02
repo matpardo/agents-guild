@@ -449,6 +449,20 @@ class SoloPlayersLaunchTests(SoloPlayersTestCase):
         self.assertEqual(call[call.index("-c") + 1], str(self.project_dir))
         self.assertTrue(call[-1].startswith("GUILD_ADVENTURER_JOB=red-main-acme-app claude "))
 
+    def test_launch_finds_the_player_from_a_cwd_outside_any_project(self):
+        outside = self.project_dir.parent / "elsewhere"
+        outside.mkdir()
+        tmux = FakeTmux(True, [], [])
+        with mock.patch("guild.tmux_windows.Tmux", return_value=tmux):
+            code, out, err = self.run_cli(["solo", "launch", "acme/app", "red-main"], None, outside)
+        self.assertEqual(code, 0, err)
+        self.assertIn("new-session", tmux.verbs())
+
+    def test_launch_unknown_player_says_no_solo_player(self):
+        code, out, err = self.launch(["solo", "launch", "other/app", "red-main"], None, FakeTmux(True, [], []))
+        self.assertEqual(code, 1)
+        self.assertIn("no solo player 'red-main' on 'other/app'", err)
+
     def test_launch_refuses_inside_a_session(self):
         tmux = FakeTmux(True, [], [])
         code, out, err = self.launch(["solo", "launch", "acme/app", "red-main"], "sess-1", tmux)
@@ -460,6 +474,147 @@ class SoloPlayersLaunchTests(SoloPlayersTestCase):
         tmux = FakeTmux(True, ["guild"], ["solo-red-main-acme-app"])
         self.assertEqual(self.launch(["solo", "launch", "acme/app", "red-main"], None, tmux)[0], 1)
         self.assertNotIn("new-window", tmux.verbs())
+
+
+class SoloPlayersPauseTests(SoloPlayersTestCase):
+    WINDOW = "solo-red-main-acme-app"
+
+    def run_solo(self, argv, tmux, session_id=None):
+        with mock.patch("guild.tmux_windows.Tmux", return_value=tmux):
+            return self.cli(["solo"] + argv, session_id)
+
+    def state(self, job="red-main"):
+        return self.players()[("acme/app", job)]["state"]
+
+    def adventurer_states(self):
+        return [row["state"] for row in self.db().execute("SELECT state FROM adventurers ORDER BY id").fetchall()]
+
+    def test_stop_running_player_kills_window_dismisses_adventurer_and_pauses(self):
+        self.start_player("red-main-acme-app", "adv-1")
+        tmux = KillingTmux(True, ["guild"], [self.WINDOW], 0)
+        with mock.patch("guild.session_info.live_session_ids", return_value={"adv-1"}):
+            code, out, err = self.run_solo(["stop", "acme/app", "red-main"], tmux)
+        self.assertEqual(code, 0, err)
+        self.assertEqual(out.strip(), "mender stopped")
+        self.assertEqual(tmux.killed, ["guild:=" + self.WINDOW])
+        self.assertEqual(self.adventurer_states(), ["dismissed"])
+        self.assertEqual(self.state(), "paused")
+        self.assertIn("mender stopped by the human", self.channel_texts())
+
+    def test_stop_stalled_player_dismisses_adventurer_and_pauses(self):
+        self.start_player("red-main-acme-app", "adv-1")
+        tmux = KillingTmux(True, [], [], 1)
+        code, out, err = self.run_solo(["stop", "acme/app", "red-main"], tmux)
+        self.assertEqual(code, 0, err)
+        self.assertEqual(out.strip(), "mender stopped")
+        self.assertEqual(self.adventurer_states(), ["dismissed"])
+        self.assertEqual(self.state(), "paused")
+
+    def test_stop_idle_player_only_pauses(self):
+        tmux = KillingTmux(True, ["guild"], [self.WINDOW], 0)
+        code, out, err = self.run_solo(["stop", "acme/app", "red-main"], tmux)
+        self.assertEqual(code, 0, err)
+        self.assertEqual(out.strip(), "mender paused")
+        self.assertEqual(tmux.killed, [])
+        self.assertEqual(self.state(), "paused")
+        self.assertIn("mender paused", self.channel_texts())
+
+    def test_stop_without_scope_is_refused(self):
+        code, out, err = self.run_solo(["stop"], FakeTmux(True, [], []))
+        self.assertEqual(code, 1)
+        self.assertEqual(self.state(), "idle")
+
+    def test_stop_rejects_mixed_scopes_and_unknown_targets(self):
+        tmux = FakeTmux(True, [], [])
+        self.assertEqual(self.run_solo(["stop", "--all", "--project", "acme"], tmux)[0], 1)
+        self.assertEqual(self.run_solo(["stop", "--project", "nope"], tmux)[0], 1)
+        self.assertEqual(self.run_solo(["stop", "acme/app", "nope"], tmux)[0], 1)
+        self.assertEqual(self.state(), "idle")
+
+    def test_stop_already_paused_player(self):
+        self.run_solo(["stop", "acme/app", "red-main"], FakeTmux(True, [], []))
+        out = self.run_solo(["stop", "acme/app", "red-main"], FakeTmux(True, [], []))[1]
+        self.assertEqual(out.strip(), "mender already paused")
+
+    def test_stop_all_and_project_print_one_line_per_player(self):
+        for argv in (["stop", "--all"], ["stop", "--project", "acme"]):
+            self.cli(["solo", "resume", "--all"], None)
+            out = self.run_solo(argv, FakeTmux(True, [], []))[1]
+            self.assertEqual(sorted(out.splitlines()), ["dependabot paused", "mender paused"])
+
+    def test_stop_continues_after_a_player_error(self):
+        self.start_player("red-main-acme-app", "adv-1")
+        tmux = KillingTmux(True, ["guild"], [self.WINDOW], 0)
+        with (
+            mock.patch("guild.session_info.live_session_ids", return_value={"adv-1"}),
+            mock.patch("guild.commands.adventurer.dismiss_stopped", side_effect=GuildError("boom", 1)),
+        ):
+            out = self.run_solo(["stop", "--all"], tmux)[1]
+        self.assertIn("mender not stopped: boom", out)
+        self.assertIn("dependabot paused", out)
+
+    def test_resume_unpauses_and_posts(self):
+        self.run_solo(["stop", "acme/app", "red-main"], FakeTmux(True, [], []))
+        code, out, err = self.cli(["solo", "resume", "acme/app", "red-main"], None)
+        self.assertEqual(code, 0, err)
+        self.assertEqual(out.strip(), "mender resumed")
+        self.assertEqual(self.state(), "idle")
+        self.assertIn("mender resumed", self.channel_texts())
+
+    def test_resume_not_paused(self):
+        out = self.cli(["solo", "resume", "acme/app", "red-main"], None)[1]
+        self.assertEqual(out.strip(), "mender not paused")
+
+    def test_resume_requires_a_scope_and_accepts_all_and_project(self):
+        self.assertEqual(self.cli(["solo", "resume"], None)[0], 1)
+        self.run_solo(["stop", "--all"], FakeTmux(True, [], []))
+        out = self.cli(["solo", "resume", "--project", "acme"], None)[1]
+        self.assertEqual(sorted(out.splitlines()), ["dependabot resumed", "mender resumed"])
+        self.assertEqual(self.cli(["solo", "resume", "--all"], None)[1].count("not paused"), 2)
+
+    def test_stop_and_resume_refuse_inside_a_session(self):
+        tmux = FakeTmux(True, [], [])
+        self.assertEqual(self.run_solo(["stop", "--all"], tmux, "sess-1")[0], 1)
+        self.assertEqual(self.cli(["solo", "resume", "--all"], "sess-1")[0], 1)
+        self.assertEqual(self.state(), "idle")
+
+    def test_a_paused_player_is_never_due_and_tick_skips_it(self):
+        self.red("ci down")
+        self.assertEqual(self.state(), "due")
+        self.run_solo(["stop", "acme/app", "red-main"], FakeTmux(True, [], []))
+        self.assertEqual(self.state(), "paused")
+        tmux = FakeTmux(True, [], [])
+        self.run_solo(["tick"], tmux)
+        self.assertNotIn("new-session", tmux.verbs())
+
+    def test_launch_skips_a_paused_player(self):
+        self.run_solo(["stop", "--all"], FakeTmux(True, [], []))
+        tmux = FakeTmux(True, [], [])
+        code, out, err = self.run_solo(["launch", "acme/app", "red-main"], tmux)
+        self.assertEqual(code, 1)
+        self.assertIn("mender skipped: paused, run guild solo resume acme/app red-main", err)
+        for argv in (["launch", "--all"], ["launch", "--project", "acme"]):
+            out = self.run_solo(argv, tmux)[1]
+            self.assertIn("mender skipped: paused, run guild solo resume acme/app red-main", out)
+        self.assertEqual(tmux.verbs(), [])
+
+    def test_paused_row_carries_the_resume_command(self):
+        self.run_solo(["stop", "acme/app", "red-main"], FakeTmux(True, [], []))
+        self.assertEqual(self.players()[("acme/app", "red-main")]["launch"], "guild solo resume acme/app red-main")
+        self.assertIn("guild solo resume acme/app red-main", self.cli(["board"], None)[1])
+
+    def test_rebuild_keeps_pauses_and_resumes(self):
+        self.run_solo(["stop", "--all"], FakeTmux(True, [], []))
+        self.cli(["solo", "resume", "acme/app", "dependabot"], None)
+        self.assertEqual(self.cli(["rebuild"], None)[0], 0)
+        self.assertEqual(self.state(), "paused")
+        self.assertEqual(self.state("dependabot"), "idle")
+        rows = self.db().execute("SELECT health_job FROM solo_pauses").fetchall()
+        self.assertEqual([row["health_job"] for row in rows], ["red-main-acme-app"])
+
+    def test_payloads_require_repo_and_job(self):
+        self.assertEqual(reducers.required_keys("solo.paused"), ("repo", "job"))
+        self.assertEqual(reducers.required_keys("solo.resumed"), ("repo", "job"))
 
 
 class SoloPlayersTickTests(SoloPlayersTestCase):
