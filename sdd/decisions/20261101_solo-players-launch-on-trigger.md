@@ -12,7 +12,7 @@ Health jobs only launch by hand: the board says a job is due and the human runs 
 Decisión del dev, 2026-11-01: guild ships built-in per-repo solo players, `red-main` and `dependabot`, declared in the project config key `solo_players`. The sync detects their triggers (a red main, an unmergeable Dependabot PR, a failing Dependabot update run). They launch on trigger: the ticker of `guild web`, the hooks and `pr wait` spawn `guild solo tick` every 10 minutes, and it opens a window for each due player. Guards:
 
 - opt-in config per repo, absent means nothing;
-- one window per job;
+- one window per job: the tick closes the leftover window of a `due` player before launching it;
 - one active adventurer per job;
 - a 1h cooldown after a report;
 - a 24h cooldown instead of 1h when the trigger text equals the one of the last launch;
