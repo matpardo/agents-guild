@@ -154,3 +154,16 @@ updated: 2026-11-01
 - [x] Each player prints one line: launched, skipped (running or stalled with the dismiss hint) or not launched with the error; a failure does not stop the rest.
 - [x] An unknown project is an error.
 - [x] Each launch posts the channel started message.
+
+## T14 — Group solo players by project
+
+**Depends on:** T13
+**Status:** [x] done
+
+**What:** solo players and their channel are grouped by project. Each `solo_channel` item of the board JSON carries `project`. The web side menu lists a sub-item `<project> (n)` under "solo players (N)" for each project with players; `#solo-players` renders one block per project and `#solo-players/<project>` only that block. `guild solo list` and `guild solo channel` group their output under a project header and take an optional `--project` filter; the text board groups the same way.
+
+**Acceptance:**
+- [x] Sub-items exist only for projects with at least one player and link to `#solo-players/<project>`.
+- [x] The all view shows a block per project with its own channel and "no messages yet" when empty; the project view shows only its block.
+- [x] `solo list --project` and `solo channel --project` filter, and an unknown project is an error.
+- [x] The text board shows a project header under SOLO PLAYERS.

@@ -22,11 +22,28 @@ def format_row(row):
     )
 
 
-def list_players(ctx):
-    rows = _player_rows(ctx)
+def _require_known_project(ctx, project):
+    if project is not None and project not in _projects_by_name(ctx):
+        raise GuildError("unknown project '{}'".format(project), 1)
+
+
+def _grouped_lines(items, format_item):
+    groups = {}
+    for item in items:
+        groups.setdefault(item["project"], []).append(item)
+    lines = []
+    for project in sorted(groups):
+        lines.append(project)
+        lines.extend(format_item(item) for item in groups[project])
+    return lines
+
+
+def list_players(ctx, project):
+    _require_known_project(ctx, project)
+    rows = [row for row in _player_rows(ctx) if project is None or row["project"] == project]
     if not rows:
         return "no solo players"
-    return "\n".join(format_row(row) for row in rows)
+    return "\n".join(_grouped_lines(rows, format_row))
 
 
 def _find_player(project_data, repo, job_name):
@@ -104,11 +121,8 @@ def _launch_line(ctx, row, tmux):
 
 
 def _launch_all(ctx, project, tmux):
-    rows = _player_rows(ctx)
-    if project is not None:
-        if project not in _projects_by_name(ctx):
-            raise GuildError("unknown project '{}'".format(project), 1)
-        rows = [row for row in rows if row["project"] == project]
+    _require_known_project(ctx, project)
+    rows = [row for row in _player_rows(ctx) if project is None or row["project"] == project]
     if not rows:
         return "no solo players"
     return "\n".join(_launch_line(ctx, row, tmux) for row in rows)
@@ -182,11 +196,14 @@ def _projects_by_name(ctx):
     return {project["name"]: project for project in config.load_all_projects(ctx.projects_dir)}
 
 
-def channel(ctx, limit):
-    messages = solo_channel.latest(ctx.conn, _projects_by_name(ctx), limit)
+def channel(ctx, limit, project):
+    _require_known_project(ctx, project)
+    messages = solo_channel.latest(ctx.conn, _projects_by_name(ctx), project, limit)
     if not messages:
         return "no messages"
-    return "\n".join("  {} {} [{}] {}".format(m["ts"], m["name"], m["class"], m["text"]) for m in messages)
+    return "\n".join(
+        _grouped_lines(messages, lambda m: "  {} {} [{}] {}".format(m["ts"], m["name"], m["class"], m["text"]))
+    )
 
 
 def _format_run(run):

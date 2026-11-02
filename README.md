@@ -207,11 +207,11 @@ guild adventurer launch <name>                          # human terminal only: t
 guild adventurer done --pending "<text>"                # ends it; `--pending none` is the explicit empty report
 guild adventurer dismiss <id>                           # removes a done adventurer, or an active one whose session is gone, from the board
 guild adventurers [<id>]                                # active ones, then recent done ones; <id> shows one in full
-guild solo list                                         # solo players of the project config with trigger and state
+guild solo list [--project <name>]                     # solo players of the project config with trigger and state
 guild solo launch <owner/repo> <job> | --all | --project <name>  # human terminal only: tmux window running a solo player, due or not
 guild solo tick                                         # background job: launch every due solo player (human terminal only)
 guild solo say "<text>"                                 # solo player session only: post an important message to the channel (max 300 chars)
-guild solo channel [--limit N]                          # latest solo channel messages, newest first (default 20)
+guild solo channel [--limit N] [--project <name>]     # latest solo channel messages, newest first (default 20)
 guild solo runs <owner/repo> <job>                      # last runs of a solo player: start, state, duration, pending
 
 guild claim <area> --ttl <dur>          # area, or task:<epic>/<tid> / task:<quest>/<tid>
@@ -1504,7 +1504,7 @@ finished: <pending>` when its adventurer ends, and what the player posts with
 adventurer of a solo player, strips control sequences and refuses empty text
 or text over 300 characters. `guild solo channel --limit N` prints the latest
 messages newest first. The web shows the latest 20 as a read-only feed at the
-top of the solo players section (the board JSON key `solo_channel`).
+top of the solo players section (the board JSON key `solo_channel`). Every item carries its `project`. `guild solo list` and `guild solo channel` group by project and take `--project <name>` to show one; the text board groups the same way.
 `guild solo runs <owner/repo> <job>` prints the last runs of a player, read
 from its adventurers: start time, `running`, `stalled` or `done`, duration and
 pending report. The web lists the last 5 per player under a collapsible
@@ -1556,7 +1556,7 @@ after updating guild.
 sidebar sits above the pane. The sidebar links to the views, kept in the URL hash so a
 reload or the 10-second refresh keeps them: `#needs-you` (default: open asks, ready for
 you, answered asks), `#party/<name>`, `#raid/<name>` (asks, merge queue, tasks per day, parties, memory),
-`#adventurers` (adventurers and health jobs), `#solo-players` (solo players, channel and runs), `#ideas`, `#quests` (quest board) and
+`#adventurers` (adventurers and health jobs), `#solo-players` (solo players, channel and runs, one block per project; `#solo-players/<project>` shows one project, with a sub-item per project in the side menu), `#ideas`, `#quests` (quest board) and
 `#overview` (notices, raids, drift, projects). It lists parties grouped by raid (a party in
 two raids shows under both) and a `solo` group for parties outside raids, with counts for
 asks, ready PRs, blocked and context-high parties (a count above zero is a pill coloured by

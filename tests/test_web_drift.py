@@ -87,12 +87,16 @@ def _view_hash(party_filter, raid_filter):
 
 
 def _render(board, party_filter, raid_filter, out_id, mode):
+    return _render_at(board, _view_hash(party_filter, raid_filter), out_id, mode)
+
+
+def _render_at(board, view_hash, out_id, mode):
     return node_harness.request(
         _HARNESS_NAME,
         {
             "src": str(_APP_JS_PATH),
             "data": board,
-            "hash": _view_hash(party_filter, raid_filter),
+            "hash": view_hash,
             "outId": out_id,
             "mode": mode,
         },
@@ -491,7 +495,13 @@ class WebSoloPlayerBehaviorTests(unittest.TestCase):
         return _render(dict(_BOARD, solo_players=players, solo_channel=channel), "all", "all", "solo-players", "text")
 
     def test_channel_feed_shows_time_name_class_and_text(self):
-        message = {"ts": "2026-11-02T09:30:00+00:00", "name": "mender", "class": "cleric", "text": "fix PR ready"}
+        message = {
+            "ts": "2026-11-02T09:30:00+00:00",
+            "name": "mender",
+            "class": "cleric",
+            "project": "acme",
+            "text": "fix PR ready",
+        }
         out = self._channel_text([message], [_solo_player()])
         for expected in ("mender", "cleric", "fix PR ready"):
             self.assertIn(expected, out)
@@ -502,11 +512,11 @@ class WebSoloPlayerBehaviorTests(unittest.TestCase):
         self.assertIn("no messages yet", out)
 
     def test_filled_channel_has_no_placeholder(self):
-        message = {"ts": "2026-11-02T09:30:00+00:00", "name": "mender", "class": "", "text": "hi"}
+        message = {"ts": "2026-11-02T09:30:00+00:00", "name": "mender", "class": "", "project": "acme", "text": "hi"}
         self.assertNotIn("no messages yet", self._channel_text([message], [_solo_player()]))
 
     def test_dates_use_the_short_local_format(self):
-        message = {"ts": "2026-11-02T09:30:00+00:00", "name": "mender", "class": "", "text": "hi"}
+        message = {"ts": "2026-11-02T09:30:00+00:00", "name": "mender", "class": "", "project": "acme", "text": "hi"}
         run = {
             "started_at": "2026-11-02T08:00:00+00:00",
             "done_at": None,
@@ -523,14 +533,20 @@ class WebSoloPlayerBehaviorTests(unittest.TestCase):
         self.assertGreaterEqual(len(re.findall(r"\d{4}-\d{2}-\d{2} \d{2}:\d{2}", out)), 4)
 
     def test_channel_text_stays_literal(self):
-        message = {"ts": "t", "name": "mender", "class": "cleric", "text": "<img src=x onerror=alert(1)>"}
+        message = {
+            "ts": "t",
+            "name": "mender",
+            "class": "cleric",
+            "project": "acme",
+            "text": "<img src=x onerror=alert(1)>",
+        }
         board = dict(_BOARD, solo_players=[_solo_player()], solo_channel=[message])
         tree = _render(board, "all", "all", "solo-players", "tree")
         self.assertIn("<img src=x onerror=alert(1)>", tree)
         self.assertNotIn('"tag":"img"', tree)
 
     def test_channel_has_no_input(self):
-        message = {"ts": "t", "name": "mender", "class": "cleric", "text": "hi"}
+        message = {"ts": "t", "name": "mender", "class": "cleric", "project": "acme", "text": "hi"}
         board = dict(_BOARD, solo_players=[_solo_player()], solo_channel=[message])
         tree = _render(board, "all", "all", "solo-players", "tree")
         self.assertNotIn('"tag":"input"', tree)
@@ -569,6 +585,68 @@ class WebSoloPlayerBehaviorTests(unittest.TestCase):
 
     def test_players_survive_the_party_filter(self):
         self.assertIn("mender", self._text([_solo_player()], "a"))
+
+
+def _two_project_board():
+    players = [
+        _solo_player(project="acme", name="mender"),
+        _solo_player(project="acme", name="dep", job="dependabot"),
+        _solo_player(project="zeta", name="zed", repo="zeta/app"),
+    ]
+    channel = [
+        {"ts": "t", "name": "zed", "class": "", "text": "zeta said", "project": "zeta"},
+        {"ts": "t", "name": "mender", "class": "", "text": "acme said", "project": "acme"},
+    ]
+    return dict(_BOARD, solo_players=players, solo_channel=channel, project_names=["acme", "idle", "zeta"])
+
+
+@unittest.skipIf(shutil.which("node") is None, "node not installed")
+class WebSoloByProjectTests(unittest.TestCase):
+    def _text(self, view_hash):
+        return _render_at(_two_project_board(), view_hash, "solo-players", "text")
+
+    def test_all_view_renders_a_block_per_project(self):
+        out = self._text("#solo-players")
+        for expected in ("acme", "zeta", "acme said", "zeta said", "mender", "zed"):
+            self.assertIn(expected, out)
+        self.assertLess(out.index("acme said"), out.index("zeta said"))
+
+    def test_project_view_renders_only_that_project(self):
+        out = self._text("#solo-players/zeta")
+        self.assertIn("zeta said", out)
+        self.assertIn("zed", out)
+        self.assertNotIn("acme said", out)
+        self.assertNotIn("mender", out)
+
+    def test_project_without_messages_shows_the_placeholder(self):
+        board = _two_project_board()
+        board["solo_channel"] = [message for message in board["solo_channel"] if message["project"] == "zeta"]
+        out = _render_at(board, "#solo-players/acme", "solo-players", "text")
+        self.assertIn("no messages yet", out)
+        self.assertNotIn("zeta said", out)
+
+    def test_sidebar_lists_only_projects_with_players(self):
+        tree = _render_at(_two_project_board(), "#solo-players", "sidebar", "tree")
+        text = _render_at(_two_project_board(), "#solo-players", "sidebar", "text")
+        self.assertIn("solo players (3)", text)
+        self.assertIn("acme (2)", text)
+        self.assertIn("zeta (1)", text)
+        self.assertNotIn("idle (", text)
+        self.assertIn(
+            '"tag":"a","className":"","type":"","value":"all","placeholder":"","title":"","text":"acme (2)"', tree
+        )
+
+    def test_project_view_shows_the_solo_players_section(self):
+        hidden = json.loads(_render_at(_two_project_board(), "#solo-players/acme", "x", "hidden"))
+        self.assertNotIn("solo-players", hidden)
+        self.assertIn("adventurers", hidden)
+
+    def test_project_text_stays_literal(self):
+        board = _two_project_board()
+        board["solo_channel"][0]["text"] = "<img src=x onerror=alert(1)>"
+        tree = _render_at(board, "#solo-players", "solo-players", "tree")
+        self.assertIn("<img src=x onerror=alert(1)>", tree)
+        self.assertNotIn('"tag":"img"', tree)
 
 
 @unittest.skipIf(shutil.which("node") is None, "node not installed")
