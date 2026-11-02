@@ -14,6 +14,8 @@ from guild import (
     notices,
     paths,
     raid_members,
+    sanitize,
+    solo_channel,
     timeutil,
     trace_validator,
 )
@@ -28,6 +30,8 @@ from guild.errors import GuildError
 _SDD_PATTERN_KEYS = ("task_heading", "key_ref", "deps_line", "status_line")
 _SDD_OPTIONAL_PATTERN_KEYS = ("order_list", "key_line")
 
+_READY_CHECK_RESULTS = ("SUCCESS", "NEUTRAL", "SKIPPED")
+_ANNOUNCE_TITLE_MAX = 120
 _FAILING_CONCLUSIONS = ("FAILURE", "CANCELLED", "TIMED_OUT", "ACTION_REQUIRED")
 _SUCCESS_CONCLUSION = "SUCCESS"
 _CHECK_RUN_COMPLETED_STATUS = "COMPLETED"
@@ -609,6 +613,39 @@ def _recorded_dependabot_status(ctx, repo):
     return row["unmergeable"], bool(row["run_failed"])
 
 
+def _pr_ready(pr):
+    if pr["mergeable"] != "MERGEABLE" or pr["mergeStateStatus"] != "CLEAN" or not pr["statusCheckRollup"]:
+        return False
+    return all(
+        (check.get("conclusion") or check.get("state")) in _READY_CHECK_RESULTS for check in pr["statusCheckRollup"]
+    )
+
+
+def _announce_ready_prs(ctx, project, repo, prs):
+    player = {"repo": repo, "job": "dependabot"}
+    for pr in prs:
+        if not _pr_ready(pr):
+            continue
+        key = (repo, pr["number"])
+        if ctx.conn.execute("SELECT 1 FROM dependabot_announced WHERE repo = ? AND number = ?", key).fetchone():
+            continue
+        title = sanitize.collapse_to_single_line(sanitize.strip_control_sequences(pr["title"]))[:_ANNOUNCE_TITLE_MAX]
+        text = "{}#{} ready to merge: {}".format(repo, pr["number"], title)
+        with db.writing(ctx.conn):
+            solo_channel.post(ctx.conn, ctx.now, ctx.origin, ctx.session_id, project["name"], player, text)
+            events.record(
+                ctx.conn,
+                ctx.now,
+                ctx.origin,
+                None,
+                ctx.session_id,
+                project["name"],
+                "dependabot.announced",
+                "guild",
+                {"repo": repo, "number": pr["number"]},
+            )
+
+
 def _sync_repo_dependabot(ctx, project, repo, failures):
     try:
         prs = github.dependabot_prs(ctx.cwd, repo)
@@ -616,6 +653,7 @@ def _sync_repo_dependabot(ctx, project, repo, failures):
     except github.GhCommandError as error:
         failures.append("{}: dependabot check failed: {}".format(repo, error))
         return
+    _announce_ready_prs(ctx, project, repo, prs)
     unmergeable = sum(1 for pr in prs if _pr_unmergeable(pr))
     run_failed = _update_run_failed(runs)
     if _recorded_dependabot_status(ctx, repo) == (unmergeable, run_failed):

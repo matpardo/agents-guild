@@ -22,6 +22,7 @@ PROJECTION_TABLES = (
     "merge_queue_pins",
     "main_status",
     "dependabot_status",
+    "dependabot_announced",
     "solo_launches",
     "solo_messages",
     "solo_pauses",
@@ -303,6 +304,13 @@ _CREATE_STATEMENTS = (
         unmergeable INTEGER NOT NULL,
         run_failed INTEGER NOT NULL,
         updated_at TEXT NOT NULL
+    )
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS dependabot_announced (
+        repo TEXT NOT NULL,
+        number INTEGER NOT NULL,
+        PRIMARY KEY (repo, number)
     )
     """,
     """

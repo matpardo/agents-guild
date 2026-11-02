@@ -205,3 +205,15 @@ updated: 2026-11-02
 - [x] Stop and resume with no scope are an error; inside a session both are refused.
 - [x] The tick and every launch form skip a paused player; the row carries the resume command.
 - [x] A rebuild keeps pauses and resumes.
+
+## T18 — Announce green Dependabot PRs
+
+**Depends on:** T17
+**Status:** [x] done
+
+**What:** `guild sync --source gh` posts `<repo>#<n> ready to merge: <title>` in the solo players channel, as the repo's `dependabot` player, for each open Dependabot PR that is mergeable, clean and has only SUCCESS, NEUTRAL or SKIPPED checks (at least one). Once per PR: the `dependabot.announced` event, posted in the same transaction as the message. The built-in Dependabot prompt no longer posts the ready message.
+
+**Acceptance:**
+- [x] A ready PR is announced once; not mergeable, failing, pending, unknown or check-less PRs are not.
+- [x] A repo without a `dependabot` player is not announced.
+- [x] A rebuild keeps the announcements.

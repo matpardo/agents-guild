@@ -1445,6 +1445,13 @@ Triggers come from facts the sync stores:
   Dependabot update run (runs with event `dynamic`, the latest completed run
   per ecosystem). It records `dependabot.synced` only when the counts change.
 
+`guild sync --source gh` also announces each open Dependabot PR that is ready
+(mergeable, merge state clean, at least one check and all of them SUCCESS,
+NEUTRAL or SKIPPED) once in the solo players channel, posted by guild as the
+`dependabot` player (`<repo>#<n> ready to merge: <title>`, no session is
+launched). It records `dependabot.announced`, so a PR that breaks and turns
+green again is not announced twice.
+
 A solo player is `running` while an adventurer on its health job is active and
 its session is alive, `stalled` when that adventurer is active but its session is
 gone (crash, closed window, usage limit; the row reads `stalled: session gone,
