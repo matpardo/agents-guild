@@ -272,12 +272,19 @@ class WebViewBehaviorTests(unittest.TestCase):
 
     def test_sidebar_counts(self):
         board = dict(
-            _VIEWS_BOARD, ideas=[{}, {}], adventurers=[{"state": "active"}, {"state": "done"}], new_notice_count=3
+            _VIEWS_BOARD,
+            ideas=[{}, {}],
+            adventurers=[{"state": "active"}, {"state": "done"}],
+            solo_players=[{}, {}],
+            new_notice_count=3,
         )
         text = _render(board, "", "sidebar", "text")
         self.assertIn("ideas (2)", text)
         self.assertIn("adventurers (1)", text)
+        self.assertIn("solo players (2)", text)
         self.assertIn("overview (3 new)", text)
+        self.assertLess(text.index("adventurers (1)"), text.index("solo players (2)"))
+        self.assertLess(text.index("solo players (2)"), text.index("ideas (2)"))
 
     def test_needs_you_counts_above_zero_are_pills_by_type(self):
         board = dict(_VIEWS_BOARD, asks=[{"party": "a"}], ready_for_you=[], blocked=[{}, {}])
@@ -306,7 +313,8 @@ class WebViewBehaviorTests(unittest.TestCase):
 
     def test_other_views_hide_their_complement(self):
         shown = {
-            "#adventurers": {"adventurers", "health-jobs", "solo-players"},
+            "#adventurers": {"adventurers", "health-jobs"},
+            "#solo-players": {"solo-players"},
             "#ideas": {"ideas"},
             "#quests": {"quest-board"},
             "#overview": {"notices", "raids", "drift", "projects", "realm"},
