@@ -587,6 +587,13 @@ class WebSoloPlayerBehaviorTests(unittest.TestCase):
         self.assertIn("mender", self._text([_solo_player()], "a"))
 
 
+def _walk_tree(node):
+    nodes = [node]
+    for child in node["children"]:
+        nodes.extend(_walk_tree(child))
+    return nodes
+
+
 def _two_project_board():
     players = [
         _solo_player(project="acme", name="mender"),
@@ -605,11 +612,45 @@ class WebSoloByProjectTests(unittest.TestCase):
     def _text(self, view_hash):
         return _render_at(_two_project_board(), view_hash, "solo-players", "text")
 
-    def test_all_view_renders_a_block_per_project(self):
+    def test_bare_view_selects_the_first_project_alphabetically(self):
         out = self._text("#solo-players")
-        for expected in ("acme", "zeta", "acme said", "zeta said", "mender", "zed"):
-            self.assertIn(expected, out)
-        self.assertLess(out.index("acme said"), out.index("zeta said"))
+        self.assertIn("acme said", out)
+        self.assertIn("mender", out)
+        self.assertNotIn("zeta said", out)
+        self.assertNotIn("zed", out)
+
+    def _tabs(self, view_hash, board):
+        tree = json.loads(_render_at(board, view_hash, "solo-players", "tree"))
+        nodes = _walk_tree(tree)
+        bar = [node for node in nodes if node["attrs"].get("role") == "tablist"]
+        self.assertEqual(len(bar), 1)
+        return [(tab["text"], tab["attrs"]["aria-selected"]) for tab in bar[0]["children"]]
+
+    def test_one_tab_per_project_with_the_current_selected(self):
+        self.assertEqual(self._tabs("#solo-players/zeta", _two_project_board()), [("acme", "false"), ("zeta", "true")])
+
+    def test_bare_view_marks_the_first_tab_selected(self):
+        self.assertEqual(self._tabs("#solo-players", _two_project_board()), [("acme", "true"), ("zeta", "false")])
+
+    def test_tab_bar_shows_with_a_single_project(self):
+        board = dict(_two_project_board(), solo_players=[_solo_player()])
+        self.assertEqual(self._tabs("#solo-players", board), [("acme", "true")])
+
+    def test_clicking_a_tab_sets_the_hash(self):
+        request = {
+            "src": str(_APP_JS_PATH),
+            "data": _two_project_board(),
+            "hash": "#solo-players",
+            "outId": "solo-players",
+            "mode": "hash",
+            "click": "zeta",
+        }
+        self.assertEqual(node_harness.request(_HARNESS_NAME, request), "#solo-players/zeta")
+
+    def test_channel_comes_after_the_players(self):
+        out = self._text("#solo-players/acme")
+        self.assertLess(out.index("mender"), out.index("channel"))
+        self.assertLess(out.index("channel"), out.index("acme said"))
 
     def test_project_view_renders_only_that_project(self):
         out = self._text("#solo-players/zeta")
@@ -624,6 +665,42 @@ class WebSoloByProjectTests(unittest.TestCase):
         out = _render_at(board, "#solo-players/acme", "solo-players", "text")
         self.assertIn("no messages yet", out)
         self.assertNotIn("zeta said", out)
+
+    def _solo_menu(self, view_hash):
+        tree = json.loads(_render_at(_two_project_board(), view_hash, "sidebar", "tree"))
+        menu = [node for node in _walk_tree(tree) if node["tag"] == "details"]
+        self.assertEqual(len(menu), 1)
+        return menu[0]
+
+    def test_solo_menu_is_collapsed_by_default(self):
+        menu = self._solo_menu("#solo-players")
+        self.assertFalse(menu["open"])
+        self.assertEqual(menu["children"][0]["tag"], "summary")
+        self.assertEqual(menu["children"][0]["children"][0]["text"], "solo players (3)")
+
+    def test_solo_menu_opens_when_the_hash_names_a_project(self):
+        self.assertTrue(self._solo_menu("#solo-players/zeta")["open"])
+
+    def _menu_open_after(self, steps):
+        request = {
+            "src": str(_APP_JS_PATH),
+            "data": _two_project_board(),
+            "hash": "#solo-players/acme",
+            "outId": "sidebar",
+            "mode": "tree",
+            "steps": steps,
+        }
+        tree = json.loads(node_harness.request(_HARNESS_NAME, request))
+        return [node for node in _walk_tree(tree) if node["tag"] == "details"][0]["open"]
+
+    def test_menu_opens_on_the_first_render_of_a_project_hash(self):
+        self.assertTrue(self._menu_open_after([]))
+
+    def test_closed_menu_stays_closed_on_a_poll_with_the_same_hash(self):
+        self.assertFalse(self._menu_open_after(["close-details", "poll"]))
+
+    def test_navigating_to_another_project_reopens_the_menu(self):
+        self.assertTrue(self._menu_open_after(["close-details", "poll", "#solo-players/zeta"]))
 
     def test_sidebar_lists_only_projects_with_players(self):
         tree = _render_at(_two_project_board(), "#solo-players", "sidebar", "tree")
@@ -644,7 +721,7 @@ class WebSoloByProjectTests(unittest.TestCase):
     def test_project_text_stays_literal(self):
         board = _two_project_board()
         board["solo_channel"][0]["text"] = "<img src=x onerror=alert(1)>"
-        tree = _render_at(board, "#solo-players", "solo-players", "tree")
+        tree = _render_at(board, "#solo-players/zeta", "solo-players", "tree")
         self.assertIn("<img src=x onerror=alert(1)>", tree)
         self.assertNotIn('"tag":"img"', tree)
 

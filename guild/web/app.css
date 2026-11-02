@@ -219,8 +219,21 @@ main {
   margin: 0.25rem 0;
 }
 
-#sidebar .sidebar-group ul {
+#sidebar .sidebar-group ul,
+#sidebar details ul {
   padding-left: 0.75rem;
+}
+
+.solo-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  margin-bottom: 0.5rem;
+}
+
+.solo-tabs button[aria-selected="true"] {
+  font-weight: bold;
+  text-decoration: underline;
 }
 
 #sidebar .sidebar-badges {

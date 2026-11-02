@@ -247,13 +247,19 @@ class WebViewBehaviorTests(unittest.TestCase):
     def test_raid_day_exists_when_any_member_existed(self):
         self.assertNotIn('"text": "x"', self._missing_day_tree("#raid/r").replace('":"', '": "'))
 
-    def test_sidebar_groups_parties_by_raid_then_solo(self):
+    def test_sidebar_puts_raids_then_parties_after_the_fixed_items(self):
         text = _render(_VIEWS_BOARD, "", "sidebar", "text")
         self.assertEqual(text.count("raid r"), 2)
+        self.assertLess(text.index("overview (0 new)"), text.index("raid r "))
         self.assertLess(text.index("raid r "), text.index("raid r2"))
-        self.assertLess(text.index("raid r2"), text.index("solo"))
-        self.assertLess(text.index("solo"), text.index("adventurers (0)"))
+        self.assertLess(text.index("raid r2"), text.index("parties"))
         self.assertEqual(text.count("paused"), 1)
+
+    def test_sidebar_has_a_parties_heading_and_no_solo_group_heading(self):
+        tree = json.loads(_render(_VIEWS_BOARD, "", "sidebar", "tree"))
+        headings = [node["text"] for node in _walk(tree, []) if node["tag"] == "h3"]
+        self.assertIn("parties", headings)
+        self.assertNotIn("solo", headings)
 
     def test_sidebar_lists_a_party_in_two_raids_twice_and_solo_once(self):
         tree = json.loads(_render(_VIEWS_BOARD, "", "sidebar", "tree"))
@@ -283,8 +289,9 @@ class WebViewBehaviorTests(unittest.TestCase):
         self.assertIn("adventurers (1)", text)
         self.assertIn("solo players (2)", text)
         self.assertIn("overview (3 new)", text)
-        self.assertLess(text.index("adventurers (1)"), text.index("solo players (2)"))
-        self.assertLess(text.index("solo players (2)"), text.index("ideas (2)"))
+        order = ["needs you", "adventurers (1)", "solo players (2)", "ideas (2)", "quest board", "overview (3 new)"]
+        positions = [text.index(label) for label in order]
+        self.assertEqual(positions, sorted(positions))
 
     def test_needs_you_counts_above_zero_are_pills_by_type(self):
         board = dict(_VIEWS_BOARD, asks=[{"party": "a"}], ready_for_you=[], blocked=[{}, {}])
