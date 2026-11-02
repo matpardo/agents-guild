@@ -710,6 +710,13 @@ def _dependabot_synced(conn, event):
     )
 
 
+def _dependabot_announced(conn, event):
+    payload = event["payload"]
+    conn.execute(
+        "INSERT OR IGNORE INTO dependabot_announced (repo, number) VALUES (?, ?)", (payload["repo"], payload["number"])
+    )
+
+
 def _solo_launched(conn, event):
     payload = event["payload"]
     conn.execute(
@@ -978,6 +985,7 @@ _REDUCERS = {
     "merge_queue.unpinned": _merge_queue_unpinned,
     "main.status_synced": _main_status_synced,
     "dependabot.synced": _dependabot_synced,
+    "dependabot.announced": _dependabot_announced,
     "solo.launched": _solo_launched,
     "solo.message": _solo_message,
     "solo.paused": _solo_paused,
@@ -1096,6 +1104,7 @@ _REQUIRED_KEYS = {
     "merge_queue.unpinned": ("first_repo", "first_number", "second_repo", "second_number"),
     "main.status_synced": ("repo", "red", "reason"),
     "dependabot.synced": ("repo", "unmergeable", "run_failed"),
+    "dependabot.announced": ("repo", "number"),
     "solo.launched": ("repo", "job"),
     "solo.message": ("repo", "job", "text"),
     "solo.paused": ("repo", "job"),

@@ -21,8 +21,8 @@ _DEPENDABOT_PROMPT = (
     " the PR branch (version strings, hashes, formatter output, a tool `required-version` bump) so the PR becomes"
     " mergeable. Also fix a failing Dependabot update run of {repo} through a normal PR. Never merge. Report what"
     ' still needs a human. Tell the dev only important things with `guild solo say "<text>"`, no routine'
-    ' progress: `guild solo say "{repo}#<n> ready to merge"` for each PR you leave mergeable and `guild solo say'
-    ' "{repo}#<n> needs a human: <why>"`. End with `guild adventurer done --pending "<text>"`.'
+    ' progress: `guild solo say "{repo}#<n> needs a human: <why>"`. Guild itself announces the PRs that turn green.'
+    ' End with `guild adventurer done --pending "<text>"`.'
 )
 JOBS = {
     "red-main": {"class": "cleric", "prompt": _RED_MAIN_PROMPT},

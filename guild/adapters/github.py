@@ -97,7 +97,7 @@ def dependabot_prs(cwd, repo):
             "--author",
             "app/dependabot",
             "--json",
-            "number,mergeable,mergeStateStatus,statusCheckRollup",
+            "number,title,mergeable,mergeStateStatus,statusCheckRollup",
         ],
         cwd=str(cwd),
         capture_output=True,

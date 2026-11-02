@@ -12,7 +12,14 @@ from tests.testutil import GuildTestCase
 _BASE = {"name": "acme", "paths": ["/tmp/acme/*"], "github": {"repos": ["acme/app", "other/app"]}}
 _RED = {"repo": "acme/app", "job": "red-main", "name": "mender"}
 _DEP = {"repo": "acme/app", "job": "dependabot"}
-_GREEN_PR = {"number": 1, "mergeable": "MERGEABLE", "mergeStateStatus": "CLEAN", "statusCheckRollup": []}
+_GREEN_PR = {
+    "number": 1,
+    "title": "Bump x",
+    "mergeable": "MERGEABLE",
+    "mergeStateStatus": "CLEAN",
+    "statusCheckRollup": [],
+}
+_READY_PR = dict(_GREEN_PR, statusCheckRollup=[{"conclusion": "SUCCESS"}, {"conclusion": "SKIPPED"}])
 
 
 def _with_players(players):
@@ -968,6 +975,90 @@ class DependabotSyncTests(SoloPlayersTestCase):
         self.sync()
         self.cli(["rebuild"], None)
         self.assertEqual(self.status(), [("acme/app", 1, 0)])
+
+
+class DependabotAnnounceTests(SoloPlayersTestCase):
+    def setUp(self):
+        super().setUp()
+        self.write_gh_fixture("dependabot_runs_acme-app", [])
+        self.prs([_READY_PR])
+
+    def prs(self, prs):
+        self.write_gh_fixture("dependabot_prs_acme-app", prs)
+
+    def sync(self):
+        return self.cli(["sync", "--source", "gh"], "sess-1")
+
+    def announced(self):
+        rows = self.db().execute("SELECT repo, number FROM dependabot_announced").fetchall()
+        return [tuple(row) for row in rows]
+
+    def test_ready_pr_is_announced_once_as_the_dependabot_player(self):
+        self.sync()
+        self.sync()
+        self.assertEqual(self.channel_texts(), ["acme/app#1 ready to merge: Bump x"])
+        self.assertEqual(self.announced(), [("acme/app", 1)])
+        row = self.db().execute("SELECT health_job FROM solo_messages").fetchone()
+        self.assertEqual(row["health_job"], "dependabot-acme-app")
+
+    def test_pr_not_ready_is_not_announced(self):
+        not_ready = [
+            dict(_READY_PR, number=2, mergeable="CONFLICTING"),
+            dict(_READY_PR, number=3, mergeable="UNKNOWN"),
+            dict(_READY_PR, number=4, mergeStateStatus="UNKNOWN"),
+            dict(_READY_PR, number=5, mergeStateStatus="BEHIND"),
+            dict(_READY_PR, number=6, statusCheckRollup=[{"conclusion": "SUCCESS"}, {"conclusion": "FAILURE"}]),
+            dict(_READY_PR, number=7, statusCheckRollup=[{"conclusion": ""}]),
+            dict(_READY_PR, number=8, statusCheckRollup=[{"state": "PENDING"}]),
+            dict(_READY_PR, number=9, statusCheckRollup=[]),
+        ]
+        self.prs(not_ready)
+        self.sync()
+        self.assertEqual(self.channel_texts(), [])
+        self.assertEqual(self.announced(), [])
+
+    def test_status_context_success_counts_as_green(self):
+        self.prs([dict(_READY_PR, statusCheckRollup=[{"state": "SUCCESS"}])])
+        self.sync()
+        self.assertEqual(len(self.channel_texts()), 1)
+
+    def test_pr_ready_again_after_breaking_is_not_reannounced(self):
+        self.sync()
+        self.prs([dict(_READY_PR, mergeable="CONFLICTING")])
+        self.sync()
+        self.prs([_READY_PR])
+        self.sync()
+        self.assertEqual(len(self.channel_texts()), 1)
+
+    def test_repo_without_a_dependabot_player_is_not_announced(self):
+        self.set_players([_RED])
+        self.sync()
+        self.assertEqual(self.channel_texts(), [])
+        self.assertEqual(self.announced(), [])
+
+    def test_title_is_stripped_and_capped(self):
+        self.prs([dict(_READY_PR, title="Bump \x1b[31mx\x1b[0m" + "y" * 400)])
+        self.sync()
+        text = self.channel_texts()[0]
+        self.assertNotIn("\x1b", text)
+        self.assertLessEqual(len(text), 300)
+
+    def test_rebuild_keeps_announcements(self):
+        self.sync()
+        self.cli(["rebuild"], None)
+        self.assertEqual(self.announced(), [("acme/app", 1)])
+        self.sync()
+        self.assertEqual(len(self.channel_texts()), 1)
+
+    def test_payload_requires_repo_and_number(self):
+        from guild import reducers
+
+        self.assertEqual(reducers._REQUIRED_KEYS["dependabot.announced"], ("repo", "number"))
+
+    def test_prompt_leaves_the_ready_announcement_to_guild(self):
+        prompt = solo_players.JOBS["dependabot"]["prompt"]
+        self.assertNotIn("ready to merge", prompt)
+        self.assertIn("needs a human", prompt)
 
 
 class SoloChannelTests(SoloPlayersTestCase):
