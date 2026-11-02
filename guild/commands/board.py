@@ -976,7 +976,11 @@ def _solo_player_lines(painter, projects_by_name, ctx):
     if not rows:
         return []
     lines = [painter.paint("SOLO PLAYERS · {}".format(len(rows)), "bold")]
+    shown_project = None
     for row in rows:
+        if row["project"] != shown_project:
+            shown_project = row["project"]
+            lines.append("  {}".format(shown_project))
         lines.append(
             "  {} [{}] {} {}{} {}".format(
                 row["name"],
@@ -1499,7 +1503,7 @@ def board_model(ctx):
         ],
         "health_jobs": health_jobs.models(ctx, projects_by_name),
         "solo_players": solo_players.models(ctx.conn, ctx.now, projects_by_name, live_ids),
-        "solo_channel": solo_channel.latest(ctx.conn, projects_by_name, solo_channel.BOARD_LIMIT),
+        "solo_channel": solo_channel.latest(ctx.conn, projects_by_name, None, solo_channel.BOARD_LIMIT),
         "memory": [
             _memory_item_model(item) for item in memory_commands.all_items(None) if item["party"] in live_party_names
         ],

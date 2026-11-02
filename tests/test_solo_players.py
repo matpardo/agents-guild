@@ -359,6 +359,18 @@ class SoloPlayersBoardTests(SoloPlayersTestCase):
         self.assertEqual(code, 0, err)
         self.assertIn("mender [cleric] acme/app red-main idle", out)
         self.assertIn("dependabot [artificer] acme/app dependabot idle", out)
+        self.assertEqual(out.splitlines()[0], "acme")
+
+    def test_solo_list_project_filter(self):
+        code, out, err = self.cli(["solo", "list", "--project", "acme"], None)
+        self.assertEqual(code, 0, err)
+        self.assertEqual(out.splitlines()[0], "acme")
+        self.assertEqual(self.cli(["solo", "list", "--project", "nope"], None)[0], 1)
+
+    def test_text_board_groups_players_under_a_project_header(self):
+        lines = self.cli(["board"], None)[1].splitlines()
+        start = next(index for index, line in enumerate(lines) if "SOLO PLAYERS" in line)
+        self.assertEqual(lines[start + 1].strip(), "acme")
 
     def test_solo_list_without_players(self):
         self.set_players([])
@@ -809,9 +821,19 @@ class SoloChannelTests(SoloPlayersTestCase):
         code, out, err = self.cli(["solo", "channel", "--limit", "2"], None)
         self.assertEqual(code, 0, err)
         lines = out.strip().splitlines()
-        self.assertEqual(len(lines), 2)
-        self.assertIn("mender [cleric] three", lines[0])
-        self.assertIn("mender [cleric] two", lines[1])
+        self.assertEqual(len(lines), 3)
+        self.assertIn("mender [cleric] three", lines[1])
+        self.assertIn("mender [cleric] two", lines[2])
+
+    def test_channel_groups_by_project_and_filters(self):
+        self.start_player("red-main-acme-app", "adv-1")
+        self.say("one", "adv-1")
+        out = self.cli(["solo", "channel", "--limit", "5"], None)[1].splitlines()
+        self.assertEqual(out[0], "acme")
+        self.assertIn("mender [cleric] one", out[1])
+        filtered = self.cli(["solo", "channel", "--limit", "5", "--project", "acme"], None)
+        self.assertEqual(filtered[1].splitlines(), out)
+        self.assertEqual(self.cli(["solo", "channel", "--limit", "5", "--project", "nope"], None)[0], 1)
 
     def test_empty_channel_says_so(self):
         self.assertIn("no messages", self.cli(["solo", "channel", "--limit", "5"], None)[1])
@@ -828,7 +850,7 @@ class SoloChannelTests(SoloPlayersTestCase):
         self.assertEqual(channel[0]["text"], "m24")
         self.assertEqual(
             sorted(channel[0]),
-            ["class", "name", "text", "ts"],
+            ["class", "name", "project", "text", "ts"],
         )
 
     def test_messages_survive_rebuild(self):

@@ -525,7 +525,7 @@ def _handle_adventurer_launch(ctx, args):
 def _handle_solo_list(ctx, args):
     from guild.commands import solo as solo_commands
 
-    _print(solo_commands.list_players(ctx))
+    _print(solo_commands.list_players(ctx, args.project))
     return 0
 
 
@@ -555,7 +555,7 @@ def _handle_solo_say(ctx, args):
 def _handle_solo_channel(ctx, args):
     from guild.commands import solo as solo_commands
 
-    _print(solo_commands.channel(ctx, args.limit))
+    _print(solo_commands.channel(ctx, args.limit, args.project))
     return 0
 
 
@@ -1475,6 +1475,7 @@ def _add_solo_parser(subparsers):
     actions = parser.add_subparsers(dest="solo_action", required=True, metavar="<subcommand>")
 
     list_ = actions.add_parser("list", help="print every solo player with its trigger and state")
+    list_.add_argument("--project", default=None, help="only the solo players of this project")
     list_.set_defaults(handler=_handle_solo_list)
 
     launch = actions.add_parser("launch", help="open a tmux window running a solo player (human terminal only)")
@@ -1493,6 +1494,7 @@ def _add_solo_parser(subparsers):
 
     channel = actions.add_parser("channel", help="print the latest solo player messages, newest first")
     channel.add_argument("--limit", type=int, default=20, help="how many messages to print (default 20)")
+    channel.add_argument("--project", default=None, help="only the messages of this project")
     channel.set_defaults(handler=_handle_solo_channel)
 
     runs = actions.add_parser("runs", help="print the recent runs of a solo player")

@@ -2065,19 +2065,55 @@ realmDoctorLines: [],
     return classedText("p", shortLocalDate(message.ts) + " \u00b7 " + who + " \u00b7 " + message.text, "solo-message");
   }
 
-  function renderSoloPlayers(players, channel) {
+  function soloProjectNames(players) {
+    var names = [];
+    players.forEach(function (player) {
+      if (names.indexOf(player.project) === -1) {
+        names.push(player.project);
+      }
+    });
+    return names.sort();
+  }
+
+  function renderSoloProject(project, players, channel) {
+    var block = el("div");
+    block.className = "solo-project";
+    block.appendChild(textEl("h3", project));
+    block.appendChild(textEl("h4", "channel"));
+    var messages = channel.filter(function (message) {
+      return message.project === project;
+    });
+    if (messages.length === 0) {
+      block.appendChild(classedText("p", "no messages yet", "muted"));
+    }
+    appendAll(block, messages.map(soloChannelLine));
+    appendAll(
+      block,
+      players
+        .filter(function (player) {
+          return player.project === project;
+        })
+        .map(renderSoloPlayer)
+    );
+    return block;
+  }
+
+  function renderSoloPlayers(players, channel, project) {
     var section = document.getElementById("solo-players");
     clear(section);
-    if (players.length === 0) {
+    var shown = players.filter(function (player) {
+      return project === "" || player.project === project;
+    });
+    if (shown.length === 0) {
       return;
     }
-    section.appendChild(textEl("h2", "solo players (" + players.length + ")"));
-    section.appendChild(textEl("h3", "channel"));
-    if (channel.length === 0) {
-      section.appendChild(classedText("p", "no messages yet", "muted"));
-    }
-    appendAll(section, channel.map(soloChannelLine));
-    appendAll(section, players.map(renderSoloPlayer));
+    section.appendChild(textEl("h2", "solo players (" + shown.length + ")"));
+    appendAll(
+      section,
+      soloProjectNames(shown).map(function (name) {
+        return renderSoloProject(name, shown, channel);
+      })
+    );
   }
 
   function renderMemoryItem(item) {
@@ -4025,7 +4061,7 @@ realmDoctorLines: [],
       return DEFAULT_VIEW;
     }
     var named = kind === "party" || kind === "raid";
-    if (named !== (name !== "")) {
+    if (kind !== "solo-players" && named !== (name !== "")) {
       return DEFAULT_VIEW;
     }
     return { kind: kind, name: name, hash: hash };
@@ -4120,6 +4156,14 @@ realmDoctorLines: [],
         return adventurer.state === "active";
       }).length,
       soloPlayers: data.solo_players.length,
+      soloProjects: soloProjectNames(data.solo_players).map(function (name) {
+        return {
+          name: name,
+          count: data.solo_players.filter(function (player) {
+            return player.project === name;
+          }).length,
+        };
+      }),
       ideas: data.ideas.length,
       openQuests: data.quest_boards.reduce(function (total, project) {
         return total + project.open_quests.length;
@@ -4228,9 +4272,18 @@ realmDoctorLines: [],
       top.appendChild(solo);
     }
     top.appendChild(sidebarItem(sidebarLink("adventurers", "adventurers (" + model.adventurers + ")", currentHash)));
-    top.appendChild(
-      sidebarItem(sidebarLink("solo-players", "solo players (" + model.soloPlayers + ")", currentHash))
+    var soloItem = sidebarItem(sidebarLink("solo-players", "solo players (" + model.soloPlayers + ")", currentHash));
+    var soloList = el("ul");
+    appendAll(
+      soloList,
+      model.soloProjects.map(function (project) {
+        return sidebarItem(
+          sidebarLink("solo-players/" + project.name, project.name + " (" + project.count + ")", currentHash)
+        );
+      })
     );
+    soloItem.appendChild(soloList);
+    top.appendChild(soloItem);
     top.appendChild(sidebarItem(sidebarLink("ideas", "ideas (" + model.ideas + ")", currentHash)));
     top.appendChild(sidebarItem(sidebarLink("quests", "quest board (" + model.openQuests + ")", currentHash)));
     top.appendChild(sidebarItem(sidebarLink("overview", "overview (" + model.newNotices + " new)", currentHash)));
@@ -4287,7 +4340,12 @@ realmDoctorLines: [],
     );
     renderSection("adventurers", [filtered.adventurers], renderAdventurers, onlyIfChanged);
     renderSection("health-jobs", [filtered.health_jobs], renderHealthJobs, onlyIfChanged);
-    renderSection("solo-players", [filtered.solo_players, filtered.solo_channel], renderSoloPlayers, onlyIfChanged);
+    renderSection(
+      "solo-players",
+      [filtered.solo_players, filtered.solo_channel, view.kind === "solo-players" ? view.name : ""],
+      renderSoloPlayers,
+      onlyIfChanged
+    );
     renderSection("memory", [filtered.memory], renderMemory, onlyIfChanged);
     renderSection("raids", [filtered.raids], renderRaids, onlyIfChanged);
     renderSection("merge-queues", [filtered.merge_queues], renderMergeQueues, onlyIfChanged);
