@@ -208,7 +208,7 @@ guild adventurer done --pending "<text>"                # ends it; `--pending no
 guild adventurer dismiss <id>                           # removes a done adventurer, or an active one whose session is gone, from the board
 guild adventurers [<id>]                                # active ones, then recent done ones; <id> shows one in full
 guild solo list                                         # solo players of the project config with trigger and state
-guild solo launch <owner/repo> <job>                    # human terminal only: tmux window running a solo player, due or not
+guild solo launch <owner/repo> <job> | --all | --project <name>  # human terminal only: tmux window running a solo player, due or not
 guild solo tick                                         # background job: launch every due solo player (human terminal only)
 guild solo say "<text>"                                 # solo player session only: post an important message to the channel (max 300 chars)
 guild solo channel [--limit N]                          # latest solo channel messages, newest first (default 20)
@@ -1473,6 +1473,16 @@ inside a Claude Code session. It opens a tmux window named
 `solo-<job>-<owner>-<repo>` the same way `guild adventurer launch` does, even
 when the player is not due.
 It closes the finished window a player left open before launching, and refuses a running player or a stalled one (dismiss it first).
+`guild solo launch --all` launches every configured player and `guild solo launch
+--project <name>` those of one project, whatever their trigger, skipping the
+running and the stalled ones. They print one line per player (`<name> launched`,
+`<name> skipped: running`, `<name> skipped: stalled, run guild adventurer dismiss
+<id>`, `<name> not launched: <error>`) and go on after a failure. The pair
+`<owner/repo> <job>`, `--all` and `--project` exclude each other.
+
+Solo players are active as soon as they are configured: there is no process to
+start. The `solo-tick` background job runs `guild solo tick`, driven by sessions
+and `guild web`.
 
 `guild solo tick` launches every `due` player the same way and is the
 `solo-tick` background job (see "Background jobs"), so a red main or a stuck

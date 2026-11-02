@@ -496,9 +496,73 @@ class SoloPlayersTickTests(SoloPlayersTestCase):
         tmux = KillingTmux(True, ["guild"], ["solo-red-main-acme-app"], 1)
         code, out, err = self.manual_launch(tmux)
         self.assertEqual(code, 1)
-        self.assertIn("could not close the finished window of mender", err)
+        self.assertIn("could not close its finished window", err)
         self.assertNotIn("new-window", tmux.verbs())
         self.assertEqual(self.launch_events(), [])
+
+    def launch_args(self, args, tmux, session_id=None):
+        with mock.patch("guild.tmux_windows.Tmux", return_value=tmux):
+            return self.cli(["solo", "launch", *args], session_id)
+
+    def test_launch_all_launches_every_player_regardless_of_trigger(self):
+        tmux = FakeTmux(True, [], [])
+        code, out, err = self.launch_args(["--all"], tmux)
+        self.assertEqual(code, 0, err)
+        self.assertEqual(out.splitlines(), ["mender launched", "{} launched".format(self.dep_name())])
+        self.assertEqual(sorted(self.launched_windows(tmux)), ["solo-dependabot-acme-app", "solo-red-main-acme-app"])
+        self.assertEqual(len(self.launch_events()), 2)
+        self.assertEqual(len(self.channel_texts()), 2)
+
+    def dep_name(self):
+        return self.players()[("acme/app", "dependabot")]["name"]
+
+    def test_launch_all_skips_running_and_stalled_and_closes_leftovers(self):
+        self.red("ci broke")
+        self.cli(["adventurer", "start", "--job", "red-main-acme-app", "--reason", "test reason"], "adv-1")
+        tmux = KillingTmux(True, ["guild"], ["solo-dependabot-acme-app"], 0)
+        code, out, err = self.launch_args(["--all"], tmux)
+        self.assertEqual(code, 0, err)
+        self.assertIn("mender skipped: stalled, run guild adventurer dismiss 1", out)
+        self.assertIn("{} launched".format(self.dep_name()), out)
+        self.assertEqual(tmux.killed, ["guild:=solo-dependabot-acme-app"])
+        self.write_session(os.getpid(), "adv-1", "adv")
+        code, out, err = self.launch_args(["--all"], KillingTmux(True, ["guild"], [], 0))
+        self.assertIn("mender skipped: running", out)
+
+    def test_launch_all_continues_after_a_player_error(self):
+        tmux = KillingTmux(True, ["guild"], ["solo-red-main-acme-app", "solo-dependabot-acme-app"], 1)
+        code, out, err = self.launch_args(["--all"], tmux)
+        self.assertEqual(code, 0, err)
+        self.assertEqual(
+            out.splitlines(),
+            [
+                "mender not launched: could not close its finished window",
+                "{} not launched: could not close its finished window".format(self.dep_name()),
+            ],
+        )
+
+    def test_launch_project_limits_players_and_rejects_unknown_project(self):
+        tmux = FakeTmux(True, [], [])
+        code, out, err = self.launch_args(["--project", "acme"], tmux)
+        self.assertEqual(code, 0, err)
+        self.assertEqual(len(out.splitlines()), 2)
+        code, out, err = self.launch_args(["--project", "nope"], FakeTmux(True, [], []))
+        self.assertEqual(code, 1)
+        self.assertIn("unknown project 'nope'", err)
+
+    def test_launch_modes_are_exclusive_and_one_is_required(self):
+        for args in (["--all", "--project", "acme"], ["acme/app", "red-main", "--all"], [], ["acme/app"]):
+            tmux = FakeTmux(True, [], [])
+            code, out, err = self.launch_args(args, tmux)
+            self.assertEqual(code, 1, args)
+            self.assertEqual(self.launched_windows(tmux), [])
+
+    def test_launch_all_refuses_inside_a_session(self):
+        tmux = FakeTmux(True, [], [])
+        code, out, err = self.launch_args(["--all"], tmux, "sess-1")
+        self.assertEqual(code, 1)
+        self.assertIn("human terminal", err)
+        self.assertEqual(self.launched_windows(tmux), [])
 
     def test_tick_without_tmux_prints_a_failure_and_records_nothing(self):
         self.red("ci broke")

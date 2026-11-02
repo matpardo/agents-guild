@@ -77,15 +77,7 @@ def _refuse_inside_session(ctx, command):
         raise GuildError("solo {} runs from the human terminal, not inside a Claude Code session".format(command), 1)
 
 
-def launch(ctx, repo, job_name, tmux):
-    _refuse_inside_session(ctx, "launch")
-    project = config.require_project(ctx.cwd, ctx.projects_dir)
-    project_data = config.load_project(ctx.projects_dir, project)
-    if _find_player(project_data, repo, job_name) is None:
-        raise GuildError("project '{}' has no solo player '{}' on '{}'".format(project, job_name, repo), 1)
-    row = next(
-        row for row in _player_rows(ctx) if row["project"] == project and (row["repo"], row["job"]) == (repo, job_name)
-    )
+def _launch_row(ctx, row, tmux):
     if row["state"] == "running":
         raise GuildError("{} is running".format(row["name"]), 1)
     if row["state"] == "stalled":
@@ -94,8 +86,51 @@ def launch(ctx, repo, job_name, tmux):
         )
     if tmux.installed() and _window_is_open(tmux, row["health_job"]):
         if not tmux_windows.kill_window(tmux, _window_name(row["health_job"])):
-            raise GuildError("could not close the finished window of {}".format(row["name"]), 1)
-    return _launch_player(ctx, project, project_data, repo, job_name, tmux)
+            raise GuildError("could not close its finished window", 1)
+    project_data = config.load_project(ctx.projects_dir, row["project"])
+    return _launch_player(ctx, row["project"], project_data, row["repo"], row["job"], tmux)
+
+
+def _launch_line(ctx, row, tmux):
+    if row["state"] == "running":
+        return "{} skipped: running".format(row["name"])
+    if row["state"] == "stalled":
+        return "{} skipped: stalled, run guild adventurer dismiss {}".format(row["name"], row["stalled_adventurer"])
+    try:
+        _launch_row(ctx, row, tmux)
+    except GuildError as error:
+        return "{} not launched: {}".format(row["name"], error.message)
+    return "{} launched".format(row["name"])
+
+
+def _launch_all(ctx, project, tmux):
+    rows = _player_rows(ctx)
+    if project is not None:
+        if project not in _projects_by_name(ctx):
+            raise GuildError("unknown project '{}'".format(project), 1)
+        rows = [row for row in rows if row["project"] == project]
+    if not rows:
+        return "no solo players"
+    return "\n".join(_launch_line(ctx, row, tmux) for row in rows)
+
+
+def launch(ctx, repo, job_name, all_players, project, tmux):
+    _refuse_inside_session(ctx, "launch")
+    pair = repo is not None or job_name is not None
+    if [pair, all_players, project is not None].count(True) != 1:
+        raise GuildError("solo launch takes exactly one of '<repo> <job>', --all or --project <name>", 1)
+    if all_players or project is not None:
+        return _launch_all(ctx, project, tmux)
+    if repo is None or job_name is None:
+        raise GuildError("solo launch takes both '<repo>' and '<job>'", 1)
+    current = config.require_project(ctx.cwd, ctx.projects_dir)
+    project_data = config.load_project(ctx.projects_dir, current)
+    if _find_player(project_data, repo, job_name) is None:
+        raise GuildError("project '{}' has no solo player '{}' on '{}'".format(current, job_name, repo), 1)
+    row = next(
+        row for row in _player_rows(ctx) if row["project"] == current and (row["repo"], row["job"]) == (repo, job_name)
+    )
+    return _launch_row(ctx, row, tmux)
 
 
 def _window_is_open(tmux, health_job):
@@ -113,14 +148,8 @@ def tick(ctx, tmux):
         return "\n".join("solo player {} not launched: tmux not found".format(row["name"]) for row in due)
     lines = []
     for row in due:
-        if _window_is_open(tmux, row["health_job"]) and not tmux_windows.kill_window(
-            tmux, _window_name(row["health_job"])
-        ):
-            lines.append("solo player {} not launched: could not close its finished window".format(row["name"]))
-            continue
-        project_data = config.load_project(ctx.projects_dir, row["project"])
         try:
-            lines.append(_launch_player(ctx, row["project"], project_data, row["repo"], row["job"], tmux))
+            lines.append(_launch_row(ctx, row, tmux))
         except GuildError as error:
             lines.append("solo player {} not launched: {}".format(row["name"], error.message))
     return "\n".join(lines)
