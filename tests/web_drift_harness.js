@@ -18,7 +18,7 @@ function mk(tag) {
   Object.defineProperty(o, "firstChild", { get() { return o.children[0] || null; } });
   return o;
 }
-const tree = (n) => ({ tag: n.tag, className: n.className || "", type: n.type || "", value: n.value, placeholder: n.placeholder || "", title: n.title || "", text: n._text, children: n.children.map(tree) });
+const tree = (n) => ({ tag: n.tag, className: n.className || "", type: n.type || "", value: n.value, placeholder: n.placeholder || "", title: n.title || "", text: n._text, children: n.children.map(tree), open: n.open === true, attrs: { role: n.role, "aria-selected": n.ariaSelected } });
 const tick = () => new Promise((resolve) => setImmediate(resolve));
 const walk = (n) => [n].concat(...n.children.map(walk));
 async function openDetails(root, summaries) {
@@ -31,7 +31,7 @@ async function openDetails(root, summaries) {
     }
   }
 }
-async function render({ src, data, hash, outId, mode, responses, open }) {
+async function render({ src, data, hash, outId, mode, responses, open, click, steps }) {
   byId = {};
   const doc = {
     getElementById: (id) => (byId[id] = byId[id] || mk(id.endsWith("-filter") ? "select" : "div")),
@@ -39,7 +39,8 @@ async function render({ src, data, hash, outId, mode, responses, open }) {
     addEventListener: (n, f) => { doc.h = f; },
     activeElement: null, querySelector: () => null, querySelectorAll: () => [],
   };
-  const ctx = { document: doc, window: {}, location: { hash }, addEventListener(n, f) { ctx.hashchange = f; }, console, setInterval() {}, setTimeout() {},
+  const intervals = [];
+  const ctx = { document: doc, window: {}, location: { hash }, addEventListener(n, f) { ctx.hashchange = f; }, console, setInterval(f) { intervals.push(f); }, setTimeout() {},
     fetch: (url) => Promise.resolve({ json: () => Promise.resolve(responses && url in responses ? responses[url] : url === "/api/board" ? data : { token: "t" }) }) };
   ctx.window = ctx;
   vm.createContext(ctx);
@@ -48,7 +49,16 @@ async function render({ src, data, hash, outId, mode, responses, open }) {
   await tick();
   await tick();
   const out = doc.getElementById(outId);
+  for (const step of steps || []) {
+    if (step === "poll") intervals[0]();
+    else if (step === "close-details") { const d = walk(out).find((n) => n.tag === "details"); d.open = false; d.h.toggle(); }
+    else { ctx.location.hash = step; ctx.hashchange(); }
+    await tick();
+    await tick();
+  }
   if (open) await openDetails(out, open);
+  if (click) for (const node of walk(out)) if (node.tag === "button" && node._text === click) node.h.click();
+  if (mode === "hash") return ctx.location.hash;
   if (mode === "hidden") return JSON.stringify(Object.keys(byId).filter((id) => byId[id].hidden === true).sort());
   return mode === "tree" ? JSON.stringify(tree(out)) : out.textContent;
 }

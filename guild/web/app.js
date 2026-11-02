@@ -55,6 +55,8 @@ var REALM_FLAG_TEXT = "[flagged: looks like an instruction or a command] read it
     raidFilter: "all",
     openParties: {},
     resourcesOpen: false,
+    soloMenuOpen: false,
+    renderedHash: "",
     resourcesModel: null,
     realmModel: null,
     realmBusy: false,
@@ -2075,45 +2077,60 @@ realmDoctorLines: [],
     return names.sort();
   }
 
-  function renderSoloProject(project, players, channel) {
-    var block = el("div");
-    block.className = "solo-project";
-    block.appendChild(textEl("h3", project));
-    block.appendChild(textEl("h4", "channel"));
-    var messages = channel.filter(function (message) {
-      return message.project === project;
-    });
-    if (messages.length === 0) {
-      block.appendChild(classedText("p", "no messages yet", "muted"));
-    }
-    appendAll(block, messages.map(soloChannelLine));
+  function renderSoloPanel(project, players, channel) {
+    var panel = el("div");
+    panel.className = "solo-project";
+    panel.role = "tabpanel";
     appendAll(
-      block,
+      panel,
       players
         .filter(function (player) {
           return player.project === project;
         })
         .map(renderSoloPlayer)
     );
-    return block;
+    panel.appendChild(textEl("h3", "channel"));
+    var messages = channel.filter(function (message) {
+      return message.project === project;
+    });
+    if (messages.length === 0) {
+      panel.appendChild(classedText("p", "no messages yet", "muted"));
+    }
+    appendAll(panel, messages.map(soloChannelLine));
+    return panel;
+  }
+
+  function renderSoloTabs(names, selected) {
+    var bar = el("div");
+    bar.className = "solo-tabs";
+    bar.role = "tablist";
+    appendAll(
+      bar,
+      names.map(function (name) {
+        var tab = textEl("button", name);
+        tab.type = "button";
+        tab.role = "tab";
+        tab.ariaSelected = name === selected ? "true" : "false";
+        tab.addEventListener("click", function () {
+          window.location.hash = "#solo-players/" + name;
+        });
+        return tab;
+      })
+    );
+    return bar;
   }
 
   function renderSoloPlayers(players, channel, project) {
     var section = document.getElementById("solo-players");
     clear(section);
-    var shown = players.filter(function (player) {
-      return project === "" || player.project === project;
-    });
-    if (shown.length === 0) {
+    if (players.length === 0) {
       return;
     }
-    section.appendChild(textEl("h2", "solo players (" + shown.length + ")"));
-    appendAll(
-      section,
-      soloProjectNames(shown).map(function (name) {
-        return renderSoloProject(name, shown, channel);
-      })
-    );
+    var names = soloProjectNames(players);
+    var selected = names.indexOf(project) === -1 ? names[0] : project;
+    section.appendChild(textEl("h2", "solo players (" + players.length + ")"));
+    section.appendChild(renderSoloTabs(names, selected));
+    section.appendChild(renderSoloPanel(selected, players, channel));
   }
 
   function renderMemoryItem(item) {
@@ -4144,7 +4161,7 @@ realmDoctorLines: [],
             .sort(byAttention),
         };
       }),
-      solo: data.parties
+      parties: data.parties
         .filter(function (party) {
           return party.raids.length === 0;
         })
@@ -4251,6 +4268,28 @@ realmDoctorLines: [],
     return counts;
   }
 
+  function sidebarSoloMenu(model, currentHash) {
+    var details = el("details");
+    details.open = state.soloMenuOpen;
+    details.addEventListener("toggle", function () {
+      state.soloMenuOpen = details.open;
+    });
+    var summary = el("summary");
+    summary.appendChild(sidebarLink("solo-players", "solo players (" + model.soloPlayers + ")", currentHash));
+    details.appendChild(summary);
+    var list = el("ul");
+    appendAll(
+      list,
+      model.soloProjects.map(function (project) {
+        return sidebarItem(
+          sidebarLink("solo-players/" + project.name, project.name + " (" + project.count + ")", currentHash)
+        );
+      })
+    );
+    details.appendChild(list);
+    return sidebarItem(details);
+  }
+
   function renderSidebar(model, currentHash) {
     var nav = document.getElementById("sidebar");
     clear(nav);
@@ -4258,35 +4297,24 @@ realmDoctorLines: [],
     var needs = sidebarItem(sidebarLink("needs-you", "needs you", currentHash));
     needs.appendChild(sidebarNeedsCounts(model));
     top.appendChild(needs);
+    top.appendChild(sidebarItem(sidebarLink("adventurers", "adventurers (" + model.adventurers + ")", currentHash)));
+    top.appendChild(sidebarSoloMenu(model, currentHash));
+    top.appendChild(sidebarItem(sidebarLink("ideas", "ideas (" + model.ideas + ")", currentHash)));
+    top.appendChild(sidebarItem(sidebarLink("quests", "quest board (" + model.openQuests + ")", currentHash)));
+    top.appendChild(sidebarItem(sidebarLink("overview", "overview (" + model.newNotices + " new)", currentHash)));
     appendAll(
       top,
       model.raids.map(function (raid) {
         return sidebarRaidGroup(raid, currentHash);
       })
     );
-    if (model.solo.length > 0) {
-      var solo = el("li");
-      solo.className = "sidebar-group";
-      solo.appendChild(textEl("h3", "solo"));
-      solo.appendChild(sidebarPartyList(model.solo, currentHash));
-      top.appendChild(solo);
+    if (model.parties.length > 0) {
+      var parties = el("li");
+      parties.className = "sidebar-group";
+      parties.appendChild(textEl("h3", "parties"));
+      parties.appendChild(sidebarPartyList(model.parties, currentHash));
+      top.appendChild(parties);
     }
-    top.appendChild(sidebarItem(sidebarLink("adventurers", "adventurers (" + model.adventurers + ")", currentHash)));
-    var soloItem = sidebarItem(sidebarLink("solo-players", "solo players (" + model.soloPlayers + ")", currentHash));
-    var soloList = el("ul");
-    appendAll(
-      soloList,
-      model.soloProjects.map(function (project) {
-        return sidebarItem(
-          sidebarLink("solo-players/" + project.name, project.name + " (" + project.count + ")", currentHash)
-        );
-      })
-    );
-    soloItem.appendChild(soloList);
-    top.appendChild(soloItem);
-    top.appendChild(sidebarItem(sidebarLink("ideas", "ideas (" + model.ideas + ")", currentHash)));
-    top.appendChild(sidebarItem(sidebarLink("quests", "quest board (" + model.openQuests + ")", currentHash)));
-    top.appendChild(sidebarItem(sidebarLink("overview", "overview (" + model.newNotices + " new)", currentHash)));
     nav.appendChild(top);
   }
 
@@ -4321,6 +4349,10 @@ realmDoctorLines: [],
     document.getElementById("board-title").textContent = data.guild_name ? "guild board · " + data.guild_name : "guild board";
     var view = currentView();
     applyView(view);
+    if (view.hash !== state.renderedHash && view.kind === "solo-players" && view.name !== "") {
+      state.soloMenuOpen = true;
+    }
+    state.renderedHash = view.hash;
     state.partyFilter = view.kind === "party" ? view.name : "all";
     state.raidFilter = view.kind === "raid" ? view.name : "all";
     var filtered = applyRaidFilter(applyPartyFilter(data));

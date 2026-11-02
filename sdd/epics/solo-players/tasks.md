@@ -167,3 +167,16 @@ updated: 2026-11-01
 - [x] The all view shows a block per project with its own channel and "no messages yet" when empty; the project view shows only its block.
 - [x] `solo list --project` and `solo channel --project` filter, and an unknown project is an error.
 - [x] The text board shows a project header under SOLO PLAYERS.
+
+## T15 — Project tabs and side menu order
+
+**Depends on:** T14
+**Status:** [x] done
+
+**What:** the web side menu orders needs you, adventurers, solo players, ideas, quest board and overview first, then the raid groups and the `parties` group (parties outside raids). The solo players item is a collapsed `<details>` whose summary links to `#solo-players` and whose body lists the project links; it opens when the hash names a project. `#solo-players` renders one tab per project; `#solo-players/<project>` selects that tab and the bare view the first project alphabetically. The panel shows the project's players and then its channel.
+
+**Acceptance:**
+- [x] The menu lists raids and then `parties` after the overview item, with no `solo` heading.
+- [x] The solo players menu is collapsed by default and open on a project hash.
+- [x] A tab per project with `aria-selected` on the current one; clicking a tab sets the hash.
+- [x] The panel shows only the selected project, its channel after its players.
