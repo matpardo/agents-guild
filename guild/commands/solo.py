@@ -96,7 +96,10 @@ def tick(ctx, tmux):
         return "\n".join("solo player {} not launched: tmux not found".format(row["name"]) for row in due)
     lines = []
     for row in due:
-        if _window_is_open(tmux, row["health_job"]):
+        if _window_is_open(tmux, row["health_job"]) and not tmux_windows.kill_window(
+            tmux, _window_name(row["health_job"])
+        ):
+            lines.append("solo player {} not launched: could not close its finished window".format(row["name"]))
             continue
         project_data = config.load_project(ctx.projects_dir, row["project"])
         try:

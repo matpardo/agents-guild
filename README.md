@@ -1473,8 +1473,9 @@ when the player is not due.
 `guild solo tick` launches every `due` player the same way and is the
 `solo-tick` background job (see "Background jobs"), so a red main or a stuck
 Dependabot PR gets a session without a command. It is for the human terminal and
-the background job and refuses inside a Claude Code session. It skips a player
-whose window already exists, prints one line per player it could not launch
+the background job and refuses inside a Claude Code session. It closes the
+window a `due` player still has, left by its finished run, before launching it
+again, prints one line per player it could not launch
 (for example `tmux not found`) and still exits 0. Each launch, manual or not,
 records a `solo.launched` event with the trigger text it was made for, and a launch younger than the cooldown keeps
 the player `cooling`, so a trigger that stays on while the new session binds,

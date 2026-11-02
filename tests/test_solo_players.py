@@ -46,6 +46,22 @@ class SoloPlayersConfigTests(GuildTestCase):
             self.assertIn("solo_players", raised.exception.message)
 
 
+class KillingTmux(FakeTmux):
+    def __init__(self, installed, sessions, windows, kill_returncode):
+        super().__init__(installed, sessions, windows)
+        self.kill_returncode = kill_returncode
+        self.killed = []
+
+    def run(self, args):
+        if args[0] != "kill-window":
+            return super().run(args)
+        self.calls.append(list(args))
+        if self.kill_returncode == 0:
+            self.killed.append(args[2])
+            self.windows = [name for name in self.windows if args[2] != "guild:=" + name]
+        return self.kill_returncode, ""
+
+
 class SoloPlayersTestCase(GuildTestCase):
     def setUp(self):
         super().setUp()
@@ -408,11 +424,32 @@ class SoloPlayersTickTests(SoloPlayersTestCase):
         with mock.patch("guild.tmux_windows.Tmux", return_value=FakeTmux(True, [], [])):
             self.assertEqual(self.cli(["solo", "launch", "acme/app", "red-main"], None)[0], 0)
 
-    def test_tick_skips_when_the_window_exists(self):
+    def test_tick_closes_the_window_of_a_finished_player_then_launches(self):
         self.red("ci broke")
-        tmux = FakeTmux(True, ["guild"], ["solo-red-main-acme-app"])
+        tmux = KillingTmux(True, ["guild"], ["solo-red-main-acme-app"], 0)
         code, out, err = self.tick(tmux)
         self.assertEqual(code, 0, err)
+        self.assertEqual(tmux.killed, ["guild:=solo-red-main-acme-app"])
+        self.assertLess(tmux.verbs().index("kill-window"), tmux.verbs().index("new-window"))
+        self.assertEqual(self.launched_windows(tmux), ["solo-red-main-acme-app"])
+        self.assertEqual(len(self.launch_events()), 1)
+
+    def test_tick_leaves_the_window_of_a_running_player_alone(self):
+        self.red("ci broke")
+        self.cli(["adventurer", "start", "--job", "red-main-acme-app", "--reason", "test reason"], "adv-1")
+        tmux = KillingTmux(True, ["guild"], ["solo-red-main-acme-app"], 0)
+        code, out, err = self.tick(tmux)
+        self.assertEqual(code, 0, err)
+        self.assertNotIn("kill-window", tmux.verbs())
+        self.assertNotIn("new-window", tmux.verbs())
+        self.assertEqual(self.launch_events(), [])
+
+    def test_tick_reports_a_window_it_cannot_close_and_goes_on(self):
+        self.red("ci broke")
+        tmux = KillingTmux(True, ["guild"], ["solo-red-main-acme-app"], 1)
+        code, out, err = self.tick(tmux)
+        self.assertEqual(code, 0, err)
+        self.assertIn("solo player mender not launched: could not close its finished window", out)
         self.assertNotIn("new-window", tmux.verbs())
         self.assertEqual(self.launch_events(), [])
 

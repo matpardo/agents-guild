@@ -90,3 +90,15 @@ updated: 2026-11-01
 **Acceptance:**
 - [x] The same trigger inside 24h of the last report or launch keeps the player cooling with a retry time, after 24h it is due, and a different trigger is due after 1h.
 - [x] A launch recorded without a trigger replays and counts as a different trigger.
+
+## T09 — Close a finished solo player's window before relaunching it
+
+**Depends on:** T08
+**Status:** [x] done
+
+**What:** a finished solo session stays idle in its tmux window, and the tick skipped every player whose window existed, so it never launched again. A `due` player has no active adventurer and no launch inside the cooldown, so its window is a leftover: the tick closes it, then launches. A window that cannot be closed prints a failure line and the tick goes on.
+
+**Acceptance:**
+- [x] A `due` player with an existing window has it closed, then is launched with its event recorded.
+- [x] A running player's window is untouched and nothing launches.
+- [x] A window that cannot be closed prints a failure line and launches nothing.
