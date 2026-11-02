@@ -50,6 +50,13 @@ STATUS_RUNS_SHOWN = 5
 STATUS_MESSAGES_SHOWN = 10
 
 
+def _player_row(ctx, repo, job_name):
+    for row in _player_rows(ctx):
+        if (row["repo"], row["job"]) == (repo, job_name):
+            return row
+    raise GuildError("no solo player '{}' on '{}'".format(job_name, repo), 1)
+
+
 def _find_player(project_data, repo, job_name):
     for player in project_data.get("solo_players", []):
         if player["repo"] == repo and player["job"] == job_name:
@@ -98,7 +105,13 @@ def _refuse_inside_session(ctx, command):
         raise GuildError("solo {} runs from the human terminal, not inside a Claude Code session".format(command), 1)
 
 
+def _paused_skip(row):
+    return "{} skipped: paused, run {}".format(row["name"], row["launch"])
+
+
 def _launch_row(ctx, row, tmux):
+    if row["state"] == "paused":
+        raise GuildError(_paused_skip(row), 1)
     if row["state"] == "running":
         raise GuildError("{} is running".format(row["name"]), 1)
     if row["state"] == "stalled":
@@ -113,6 +126,8 @@ def _launch_row(ctx, row, tmux):
 
 
 def _launch_line(ctx, row, tmux):
+    if row["state"] == "paused":
+        return _paused_skip(row)
     if row["state"] == "running":
         return "{} skipped: running".format(row["name"])
     if row["state"] == "stalled":
@@ -141,14 +156,7 @@ def launch(ctx, repo, job_name, all_players, project, tmux):
         return _launch_all(ctx, project, tmux)
     if repo is None or job_name is None:
         raise GuildError("solo launch takes both '<repo>' and '<job>'", 1)
-    current = config.require_project(ctx.cwd, ctx.projects_dir)
-    project_data = config.load_project(ctx.projects_dir, current)
-    if _find_player(project_data, repo, job_name) is None:
-        raise GuildError("project '{}' has no solo player '{}' on '{}'".format(current, job_name, repo), 1)
-    row = next(
-        row for row in _player_rows(ctx) if row["project"] == current and (row["repo"], row["job"]) == (repo, job_name)
-    )
-    return _launch_row(ctx, row, tmux)
+    return _launch_row(ctx, _player_row(ctx, repo, job_name), tmux)
 
 
 def _window_is_open(tmux, health_job):
@@ -216,10 +224,8 @@ def _format_run(run):
 
 
 def runs(ctx, repo, job_name):
-    for row in _player_rows(ctx):
-        if row["repo"] == repo and row["job"] == job_name:
-            return "\n".join(_format_run(run) for run in row["runs"]) or "no runs"
-    raise GuildError("no solo player '{}' on '{}'".format(job_name, repo), 1)
+    row = _player_row(ctx, repo, job_name)
+    return "\n".join(_format_run(run) for run in row["runs"]) or "no runs"
 
 
 def _player_status(ctx, row):
@@ -237,7 +243,91 @@ def status(ctx, repo, job_name, project):
         return list_players(ctx, project)
     if repo is None or job_name is None:
         raise GuildError("solo status takes both '<repo>' and '<job>'", 1)
-    for row in _player_rows(ctx):
-        if row["repo"] == repo and row["job"] == job_name:
-            return _player_status(ctx, row)
-    raise GuildError("no solo player '{}' on '{}'".format(job_name, repo), 1)
+    return _player_status(ctx, _player_row(ctx, repo, job_name))
+
+
+def _scope_rows(ctx, command, repo, job_name, all_players, project):
+    pair = repo is not None or job_name is not None
+    if [pair, all_players, project is not None].count(True) != 1:
+        raise GuildError("solo {} takes exactly one of '<repo> <job>', --all or --project <name>".format(command), 1)
+    if pair and (repo is None or job_name is None):
+        raise GuildError("solo {} takes both '<repo>' and '<job>'".format(command), 1)
+    if pair:
+        return [_player_row(ctx, repo, job_name)]
+    _require_known_project(ctx, project)
+    rows = [row for row in _player_rows(ctx) if project in (None, row["project"])]
+    if not rows:
+        raise GuildError("no solo players match", 1)
+    return rows
+
+
+def _post(ctx, row, text):
+    player = {"repo": row["repo"], "job": row["job"]}
+    solo_channel.post(ctx.conn, ctx.now, ctx.origin, None, row["project"], player, text)
+
+
+def _record_pause_event(ctx, row, kind):
+    events.record(
+        ctx.conn,
+        ctx.now,
+        ctx.origin,
+        None,
+        None,
+        row["project"],
+        kind,
+        "guild",
+        {"repo": row["repo"], "job": row["job"]},
+    )
+
+
+def _stop_row(ctx, row, tmux):
+    if solo_players.is_paused(ctx.conn, row["health_job"]):
+        return "{} already paused".format(row["name"])
+    if row["state"] not in ("running", "stalled"):
+        with db.writing(ctx.conn):
+            _record_pause_event(ctx, row, "solo.paused")
+            _post(ctx, row, "{} paused".format(row["name"]))
+        return "{} paused".format(row["name"])
+    if tmux.installed() and _window_is_open(tmux, row["health_job"]):
+        tmux_windows.kill_window(tmux, _window_name(row["health_job"]))
+    active = solo_players.active_adventurer(ctx.conn, row["project"], row["health_job"])
+    with db.writing(ctx.conn):
+        adventurer_commands.dismiss_stopped(ctx, row["project"], active["id"])
+        _record_pause_event(ctx, row, "solo.paused")
+        _post(ctx, row, "{} stopped by the human".format(row["name"]))
+    return "{} stopped".format(row["name"])
+
+
+def _stop_line(ctx, row, tmux):
+    try:
+        return _stop_row(ctx, row, tmux)
+    except GuildError as error:
+        return "{} not stopped: {}".format(row["name"], error.message)
+
+
+def stop(ctx, repo, job_name, all_players, project, tmux):
+    _refuse_inside_session(ctx, "stop")
+    rows = _scope_rows(ctx, "stop", repo, job_name, all_players, project)
+    return "\n".join(_stop_line(ctx, row, tmux) for row in rows)
+
+
+def _resume_row(ctx, row):
+    if not solo_players.is_paused(ctx.conn, row["health_job"]):
+        return "{} not paused".format(row["name"])
+    with db.writing(ctx.conn):
+        _record_pause_event(ctx, row, "solo.resumed")
+        _post(ctx, row, "{} resumed".format(row["name"]))
+    return "{} resumed".format(row["name"])
+
+
+def _resume_line(ctx, row):
+    try:
+        return _resume_row(ctx, row)
+    except GuildError as error:
+        return "{} not resumed: {}".format(row["name"], error.message)
+
+
+def resume(ctx, repo, job_name, all_players, project):
+    _refuse_inside_session(ctx, "resume")
+    rows = _scope_rows(ctx, "resume", repo, job_name, all_players, project)
+    return "\n".join(_resume_line(ctx, row) for row in rows)

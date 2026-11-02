@@ -486,6 +486,11 @@ class WebSoloPlayerBehaviorTests(unittest.TestCase):
         self.assertIn("stalled: session gone, run guild adventurer dismiss 7", out)
         self.assertNotIn("guild solo launch", out)
 
+    def test_paused_player_shows_state_and_the_resume_command(self):
+        out = self._text([_solo_player(state="paused", launch="guild solo resume acme/app red-main")])
+        self.assertIn("paused", out)
+        self.assertIn("guild solo resume acme/app red-main", out)
+
     def test_backing_off_player_shows_the_retry_time(self):
         out = self._text([_solo_player(state="cooling", retry_at="2026-11-02T10:00:00+00:00")])
         self.assertRegex(out, r"cooling: same trigger, retry after \d{4}-\d{2}-\d{2} \d{2}:\d{2}")

@@ -210,6 +210,8 @@ guild adventurers [<id>]                                # active ones, then rece
 guild solo list [--project <name>]                     # solo players of the project config with trigger and state
 guild solo status [<owner/repo> <job> | --project <name>]    # same rows as list; one player adds its last 5 runs and 10 channel messages
 guild solo launch <owner/repo> <job> | --all | --project <name>  # human terminal only: tmux window running a solo player, due or not
+guild solo stop <owner/repo> <job> | --all | --project <name>    # human terminal only: close the window, dismiss the run and pause the player
+guild solo resume <owner/repo> <job> | --all | --project <name>  # human terminal only: lift the pause
 guild solo tick                                         # background job: launch every due solo player (human terminal only)
 guild solo say "<text>"                                 # solo player session only: post an important message to the channel (max 300 chars)
 guild solo channel [--limit N] [--project <name>]     # latest solo channel messages, newest first (default 20)
@@ -1476,7 +1478,7 @@ launch button.
 `guild solo launch <owner/repo> <job>` is for the human terminal and refuses
 inside a Claude Code session. It opens a tmux window named
 `solo-<job>-<owner>-<repo>` the same way `guild adventurer launch` does, even
-when the player is not due.
+when the player is not due. `<owner/repo> <job>` is matched across all projects, so it works from any directory, like in `status`, `stop` and `resume`.
 It closes the finished window a player left open before launching, and refuses a running player or a stalled one (dismiss it first).
 `guild solo launch --all` launches every configured player and `guild solo launch
 --project <name>` those of one project, whatever their trigger, skipping the
@@ -1484,6 +1486,22 @@ running and the stalled ones. They print one line per player (`<name> launched`,
 `<name> skipped: running`, `<name> skipped: stalled, run guild adventurer dismiss
 <id>`, `<name> not launched: <error>`) and go on after a failure. The pair
 `<owner/repo> <job>`, `--all` and `--project` exclude each other.
+
+`guild solo stop` and `guild solo resume` take the three scopes of launch, but
+all players need `--all`: with no argument they are an error, so a mass stop is
+never an accident. Both are for the human terminal and refuse inside a Claude Code
+session. `stop` on a `running` or `stalled` player closes its `solo-<job>-<owner>-<repo>`
+window (a missing window is fine), dismisses its active adventurer, pauses the
+player and posts `<name> stopped by the human` to the channel; on any other
+player it only pauses it and posts `<name> paused`. `resume` lifts the pause and
+posts `<name> resumed`. A pause is a `solo.paused` event and `solo.resumed` ends
+it, so it survives `guild rebuild`. A `paused` player is never `due`: the tick
+leaves it alone, and `launch` (one player, `--all` or `--project`) skips it with
+`<name> skipped: paused, run guild solo resume <owner/repo> <job>`. The board and
+the web show `paused` with the resume command as the text to copy. They print one
+line per player (`<name> stopped`, `<name> paused`, `<name> already paused`,
+`<name> resumed`, `<name> not paused`, `<name> not stopped: <error>`) and go on
+after a failure.
 
 Solo players are active as soon as they are configured: there is no process to
 start. The `solo-tick` background job runs `guild solo tick`, driven by sessions

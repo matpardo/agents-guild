@@ -192,3 +192,16 @@ updated: 2026-11-02
 - [x] Each scope prints the expected rows; the player form adds runs and its own channel messages.
 - [x] An unknown project or player is an error.
 - [x] `guild solo list` still works.
+
+## T17 — Stop, pause and resume solo players
+
+**Depends on:** T16
+**Status:** [x] done
+
+**What:** `guild solo stop` and `guild solo resume` take the scopes of `solo launch` (`--all` is required for all players). Stop closes the window and dismisses the active adventurer of a running or stalled player, then pauses it; any other player is only paused. A paused player has the state `paused`, is never due, and a manual launch skips it. Resume lifts the pause. Pauses are the `solo.paused` and `solo.resumed` events.
+
+**Acceptance:**
+- [x] Stop on a running or stalled player kills its window, dismisses its adventurer, pauses it and posts to the channel; on an idle player it only pauses.
+- [x] Stop and resume with no scope are an error; inside a session both are refused.
+- [x] The tick and every launch form skip a paused player; the row carries the resume command.
+- [x] A rebuild keeps pauses and resumes.

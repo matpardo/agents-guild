@@ -24,6 +24,7 @@ PROJECTION_TABLES = (
     "dependabot_status",
     "solo_launches",
     "solo_messages",
+    "solo_pauses",
     "session_status",
     "cost_samples",
     "resource_samples",
@@ -309,6 +310,12 @@ _CREATE_STATEMENTS = (
         health_job TEXT PRIMARY KEY,
         launched_at TEXT NOT NULL,
         trigger TEXT
+    )
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS solo_pauses (
+        health_job TEXT PRIMARY KEY,
+        paused_at TEXT NOT NULL
     )
     """,
     """

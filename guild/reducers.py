@@ -718,6 +718,21 @@ def _solo_launched(conn, event):
     )
 
 
+def _solo_paused(conn, event):
+    payload = event["payload"]
+    conn.execute(
+        "INSERT OR REPLACE INTO solo_pauses (health_job, paused_at) VALUES (?, ?)",
+        (solo_players.health_job_name(payload["repo"], payload["job"]), event["ts"]),
+    )
+
+
+def _solo_resumed(conn, event):
+    payload = event["payload"]
+    conn.execute(
+        "DELETE FROM solo_pauses WHERE health_job = ?", (solo_players.health_job_name(payload["repo"], payload["job"]),)
+    )
+
+
 def _solo_message(conn, event):
     payload = event["payload"]
     conn.execute(
@@ -965,6 +980,8 @@ _REDUCERS = {
     "dependabot.synced": _dependabot_synced,
     "solo.launched": _solo_launched,
     "solo.message": _solo_message,
+    "solo.paused": _solo_paused,
+    "solo.resumed": _solo_resumed,
     "main.marked": _main_marked,
     "session.waiting": _session_waiting,
     "session.stopped": _session_stopped,
@@ -1081,6 +1098,8 @@ _REQUIRED_KEYS = {
     "dependabot.synced": ("repo", "unmergeable", "run_failed"),
     "solo.launched": ("repo", "job"),
     "solo.message": ("repo", "job", "text"),
+    "solo.paused": ("repo", "job"),
+    "solo.resumed": ("repo", "job"),
     "main.marked": ("repo", "red", "reason"),
     "session.waiting": ("wait", "message"),
     "session.stopped": (),

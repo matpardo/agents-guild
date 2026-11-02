@@ -232,6 +232,20 @@ def promote(ctx, name, reason):
     )
 
 
+def dismiss_stopped(ctx, project, adventurer_id):
+    events.record(
+        ctx.conn,
+        ctx.now,
+        ctx.origin,
+        None,
+        ctx.session_id,
+        project,
+        "adventurer.dismissed",
+        "local",
+        {"id": adventurer_id},
+    )
+
+
 def dismiss(ctx, adventurer_id):
     with db.writing(ctx.conn):
         row = ctx.conn.execute(
@@ -243,17 +257,7 @@ def dismiss(ctx, adventurer_id):
             raise GuildError("adventurer {} is active and its session is alive".format(adventurer_id), 1)
         if row["state"] not in ("done", "active"):
             raise GuildError("adventurer {} is {}, not done".format(adventurer_id, row["state"]), 1)
-        events.record(
-            ctx.conn,
-            ctx.now,
-            ctx.origin,
-            None,
-            ctx.session_id,
-            row["project"],
-            "adventurer.dismissed",
-            "local",
-            {"id": adventurer_id},
-        )
+        dismiss_stopped(ctx, row["project"], adventurer_id)
     return "adventurer {} dismissed".format(adventurer_id)
 
 
