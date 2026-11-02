@@ -231,3 +231,17 @@ updated: 2026-11-02
 - [x] READY FOR YOU lists the solo rows after the tracked PRs and counts them; party and raid filters hide them.
 - [x] NEEDS YOU shows a solo item only while the trigger is active and the pending text is not `none`.
 - [x] The web renders both and counts the ready rows in the badge.
+
+## T20 — Keep ready PRs while GitHub computes merge state
+
+**Depends on:** T19
+**Status:** [x] done
+
+**What:** A Dependabot PR in the recorded ready set whose `mergeable` or `mergeStateStatus` reads `UNKNOWN` stays in the set; GitHub computes the merge state lazily after the base moves. The solo view, the board SOLO PLAYERS section and `solo status` list the PRs to merge under the `dependabot` player.
+
+**Acceptance:**
+- [x] A recorded ready PR with an unknown merge state stays ready.
+- [x] A PR that was not ready is not added while its merge state is unknown.
+- [x] A definite bad state, failing or pending checks, or a PR that left the list drops out.
+- [x] The web renders a linked `<repo>#N <title>` line per PR to merge and nothing when empty.
+- [x] The board and `solo status` print an indented `to merge:` line per PR.

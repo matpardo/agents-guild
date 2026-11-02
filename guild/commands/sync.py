@@ -617,8 +617,11 @@ def _recorded_dependabot_status(ctx, repo):
     return row["unmergeable"], bool(row["run_failed"]), ready_set
 
 
-def _pr_ready(pr):
-    if pr["mergeable"] != "MERGEABLE" or pr["mergeStateStatus"] != "CLEAN" or not pr["statusCheckRollup"]:
+def _pr_ready(pr, was_ready):
+    unknown = ("UNKNOWN",) if was_ready else ()
+    if pr["mergeable"] not in ("MERGEABLE", *unknown) or pr["mergeStateStatus"] not in ("CLEAN", *unknown):
+        return False
+    if not pr["statusCheckRollup"]:
         return False
     return all(
         (check.get("conclusion") or check.get("state")) in _READY_CHECK_RESULTS for check in pr["statusCheckRollup"]
@@ -629,9 +632,13 @@ def _ready_title(pr):
     return sanitize.collapse_to_single_line(sanitize.strip_control_sequences(pr["title"]))[:_ANNOUNCE_TITLE_MAX]
 
 
-def _ready_prs(prs):
+def _ready_prs(prs, recorded_numbers):
     return sorted(
-        ({"number": pr["number"], "title": _ready_title(pr)} for pr in prs if _pr_ready(pr)),
+        (
+            {"number": pr["number"], "title": _ready_title(pr)}
+            for pr in prs
+            if _pr_ready(pr, pr["number"] in recorded_numbers)
+        ),
         key=lambda entry: entry["number"],
     )
 
@@ -665,11 +672,12 @@ def _sync_repo_dependabot(ctx, project, repo, failures):
     except github.GhCommandError as error:
         failures.append("{}: dependabot check failed: {}".format(repo, error))
         return
-    ready = _ready_prs(prs)
+    recorded = _recorded_dependabot_status(ctx, repo)
+    ready = _ready_prs(prs, {entry["number"] for entry in recorded[2]})
     _announce_ready_prs(ctx, project, repo, ready)
     unmergeable = sum(1 for pr in prs if _pr_unmergeable(pr))
     run_failed = _update_run_failed(runs)
-    if _recorded_dependabot_status(ctx, repo) == (unmergeable, run_failed, ready):
+    if recorded == (unmergeable, run_failed, ready):
         return
     with db.writing(ctx.conn):
         events.record(

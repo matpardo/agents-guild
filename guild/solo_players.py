@@ -201,6 +201,7 @@ def runs(conn, project, health_job, live_ids, limit):
 
 def models(conn, now, projects_by_name, live_ids):
     result = []
+    ready = ready_to_merge(conn, projects_by_name)
     for project in sorted(projects_by_name):
         for player in _players(projects_by_name[project]):
             health_job = health_job_name(player["repo"], player["job"])
@@ -236,6 +237,9 @@ def models(conn, now, projects_by_name, live_ids):
                     "last_done": last_done,
                     "last_pending": last_pending,
                     "runs": runs(conn, project, health_job, live_ids, RUNS_SHOWN),
+                    "to_merge": [
+                        entry for entry in ready if player["job"] == "dependabot" and entry["repo"] == player["repo"]
+                    ],
                     "launch": (RESUME_COMMAND if state == "paused" else LAUNCH_COMMAND).format(
                         player["repo"], player["job"]
                     ),
@@ -254,6 +258,7 @@ def ready_to_merge(conn, projects_by_name):
     return [
         {
             "ref": "{}#{}".format(row["repo"], row["number"]),
+            "repo": row["repo"],
             "title": row["title"],
             "url": "https://github.com/{}/pull/{}".format(row["repo"], row["number"]),
             "name": names[row["repo"]],
@@ -261,6 +266,10 @@ def ready_to_merge(conn, projects_by_name):
         for row in rows
         if row["repo"] in names
     ]
+
+
+def to_merge_lines(row):
+    return ["    to merge: {} {}".format(entry["ref"], entry["title"]) for entry in row["to_merge"]]
 
 
 def needs_human(conn, now, projects_by_name, live_ids):

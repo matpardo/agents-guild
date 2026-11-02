@@ -2043,6 +2043,22 @@ realmDoctorLines: [],
     return parts.join(" \u00b7 ");
   }
 
+  function renderSoloToMerge(entries) {
+    var list = el("div");
+    list.className = "solo-to-merge";
+    list.appendChild(classedText("p", "to merge", "muted"));
+    appendAll(
+      list,
+      entries.map(function (entry) {
+        var row = el("p");
+        row.appendChild(link(entry.url, entry.ref));
+        row.appendChild(textEl("span", " " + entry.title));
+        return row;
+      })
+    );
+    return list;
+  }
+
   function renderSoloPlayer(player) {
     var article = el("article");
     article.className = "card solo-player";
@@ -2050,6 +2066,9 @@ realmDoctorLines: [],
     article.appendChild(classedText("p", soloPlayerMeta(player), "muted"));
     if (player.state === "due" || player.state === "idle" || player.state === "paused") {
       article.appendChild(classedText("code", player.launch, "launch-command"));
+    }
+    if (player.to_merge.length > 0) {
+      article.appendChild(renderSoloToMerge(player.to_merge));
     }
     if (player.runs.length > 0) {
       article.appendChild(renderSoloRuns(player.runs));
