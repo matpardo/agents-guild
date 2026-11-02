@@ -141,3 +141,16 @@ updated: 2026-11-01
 - [x] A running player is refused and its window is untouched.
 - [x] A stalled player is refused with the `guild adventurer dismiss` hint.
 - [x] A window that cannot be closed is an error and launches nothing.
+
+## T13 — Launch all solo players at once
+
+**Depends on:** T12
+**Status:** [x] done
+
+**What:** `guild solo launch --all` and `guild solo launch --project <name>` launch every configured player, of that project for the second form, that is not running or stalled, regardless of trigger. Single launch, the two bulk forms and the tick share one per-player path that checks the state, closes a leftover window and launches.
+
+**Acceptance:**
+- [x] `<repo> <job>`, `--all` and `--project` are mutually exclusive and exactly one is required; the command refuses inside a Claude Code session.
+- [x] Each player prints one line: launched, skipped (running or stalled with the dismiss hint) or not launched with the error; a failure does not stop the rest.
+- [x] An unknown project is an error.
+- [x] Each launch posts the channel started message.
