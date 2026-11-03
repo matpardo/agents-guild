@@ -1060,6 +1060,21 @@ class DependabotAnnounceTests(SoloPlayersTestCase):
         self.assertNotIn("ready to merge", prompt)
         self.assertIn("needs a human", prompt)
 
+    def test_prompt_closes_a_stale_single_dependency_pr_through_dependabot(self):
+        prompt = solo_players.JOBS["dependabot"]["prompt"]
+        self.assertIn("stale", prompt)
+        self.assertIn("@dependabot close", prompt)
+        self.assertIn("single-dependency", prompt)
+
+    def test_prompt_drops_stale_dependencies_from_a_multi_dependency_pr(self):
+        prompt = solo_players.JOBS["dependabot"]["prompt"]
+        self.assertIn("multi-dependency", prompt)
+        self.assertIn("never update a stale dependency", prompt)
+
+    def test_prompt_keeps_the_stale_comment_free_of_guild_words(self):
+        prompt = solo_players.JOBS["dependabot"]["prompt"]
+        self.assertIn("no guild", prompt)
+
 
 class SoloTodoTests(SoloPlayersTestCase):
     def setUp(self):
