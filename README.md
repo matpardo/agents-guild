@@ -2356,6 +2356,8 @@ generation after it too.
 
 `sdd.root` above can instead be `"git_repo": "~/Documents/_projects/acme/sdd-docs", "git_ref": "origin/main"` to read the same `epics_dir` from a git ref instead of a working copy.
 
+`epics_dir` may be a subfolder (e.g. `"epics_dir": "docs/specs/epics"`), and `git_repo` may be the project's code repo itself: only `<epics_dir>/<epic>/tasks.md` files are read, in both `root` and `git_repo` modes.
+
 All keys. The loader rejects a wrong type with a clear error for every key except `sdd`, `handoff_threshold` and `pii_patterns`, which are read where they are used. An optional key is off when absent; the only default is the one stated below (`handoff_threshold`). Unknown top-level keys are allowed.
 
 - `name` (string, required): project name, a valid slug; `guild init-project <name>` requires it to match, and the file is `<name>.json`.

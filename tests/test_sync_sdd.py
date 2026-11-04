@@ -76,6 +76,18 @@ class SyncSddTests(GuildTestCase):
         code, out, err = self.run_cli(["board"], "sess-1", self.repo_dir)
         self.assertIn("queued: T01, T02", out)
 
+    def test_nested_epics_dir_under_root_syncs(self):
+        nested = self.sdd_root / "docs" / "specs" / "epics" / "inner-epic"
+        nested.mkdir(parents=True)
+        (nested / "tasks.md").write_text("## T01 — Nested task\n\n**Deps:** —\n\n**Status:** [ ] pending\n")
+        self._write_project_config(sdd_config=dict(_PATTERNS, root=str(self.sdd_root), epics_dir="docs/specs/epics"))
+        code, out, err = self.run_cli(["sync", "--source", "sdd"], "sess-1", self.repo_dir)
+        self.assertEqual(code, 0, err)
+        conn = sqlite3.connect(str(self.data_home / "guild" / "guild.db"))
+        rows = conn.execute("SELECT epic FROM epics").fetchall()
+        conn.close()
+        self.assertEqual(rows, [("inner-epic",)])
+
     def test_sync_stores_key_from_configured_key_line(self):
         (self.sdd_root / "epics" / "widget-rollout" / "tasks.md").write_text(
             "## T01 — Configure retries\n\n**JIRA:** DEMO-12\n**Deps:** —\n**Status:** [ ] pending\n"
@@ -313,6 +325,25 @@ class SyncSddGitTests(GuildTestCase):
         self.assertEqual(epic_row[0], "git:origin/main:epics/widget-rollout/tasks.md")
         self.assertEqual(task_row[0], "done")
         self.assertEqual(epics, ["widget-rollout"])
+
+    def test_nested_epics_dir_in_the_code_repo_reads_tasks_from_the_fetched_ref(self):
+        nested = self.git_repo_dir / "docs" / "specs" / "epics" / "inner-epic"
+        nested.mkdir(parents=True)
+        (nested / "tasks.md").write_text("## T01 — Nested task\n\n**Deps:** —\n\n**Status:** [x] done\n")
+        _git(["add", "."], self.git_repo_dir)
+        _git(["commit", "-m", "add nested"], self.git_repo_dir)
+        _git(["push", "origin", "main"], self.git_repo_dir)
+        self._write_project_config(
+            sdd_config=dict(
+                _PATTERNS, git_repo=str(self.git_repo_dir), git_ref="origin/main", epics_dir="docs/specs/epics"
+            )
+        )
+        code, out, err = self._sync()
+        self.assertEqual(code, 0, err)
+        conn = sqlite3.connect(str(self.data_home / "guild" / "guild.db"))
+        rows = conn.execute("SELECT epic, sdd_path FROM epics").fetchall()
+        conn.close()
+        self.assertEqual(rows, [("inner-epic", "git:origin/main:docs/specs/epics/inner-epic/tasks.md")])
 
     def test_unknown_ref_is_a_clear_error(self):
         self._configure_git_sdd(self.git_repo_dir, "origin/does-not-exist")

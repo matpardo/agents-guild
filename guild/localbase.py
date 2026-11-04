@@ -216,7 +216,7 @@ def origin_tip(clone_path, base):
 
 
 def _fast_forward_checked_out_mutating_git(worktree, base):
-    code, out, _ = _git(worktree, ["status", "--porcelain"])
+    code, out, _ = _git(worktree, ["status", "--porcelain", "--untracked-files=no"])
     if code != 0:
         return "cannot read status of {}".format(worktree)
     if out:
