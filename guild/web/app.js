@@ -2990,8 +2990,8 @@ realmDoctorLines: [],
     placeholder.value = "";
     select.appendChild(placeholder);
     quest.move_targets.forEach(function (target) {
-      var option = textEl("option", target);
-      option.value = target;
+      var option = textEl("option", target.open ? target.slug + " (open)" : target.slug);
+      option.value = target.slug;
       select.appendChild(option);
     });
     select.addEventListener("change", function () {

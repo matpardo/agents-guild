@@ -144,3 +144,14 @@ updated: 2026-10-25
 **Acceptance:**
 - [x] Both Dependabot ecosystems use `default-days: 7`.
 - [x] README and the agent rules state 7 days.
+
+## T20 — Move tasks to an open quest
+
+**Depends on:** T10
+**Status:** [x] done
+
+**What:** `guild task move` accepts an open quest (no party) as destination; the moved tasks stay queued or blocked there until someone runs `guild quest take`. The board offers open quests in the move select, labeled `(open)`.
+
+**Acceptance:**
+- [x] The other move rules (same project, same epic, both active) still apply.
+- [x] `GUILD.md` and `README.md` name an open quest as a valid destination.

@@ -1296,15 +1296,15 @@ class WebTaskMoveBehaviorTests(unittest.TestCase):
         return _render(dict(_BOARD, parties=parties), "all", "all", "parties", "text").strip()
 
     def test_queued_task_lists_the_move_targets(self):
-        out = self._rendered("queued", ["dst", "dst2"])
+        out = self._rendered("queued", [{"slug": "dst", "open": False}, {"slug": "dst2", "open": True}])
         self.assertIn("move to...", out)
-        self.assertIn("dst2", out)
+        self.assertIn("dst2 (open)", out)
 
     def test_blocked_task_can_move(self):
-        self.assertIn("move to...", self._rendered("blocked", ["dst"]))
+        self.assertIn("move to...", self._rendered("blocked", [{"slug": "dst", "open": False}]))
 
     def test_active_task_has_no_move_control(self):
-        self.assertNotIn("move to...", self._rendered("active", ["dst"]))
+        self.assertNotIn("move to...", self._rendered("active", [{"slug": "dst", "open": False}]))
 
     def test_no_targets_means_no_move_control(self):
         self.assertNotIn("move to...", self._rendered("queued", []))

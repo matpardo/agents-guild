@@ -1391,11 +1391,11 @@ def _task_model(ctx, repo_clones, project, epic, task_row, task_prs, project_con
 
 def _move_targets(conn, quest_row):
     rows = conn.execute(
-        "SELECT slug FROM quests WHERE state = 'active' AND party IS NOT NULL AND project = ? AND slug != ?"
+        "SELECT slug, party FROM quests WHERE state = 'active' AND project = ? AND slug != ?"
         " AND epic IS ? ORDER BY slug ASC",
         (quest_row["project"], quest_row["slug"], quest_row["epic"]),
     ).fetchall()
-    return [row["slug"] for row in rows]
+    return [{"slug": row["slug"], "open": row["party"] is None} for row in rows]
 
 
 def _quest_model(ctx, repo_clones, project, quest_row, prs_by_task, project_config):
