@@ -125,6 +125,26 @@ class FastForwardBaseTests(_CloneFixture):
         self.assertIn("local main of acme/app 2 commits behind origin, not updated", rows[0]["text"])
         self.assertIn("uncommitted changes", rows[0]["text"])
 
+    def test_untracked_file_does_not_block_fast_forward(self):
+        self._merge_upstream("one.txt")
+        (self.repo_dir / "editor.lock").write_text("lock")
+        self._merge_prs([1])
+        self._sync()
+        self.assertEqual(self._head("HEAD"), self._head("origin/main"))
+        self.assertTrue((self.repo_dir / "editor.lock").is_file())
+        self.assertEqual(self._ff_notices(), [])
+
+    def test_untracked_file_clashing_with_incoming_commit_is_noticed(self):
+        before = self._head("main")
+        self._merge_upstream("one.txt")
+        (self.repo_dir / "one.txt").write_text("mine")
+        self._merge_prs([1])
+        self._sync()
+        self.assertEqual(self._head("main"), before)
+        rows = self._ff_notices()
+        self.assertEqual(len(rows), 1)
+        self.assertIn("fast-forward failed", rows[0]["text"])
+
     def test_diverged_base_is_left_alone_and_noticed(self):
         self._commit(self.repo_dir, "local.txt", "local")
         before = self._head("main")

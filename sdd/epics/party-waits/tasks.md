@@ -99,3 +99,15 @@ updated: 2026-10-25
 - [x] An open ask beats `parked`, `parked` beats `queued`, `queued` beats `blocked`, and a resume or an unpark clears the mark; the mark replays in `guild rebuild`.
 - [x] `handoff --parked` refuses a blank reason, `--party` and `prune`; `party park` and `unpark` refuse unknown or closed parties, a blank reason and unparking a party that is not parked.
 - [x] The web sidebar and party card show the badge with the detail, and the park route calls the same function as the CLI.
+
+## T09 — Fast-forward the local base despite untracked files
+
+**Depends on:** T07
+**Status:** [x] done
+
+**What:** The post-merge fast-forward of a checked-out base only treats tracked changes as uncommitted, so an untracked file (an editor lock) no longer leaves the local clone stale. An untracked file that the incoming commit would overwrite is reported as a failed fast-forward. The SDD source tests cover an `epics_dir` that is a subfolder, with `git_repo` set to the code repo, in both `root` and `git_repo` modes.
+
+**Acceptance:**
+- [x] An untracked file does not block the fast-forward and a tracked modification still does.
+- [x] An untracked file clashing with an incoming commit leaves the base unchanged and posts the fast-forward failure.
+- [x] A nested `epics_dir` syncs in `root` and `git_repo` modes, and the README documents it.
