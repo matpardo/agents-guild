@@ -837,6 +837,11 @@ does.
 }
 ```
 
+- Exit codes: an entry may add `"ok_exit_codes": [5]`, a non-empty list of
+  unique integers from 1 to 255. A command that exits with a listed code is
+  recorded as `ok` and posts no notice; any other non-zero exit stays
+  `failed`. Use it for a script whose non-zero exit means a normal outcome,
+  such as skipped work.
 - When it fires: `guild sync --source gh` sees a tracked PR become `merged`
   (`on_pr_merged`) or `closed` without merging (`on_pr_closed`). PRs already
   merged or closed when tracked, seeded PRs and anything that happened before

@@ -10,6 +10,7 @@ from tests.lifecycle_fixtures import (
     FakeRunner,
     LifecycleFixture,
     error_result,
+    exit_result,
     failed_result,
     ok_result,
     timeout_result,
@@ -55,6 +56,20 @@ class RunGroupTests(LifecycleFixture):
         payload = self.ran_payloads()[0]
         self.assertEqual((payload["status"], payload["exit_code"]), ("failed", 1))
         self.assertEqual(self.notice_texts(), ["lifecycle on_pr_merged failed for acme (exit 1): see guild history"])
+
+    def test_listed_exit_code_counts_as_ok_without_notice(self):
+        self.set_ok_exit_codes("on_pr_merged", [5])
+        self._run(FakeRunner([exit_result(5)]))
+        payload = self.ran_payloads()[0]
+        self.assertEqual((payload["status"], payload["exit_code"]), ("ok", 5))
+        self.assertEqual(self.notice_texts(), [])
+
+    def test_unlisted_exit_code_still_fails_with_ok_exit_codes_declared(self):
+        self.set_ok_exit_codes("on_pr_merged", [5])
+        self._run(FakeRunner([exit_result(6)]))
+        payload = self.ran_payloads()[0]
+        self.assertEqual((payload["status"], payload["exit_code"]), ("failed", 6))
+        self.assertEqual(self.notice_texts(), ["lifecycle on_pr_merged failed for acme (exit 6): see guild history"])
 
     def test_timeout_records_status_and_posts_notice(self):
         self._run(FakeRunner([timeout_result()]))

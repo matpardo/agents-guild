@@ -216,6 +216,19 @@ class ValidateProjectConfigTests(unittest.TestCase):
             )
         )
 
+    def test_accepts_lifecycle_ok_exit_codes(self):
+        config.validate_project_config(
+            self._with_lifecycle({"on_pr_merged": {"command": ["x"], "timeout_minutes": 1, "ok_exit_codes": [5, 255]}})
+        )
+
+    def test_rejects_invalid_lifecycle_ok_exit_codes(self):
+        for codes in (5, "5", [], [0], [256], [-1], [True], [1.5], ["5"], [5, 5]):
+            with self.subTest(codes=codes):
+                self._assert_lifecycle_rejected(
+                    {"on_pr_merged": {"command": ["x"], "timeout_minutes": 1, "ok_exit_codes": codes}},
+                    "project config 'lifecycle.on_pr_merged.ok_exit_codes' must be a non-empty list of unique integers",
+                )
+
     def test_rejects_lifecycle_that_is_not_an_object(self):
         self._assert_lifecycle_rejected(["x"], "'lifecycle' must be an object")
 
