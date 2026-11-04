@@ -175,9 +175,16 @@ def _quest_released(conn, event):
 def _task_added(conn, event):
     payload = event["payload"]
     conn.execute(
-        "INSERT INTO quest_tasks (quest, tid, title, state, summary, blocked_reason, created_at, updated_at)"
-        " VALUES (?, ?, ?, 'queued', NULL, NULL, ?, ?)",
-        (payload["quest"], payload["tid"], payload["title"], event["ts"], event["ts"]),
+        "INSERT INTO quest_tasks (quest, tid, title, state, summary, blocked_reason, created_at, updated_at, no_sdd)"
+        " VALUES (?, ?, ?, 'queued', NULL, NULL, ?, ?, ?)",
+        (
+            payload["quest"],
+            payload["tid"],
+            payload["title"],
+            event["ts"],
+            event["ts"],
+            int(payload.get("no_sdd", False)),
+        ),
     )
     conn.execute("UPDATE quests SET updated_at = ? WHERE slug = ?", (event["ts"], payload["quest"]))
 

@@ -3014,6 +3014,9 @@ realmDoctorLines: [],
     head.className = "task-head";
     head.appendChild(textEl("span", task.tid));
     head.appendChild(textEl("span", task.title));
+    if (task.no_sdd) {
+      head.appendChild(classedText("span", "no sdd", "muted"));
+    }
     var taskState = textEl("span", task.state);
     taskState.className = "state state-" + task.state;
     head.appendChild(explain(taskState, "taskState", task.state));

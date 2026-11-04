@@ -1,7 +1,7 @@
 from datetime import timedelta
 from unittest import mock
 
-from guild import timeutil
+from guild import db, paths, timeutil
 from tests.testutil import GuildTestCase
 
 
@@ -475,6 +475,25 @@ class TaskLifecycleTests(GuildTestCase):
         self.assertEqual(code, 0, err)
         self.assertIn("task 'epicq/T10' added", out)
         self.assertIn("add T10 to compliance tasks.md in the SDD", out)
+
+    def test_add_task_with_no_sdd_prints_no_hint_and_marks_the_board(self):
+        self._add_epic_quest()
+        code, out, err = self.run_cli(
+            ["task", "add", "epicq/T10", "--title", "Extra", "--no-sdd"], "sess-1", self.repo_dir
+        )
+        self.assertEqual(code, 0, err)
+        self.assertNotIn("tasks.md", out)
+        code, out, err = self.run_cli(["board"], "sess-1", self.repo_dir)
+        self.assertIn("no sdd", out)
+
+    def test_no_sdd_survives_rebuild(self):
+        self._add_epic_quest()
+        self.run_cli(["task", "add", "epicq/T10", "--title", "Extra", "--no-sdd"], "sess-1", self.repo_dir)
+        self.run_cli(["rebuild"], None, None)
+        conn = db.connect(paths.db_path())
+        rows = conn.execute("SELECT tid, no_sdd FROM quest_tasks ORDER BY tid").fetchall()
+        conn.close()
+        self.assertEqual([(row["tid"], row["no_sdd"]) for row in rows], [("T09", 0), ("T10", 1)])
 
     def test_add_task_to_no_epic_quest_prints_no_hint(self):
         code, out, err = self.run_cli(["task", "add", "demo/T01", "--title", "First task"], "sess-1", self.repo_dir)

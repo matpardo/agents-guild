@@ -406,6 +406,25 @@ class QuestTaskNotInSddTests(DriftTestCase):
         self.assertIn("quest task not in SDD (1)", out)
         self.assertIn("task:wave9/T09: not in epic wave9 tasks.md, add it", out)
 
+    def test_no_sdd_task_is_not_a_finding(self):
+        self.run_cli(["task", "add", "wave9/T09", "--title", "Extra", "--no-sdd"], "sess-1", self.repo_dir)
+        code, out, err = self._drift("wave9")
+        self.assertNotIn("quest task not in SDD", out)
+
+    def test_quest_done_passes_with_a_done_no_sdd_task(self):
+        self.run_cli(["task", "add", "wave9/T09", "--title", "Extra", "--no-sdd"], "sess-1", self.repo_dir)
+        self.run_cli(["task", "done", "wave9/T09"], "sess-1", self.repo_dir)
+        self.run_cli(["task", "done", "wave9/T01"], "sess-1", self.repo_dir)
+        code, out, err = self.run_cli(["quest", "done", "wave9"], "sess-1", self.repo_dir)
+        self.assertNotIn("not in epic", err)
+
+    def test_quest_done_is_refused_while_a_no_sdd_task_is_open(self):
+        self.run_cli(["task", "add", "wave9/T09", "--title", "Extra", "--no-sdd"], "sess-1", self.repo_dir)
+        self.run_cli(["task", "done", "wave9/T01"], "sess-1", self.repo_dir)
+        code, out, err = self.run_cli(["quest", "done", "wave9"], "sess-1", self.repo_dir)
+        self.assertEqual(code, 1)
+        self.assertIn("T09", err)
+
     def test_task_present_in_the_sdd_is_not_a_finding(self):
         self.run_cli(["task", "add", "wave9/T09", "--title", "Extra"], "sess-1", self.repo_dir)
         self._write_epic(

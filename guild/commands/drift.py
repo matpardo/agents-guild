@@ -323,6 +323,7 @@ def _rule_quest_task_not_in_sdd(conn, project, epics, party_scope):
         " JOIN quests ON quests.slug = quest_tasks.quest"
         " JOIN parties ON parties.name = quests.party"
         " WHERE quests.project = ? AND quests.epic IS NOT NULL"
+        " AND quest_tasks.no_sdd = 0"
         " AND NOT EXISTS (SELECT 1 FROM tasks WHERE tasks.project = quests.project"
         " AND tasks.epic = quests.epic AND tasks.tid = quest_tasks.tid)"
         + _epic_clause("quests", epics)

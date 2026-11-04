@@ -3,7 +3,7 @@ epic: quest-bound-work
 type: tasks
 title: A party's work always belongs to a quest
 status: done
-updated: 2026-10-24
+updated: 2026-11-04
 ---
 
 # Tasks: A party's work always belongs to a quest
@@ -47,3 +47,14 @@ updated: 2026-10-24
 
 **Acceptance:**
 - [x] After `pr untrack` or a relink to a task without a card, a merged PR no longer raises "card not done".
+
+## T05 — Task add without an SDD entry
+
+**Depends on:** T01
+**Status:** [x] done
+
+**What:** `guild task add --no-sdd` adds housekeeping work that has no entry in the epic's `tasks.md`. The flag is stored on the task, the board marks the task, and drift and the epic `quest done` gate skip it.
+
+**Acceptance:**
+- [x] A `--no-sdd` task raises no "quest task not in SDD" finding and `quest done` passes once it is done.
+- [x] The flag survives `guild rebuild`.
