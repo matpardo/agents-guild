@@ -1,5 +1,6 @@
 import json
 import subprocess
+from datetime import datetime
 
 
 class GhCommandError(Exception):
@@ -132,6 +133,14 @@ def dependabot_runs(cwd, repo):
     return json.loads(result.stdout)
 
 
+def _run_duration_seconds(run):
+    if not run.get("started_at") or not run.get("completed_at"):
+        return None
+    started = datetime.strptime(run["started_at"], "%Y-%m-%dT%H:%M:%SZ")
+    completed = datetime.strptime(run["completed_at"], "%Y-%m-%dT%H:%M:%SZ")
+    return (completed - started).total_seconds()
+
+
 def branch_checks(cwd, repo, branch):
     result = _run(
         ["gh", "api", "repos/{}/commits/{}/check-runs".format(repo, branch)],
@@ -147,6 +156,7 @@ def branch_checks(cwd, repo, branch):
             "name": run["name"],
             "conclusion": (run.get("conclusion") or "").upper(),
             "annotations_count": (run.get("output") or {}).get("annotations_count") or 0,
+            "duration_seconds": _run_duration_seconds(run),
         }
         for run in json.loads(result.stdout)["check_runs"]
     ]

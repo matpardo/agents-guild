@@ -27,6 +27,24 @@ _MIXED_RUNS = {
         {"id": 12, "name": "unit", "conclusion": "failure", "output": {"annotations_count": 1}},
     ]
 }
+_FAST = {"started_at": "2026-01-01T00:00:00Z", "completed_at": "2026-01-01T00:00:02Z"}
+_SLOW = {"started_at": "2026-01-01T00:00:00Z", "completed_at": "2026-01-01T00:01:30Z"}
+_STEPLESS_RUNS = {
+    "check_runs": [
+        dict(_FAST, id=11, name="lint", conclusion="failure", output={"annotations_count": 0}),
+        dict(_FAST, id=12, name="unit", conclusion="failure", output={"annotations_count": 0}),
+        dict(_SLOW, id=13, name="docs", conclusion="success", output={"annotations_count": 0}),
+    ]
+}
+_STEPLESS_AND_SLOW_RUNS = {
+    "check_runs": [
+        dict(_FAST, id=11, name="lint", conclusion="failure", output={"annotations_count": 0}),
+        dict(_SLOW, id=12, name="unit", conclusion="failure", output={"annotations_count": 0}),
+    ]
+}
+_FAST_WITH_ANNOTATION_RUNS = {
+    "check_runs": [dict(_FAST, id=11, name="lint", conclusion="failure", output={"annotations_count": 1})]
+}
 _GREEN_RUNS = {"check_runs": [{"name": "unit", "conclusion": "success"}]}
 
 
@@ -155,6 +173,22 @@ class GhSyncTests(_CloneFixture, _MainStatusCase):
         self.write_gh_fixture("branch_checks_acme-app_main", _MIXED_RUNS)
         self._write_annotations(11, _BILLING_TEXT)
         self._write_annotations(12, "Process completed with exit code 1.")
+        self._sync()
+        self.assertEqual(self._external(), [None])
+
+    def test_fast_failing_runs_without_annotations_mark_main_external(self):
+        self.write_gh_fixture("branch_checks_acme-app_main", _STEPLESS_RUNS)
+        self._sync()
+        self.assertEqual(self._external(), ["billing"])
+
+    def test_slow_failing_run_without_annotations_keeps_main_red(self):
+        self.write_gh_fixture("branch_checks_acme-app_main", _STEPLESS_AND_SLOW_RUNS)
+        self._sync()
+        self.assertEqual(self._external(), [None])
+
+    def test_fast_failing_run_with_other_annotation_keeps_main_red(self):
+        self.write_gh_fixture("branch_checks_acme-app_main", _FAST_WITH_ANNOTATION_RUNS)
+        self._write_annotations(11, "Process completed with exit code 1.")
         self._sync()
         self.assertEqual(self._external(), [None])
 
