@@ -154,8 +154,6 @@ def _require_move_target(source_row, target_row, target):
         raise GuildError("unknown quest '{}'".format(target), 1)
     if target_row["slug"] == source_row["slug"]:
         raise GuildError("target quest is the source quest", 1)
-    if target_row["party"] is None:
-        raise GuildError("quest '{}' is open".format(target), 1)
     for row in (source_row, target_row):
         if row["state"] != "active":
             raise GuildError("quest '{}' is done".format(row["slug"]), 1)
@@ -212,10 +210,8 @@ def _move(ctx, quest_row, tids_csv, target):
             "local",
             {"from_quest": quest_row["slug"], "to_quest": target, "tid": tid, "to_party": target_row["party"]},
         )
-    return "\n".join(
-        "task '{}/{}' moved to '{}' (party {})".format(quest_row["slug"], tid, target, target_row["party"])
-        for tid in tids
-    )
+    owner = "open quest" if target_row["party"] is None else "party {}".format(target_row["party"])
+    return "\n".join("task '{}/{}' moved to '{}' ({})".format(quest_row["slug"], tid, target, owner) for tid in tids)
 
 
 def move(ctx, quest, tids_csv, target):

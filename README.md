@@ -161,7 +161,7 @@ guild task add <quest>/<tid> --title "..." [--reason "<why>"]   # open quests of
 guild task start <quest>/<tid> [--summary "..."]
 guild task block <quest>/<tid> --reason "..."
 guild task done  <quest>/<tid> [--summary "..."]   # epic quests: also mark it done in the epic's tasks.md
-guild task move  <quest>/<tid>[,<tid>...] --to <quest>   # queued or blocked tasks, same epic, to another party's quest
+guild task move  <quest>/<tid>[,<tid>...] --to <quest>   # queued or blocked tasks, same epic, to another party's quest or an open quest
 
 guild pr track <owner/repo>#<n> --task <quest>/<tid> [--card <KEY>] --what "..." --waits "..." [--needs-human-pr-review]
                                # a party needs --task; an adventurer needs --task equal to its own; a health-job adventurer passes no --task, --card optional

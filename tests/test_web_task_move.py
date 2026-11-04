@@ -43,7 +43,11 @@ class WebTaskMoveTests(WebWriteTestCase):
         self.assertEqual(response.status, 403)
 
     def test_board_lists_move_targets(self):
-        self.assertEqual(self._quest("alpha", "demo")["move_targets"], ["other"])
+        self.run_cli(["quest", "add", "pool", "--title", "Pool", "--no-epic", "--open"], "sess-2", self.repo_dir)
+        self.assertEqual(
+            self._quest("alpha", "demo")["move_targets"],
+            [{"slug": "other", "open": False}, {"slug": "pool", "open": True}],
+        )
 
 
 if __name__ == "__main__":

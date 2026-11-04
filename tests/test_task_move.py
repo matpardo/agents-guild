@@ -89,6 +89,29 @@ class TaskMoveTests(TaskMoveTestCase):
         self.assertEqual(code, 0, err)
         self.assertEqual(self._query("SELECT task_quest, task_tid FROM prs"), [("dst", "T01")])
 
+    def test_moves_queued_and_blocked_tasks_to_an_open_quest(self):
+        self._cli("sess-1", ["quest", "add", "pool", "--title", "Pool", "--epic", "wave", "--open"])
+        self._cli("sess-1", ["task", "block", "src/T02", "--reason", "waiting"])
+        code, out, err = self._move("src/T01,T02", "pool")
+        self.assertEqual(code, 0, err)
+        self.assertIn("task 'src/T01' moved to 'pool' (open quest)", out)
+        self.assertEqual(
+            self._tasks(),
+            [
+                ("pool", "T01", "queued", None),
+                ("pool", "T02", "blocked", "waiting"),
+                ("src", "T03", "queued", None),
+            ],
+        )
+
+    def test_taking_the_open_quest_gives_the_party_the_moved_tasks(self):
+        self._cli("sess-1", ["quest", "add", "pool", "--title", "Pool", "--epic", "wave", "--open"])
+        self._move("src/T01", "pool")
+        code, out, err = self._cli("sess-2", ["quest", "take", "pool"])
+        self.assertEqual(code, 0, err)
+        code, out, err = self._cli("sess-2", ["task", "start", "pool/T01"])
+        self.assertEqual(code, 0, err)
+
     def test_rebuild_reproduces_the_move(self):
         self._move("src/T01", "dst")
         before = self._tasks()
@@ -111,6 +134,10 @@ class TaskMoveRefusalTests(TaskMoveTestCase):
 
     def test_target_equals_source(self):
         self._refused("src/T01", "src", "sess-1", "source quest")
+
+    def test_open_target_still_needs_the_same_epic(self):
+        self._cli("sess-1", ["quest", "add", "pool", "--title", "Pool", "--no-epic", "--open"])
+        self._refused("src/T01", "pool", "sess-1", "another epic")
 
     def test_done_target(self):
         self._cli("sess-2", ["quest", "done", "dst"])
