@@ -71,12 +71,12 @@ def _notify_failure(ctx, payload):
     notice_commands.create_announcing(ctx, None, text, "project:{}".format(payload["project"]), _NOTICE_TTL, announces)
 
 
-def _status_of(result):
+def _status_of(entry, result):
     if result["error"] is not None:
         return "error"
     if result["timed_out"]:
         return "timeout"
-    if result["exit_code"] == 0:
+    if result["exit_code"] == 0 or result["exit_code"] in entry.get("ok_exit_codes", ()):
         return "ok"
     return "failed"
 
@@ -107,7 +107,7 @@ def _finish(ctx, payload):
 def _execute(project, event_kind, payload, runner):
     entry = project["lifecycle"][event_kind]
     result = runner(entry["command"], payload["cwd"], entry["timeout_minutes"] * _SECONDS_PER_MINUTE)
-    payload["status"] = _status_of(result)
+    payload["status"] = _status_of(entry, result)
     payload["exit_code"] = result["exit_code"]
     payload["duration_ms"] = result["duration_ms"]
     payload["output_tail"] = result["output"]

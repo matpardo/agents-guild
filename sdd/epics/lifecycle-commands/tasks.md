@@ -56,3 +56,15 @@ updated: 2026-10-04
 - [x] `--dry-run` prints the argv, working directory and timeout and records nothing.
 - [x] A real run prints the outcome, records `lifecycle.ran` with the trigger `manual`, and fails with exit 1 on failure, timeout or error.
 - [x] An unconfigured event and several clones without `--repo` are rejected.
+
+## T05 — Exit codes that count as ok
+
+**Depends on:** T04
+**Status:** [x] done
+
+**What:** A lifecycle entry may declare `ok_exit_codes`, a list of integers from 1 to 255; a command that exits with a listed code is recorded as `ok` and posts no notice, so a script whose non-zero exit means a normal outcome stops raising false failures.
+
+**Acceptance:**
+- [x] `ok_exit_codes` must be a non-empty list of unique integers from 1 to 255; other types and values are rejected.
+- [x] A listed exit code records status `ok` with the real exit code and posts no notice.
+- [x] An unlisted non-zero exit code still records `failed` and posts the unchanged notice.

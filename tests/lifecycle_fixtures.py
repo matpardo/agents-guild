@@ -16,6 +16,10 @@ def failed_result():
     return {"exit_code": 1, "output": "secret-output", "timed_out": False, "error": None, "duration_ms": 12}
 
 
+def exit_result(code):
+    return {"exit_code": code, "output": "skipped dirty", "timed_out": False, "error": None, "duration_ms": 12}
+
+
 def timeout_result():
     return {"exit_code": None, "output": "secret-output", "timed_out": True, "error": None, "duration_ms": 12}
 
@@ -62,6 +66,11 @@ class LifecycleFixture(GuildTestCase):
     def set_lifecycle(self, events_configured):
         data = json.loads(self.config_file().read_text())
         data["lifecycle"] = lifecycle_config(events_configured)
+        self.config_file().write_text(json.dumps(data))
+
+    def set_ok_exit_codes(self, event, codes):
+        data = json.loads(self.config_file().read_text())
+        data["lifecycle"][event]["ok_exit_codes"] = codes
         self.config_file().write_text(json.dumps(data))
 
     def project(self):

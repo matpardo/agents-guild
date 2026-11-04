@@ -9,7 +9,9 @@ _REQUIRED_KEYS = ("name", "paths", "github")
 TRACKER_KINDS = ("jira-acli",)
 _TRACKER_BROWSE_URL_PREFIX = "https://"
 _LIFECYCLE_EVENTS = ("on_pr_merged", "on_pr_closed")
-_LIFECYCLE_ENTRY_KEYS = {"command", "timeout_minutes"}
+_LIFECYCLE_REQUIRED_KEYS = {"command", "timeout_minutes"}
+_LIFECYCLE_ENTRY_KEYS = _LIFECYCLE_REQUIRED_KEYS | {"ok_exit_codes"}
+_LIFECYCLE_MAX_EXIT_CODE = 255
 _LIFECYCLE_MAX_TIMEOUT_MINUTES = 1440
 _HANDOFF_RETENTION_MAX_DAYS = 3650
 _RESOURCE_RETENTION_MAX_DAYS = 3650
@@ -181,19 +183,34 @@ def _validate_lifecycle_timeout(event, timeout):
         )
 
 
+def _validate_lifecycle_ok_exit_codes(event, codes):
+    label = "project config 'lifecycle.{}.ok_exit_codes' must be a non-empty list of unique integers from 1 to {}"
+    message = label.format(event, _LIFECYCLE_MAX_EXIT_CODE)
+    if not isinstance(codes, list) or not codes:
+        raise GuildError(message, 1)
+    for code in codes:
+        if isinstance(code, bool) or not isinstance(code, int) or not 1 <= code <= _LIFECYCLE_MAX_EXIT_CODE:
+            raise GuildError(message, 1)
+    if len(set(codes)) != len(codes):
+        raise GuildError(message, 1)
+
+
 def _validate_lifecycle_entry(event, entry):
     if not isinstance(entry, dict):
         raise GuildError(
             "project config 'lifecycle.{}' must be an object with 'command' and 'timeout_minutes'".format(event),
             1,
         )
-    if set(entry) != _LIFECYCLE_ENTRY_KEYS:
+    if not _LIFECYCLE_REQUIRED_KEYS <= set(entry) <= _LIFECYCLE_ENTRY_KEYS:
         raise GuildError(
-            "project config 'lifecycle.{}' must have exactly the keys 'command' and 'timeout_minutes'".format(event),
+            "project config 'lifecycle.{}' must have exactly the keys 'command' and 'timeout_minutes'"
+            " plus optionally 'ok_exit_codes'".format(event),
             1,
         )
     _validate_lifecycle_command(event, entry["command"])
     _validate_lifecycle_timeout(event, entry["timeout_minutes"])
+    if "ok_exit_codes" in entry:
+        _validate_lifecycle_ok_exit_codes(event, entry["ok_exit_codes"])
 
 
 def _validate_lifecycle_config(data):
