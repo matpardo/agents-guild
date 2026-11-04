@@ -67,3 +67,14 @@ updated: 2026-10-11
 - [x] A push to a Ready PR after `cd <worktree>` is refused while main is red; a draft PR only warns.
 - [x] An unresolvable `cd` before a push gives the unresolved warning.
 - [x] `--repo=` and `--head=` forms and bundled `-fd` are recognized.
+
+## T06 — Billing detection recognizes fast step-less failures
+
+**Depends on:** T04
+**Status:** [x] done
+
+**What:** a failing check with no annotations that finished within 5 seconds of starting counts as billing-blocked, since a job refused for billing ends at once with nothing to annotate. Every failing check must match, so a genuine failure stays red.
+
+**Acceptance:**
+- [x] Main whose failing checks are all fast and unannotated is marked `billing`.
+- [x] A slow failing check, or a fast one with another annotation, keeps main red.

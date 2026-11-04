@@ -1170,7 +1170,8 @@ account's billing failed, every job of main fails without starting. The sync
 fetches the annotations of each failing run (`gh api
 repos/<repo>/check-runs/<id>/annotations`, only for runs that have any) and,
 when every failing run carries the message `recent account payments have
-failed`, stores the mark with `external` = `billing` (`main_status.external`,
+failed` (or has no annotations and finished within 5 seconds of starting, which
+is how a job refused for billing looks), stores the mark with `external` = `billing` (`main_status.external`,
 carried by the `main.status_synced` payload; events without it replay as an
 ordinary red). The queue then shows `0. MAIN BLOCKED (billing) <repo> →
 re-run main once billing is fixed` instead of `MAIN RED`, `guild board` and the

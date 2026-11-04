@@ -517,6 +517,7 @@ def _close_met_notices(ctx):
 
 _BILLING_EXTERNAL = "billing"
 _BILLING_FAILURE_TEXT = "recent account payments have failed"
+_BILLING_MAX_UNSTARTED_SECONDS = 5
 
 
 def _branch_red_reason(checks):
@@ -526,10 +527,17 @@ def _branch_red_reason(checks):
     return "checks failing: {}".format(", ".join(sorted(failing)))
 
 
+def _failed_without_starting(check):
+    duration = check["duration_seconds"]
+    return duration is not None and duration <= _BILLING_MAX_UNSTARTED_SECONDS
+
+
 def _billing_blocked(ctx, repo, checks):
     failing = [check for check in checks if check["conclusion"] in _FAILING_CONCLUSIONS]
     for check in failing:
         if check["annotations_count"] == 0:
+            if _failed_without_starting(check):
+                continue
             return False
         messages = github.check_run_annotation_messages(ctx.cwd, repo, check["id"])
         if not any(_BILLING_FAILURE_TEXT in message.lower() for message in messages):
