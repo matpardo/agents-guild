@@ -15,7 +15,12 @@ _RED_MAIN_PROMPT = (
     ' {repo}#<n> ready, waits on merge"` (or `guild solo say "main green, nothing to do"`). End with `guild adventurer done --pending "<text>"`.'
 )
 _DEPENDABOT_PROMPT = (
-    "For each open Dependabot PR on {repo} apply these gates: identity (the author is dependabot[bot]), scope (only"
+    "For each open Dependabot PR on {repo} apply these gates: stale (compare each target version with the pin in the"
+    " manifest and lock on the base branch; a dependency is stale when the base already pins that version or a"
+    " newer one. A stale single-dependency PR: comment `@dependabot close` and tell the dev with `guild solo say"
+    ' "{repo}#<n> closed: already at <version>"`. A stale dependency in a multi-dependency PR: never update a stale'
+    " dependency, push a fix on the PR branch that restores its base pin and keeps the live bumps; when unsure"
+    " whether it is stale, do not close, say it needs a human. The comment has no guild words), identity (the author is dependabot[bot]), scope (only"
     " dependency pins change; no new steps or permissions), supply chain (an action SHA equals the commit of its"
     " tag; package hashes match the registry) and read the release notes on major bumps. Then push direct fixes on"
     " the PR branch (version strings, hashes, formatter output, a tool `required-version` bump) so the PR becomes"

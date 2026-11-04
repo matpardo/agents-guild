@@ -245,3 +245,15 @@ updated: 2026-11-02
 - [x] A definite bad state, failing or pending checks, or a PR that left the list drops out.
 - [x] The web renders a linked `<repo>#N <title>` line per PR to merge and nothing when empty.
 - [x] The board and `solo status` print an indented `to merge:` line per PR.
+
+## T21 — Drop stale dependencies in the dependabot player
+
+**Depends on:** T20
+**Status:** [x] done
+
+**What:** The `dependabot` prompt gains a stale gate. A single-dependency PR whose target the base already pins is closed with `@dependabot close`. A multi-dependency PR never updates a stale dependency: a fix on the PR branch restores its base pin. A doubtful case is reported as needing a human.
+
+**Acceptance:**
+- [x] The prompt closes a stale single-dependency PR through `@dependabot close`.
+- [x] The prompt never updates a stale dependency of a multi-dependency PR.
+- [x] The PR comment carries no guild words.

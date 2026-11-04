@@ -1426,7 +1426,7 @@ comes from a fixed set, and each job carries its prompt and a display class:
 | job | class | what its session does |
 |---|---|---|
 | `red-main` | cleric | fixes a red main with TDD, opens a PR tracked with `--fixes-main`, never merges |
-| `dependabot` | artificer | makes open Dependabot PRs mergeable (identity, scope and supply-chain gates, direct fixes on the PR branch) and fixes a failing Dependabot update run through a normal PR; never merges |
+| `dependabot` | artificer | makes open Dependabot PRs mergeable (stale, identity, scope and supply-chain gates, direct fixes on the PR branch; closes a stale single-dependency PR with `@dependabot close` and drops stale dependencies from a multi-dependency PR) and fixes a failing Dependabot update run through a normal PR; never merges |
 
 `name` is only a label for the board. Each solo player is also a health job
 named `<job>-<owner>-<repo>` (the repo with `/` turned into `-`, for example
