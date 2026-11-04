@@ -435,6 +435,7 @@ _COLUMN_MIGRATIONS = (
     ("quests", "updated_at", "TEXT"),
     ("quest_tasks", "created_at", "TEXT"),
     ("quest_tasks", "updated_at", "TEXT"),
+    ("quest_tasks", "no_sdd", "INTEGER NOT NULL DEFAULT 0"),
     ("prs", "tracked_at", "TEXT"),
     ("claims", "created_at", "TEXT"),
     ("claims", "updated_at", "TEXT"),

@@ -192,7 +192,7 @@ def _handle_task_add(ctx, args):
     from guild.commands import task as task_commands
 
     quest, tid = args.ref.split("/", 1)
-    _print(task_commands.add(ctx, quest, tid, args.title, args.reason))
+    _print(task_commands.add(ctx, quest, tid, args.title, args.reason, args.no_sdd))
     return 0
 
 
@@ -1149,6 +1149,7 @@ def _add_task_parser(subparsers):
     add.add_argument("ref")
     add.add_argument("--title", required=True)
     add.add_argument("--reason", help="why the task was added")
+    add.add_argument("--no-sdd", action="store_true", help="housekeeping task with no entry in the epic's tasks.md")
     add.set_defaults(handler=_handle_task_add)
 
     start = actions.add_parser("start", help="mark a task in progress")

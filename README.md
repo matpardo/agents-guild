@@ -157,7 +157,7 @@ guild quest board [--project <name>]   # open quests and the synced SDD tasks no
 guild quest done <slug> [--accept-drift] [--force]   # refuses while tasks are not done; --force overrides
 guild quest incomplete <slug> --reason "..."          # a done quest that was not really finished
 
-guild task add <quest>/<tid> --title "..." [--reason "<why>"]   # open quests of your party, epic quests included
+guild task add <quest>/<tid> --title "..." [--reason "<why>"] [--no-sdd]   # open quests of your party, epic quests included
 guild task start <quest>/<tid> [--summary "..."]
 guild task block <quest>/<tid> --reason "..."
 guild task done  <quest>/<tid> [--summary "..."]   # epic quests: also mark it done in the epic's tasks.md
@@ -2118,7 +2118,10 @@ another party, the command is refused. A tid that is not in the epic's
 `tasks.md` yet is accepted. Guild stays read-only towards the SDD, so for an
 epic quest `task add` prints `add <tid> to <epic> tasks.md in the SDD` and
 `task done` prints `mark <tid> done in <epic> tasks.md in the SDD`: the agent
-updates `tasks.md` through the normal skills. Two `guild drift` rules detect
+updates `tasks.md` through the normal skills. `task add --no-sdd` marks
+housekeeping work with no entry in `tasks.md` (a task that tracks a specs PR,
+say): it prints no hint, shows `(no sdd)` on the board, and the `quest task not
+in SDD` rule skips it; it still has to be done before `quest done`. Two `guild drift` rules detect
 a missed update (`quest task not in SDD`, `task done, SDD not done`), and the
 epic `quest done` drift gate refuses on them.
 

@@ -41,7 +41,7 @@ def _with_sdd_hint(message, quest_row, hint_template, tid):
     return "{}\n{}".format(message, hint_template.format(tid, quest_row["epic"]))
 
 
-def add(ctx, quest, tid, title, reason):
+def add(ctx, quest, tid, title, reason, no_sdd):
     with db.writing(ctx.conn):
         quest_row, binding = _load_owned_quest(ctx, quest)
         if quest_row["state"] != "active":
@@ -54,6 +54,8 @@ def add(ctx, quest, tid, title, reason):
                 ctx.conn, ctx.now, quest_row["project"], quest_row["epic"], [{"tid": tid}], binding["party"], False
             )
         payload = {"quest": quest, "tid": tid, "title": title}
+        if no_sdd:
+            payload["no_sdd"] = True
         if reason is not None:
             pii.validate_reason(reason, ctx.projects_dir, quest_row["project"])
             payload["reason"] = reason
@@ -68,7 +70,10 @@ def add(ctx, quest, tid, title, reason):
             "local",
             payload,
         )
-    return _with_sdd_hint("task '{}/{}' added".format(quest, tid), quest_row, "add {} to {} tasks.md in the SDD", tid)
+    message = "task '{}/{}' added".format(quest, tid)
+    if no_sdd:
+        return message
+    return _with_sdd_hint(message, quest_row, "add {} to {} tasks.md in the SDD", tid)
 
 
 def start(ctx, quest, tid, summary):

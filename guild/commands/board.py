@@ -550,6 +550,8 @@ def _task_lines(ctx, repo_clones, painter, task_row, task_prs):
             )
         ]
     title = sanitize.strip_control_sequences(task_row["title"])
+    if task_row["no_sdd"]:
+        title = "{} (no sdd)".format(title)
     lines = [_dated(painter, "    ▶ {}  {}".format(painter.paint(task_row["tid"], "bold"), title), dates)]
     if task_row["summary"]:
         lines.extend(painter.paint(line, "dim") for line in painter.wrap(task_row["summary"], "        "))
@@ -600,7 +602,7 @@ def _quest_lines(ctx, repo_clones, painter, quest_row, prs_by_task):
     queued = []
     for task_row in task_rows:
         if task_row["state"] == "queued":
-            queued.append(task_row["tid"])
+            queued.append("{} (no sdd)".format(task_row["tid"]) if task_row["no_sdd"] else task_row["tid"])
             continue
         task_prs = prs_by_task.get((quest_row["slug"], task_row["tid"]), [])
         lines.extend(_task_lines(ctx, repo_clones, painter, task_row, task_prs))
@@ -1381,6 +1383,7 @@ def _task_model(ctx, repo_clones, project, epic, task_row, task_prs, project_con
         "tid": task_row["tid"],
         "title": sanitize.strip_control_sequences(task_row["title"]),
         "state": task_row["state"],
+        "no_sdd": bool(task_row["no_sdd"]),
         "dates": _row_dates(task_row),
         "summary": _optional_text(task_row["summary"]),
         "blocked_reason": _optional_text(task_row["blocked_reason"]),

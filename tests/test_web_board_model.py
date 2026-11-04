@@ -311,7 +311,7 @@ class BoardModelShapeTests(BoardModelTestCase):
         t01 = tasks_by_tid["T01"]
         self.assertEqual(
             set(t01),
-            {"tid", "title", "state", "dates", "summary", "blocked_reason", "card_url", "prs"},
+            {"tid", "title", "state", "no_sdd", "dates", "summary", "blocked_reason", "card_url", "prs"},
         )
         self.assertEqual(t01["state"], "active")
         self.assertEqual(t01["summary"], "in progress")

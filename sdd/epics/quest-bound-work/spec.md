@@ -5,7 +5,7 @@ title: A party's work always belongs to a quest
 status: done
 owner: matpardo
 created: 2026-10-23
-updated: 2026-10-23
+updated: 2026-11-04
 ---
 
 # Spec: A party's work always belongs to a quest
@@ -24,6 +24,7 @@ Every PR a party opens belongs to one of its quest tasks, so the board never sho
 - `--card` is accepted only from an adventurer with a free job. An adventurer on a task tracks with `--task`.
 - PRs already tracked loose stay on the board until they merge or close; nothing creates new ones. Adventurer PRs show under the adventurer.
 - `guild pr track --card` on an existing PR keeps working for the card key of a task-bound PR.
+- `guild task add --no-sdd` marks housekeeping work with no entry in the epic `tasks.md`; drift and the epic `quest done` gate skip it, and the board marks it.
 - `README.md` and `GUILD.md` change with the code.
 
 ## Out of scope
