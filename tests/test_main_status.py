@@ -152,6 +152,79 @@ class GhSyncTests(_CloneFixture, _MainStatusCase):
         self.assertIn("acme/app: main status check failed: boom", out + err)
         self.assertEqual(self.rows(), [])
 
+    def _run(self, workflow, conclusion, sha, run_id, event):
+        status = "completed" if conclusion else "in_progress"
+        return {
+            "workflowName": workflow,
+            "conclusion": conclusion,
+            "status": status,
+            "headSha": sha,
+            "databaseId": run_id,
+            "event": event,
+        }
+
+    def test_latest_failed_workflow_run_marks_main_red_when_head_has_no_failing_checks(self):
+        self.write_gh_fixture("branch_checks_acme-app_main", _GREEN_RUNS)
+        self.write_gh_fixture(
+            "branch_runs_acme-app_main",
+            [
+                self._run("CI", "failure", "4cf88e46d0", 41, "workflow_dispatch"),
+                self._run("CI", "success", "c6365058d0", 40, "schedule"),
+                self._run("Docs", "success", "c6365058d0", 39, "schedule"),
+            ],
+        )
+        self._sync()
+        self.assertEqual(self.rows(), [("acme/app", "gh", 1, "workflow CI failed @ 4cf88e4 (run 41)")])
+
+    def test_a_later_green_run_of_the_workflow_clears_the_red(self):
+        self.write_gh_fixture("branch_checks_acme-app_main", _GREEN_RUNS)
+        self.write_gh_fixture("branch_runs_acme-app_main", [self._run("CI", "failure", "4cf88e46d0", 41, "schedule")])
+        self._sync()
+        self.write_gh_fixture(
+            "branch_runs_acme-app_main",
+            [
+                self._run("CI", "success", "12bb6740f0", 42, "schedule"),
+                self._run("CI", "failure", "4cf88e46d0", 41, "schedule"),
+            ],
+        )
+        self._sync()
+        self.assertEqual(self.rows(), [("acme/app", "gh", 0, None)])
+
+    def test_running_cancelled_and_skipped_runs_fall_back_to_the_previous_completed_one(self):
+        self.write_gh_fixture("branch_checks_acme-app_main", _GREEN_RUNS)
+        self.write_gh_fixture(
+            "branch_runs_acme-app_main",
+            [
+                self._run("CI", "", "aaaaaaa000", 45, "schedule"),
+                self._run("CI", "cancelled", "bbbbbbb000", 44, "schedule"),
+                self._run("CI", "skipped", "ccccccc000", 43, "schedule"),
+                self._run("CI", "failure", "ddddddd000", 42, "schedule"),
+            ],
+        )
+        self._sync()
+        self.assertEqual(self.rows(), [("acme/app", "gh", 1, "workflow CI failed @ ddddddd (run 42)")])
+
+    def test_dependabot_update_runs_on_the_base_do_not_mark_main_red(self):
+        self.write_gh_fixture("branch_checks_acme-app_main", _GREEN_RUNS)
+        self.write_gh_fixture(
+            "branch_runs_acme-app_main", [self._run("pip in /. - Update #1", "failure", "aaaaaaa000", 9, "dynamic")]
+        )
+        self._sync()
+        self.assertEqual(self.rows(), [])
+
+    def test_failing_head_checks_win_over_workflow_runs(self):
+        self.write_gh_fixture("branch_checks_acme-app_main", _FAILED_RUNS)
+        self.write_gh_fixture("branch_runs_acme-app_main", [self._run("CI", "failure", "aaaaaaa000", 9, "schedule")])
+        self._sync()
+        self.assertEqual(self.rows(), [("acme/app", "gh", 1, "checks failing: e2e, lint")])
+
+    def test_workflow_runs_failure_is_reported_and_leaves_the_status_alone(self):
+        self.write_gh_fixture("branch_checks_acme-app_main", _GREEN_RUNS)
+        self.write_gh_error("branch_runs_acme-app_main", "boom")
+        code, out, err = self.run_cli(["sync", "--source", "gh"], "sess-1", self.repo_dir)
+        self.assertIn("acme/app: main status check failed: boom", out + err)
+        self.assertEqual(self.rows(), [])
+
     def _write_annotations(self, run_id, message):
         self.write_gh_fixture("annotations_acme-app_{}".format(run_id), [{"message": message}])
 

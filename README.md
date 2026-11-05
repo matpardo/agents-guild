@@ -1164,7 +1164,15 @@ rather than ordered arbitrarily.
 among the shown PRs. Two sources feed it: `guild sync --source gh` reads the
 check runs of the base branch (`gh api repos/<repo>/commits/<branch>/check-runs`)
 for each project repo that has a local clone with a known base branch, and
-it is red when any run failed, was cancelled, timed out or needs action
+it is red when any run failed, was cancelled, timed out or needs action. When
+no check run of the head commit fails, it also reads the last 30 workflow runs
+of the base branch (`gh run list --branch <branch>`) and is red when the latest
+decided run of a workflow failed, timed out or failed to start (reason
+`workflow <name> failed @ <sha7> (run <id>)`): this catches a repo whose CI on
+the base runs on a schedule or by hand, so the head commit has no CI checks.
+Runs still in progress, cancelled or skipped fall back to that workflow's
+previous run, a later green run clears it, and Dependabot update runs (event
+`dynamic`) never count
 (event `main.status_synced`, one event per change, source `gh`); and
 `guild main red <repo> --reason "<text>"` / `guild main green <repo>` mark it
 by hand (event `main.marked`, source `manual`). A repo is red when any source
@@ -1436,6 +1444,17 @@ comes from a fixed set, and each job carries its prompt and a display class:
 |---|---|---|
 | `red-main` | cleric | fixes a red main with TDD, opens a PR tracked with `--fixes-main`, never merges |
 | `dependabot` | artificer | makes open Dependabot PRs mergeable (stale, identity, scope and supply-chain gates, direct fixes on the PR branch; closes a stale single-dependency PR with `@dependabot close` and drops stale dependencies from a multi-dependency PR) and fixes a failing Dependabot update run through a normal PR; never merges |
+
+Each prompt has two parts. The rules always apply: the goal, never merge,
+how to track the PR, `guild solo say` and `guild adventurer done`. The steps are
+built in, unless the local clone of the player's repo has a skill named after
+the job, `.claude/skills/<job>/SKILL.md`: then the session starts with
+`/<job> <owner/repo>` and follows that skill for the steps, with the rules
+still on top (they win on merging, tracking and messages; the skill wins on the
+repo's own steps, such as how a PR becomes ready). A repo keeps its own flow
+that way, and the skill stays usable without guild. `guild solo launch` and the
+tick open the window in that clone; without a local clone, in the project's
+first path with the built-in steps.
 
 `name` is only a label for the board. Each solo player is also a health job
 named `<job>-<owner>-<repo>` (the repo with `/` turned into `-`, for example

@@ -527,6 +527,28 @@ def _branch_red_reason(checks):
     return "checks failing: {}".format(", ".join(sorted(failing)))
 
 
+_UNDECIDED_RUN_CONCLUSIONS = ("", "cancelled", "skipped")
+_FAILING_RUN_CONCLUSIONS = ("failure", "timed_out", "startup_failure")
+_DEPENDABOT_RUN_EVENT = "dynamic"
+
+
+def _workflow_red_reason(runs):
+    latest = {}
+    for run in runs:
+        if run["event"] == _DEPENDABOT_RUN_EVENT or run["status"] != "completed":
+            continue
+        if run["conclusion"] in _UNDECIDED_RUN_CONCLUSIONS:
+            continue
+        latest.setdefault(run["workflowName"], run)
+    failed = [run for name, run in sorted(latest.items()) if run["conclusion"] in _FAILING_RUN_CONCLUSIONS]
+    if not failed:
+        return None
+    return ", ".join(
+        "workflow {} failed @ {} (run {})".format(run["workflowName"], run["headSha"][:7], run["databaseId"])
+        for run in failed
+    )
+
+
 def _failed_without_starting(check):
     duration = check["duration_seconds"]
     return duration is not None and duration <= _BILLING_MAX_UNSTARTED_SECONDS
@@ -573,10 +595,10 @@ def _sync_repo_main_status(ctx, project, repo, base, failures):
     try:
         checks = github.branch_checks(ctx.cwd, repo, base)
         external = _BILLING_EXTERNAL if _billing_blocked(ctx, repo, checks) else None
+        reason = _branch_red_reason(checks) or _workflow_red_reason(github.branch_runs(ctx.cwd, repo, base))
     except github.GhCommandError as error:
         failures.append("{}: main status check failed: {}".format(repo, error))
         return
-    reason = _branch_red_reason(checks)
     if _recorded_gh_status(ctx, repo) == (reason is not None, reason, external):
         return
     _record_main_status(ctx, project, repo, reason, external)
