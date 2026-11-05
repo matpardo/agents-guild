@@ -67,8 +67,9 @@ def _find_player(project_data, repo, job_name):
 
 def _launch_player(ctx, project, project_data, repo, job_name, tmux):
     health_job = solo_players.health_job_name(repo, job_name)
-    job = next(job for job in solo_players.jobs(project_data) if job["name"] == health_job)
-    message = adventurer_commands.launch_window(project_data, job, _window_name(health_job), tmux)
+    job = solo_players.launch_job(project_data, repo, job_name)
+    cwd = job["cwd"] or adventurer_commands.first_path(project_data)
+    message = adventurer_commands.launch_window(cwd, job, _window_name(health_job), tmux)
     player = _find_player(project_data, repo, job_name)
     trigger = solo_players.current_trigger(ctx.conn, repo, job_name)
     with db.writing(ctx.conn):

@@ -1,4 +1,6 @@
-from guild import sanitize, timeutil
+from pathlib import Path
+
+from guild import localbase, sanitize, timeutil
 
 COOLDOWN = "1h"
 REPEAT_COOLDOWN = "24h"
@@ -6,16 +8,20 @@ RUNS_SHOWN = 5
 LAUNCH_COMMAND = "guild solo launch {} {}"
 RESUME_COMMAND = "guild solo resume {} {}"
 
-_RED_MAIN_PROMPT = (
-    "Main of {repo} is red. Read its failing checks (`gh run list --branch <base> --repo {repo}`, `gh pr checks`),"
-    " reproduce the failure locally and fix it with TDD in a worktree. Open a PR and track it with"
-    " `guild pr track ... --fixes-main` (add `--fixes-flaky` when the failure is flaky). Mark the PR ready once CI"
-    ' is green. Never merge. Tell the dev only important things with `guild solo say "<text>"`, no routine'
+_RED_MAIN_GOAL = "Main of {repo} is red: get it green."
+_RED_MAIN_STEPS = (
+    " Read its failing checks (`gh run list --branch <base> --repo {repo}`, `gh pr checks`), reproduce the failure"
+    " locally and fix it with TDD in a worktree. Open a PR and mark it ready once CI is green."
+)
+_RED_MAIN_RULES = (
+    " Track the fix PR with `guild pr track ... --fixes-main` (add `--fixes-flaky` when the failure is flaky)."
+    ' Never merge. Tell the dev only important things with `guild solo say "<text>"`, no routine'
     ' progress: `guild solo say "started fixing: <cause>"` when you know the cause, then `guild solo say "fix PR'
     ' {repo}#<n> ready, waits on merge"` (or `guild solo say "main green, nothing to do"`). End with `guild adventurer done --pending "<text>"`.'
 )
-_DEPENDABOT_PROMPT = (
-    "For each open Dependabot PR on {repo} apply these gates: stale (compare each target version with the pin in the"
+_DEPENDABOT_GOAL = "Get the open Dependabot PRs of {repo} mergeable and its Dependabot update runs passing."
+_DEPENDABOT_STEPS = (
+    " For each open Dependabot PR on {repo} apply these gates: stale (compare each target version with the pin in the"
     " manifest and lock on the base branch; a dependency is stale when the base already pins that version or a"
     " newer one. A stale single-dependency PR: comment `@dependabot close` and tell the dev with `guild solo say"
     ' "{repo}#<n> closed: already at <version>"`. A stale dependency in a multi-dependency PR: never update a stale'
@@ -24,14 +30,26 @@ _DEPENDABOT_PROMPT = (
     " dependency pins change; no new steps or permissions), supply chain (an action SHA equals the commit of its"
     " tag; package hashes match the registry) and read the release notes on major bumps. Then push direct fixes on"
     " the PR branch (version strings, hashes, formatter output, a tool `required-version` bump) so the PR becomes"
-    " mergeable. Also fix a failing Dependabot update run of {repo} through a normal PR. Never merge. Report what"
-    ' still needs a human. Tell the dev only important things with `guild solo say "<text>"`, no routine'
-    ' progress: `guild solo say "{repo}#<n> needs a human: <why>"`. Guild itself announces the PRs that turn green.'
-    ' End with `guild adventurer done --pending "<text>"`.'
+    " mergeable. Also fix a failing Dependabot update run of {repo} through a normal PR."
 )
+_DEPENDABOT_RULES = (
+    " Never merge. Report what still needs a human. Tell the dev only important things with `guild solo say"
+    ' "<text>"`, no routine progress: `guild solo say "{repo}#<n> needs a human: <why>"`. Guild itself announces'
+    ' the PRs that turn green. End with `guild adventurer done --pending "<text>"`.'
+)
+_SKILL_STEPS = (
+    " Follow the repo skill above for the steps. Where it disagrees with these rules, the rules win on merging,"
+    " guild tracking and messages; the skill wins on the repo's own steps, such as how a PR becomes ready."
+)
+
+
+def _job(job_class, goal, steps, rules):
+    return {"class": job_class, "goal": goal, "rules": rules, "prompt": goal + steps + rules}
+
+
 JOBS = {
-    "red-main": {"class": "cleric", "prompt": _RED_MAIN_PROMPT},
-    "dependabot": {"class": "artificer", "prompt": _DEPENDABOT_PROMPT},
+    "red-main": _job("cleric", _RED_MAIN_GOAL, _RED_MAIN_STEPS, _RED_MAIN_RULES),
+    "dependabot": _job("artificer", _DEPENDABOT_GOAL, _DEPENDABOT_STEPS, _DEPENDABOT_RULES),
 }
 
 
@@ -63,6 +81,25 @@ def jobs(project_data):
         }
         for player in _players(project_data)
     ]
+
+
+def _clone_path(project_data, repo):
+    for clone in localbase.locate_clones(project_data):
+        if clone["repo"] == repo:
+            return clone["path"]
+    return None
+
+
+def _repo_skill_prompt(job_name, repo):
+    job = JOBS[job_name]
+    return "/{} {}\n\n".format(job_name, repo) + (job["goal"] + _SKILL_STEPS + job["rules"]).format(repo=repo)
+
+
+def launch_job(project_data, repo, job_name):
+    clone = _clone_path(project_data, repo)
+    skill = clone is not None and Path(clone, ".claude", "skills", job_name, "SKILL.md").is_file()
+    command = _repo_skill_prompt(job_name, repo) if skill else JOBS[job_name]["prompt"].format(repo=repo)
+    return {"name": health_job_name(repo, job_name), "command": command, "every": COOLDOWN, "cwd": clone}
 
 
 def _red_main_trigger(conn, repo):

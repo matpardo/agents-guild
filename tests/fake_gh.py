@@ -45,6 +45,14 @@ def respond(directory, args):
     if args[:2] == ["pr", "list"] and "--author" in args:
         repo = args[args.index("--repo") + 1]
         return _respond(directory, "dependabot_prs_{}".format(repo.replace("/", "-")))
+    if args[:2] == ["run", "list"] and "--branch" in args:
+        repo = args[args.index("--repo") + 1].replace("/", "-")
+        name = "branch_runs_{}_{}".format(repo, args[args.index("--branch") + 1])
+        if not os.path.isfile(os.path.join(directory, name + ".json")) and not os.path.isfile(
+            os.path.join(directory, name + ".err")
+        ):
+            return subprocess.CompletedProcess([], 0, "[]", "")
+        return _respond(directory, name)
     if args[:2] == ["run", "list"]:
         repo = args[args.index("--repo") + 1]
         return _respond(directory, "dependabot_runs_{}".format(repo.replace("/", "-")))

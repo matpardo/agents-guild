@@ -257,3 +257,27 @@ updated: 2026-11-02
 - [x] The prompt closes a stale single-dependency PR through `@dependabot close`.
 - [x] The prompt never updates a stale dependency of a multi-dependency PR.
 - [x] The PR comment carries no guild words.
+
+## T22 — A repo skill gives the steps of a solo player's job
+
+**Depends on:** T21
+**Status:** [x] done
+
+**What:** Each built-in prompt splits into a goal, steps and rules. When the local clone of the player's repo has `.claude/skills/<job>/SKILL.md`, the session starts with `/<job> <owner/repo>`, the skill replaces the built-in steps and the goal and rules stay. `guild solo launch` and the tick open the window in that clone, falling back to the project's first path.
+
+**Acceptance:**
+- [x] A clone with the job's skill gets `/<job> <owner/repo>`, the goal and the rules, and not the built-in steps; for both jobs.
+- [x] A clone without it, or with another job's skill, gets the built-in prompt.
+- [x] The window opens in the clone of the player's repo.
+
+## T23 — Main red from the latest workflow run of the base branch
+
+**Depends on:** T22
+**Status:** [x] done
+
+**What:** When no check run of the base branch head fails, the gh sync reads the last 30 workflow runs of the base branch and marks main red when the latest decided run of a workflow failed, timed out or failed to start. Repos whose CI on the base runs only on a schedule or by hand become visible to the `red-main` trigger.
+
+**Acceptance:**
+- [x] A failed latest run marks main red with `workflow <name> failed @ <sha7> (run <id>)`; a later green run clears it.
+- [x] Runs in progress, cancelled or skipped fall back to the previous run of the workflow; Dependabot update runs never count.
+- [x] Failing head checks keep their reason; a `gh run list` failure is reported and leaves the status alone.

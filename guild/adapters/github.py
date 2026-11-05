@@ -133,6 +133,30 @@ def dependabot_runs(cwd, repo):
     return json.loads(result.stdout)
 
 
+def branch_runs(cwd, repo, branch):
+    result = _run(
+        [
+            "gh",
+            "run",
+            "list",
+            "--repo",
+            repo,
+            "--branch",
+            branch,
+            "--limit",
+            "30",
+            "--json",
+            "workflowName,conclusion,status,headSha,databaseId,event",
+        ],
+        cwd=str(cwd),
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode != 0:
+        raise GhCommandError(result.stderr.strip() or "gh run list failed")
+    return json.loads(result.stdout)
+
+
 def _run_duration_seconds(run):
     if not run.get("started_at") or not run.get("completed_at"):
         return None

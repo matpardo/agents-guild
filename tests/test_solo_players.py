@@ -1,6 +1,7 @@
 import json
 import os
 import sqlite3
+import subprocess
 from datetime import timedelta
 from unittest import mock
 
@@ -455,6 +456,58 @@ class SoloPlayersLaunchTests(SoloPlayersTestCase):
         self.assertEqual(call[call.index("-n") + 1], "solo-red-main-acme-app")
         self.assertEqual(call[call.index("-c") + 1], str(self.project_dir))
         self.assertTrue(call[-1].startswith("GUILD_ADVENTURER_JOB=red-main-acme-app claude "))
+
+    def make_clone(self):
+        for args in (["init", "-q"], ["remote", "add", "origin", "https://github.com/acme/app.git"]):
+            subprocess.run(["git", "-C", str(self.repo_dir)] + args, check=True, capture_output=True)
+
+    def add_skill(self, job):
+        skill = self.repo_dir / ".claude" / "skills" / job / "SKILL.md"
+        skill.parent.mkdir(parents=True)
+        skill.write_text("# {}\n".format(job))
+
+    def launched(self, job):
+        tmux = FakeTmux(True, [], [])
+        code, out, err = self.launch(["solo", "launch", "acme/app", job], None, tmux)
+        self.assertEqual(code, 0, err)
+        call = next(c for c in tmux.calls if c[0] == "new-session")
+        return call[call.index("-c") + 1], call[-1]
+
+    def test_launch_opens_the_window_in_the_clone_of_the_players_repo(self):
+        self.make_clone()
+        cwd, command = self.launched("red-main")
+        self.assertEqual(cwd, str(self.repo_dir))
+        self.assertIn("reproduce the failure locally", command)
+
+    def test_a_repo_skill_for_the_job_replaces_the_built_in_steps_and_keeps_the_rules(self):
+        self.make_clone()
+        self.add_skill("red-main")
+        cwd, command = self.launched("red-main")
+        self.assertIn("/red-main acme/app", command)
+        self.assertNotIn("reproduce the failure locally", command)
+        for rule in (
+            "Main of acme/app is red",
+            "Never merge",
+            "--fixes-main",
+            "guild solo say",
+            "guild adventurer done",
+        ):
+            self.assertIn(rule, command)
+
+    def test_a_repo_skill_for_another_job_does_not_change_the_prompt(self):
+        self.make_clone()
+        self.add_skill("dependabot")
+        cwd, command = self.launched("red-main")
+        self.assertNotIn("/dependabot", command)
+        self.assertIn("reproduce the failure locally", command)
+
+    def test_dependabot_follows_its_repo_skill_too(self):
+        self.make_clone()
+        self.add_skill("dependabot")
+        cwd, command = self.launched("dependabot")
+        self.assertIn("/dependabot acme/app", command)
+        self.assertNotIn("apply these gates", command)
+        self.assertIn("Never merge", command)
 
     def test_launch_finds_the_player_from_a_cwd_outside_any_project(self):
         outside = self.project_dir.parent / "elsewhere"

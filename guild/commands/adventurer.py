@@ -125,7 +125,7 @@ def start(ctx, job, task, health_job, reason):
     return "adventurer {} started".format(adventurer_id)
 
 
-def _first_path(project_data):
+def first_path(project_data):
     pattern = os.path.expanduser(project_data["paths"][0])
     parts = []
     for part in Path(pattern).parts:
@@ -135,8 +135,7 @@ def _first_path(project_data):
     return str(Path(*parts))
 
 
-def launch_window(project_data, job, window_name, tmux):
-    cwd = _first_path(project_data)
+def launch_window(cwd, job, window_name, tmux):
     if not os.path.isdir(cwd):
         raise GuildError("project path '{}' does not exist".format(cwd), 1)
     if not tmux.installed():
@@ -159,7 +158,7 @@ def launch(ctx, job_name, tmux):
     project = config.require_project(ctx.cwd, ctx.projects_dir)
     project_data = config.load_project(ctx.projects_dir, project)
     job = health_jobs.require_job(project_data, job_name)
-    return launch_window(project_data, job, "health-" + job_name, tmux)
+    return launch_window(first_path(project_data), job, "health-" + job_name, tmux)
 
 
 def _post_solo_finished(ctx, adventurer, pending):
