@@ -411,6 +411,37 @@ class QuestTaskNotInSddTests(DriftTestCase):
         code, out, err = self._drift("wave9")
         self.assertNotIn("quest task not in SDD", out)
 
+    def test_discarded_task_missing_from_the_sdd_is_not_a_finding(self):
+        self.run_cli(["task", "add", "wave9/T09", "--title", "Extra"], "sess-1", self.repo_dir)
+        self.run_cli(["task", "discard", "wave9/T09", "--reason", "mistake"], "sess-1", self.repo_dir)
+        code, out, err = self._drift("wave9")
+        self.assertNotIn("quest task not in SDD", out)
+        self.assertNotIn("discarded task in SDD", out)
+
+    def test_discarded_task_still_in_the_sdd_is_a_finding(self):
+        self.run_cli(["task", "discard", "wave9/T01", "--reason", "mistake"], "sess-1", self.repo_dir)
+        code, out, err = self._drift("wave9")
+        self.assertIn("discarded task in SDD (1)", out)
+        self.assertIn("task:wave9/T01 discarded but still listed in epic wave9 tasks.md", out)
+
+    def test_discarded_no_sdd_task_is_not_a_finding(self):
+        self.run_cli(["task", "add", "wave9/T09", "--title", "Extra", "--no-sdd"], "sess-1", self.repo_dir)
+        self.run_cli(["task", "discard", "wave9/T09", "--reason", "mistake"], "sess-1", self.repo_dir)
+        code, out, err = self._drift("wave9")
+        self.assertNotIn("discarded task in SDD", out)
+
+    def test_restored_task_is_no_longer_a_finding(self):
+        self.run_cli(["task", "discard", "wave9/T01", "--reason", "mistake"], "sess-1", self.repo_dir)
+        self.run_cli(["task", "restore", "wave9/T01"], "sess-1", self.repo_dir)
+        code, out, err = self._drift("wave9")
+        self.assertNotIn("discarded task in SDD", out)
+
+    def test_quest_done_gate_reports_a_discarded_task_still_in_the_sdd(self):
+        self.run_cli(["task", "discard", "wave9/T01", "--reason", "mistake"], "sess-1", self.repo_dir)
+        code, out, err = self.run_cli(["quest", "done", "wave9"], "sess-1", self.repo_dir)
+        self.assertEqual(code, 1)
+        self.assertIn("discarded but still listed", err)
+
     def test_quest_done_passes_with_a_done_no_sdd_task(self):
         self.run_cli(["task", "add", "wave9/T09", "--title", "Extra", "--no-sdd"], "sess-1", self.repo_dir)
         self.run_cli(["task", "done", "wave9/T09"], "sess-1", self.repo_dir)

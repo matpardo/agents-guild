@@ -60,7 +60,7 @@ def _is_open_free_quest_task(conn, project, slug, tid):
     row = conn.execute(
         "SELECT 1 FROM quests q JOIN quest_tasks qt ON qt.quest = q.slug"
         " WHERE q.slug = ? AND q.project = ? AND q.party IS NULL AND q.state = 'active'"
-        " AND q.epic IS NULL AND qt.tid = ?",
+        " AND q.epic IS NULL AND qt.state != 'discarded' AND qt.tid = ?",
         (slug, project, tid),
     ).fetchone()
     return row is not None

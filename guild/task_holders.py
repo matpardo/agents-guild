@@ -11,7 +11,9 @@ def _quest_holders(conn, project, epic, party, allow_open_quests):
     rows = conn.execute(
         "SELECT q.slug AS slug, q.party AS party, qt.tid AS tid"
         " FROM quests q JOIN quest_tasks qt ON qt.quest = q.slug"
-        " WHERE q.project = ? AND q.epic = ? AND q.state = 'active' AND " + party_filter + " ORDER BY q.slug, qt.tid",
+        " WHERE q.project = ? AND q.epic = ? AND q.state = 'active' AND qt.state != 'discarded' AND "
+        + party_filter
+        + " ORDER BY q.slug, qt.tid",
         (project, epic, party),
     ).fetchall()
     holders = {}
@@ -53,7 +55,7 @@ def task_adventurer(conn, quest_row, tid):
 def open_quest_holder(conn, project, epic, tid):
     row = conn.execute(
         "SELECT q.slug AS slug FROM quests q JOIN quest_tasks qt ON qt.quest = q.slug"
-        " WHERE q.project = ? AND q.party IS NULL AND q.state = 'active' AND qt.tid = ?"
+        " WHERE q.project = ? AND q.party IS NULL AND q.state = 'active' AND qt.state != 'discarded' AND qt.tid = ?"
         " AND (q.epic = ? OR (q.epic IS NULL AND q.slug = ?)) ORDER BY q.slug",
         (project, tid, epic, epic),
     ).fetchone()

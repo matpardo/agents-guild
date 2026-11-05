@@ -99,7 +99,8 @@ def party_report(ctx, party, pending):
     ).fetchall()
     quests = ctx.conn.execute(
         "SELECT quests.slug AS slug, quests.state AS state,"
-        " (SELECT COUNT(*) FROM quest_tasks WHERE quest_tasks.quest = quests.slug) AS total,"
+        " (SELECT COUNT(*) FROM quest_tasks WHERE quest_tasks.quest = quests.slug"
+        " AND quest_tasks.state != 'discarded') AS total,"
         " (SELECT COUNT(*) FROM quest_tasks WHERE quest_tasks.quest = quests.slug AND quest_tasks.state = 'done')"
         " AS done FROM quests WHERE quests.party = ? ORDER BY quests.slug ASC",
         (party,),

@@ -97,7 +97,8 @@ def _quest_label(conn, party):
     labels = []
     for quest in quests:
         counts = conn.execute(
-            "SELECT COUNT(*) AS total, COALESCE(SUM(state = 'done'), 0) AS done FROM quest_tasks WHERE quest = ?",
+            "SELECT COUNT(*) AS total, COALESCE(SUM(state = 'done'), 0) AS done FROM quest_tasks"
+            " WHERE quest = ? AND state != 'discarded'",
             (quest["slug"],),
         ).fetchone()
         labels.append("{} {}/{}".format(quest["slug"], counts["done"], counts["total"]))

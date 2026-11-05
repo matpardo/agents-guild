@@ -280,7 +280,7 @@ def _epic_done_task_findings(conn, project, epic):
         "SELECT quest_tasks.quest AS quest, quest_tasks.tid AS tid, quest_tasks.state AS state"
         " FROM quest_tasks"
         " JOIN quests ON quests.slug = quest_tasks.quest"
-        " WHERE quests.project = ? AND quests.epic = ? AND quest_tasks.state != 'done'",
+        " WHERE quests.project = ? AND quests.epic = ? AND quest_tasks.state NOT IN ('done', 'discarded')",
         (project, epic),
     ).fetchall()
     return [
@@ -323,7 +323,7 @@ def _rule_quest_task_not_in_sdd(conn, project, epics, party_scope):
         " JOIN quests ON quests.slug = quest_tasks.quest"
         " JOIN parties ON parties.name = quests.party"
         " WHERE quests.project = ? AND quests.epic IS NOT NULL"
-        " AND quest_tasks.no_sdd = 0"
+        " AND quest_tasks.no_sdd = 0 AND quest_tasks.state != 'discarded'"
         " AND NOT EXISTS (SELECT 1 FROM tasks WHERE tasks.project = quests.project"
         " AND tasks.epic = quests.epic AND tasks.tid = quest_tasks.tid)"
         + _epic_clause("quests", epics)
@@ -351,6 +351,28 @@ def _rule_task_done_sdd_not_done(conn, project, epics, party_scope):
     ).fetchall()
     return [
         "task:{}/{} done, epic {} tasks.md says {}".format(row["quest"], row["tid"], row["epic"], row["sdd_status"])
+        for row in rows
+    ]
+
+
+def _rule_discarded_task_in_sdd(conn, project, epics, party_scope):
+    rows = conn.execute(
+        "SELECT quests.epic AS epic, quest_tasks.quest AS quest, quest_tasks.tid AS tid"
+        " FROM quest_tasks"
+        " JOIN quests ON quests.slug = quest_tasks.quest"
+        " JOIN tasks ON tasks.project = quests.project AND tasks.epic = quests.epic"
+        " AND tasks.tid = quest_tasks.tid"
+        " JOIN parties ON parties.name = quests.party"
+        " WHERE quests.project = ? AND quest_tasks.state = 'discarded' AND quest_tasks.no_sdd = 0"
+        + _epic_clause("quests", epics)
+        + _party_clause(party_scope)
+        + " ORDER BY quests.epic, quest_tasks.quest, quest_tasks.tid",
+        _epic_params(project, epics) + _party_params(party_scope),
+    ).fetchall()
+    return [
+        "task:{}/{} discarded but still listed in epic {} tasks.md: remove it there or restore it".format(
+            row["quest"], row["tid"], row["epic"]
+        )
         for row in rows
     ]
 
@@ -394,6 +416,7 @@ def _collect_epic_scoped(conn, project, epics, party_scope):
         ("epic done with open work", _rule_epic_done_with_open_work(conn, project, epics)),
         ("quest task not in SDD", _rule_quest_task_not_in_sdd(conn, project, epics, party_scope)),
         ("task done, SDD not done", _rule_task_done_sdd_not_done(conn, project, epics, party_scope)),
+        ("discarded task in SDD", _rule_discarded_task_in_sdd(conn, project, epics, party_scope)),
     ]
 
 
@@ -513,6 +536,7 @@ _PARTY_OWNED_RULES = frozenset(
         "PR closed unmerged",
         "quest task not in SDD",
         "task done, SDD not done",
+        "discarded task in SDD",
     )
 )
 _PR_REF = re.compile(r"pr:(\S+)#(\d+)")

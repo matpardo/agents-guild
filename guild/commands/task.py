@@ -35,6 +35,13 @@ def _load_task(ctx, quest, tid):
     return row
 
 
+def _require_open(task_row, quest, tid):
+    if task_row["state"] == "done":
+        raise GuildError("task '{}/{}' is already done".format(quest, tid), 1)
+    if task_row["state"] == "discarded":
+        raise GuildError("task '{}/{}' is discarded: run `guild task restore {}/{}`".format(quest, tid, quest, tid), 1)
+
+
 def _with_sdd_hint(message, quest_row, hint_template, tid):
     if quest_row["epic"] is None:
         return message
@@ -80,8 +87,7 @@ def start(ctx, quest, tid, summary):
     with db.writing(ctx.conn):
         quest_row, binding = _load_owned_quest(ctx, quest)
         task_row = _load_task(ctx, quest, tid)
-        if task_row["state"] == "done":
-            raise GuildError("task '{}/{}' is already done".format(quest, tid), 1)
+        _require_open(task_row, quest, tid)
         adventurer_id = task_holders.task_adventurer(ctx.conn, quest_row, tid)
         if adventurer_id is not None:
             raise GuildError("task '{}/{}' is held by adventurer {}".format(quest, tid, adventurer_id), 1)
@@ -107,8 +113,7 @@ def block(ctx, quest, tid, reason):
     with db.writing(ctx.conn):
         quest_row, binding = _load_owned_quest(ctx, quest)
         task_row = _load_task(ctx, quest, tid)
-        if task_row["state"] == "done":
-            raise GuildError("task '{}/{}' is already done".format(quest, tid), 1)
+        _require_open(task_row, quest, tid)
         events.record(
             ctx.conn,
             ctx.now,
@@ -127,8 +132,7 @@ def done(ctx, quest, tid, summary):
     with db.writing(ctx.conn):
         quest_row, binding = _load_owned_quest(ctx, quest)
         task_row = _load_task(ctx, quest, tid)
-        if task_row["state"] == "done":
-            raise GuildError("task '{}/{}' is already done".format(quest, tid), 1)
+        _require_open(task_row, quest, tid)
         events.record(
             ctx.conn,
             ctx.now,
@@ -168,15 +172,7 @@ def _require_move_target(source_row, target_row, target):
         raise GuildError("quest '{}' is in another epic".format(target), 1)
 
 
-def _require_movable(ctx, quest_row, target, tid):
-    task_row = _load_task(ctx, quest_row["slug"], tid)
-    if task_row["state"] not in ("queued", "blocked"):
-        raise GuildError(
-            "task '{}/{}' is {}: only queued or blocked tasks move".format(quest_row["slug"], tid, task_row["state"]), 1
-        )
-    taken = ctx.conn.execute("SELECT tid FROM quest_tasks WHERE quest = ? AND tid = ?", (target, tid)).fetchone()
-    if taken is not None:
-        raise GuildError("task '{}/{}' already exists".format(target, tid), 1)
+def _reject_open_pr(ctx, quest_row, tid):
     open_pr = ctx.conn.execute(
         "SELECT repo, number FROM prs WHERE task_quest = ? AND task_tid = ?"
         " AND COALESCE(gh_state, 'OPEN') = 'OPEN' AND lifecycle NOT IN ('merged', 'closed')",
@@ -186,6 +182,9 @@ def _require_movable(ctx, quest_row, target, tid):
         raise GuildError(
             "task '{}/{}' has open PR {}#{}".format(quest_row["slug"], tid, open_pr["repo"], open_pr["number"]), 1
         )
+
+
+def _reject_live_claim(ctx, quest_row, tid):
     area = work_queue.claim_area({"epic": quest_row["epic"], "quest": quest_row["slug"], "tid": tid})
     claim = ctx.conn.execute(
         "SELECT expires_at FROM claims WHERE project = ? AND area = ? AND party = ?",
@@ -193,6 +192,19 @@ def _require_movable(ctx, quest_row, target, tid):
     ).fetchone()
     if claim is not None and not timeutil.is_expired(ctx.now, claim["expires_at"]):
         raise GuildError("task '{}/{}' is claimed: run `guild release {}`".format(quest_row["slug"], tid, area), 1)
+
+
+def _require_movable(ctx, quest_row, target, tid):
+    task_row = _load_task(ctx, quest_row["slug"], tid)
+    if task_row["state"] not in ("queued", "blocked"):
+        raise GuildError(
+            "task '{}/{}' is {}: only queued or blocked tasks move".format(quest_row["slug"], tid, task_row["state"]), 1
+        )
+    taken = ctx.conn.execute("SELECT tid FROM quest_tasks WHERE quest = ? AND tid = ?", (target, tid)).fetchone()
+    if taken is not None:
+        raise GuildError("task '{}/{}' already exists".format(target, tid), 1)
+    _reject_open_pr(ctx, quest_row, tid)
+    _reject_live_claim(ctx, quest_row, tid)
 
 
 def _move(ctx, quest_row, tids_csv, target):
@@ -228,3 +240,90 @@ def move(ctx, quest, tids_csv, target):
 def move_for_owner(ctx, quest, tids_csv, target):
     with db.writing(ctx.conn):
         return _move(ctx, _load_quest(ctx, quest), tids_csv, target)
+
+
+def _require_discardable(ctx, quest_row, tid, force):
+    task_row = _load_task(ctx, quest_row["slug"], tid)
+    if task_row["state"] == "done":
+        raise GuildError("task '{}/{}' is done: only unfinished tasks are discarded".format(quest_row["slug"], tid), 1)
+    if task_row["state"] == "discarded":
+        raise GuildError("task '{}/{}' is already discarded".format(quest_row["slug"], tid), 1)
+    adventurer_id = task_holders.task_adventurer(ctx.conn, quest_row, tid)
+    if adventurer_id is not None:
+        raise GuildError("task '{}/{}' is held by adventurer {}".format(quest_row["slug"], tid, adventurer_id), 1)
+    if force:
+        return
+    if task_row["state"] == "active":
+        raise GuildError("task '{}/{}' is active: pass --force to discard it".format(quest_row["slug"], tid), 1)
+    _reject_open_pr(ctx, quest_row, tid)
+    _reject_live_claim(ctx, quest_row, tid)
+
+
+def _discard(ctx, quest_row, party, tid, reason, force, author):
+    if quest_row["state"] != "active":
+        raise GuildError("quest '{}' is done".format(quest_row["slug"]), 1)
+    _require_discardable(ctx, quest_row, tid, force)
+    pii.validate_reason(reason, ctx.projects_dir, quest_row["project"])
+    events.record(
+        ctx.conn,
+        ctx.now,
+        ctx.origin,
+        party,
+        ctx.session_id,
+        quest_row["project"],
+        "task.discarded",
+        "local",
+        {"quest": quest_row["slug"], "tid": tid, "reason": reason, "author": author},
+    )
+    return _with_sdd_hint(
+        "task '{}/{}' discarded".format(quest_row["slug"], tid),
+        quest_row,
+        "remove {} from {} tasks.md in the SDD",
+        tid,
+    )
+
+
+def _restore(ctx, quest_row, party, tid):
+    task_row = _load_task(ctx, quest_row["slug"], tid)
+    if task_row["state"] != "discarded":
+        raise GuildError("task '{}/{}' is not discarded".format(quest_row["slug"], tid), 1)
+    if quest_row["epic"] is not None and party is not None:
+        task_holders.reject_taken_tasks(
+            ctx.conn, ctx.now, quest_row["project"], quest_row["epic"], [{"tid": tid}], party, False
+        )
+    events.record(
+        ctx.conn,
+        ctx.now,
+        ctx.origin,
+        party,
+        ctx.session_id,
+        quest_row["project"],
+        "task.restored",
+        "local",
+        {"quest": quest_row["slug"], "tid": tid},
+    )
+    return "task '{}/{}' restored as queued".format(quest_row["slug"], tid)
+
+
+def discard(ctx, quest, tid, reason, force):
+    with db.writing(ctx.conn):
+        quest_row, binding = _load_owned_quest(ctx, quest)
+        return _discard(ctx, quest_row, binding["party"], tid, reason, force, binding["party"])
+
+
+def discard_for_owner(ctx, quest, tid, reason, force):
+    with db.writing(ctx.conn):
+        quest_row = _load_quest(ctx, quest)
+        return _discard(ctx, quest_row, quest_row["party"], tid, reason, force, identity.HUMAN_LABEL)
+
+
+def restore(ctx, quest, tid):
+    with db.writing(ctx.conn):
+        quest_row, binding = _load_owned_quest(ctx, quest)
+        return _restore(ctx, quest_row, binding["party"], tid)
+
+
+def restore_for_owner(ctx, quest, tid):
+    with db.writing(ctx.conn):
+        quest_row = _load_quest(ctx, quest)
+        return _restore(ctx, quest_row, quest_row["party"], tid)

@@ -113,6 +113,7 @@ realmDoctorLines: [],
     collectStatus: "",
     collectBusy: false,
     taskMoveStatuses: {},
+    taskDiscardStatuses: {},
     focusedAskId: null,
     focusStart: 0,
     focusEnd: 0,
@@ -298,6 +299,7 @@ realmDoctorLines: [],
       "epic done with open work": "The epic is marked done but still has open work.",
       "quest task not in SDD": "A quest task has no matching task in the SDD.",
       "task done, SDD not done": "A task is done in guild but not in the SDD.",
+      "discarded task in SDD": "A task was discarded in guild but the SDD still lists it.",
       "adventurer task not in SDD": "An adventurer's PR merged but its task id never appeared in the epic's SDD tasks.",
     },
     resourceCategory: {
@@ -632,6 +634,25 @@ realmDoctorLines: [],
         delete state.taskMoveStatuses[key];
       } else {
         state.taskMoveStatuses[key] = errorMessage(result.body);
+      }
+      fetchBoard();
+    });
+  }
+
+  function postTaskDiscard(quest, tid, action, payload) {
+    var key = quest + "/" + tid;
+    if (sessionToken === null) {
+      state.taskDiscardStatuses[key] = NO_SESSION_MESSAGE;
+      fetchBoard();
+      return;
+    }
+    state.taskDiscardStatuses[key] = "sending...";
+    fetchBoard();
+    sendPost("/api/quests/" + quest + "/tasks/" + tid + "/" + action, payload).then(function (result) {
+      if (result.ok) {
+        delete state.taskDiscardStatuses[key];
+      } else {
+        state.taskDiscardStatuses[key] = errorMessage(result.body);
       }
       fetchBoard();
     });
@@ -3007,6 +3028,63 @@ realmDoctorLines: [],
     return controls;
   }
 
+  function renderTaskDiscardControls(quest, task) {
+    var controls = el("span");
+    controls.className = "task-discard-controls";
+    var force = el("input");
+    force.type = "checkbox";
+    var forceLabel = el("label");
+    appendAll(forceLabel, [force, textEl("span", "force")]);
+    controls.appendChild(forceLabel);
+    controls.appendChild(
+      ideaActionButton("Discard", false, function () {
+        var reason = window.prompt("Why is " + task.tid + " discarded?");
+        if (reason === null || reason.trim() === "") {
+          return;
+        }
+        postTaskDiscard(quest.slug, task.tid, "discard", { reason: reason, force: force.checked });
+      })
+    );
+    var status = textEl("span", state.taskDiscardStatuses[quest.slug + "/" + task.tid] || "");
+    status.className = "ask-status";
+    controls.appendChild(status);
+    return controls;
+  }
+
+  function renderDiscardedTask(quest, task) {
+    var item = el("li");
+    item.className = "task task-discarded";
+    var head = el("div");
+    head.className = "task-head";
+    head.appendChild(textEl("span", task.tid));
+    head.appendChild(textEl("span", task.title));
+    item.appendChild(head);
+    item.appendChild(classedText("p", "discarded by " + task.by + " on " + shortLocalDate(task.at) + ": " + task.reason, "muted"));
+    item.appendChild(
+      ideaActionButton("Restore", false, function () {
+        postTaskDiscard(quest.slug, task.tid, "restore", {});
+      })
+    );
+    item.appendChild(classedText("span", state.taskDiscardStatuses[quest.slug + "/" + task.tid] || "", "ask-status"));
+    return item;
+  }
+
+  function renderDiscardedTasks(quest) {
+    var details = el("details");
+    details.className = "discarded-tasks";
+    details.appendChild(textEl("summary", "Discarded (" + quest.discarded.length + ")"));
+    var list = el("ul");
+    list.className = "task-list";
+    appendAll(
+      list,
+      quest.discarded.map(function (task) {
+        return renderDiscardedTask(quest, task);
+      })
+    );
+    details.appendChild(list);
+    return details;
+  }
+
   function renderTask(quest, task) {
     var item = el("li");
     item.className = "task task-" + task.state;
@@ -3030,6 +3108,9 @@ realmDoctorLines: [],
     var movable = task.state === "queued" || task.state === "blocked";
     if (movable && quest.move_targets.length > 0) {
       item.appendChild(renderTaskMoveControls(quest, task));
+    }
+    if (task.state !== "done") {
+      item.appendChild(renderTaskDiscardControls(quest, task));
     }
     if (task.summary) {
       item.appendChild(textEl("p", task.summary));
@@ -3112,6 +3193,9 @@ realmDoctorLines: [],
       })
     );
     article.appendChild(list);
+    if (quest.discarded.length > 0) {
+      article.appendChild(renderDiscardedTasks(quest));
+    }
     if (quest.releasable) {
       article.appendChild(renderQuestRelease(quest));
     }

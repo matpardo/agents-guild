@@ -220,6 +220,22 @@ def _handle_task_done(ctx, args):
     return 0
 
 
+def _handle_task_discard(ctx, args):
+    from guild.commands import task as task_commands
+
+    quest, tid = args.ref.split("/", 1)
+    _print(task_commands.discard(ctx, quest, tid, args.reason, args.force))
+    return 0
+
+
+def _handle_task_restore(ctx, args):
+    from guild.commands import task as task_commands
+
+    quest, tid = args.ref.split("/", 1)
+    _print(task_commands.restore(ctx, quest, tid))
+    return 0
+
+
 def _handle_task_move(ctx, args):
     from guild.commands import task as task_commands
 
@@ -1171,6 +1187,16 @@ def _add_task_parser(subparsers):
     move.add_argument("ref", help="<quest>/<tid>[,<tid>...]")
     move.add_argument("--to", required=True, help="target quest slug")
     move.set_defaults(handler=_handle_task_move)
+
+    discard = actions.add_parser("discard", help="discard a task created by mistake, with a reason")
+    discard.add_argument("ref", help="<quest>/<tid>")
+    discard.add_argument("--reason", required=True, help="why the task is discarded")
+    discard.add_argument("--force", action="store_true", help="discard an active task, or one with an open PR or claim")
+    discard.set_defaults(handler=_handle_task_discard)
+
+    restore = actions.add_parser("restore", help="bring a discarded task back as queued")
+    restore.add_argument("ref", help="<quest>/<tid>")
+    restore.set_defaults(handler=_handle_task_restore)
 
 
 def _add_flag_pair(parser, name, dest):

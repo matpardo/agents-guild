@@ -1291,7 +1291,7 @@ class WebTaskMoveBehaviorTests(unittest.TestCase):
             "card_url": None,
             "prs": [],
         }
-        quest = {"slug": "src", "title": "Src", "move_targets": move_targets, "tasks": [task]}
+        quest = {"slug": "src", "title": "Src", "move_targets": move_targets, "tasks": [task], "discarded": []}
         parties = [dict(_BOARD["parties"][0], name="a", quests=[quest])]
         return _render(dict(_BOARD, parties=parties), "all", "all", "parties", "text").strip()
 
@@ -1308,6 +1308,43 @@ class WebTaskMoveBehaviorTests(unittest.TestCase):
 
     def test_no_targets_means_no_move_control(self):
         self.assertNotIn("move to...", self._rendered("queued", []))
+
+
+@unittest.skipIf(shutil.which("node") is None, "node not installed")
+class WebTaskDiscardBehaviorTests(unittest.TestCase):
+    def _rendered(self, task_state, discarded):
+        task = {
+            "tid": "T01",
+            "title": "First",
+            "state": task_state,
+            "summary": None,
+            "blocked_reason": None,
+            "card_url": None,
+            "prs": [],
+        }
+        quest = {"slug": "src", "title": "Src", "move_targets": [], "tasks": [task], "discarded": discarded}
+        parties = [dict(_BOARD["parties"][0], name="a", quests=[quest])]
+        return _render(dict(_BOARD, parties=parties), "all", "all", "parties", "text").strip()
+
+    def test_unfinished_task_has_a_discard_button(self):
+        self.assertIn("Discard", self._rendered("queued", []))
+        self.assertIn("Discard", self._rendered("active", []))
+
+    def test_done_task_has_no_discard_button(self):
+        self.assertNotIn("Discard", self._rendered("done", []))
+
+    def test_discarded_list_shows_count_reason_author_and_restore(self):
+        discarded = [
+            {"tid": "T02", "title": "Wrong", "reason": "made by mistake", "by": "human", "at": "2026-11-05T10:00:00Z"}
+        ]
+        out = self._rendered("queued", discarded)
+        self.assertIn("Discarded (1)", out)
+        self.assertIn("made by mistake", out)
+        self.assertIn("discarded by human", out)
+        self.assertIn("Restore", out)
+
+    def test_no_discarded_tasks_means_no_list(self):
+        self.assertNotIn("Discarded (", self._rendered("queued", []))
 
 
 @unittest.skipIf(shutil.which("node") is None, "node not installed")
@@ -1334,7 +1371,14 @@ class WebCtxBehaviorTests(unittest.TestCase):
 @unittest.skipIf(shutil.which("node") is None, "node not installed")
 class WebCloseBlockersBehaviorTests(unittest.TestCase):
     def _parties_text(self, close_blockers):
-        quest = {"slug": "q1", "title": "Quest", "move_targets": [], "tasks": [], "close_blockers": close_blockers}
+        quest = {
+            "slug": "q1",
+            "title": "Quest",
+            "move_targets": [],
+            "tasks": [],
+            "discarded": [],
+            "close_blockers": close_blockers,
+        }
         parties = [dict(_BOARD["parties"][0], quests=[quest])]
         return _render(dict(_BOARD, parties=parties), "all", "all", "parties", "text")
 
@@ -1555,6 +1599,7 @@ class WebQuestBoardBehaviorTests(unittest.TestCase):
                 "slug": "q",
                 "title": "Q",
                 "tasks": [],
+                "discarded": [],
                 "close_blockers": None,
                 "move_targets": [],
                 "releasable": releasable,
@@ -1588,6 +1633,7 @@ class WebQuestBoardBehaviorTests(unittest.TestCase):
                 "title": "Q",
                 "dates": quest_dates,
                 "tasks": [task],
+                "discarded": [],
                 "close_blockers": None,
                 "move_targets": [],
                 "releasable": False,

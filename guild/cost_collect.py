@@ -4,7 +4,7 @@ from datetime import timedelta, timezone
 from guild import db, events, paths, timeutil, transcript_usage
 
 _GRACE = timedelta(minutes=10)
-_TASK_KINDS = ("task.started", "task.blocked", "task.done")
+_TASK_KINDS = ("task.started", "task.blocked", "task.done", "task.discarded")
 _USAGE_FIELDS = ("input", "cache_creation", "cache_read", "output")
 
 
@@ -22,7 +22,7 @@ def _transcripts(projects_dir):
 
 def _task_windows(conn):
     rows = conn.execute(
-        "SELECT kind, ts, party, payload FROM events WHERE kind IN (?, ?, ?) AND party IS NOT NULL ORDER BY seq ASC",
+        "SELECT kind, ts, party, payload FROM events WHERE kind IN (?, ?, ?, ?) AND party IS NOT NULL ORDER BY seq ASC",
         _TASK_KINDS,
     ).fetchall()
     open_starts = {}

@@ -127,8 +127,23 @@ class CostCollectTests(GuildTestCase):
         self.assertEqual(self._samples(ctx)[0]["party"], "")
 
     def _task_event(self, ctx, kind, ts, tid):
-        detail = "reason" if kind == "task.blocked" else "summary"
-        self._record(ctx, "alpha", "sess-1", kind, ts, {"quest": "q", "tid": tid, detail: "x"})
+        detail = "reason" if kind in ("task.blocked", "task.discarded") else "summary"
+        payload = {"quest": "q", "tid": tid, detail: "x"}
+        if kind == "task.discarded":
+            payload["author"] = "alpha"
+        self._record(ctx, "alpha", "sess-1", kind, ts, payload)
+
+    def test_discard_closes_the_task_window(self):
+        self._bind()
+        ctx = self._ctx()
+        self._task_event(ctx, "task.started", "2020-01-01T10:00:00+00:00", "T01")
+        self._task_event(ctx, "task.discarded", "2020-01-01T11:00:00+00:00", "T01")
+        write_transcript(
+            self.main_path,
+            [_line("m1", "2020-01-01T10:30:00Z", 10, 0), _line("m2", "2020-01-01T11:30:00Z", 100, 0)],
+        )
+        rows = {(row["quest"], row["tid"]): row["input_tokens"] for row in self._samples(self._collect())}
+        self.assertEqual(rows, {("", ""): 100, ("q", "T01"): 10})
 
     def test_task_window_attribution(self):
         self._bind()

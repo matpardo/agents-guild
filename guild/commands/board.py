@@ -234,7 +234,7 @@ def _task_ref_blocked(conn, ref):
     row = conn.execute("SELECT state FROM quest_tasks WHERE quest = ? AND tid = ?", (quest, tid)).fetchone()
     if row is None:
         return True
-    return row["state"] != "done"
+    return row["state"] not in ("done", "discarded")
 
 
 def _blocked_ref_count(conn, ref_list):
@@ -562,7 +562,7 @@ def _task_lines(ctx, repo_clones, painter, task_row, task_prs):
 
 def _open_task_rows(conn, quest_slug):
     return conn.execute(
-        "SELECT * FROM quest_tasks WHERE quest = ? AND state != 'done' ORDER BY tid ASC",
+        "SELECT * FROM quest_tasks WHERE quest = ? AND state NOT IN ('done', 'discarded') ORDER BY tid ASC",
         (quest_slug,),
     ).fetchall()
 
@@ -593,6 +593,12 @@ def _close_blocker_lines(painter, blockers):
     return lines
 
 
+def _discarded_count(conn, quest_slug):
+    return conn.execute(
+        "SELECT COUNT(*) FROM quest_tasks WHERE quest = ? AND state = 'discarded'", (quest_slug,)
+    ).fetchone()[0]
+
+
 def _quest_lines(ctx, repo_clones, painter, quest_row, prs_by_task):
     title = sanitize.strip_control_sequences(quest_row["title"])
     lines = [
@@ -608,6 +614,9 @@ def _quest_lines(ctx, repo_clones, painter, quest_row, prs_by_task):
         lines.extend(_task_lines(ctx, repo_clones, painter, task_row, task_prs))
     if queued:
         lines.append(painter.paint("    ○ queued: {}".format(", ".join(queued)), "dim"))
+    discarded_count = _discarded_count(ctx.conn, quest_row["slug"])
+    if discarded_count:
+        lines.append(painter.paint("    ✕ {} discarded".format(discarded_count), "dim"))
     blockers = _close_blockers(ctx, quest_row)
     if blockers is not None:
         lines.extend(_close_blocker_lines(painter, blockers))
@@ -621,7 +630,7 @@ def _finished_with_task(ctx, pr_row):
         "SELECT state FROM quest_tasks WHERE quest = ? AND tid = ?",
         (pr_row["task_quest"], pr_row["task_tid"]),
     ).fetchone()
-    return task_row is None or task_row["state"] == "done"
+    return task_row is None or task_row["state"] in ("done", "discarded")
 
 
 def _visible_task_keys(ctx, quests):
@@ -1401,6 +1410,24 @@ def _move_targets(conn, quest_row):
     return [{"slug": row["slug"], "open": row["party"] is None} for row in rows]
 
 
+def _discarded_models(conn, quest_slug):
+    rows = conn.execute(
+        "SELECT tid, title, discarded_reason, discarded_by, discarded_at FROM quest_tasks"
+        " WHERE quest = ? AND state = 'discarded' ORDER BY tid ASC",
+        (quest_slug,),
+    ).fetchall()
+    return [
+        {
+            "tid": row["tid"],
+            "title": sanitize.strip_control_sequences(row["title"]),
+            "reason": sanitize.strip_control_sequences(row["discarded_reason"]),
+            "by": row["discarded_by"],
+            "at": row["discarded_at"],
+        }
+        for row in rows
+    ]
+
+
 def _quest_model(ctx, repo_clones, project, quest_row, prs_by_task, project_config):
     task_rows = _open_task_rows(ctx.conn, quest_row["slug"])
     tasks = [
@@ -1423,6 +1450,7 @@ def _quest_model(ctx, repo_clones, project, quest_row, prs_by_task, project_conf
         "close_blockers": _close_blockers(ctx, quest_row),
         "releasable": not quest_commands.release_blockers(ctx, quest_row),
         "tasks": tasks,
+        "discarded": _discarded_models(ctx.conn, quest_row["slug"]),
     }
 
 

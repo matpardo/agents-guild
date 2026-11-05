@@ -19,7 +19,8 @@ def _open_quest_models(conn, project):
     models = []
     for quest_row in quests:
         tasks = conn.execute(
-            "SELECT tid, title FROM quest_tasks WHERE quest = ? ORDER BY tid", (quest_row["slug"],)
+            "SELECT tid, title FROM quest_tasks WHERE quest = ? AND state != 'discarded' ORDER BY tid",
+            (quest_row["slug"],),
         ).fetchall()
         models.append(
             {
@@ -45,7 +46,7 @@ def _open_quest_models(conn, project):
 def _covered_tids(conn, project, epic):
     rows = conn.execute(
         "SELECT qt.tid AS tid FROM quest_tasks qt JOIN quests q ON q.slug = qt.quest"
-        " WHERE q.project = ? AND q.epic = ?",
+        " WHERE q.project = ? AND q.epic = ? AND qt.state != 'discarded'",
         (project, epic),
     ).fetchall()
     return {row["tid"] for row in rows}
