@@ -32,6 +32,7 @@ PROJECTION_TABLES = (
     "resource_samples",
     "resource_machine",
     "leader_windows",
+    "health_windows",
     "findings",
 )
 
@@ -413,6 +414,12 @@ _CREATE_STATEMENTS = (
         generation INTEGER NOT NULL,
         window_id TEXT NOT NULL,
         PRIMARY KEY (party, generation)
+    )
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS health_windows (
+        window_id TEXT PRIMARY KEY,
+        project TEXT NOT NULL
     )
     """,
     """

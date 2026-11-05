@@ -201,8 +201,7 @@ def _spawn_due_jobs(ctx):
     due_jobs.spawn_due(ctx.state_dir, ctx.cwd, time.time(), due_jobs.spawn_detached)
 
 
-def stop(ctx):
-    _spawn_due_jobs(ctx)
+def _record_stopped(ctx):
     binding = _session_actor(ctx)
     if binding is None:
         return
@@ -210,6 +209,35 @@ def stop(ctx):
         if not session_status.is_change(ctx.conn, ctx.session_id, "stopped"):
             return
         session_status.record_change(ctx, binding, "session.stopped", {})
+
+
+def _finished_adventurer_window(ctx, tmux, tmux_pane):
+    if tmux_pane is None or ctx.session_id is None:
+        return None
+    latest = ctx.conn.execute(
+        "SELECT state FROM adventurers WHERE session_id = ? ORDER BY id DESC LIMIT 1", (ctx.session_id,)
+    ).fetchone()
+    if latest is None or latest["state"] != "done":
+        return None
+    if not tmux.installed():
+        return None
+    window_id = tmux_windows.window_id_of_pane(tmux, tmux_pane)
+    if window_id is None:
+        return None
+    if ctx.conn.execute("SELECT 1 FROM health_windows WHERE window_id = ?", (window_id,)).fetchone() is None:
+        return None
+    if not tmux_windows.window_in_session(tmux, window_id):
+        return None
+    return tmux_pane
+
+
+def stop(ctx, tmux, tmux_pane):
+    _spawn_due_jobs(ctx)
+    _record_stopped(ctx)
+    pane = _finished_adventurer_window(ctx, tmux, tmux_pane)
+    if pane is None:
+        return
+    tmux_windows.kill_pane(tmux, pane)
 
 
 def _subagent_meta_path(transcript_path, agent_id):

@@ -281,3 +281,16 @@ updated: 2026-11-02
 - [x] A failed latest run marks main red with `workflow <name> failed @ <sha7> (run <id>)`; a later green run clears it.
 - [x] Runs in progress, cancelled or skipped fall back to the previous run of the workflow; Dependabot update runs never count.
 - [x] Failing head checks keep their reason; a `gh run list` failure is reported and leaves the status alone.
+
+## T24 — Close guild-launched solo and health windows after done
+
+**Depends on:** T23
+**Status:** [x] done
+
+**What:** `guild adventurer launch` and `guild solo launch` record the tmux window id they create (`health_window.launched`, table `health_windows`). The `Stop` hook closes the pane of a session whose adventurer is done when its window is a recorded one in the `guild` tmux session; any failed check leaves it open. The built-in solo prompts end with one short `guild solo say` instead of the long final report.
+
+**Acceptance:**
+- [x] Both launch commands record the created window id; a failed launch records nothing.
+- [x] The `Stop` hook kills the pane only for a done adventurer in a recorded window of the `guild` session.
+- [x] An unset pane, an unrecorded or other window, an active adventurer or a failed tmux lookup leave the pane open.
+- [x] The solo prompts ask for one short chat message before `adventurer done`.

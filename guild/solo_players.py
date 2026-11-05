@@ -17,7 +17,7 @@ _RED_MAIN_RULES = (
     " Track the fix PR with `guild pr track ... --fixes-main` (add `--fixes-flaky` when the failure is flaky)."
     ' Never merge. Tell the dev only important things with `guild solo say "<text>"`, no routine'
     ' progress: `guild solo say "started fixing: <cause>"` when you know the cause, then `guild solo say "fix PR'
-    ' {repo}#<n> ready, waits on merge"` (or `guild solo say "main green, nothing to do"`). End with `guild adventurer done --pending "<text>"`.'
+    ' {repo}#<n> ready, waits on merge"` (or `guild solo say "main green, nothing to do"`). Before finishing, post one short `guild solo say` with the PRs you touched and what needs a human; skip the long final report, the chat is the record. End with `guild adventurer done --pending "<text>"`; the window closes after it.'
 )
 _DEPENDABOT_GOAL = "Get the open Dependabot PRs of {repo} mergeable and its Dependabot update runs passing."
 _DEPENDABOT_STEPS = (
@@ -35,7 +35,9 @@ _DEPENDABOT_STEPS = (
 _DEPENDABOT_RULES = (
     " Never merge. Report what still needs a human. Tell the dev only important things with `guild solo say"
     ' "<text>"`, no routine progress: `guild solo say "{repo}#<n> needs a human: <why>"`. Guild itself announces'
-    ' the PRs that turn green. End with `guild adventurer done --pending "<text>"`.'
+    " the PRs that turn green. Before finishing, post one short `guild solo say` with the PRs you touched and what"
+    " needs a human; skip the long final report, the chat is the record."
+    ' End with `guild adventurer done --pending "<text>"`; the window closes after it.'
 )
 _SKILL_STEPS = (
     " Follow the repo skill above for the steps. Where it disagrees with these rules, the rules win on merging,"

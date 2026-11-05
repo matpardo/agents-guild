@@ -135,7 +135,7 @@ def first_path(project_data):
     return str(Path(*parts))
 
 
-def launch_window(cwd, job, window_name, tmux):
+def launch_window(ctx, project, cwd, job, window_name, tmux):
     if not os.path.isdir(cwd):
         raise GuildError("project path '{}' does not exist".format(cwd), 1)
     if not tmux.installed():
@@ -149,6 +149,18 @@ def launch_window(cwd, job, window_name, tmux):
         raise GuildError("tmux could not create the window", 1)
     tmux_windows.pin_window_name(tmux, window_id)
     tmux_windows.set_session_options(tmux)
+    with db.writing(ctx.conn):
+        events.record(
+            ctx.conn,
+            ctx.now,
+            ctx.origin,
+            None,
+            None,
+            project,
+            "health_window.launched",
+            "local",
+            {"window_id": window_id},
+        )
     return "launched {} in {}: tmux attach -t {}".format(job["name"], cwd, tmux_windows.SESSION)
 
 
@@ -158,7 +170,7 @@ def launch(ctx, job_name, tmux):
     project = config.require_project(ctx.cwd, ctx.projects_dir)
     project_data = config.load_project(ctx.projects_dir, project)
     job = health_jobs.require_job(project_data, job_name)
-    return launch_window(first_path(project_data), job, "health-" + job_name, tmux)
+    return launch_window(ctx, project, first_path(project_data), job, "health-" + job_name, tmux)
 
 
 def _post_solo_finished(ctx, adventurer, pending):

@@ -118,6 +118,13 @@ def _leader_window_launched(conn, event):
     )
 
 
+def _health_window_launched(conn, event):
+    conn.execute(
+        "INSERT OR REPLACE INTO health_windows (window_id, project) VALUES (?, ?)",
+        (event["payload"]["window_id"], event["project"]),
+    )
+
+
 def _leader_located(conn, event):
     payload = event["payload"]
     conn.execute(
@@ -967,6 +974,7 @@ _REDUCERS = {
     "handoff.pruned": _handoff_pruned,
     "leader.located": _leader_located,
     "leader.window_launched": _leader_window_launched,
+    "health_window.launched": _health_window_launched,
     "quest.added": _quest_added,
     "quest.done": _quest_done,
     "quest.taken": _quest_taken,
@@ -1063,6 +1071,7 @@ _REQUIRED_KEYS = {
     "handoff.pruned": ("party", "generation"),
     "leader.located": ("cwd", "permission_mode", "party", "generation"),
     "leader.window_launched": ("party", "generation", "window_id"),
+    "health_window.launched": ("window_id",),
     "quest.added": ("slug", "project", "party", "epic", "title", "tasks"),
     "quest.done": ("slug",),
     "quest.taken": ("party", "slug"),
