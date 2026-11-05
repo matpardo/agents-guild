@@ -52,6 +52,7 @@ _BASE_ACTION_RE = re.compile(r"^/api/bases/([^/]+/[^/]+)/(pause|resume)$")
 _RAID_ACTION_RE = re.compile(r"^/api/raids/([^/]+)/(pause|resume)$")
 _MEMORY_ACTION_RE = re.compile(r"^/api/memory/([^/]+)/([1-9][0-9]*)/rm$")
 _TASK_MOVE_RE = re.compile(r"^/api/quests/([^/]+)/tasks/([^/]+)/move$")
+_TASK_DISCARD_RE = re.compile(r"^/api/quests/([^/]+)/tasks/([^/]+)/(discard|restore)$")
 _PARTY_HANDOFF_RE = re.compile(r"^/api/parties/([^/]+)/hand-off$")
 _PARTY_PARK_RE = re.compile(r"^/api/parties/([^/]+)/(park|unpark)$")
 _IDEA_ACTION_RE = re.compile(r"^/api/ideas/([^/]+)/(edit|delete|link|unlink)$")
@@ -364,6 +365,16 @@ def _run_task_move_action(quest, tid, payload):
         ctx.conn.close()
 
 
+def _run_task_discard_action(action, quest, tid, payload):
+    ctx = _action_context()
+    try:
+        if action == "discard":
+            return task_commands.discard_for_owner(ctx, quest, tid, payload["reason"], payload["force"])
+        return task_commands.restore_for_owner(ctx, quest, tid)
+    finally:
+        ctx.conn.close()
+
+
 def _run_pr_action(action, ref, payload):
     ctx = _action_context()
     try:
@@ -508,6 +519,10 @@ class BoardRequestHandler(http_server.BaseHTTPRequestHandler):
             raise _RequestRejected(400, "party must be a string")
         if action == "move" and not isinstance(payload.get("to"), str):
             raise _RequestRejected(400, "to must be a string")
+        if action == "discard" and not (
+            isinstance(payload.get("reason"), str) and isinstance(payload.get("force"), bool)
+        ):
+            raise _RequestRejected(400, "reason must be a string and force a boolean")
         if action in ("block", "park") and not isinstance(payload.get("reason"), str):
             raise _RequestRejected(400, "reason must be a string")
         if action == "relink" and not all(isinstance(payload.get(key, ""), str) for key in ("task", "card")):
@@ -613,6 +628,10 @@ class BoardRequestHandler(http_server.BaseHTTPRequestHandler):
         if task_move_match is not None:
             quest, tid = task_move_match.groups()
             return self._post_action("move", lambda payload: _run_task_move_action(quest, tid, payload))
+        task_discard_match = _TASK_DISCARD_RE.match(path)
+        if task_discard_match is not None:
+            quest, tid, action = task_discard_match.groups()
+            return self._post_action(action, lambda payload: _run_task_discard_action(action, quest, tid, payload))
         notice_match = _NOTICE_ACTION_RE.match(path)
         if notice_match is None:
             return self._method_not_allowed()

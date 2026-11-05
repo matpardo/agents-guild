@@ -64,7 +64,8 @@ def _gate_drift(ctx, project, epic, party, accept_drift, stale_notes):
 
 def _unfinished_task_lines(conn, slug):
     rows = conn.execute(
-        "SELECT tid, state FROM quest_tasks WHERE quest = ? AND state != 'done' ORDER BY tid", (slug,)
+        "SELECT tid, state FROM quest_tasks WHERE quest = ? AND state NOT IN ('done', 'discarded') ORDER BY tid",
+        (slug,),
     ).fetchall()
     return ["{} ({})".format(row["tid"], row["state"]) for row in rows]
 
@@ -300,7 +301,9 @@ def release_blockers(ctx, row):
     tasks = ctx.conn.execute(
         "SELECT tid, state FROM quest_tasks WHERE quest = ? ORDER BY tid", (row["slug"],)
     ).fetchall()
-    blockers.extend("{} is {}".format(task["tid"], task["state"]) for task in tasks if task["state"] != "queued")
+    blockers.extend(
+        "{} is {}".format(task["tid"], task["state"]) for task in tasks if task["state"] not in ("queued", "discarded")
+    )
     prs = ctx.conn.execute(
         "SELECT repo, number FROM prs WHERE task_quest = ?"
         " AND COALESCE(gh_state, 'OPEN') = 'OPEN' AND lifecycle NOT IN ('merged', 'closed')",

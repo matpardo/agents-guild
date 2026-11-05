@@ -1,6 +1,6 @@
 def task_counts(conn, slug):
     rows = conn.execute("SELECT state FROM quest_tasks WHERE quest = ?", (slug,)).fetchall()
-    states = [row["state"] for row in rows]
+    states = [row["state"] for row in rows if row["state"] != "discarded"]
     return {
         "done": states.count("done"),
         "active": states.count("active"),

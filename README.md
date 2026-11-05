@@ -162,6 +162,8 @@ guild task start <quest>/<tid> [--summary "..."]
 guild task block <quest>/<tid> --reason "..."
 guild task done  <quest>/<tid> [--summary "..."]   # epic quests: also mark it done in the epic's tasks.md
 guild task move  <quest>/<tid>[,<tid>...] --to <quest>   # queued or blocked tasks, same epic, to another party's quest or an open quest
+guild task discard <quest>/<tid> --reason "..." [--force]   # drop a task created by mistake; never use `done` for it
+guild task restore <quest>/<tid>                   # a discarded task comes back as queued
 
 guild pr track <owner/repo>#<n> --task <quest>/<tid> [--card <KEY>] --what "..." --waits "..." [--needs-human-pr-review]
                                # a party needs --task; an adventurer needs --task equal to its own; a health-job adventurer passes no --task, --card optional
@@ -1294,6 +1296,7 @@ naming the refs and what each source says:
 | `epic done with open work` | the epic's `sdd_status == done` but it still has a non-done quest task, or an open tracked PR linked to it |
 | `quest task not in SDD` | a task of an epic quest has no synced task with that tid in the epic's `tasks.md` (typically added with `guild task add` and never written to the SDD) |
 | `task done, SDD not done` | a task of an epic quest is `done` in guild while the epic's synced `sdd_status` for that tid is not `done` |
+| `discarded task in SDD` | a task of an epic quest was discarded in guild while the epic's `tasks.md` still lists that tid; remove it there or run `guild task restore` |
 | `adventurer task not in SDD` | an adventurer held `<epic>/<tid>` of a synced epic, one of its tracked PRs is `merged`, and the epic has no synced task with that tid (a mistyped tid, or a task the PR never added to `tasks.md`); a sync of the SDD after the merge clears a correct one |
 
 The last line is `N findings` or `no drift`. `guild drift` never writes to
@@ -2137,6 +2140,24 @@ in the target, has an open tracked PR, or holds an unexpired claim of your party
 (`guild release <area>` first). Title, state, summary and blocked reason travel
 with the task, and its tracked PRs are re-pointed to the target quest. The board
 shows a `move to` select on queued and blocked tasks.
+
+### Discarding tasks
+
+`guild task discard <quest>/<tid> --reason "..."` drops a task created by
+mistake without counting it as work done. The task keeps its row with state
+`discarded`, plus the reason, the author (the party that ran it, or `human` from
+the web) and the date. A discarded task is neither unfinished nor done: `quest
+done` and `party close` ignore it, progress totals, `guild history` and the
+final report leave it out, the board hides it, and its tid is free again for
+other quests. `guild brief` lists it in a `discarded` lane. Discarding is refused
+for a `done` or already discarded task and for a task held by an adventurer;
+an `active` task, a task with an open tracked PR, or one with an unexpired claim
+of your party needs `--force`. `start`, `block` and `done` refuse a discarded
+task. `guild task restore <quest>/<tid>` brings it back as `queued`. On an epic
+quest, the command asks you to remove the task from the epic's `tasks.md`, and
+the drift rule `discarded task in SDD` catches it if you forget. The web board
+shows a `Discard` button (reason prompt, `force` checkbox) on unfinished tasks
+and a collapsed `Discarded (N)` list per quest with a `Restore` button.
 
 ### No overlapping task lists
 

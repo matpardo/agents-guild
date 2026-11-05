@@ -213,6 +213,24 @@ def _task_done(conn, event):
     )
 
 
+def _task_discarded(conn, event):
+    payload = event["payload"]
+    conn.execute(
+        "UPDATE quest_tasks SET state = 'discarded', discarded_reason = ?, discarded_by = ?, discarded_at = ?,"
+        " updated_at = ? WHERE quest = ? AND tid = ?",
+        (payload["reason"], payload["author"], event["ts"], event["ts"], payload["quest"], payload["tid"]),
+    )
+
+
+def _task_restored(conn, event):
+    payload = event["payload"]
+    conn.execute(
+        "UPDATE quest_tasks SET state = 'queued', discarded_reason = NULL, discarded_by = NULL, discarded_at = NULL,"
+        " updated_at = ? WHERE quest = ? AND tid = ?",
+        (event["ts"], payload["quest"], payload["tid"]),
+    )
+
+
 def _task_moved(conn, event):
     payload = event["payload"]
     conn.execute(
@@ -958,6 +976,8 @@ _REDUCERS = {
     "task.started": _task_started,
     "task.blocked": _task_blocked,
     "task.done": _task_done,
+    "task.discarded": _task_discarded,
+    "task.restored": _task_restored,
     "task.moved": _task_moved,
     "epic.synced": _epic_synced,
     "tracker.synced": _tracker_synced,
@@ -1052,6 +1072,8 @@ _REQUIRED_KEYS = {
     "task.started": ("summary", "quest", "tid"),
     "task.blocked": ("reason", "quest", "tid"),
     "task.done": ("summary", "quest", "tid"),
+    "task.discarded": ("quest", "tid", "reason", "author"),
+    "task.restored": ("quest", "tid"),
     "task.moved": ("to_quest", "from_quest", "tid"),
     "epic.synced": ("project", "epic", "sdd_path", "tasks"),
     "tracker.synced": ("project", "cards"),

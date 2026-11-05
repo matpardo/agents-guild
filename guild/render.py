@@ -15,12 +15,14 @@ def pr_line(row):
 
 def quest_lanes(conn, quest_slug):
     rows = conn.execute("SELECT * FROM quest_tasks WHERE quest = ? ORDER BY tid ASC", (quest_slug,)).fetchall()
-    lanes = {"active": [], "queued": [], "blocked": []}
+    lanes = {"active": [], "queued": [], "blocked": [], "discarded": []}
     for row in rows:
         if row["state"] == "done":
             continue
         if row["state"] == "active":
             lanes["active"].append("{} ({})".format(row["tid"], row["summary"] or row["title"]))
+        elif row["state"] == "discarded":
+            lanes["discarded"].append("{} — {}".format(row["tid"], row["discarded_reason"]))
         elif row["state"] == "blocked":
             lanes["blocked"].append("{} — {}".format(row["tid"], row["blocked_reason"]))
         else:

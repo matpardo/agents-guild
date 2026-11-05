@@ -71,7 +71,7 @@ def render_brief(ctx):
     for quest in quests:
         lines.append("quest: {} — {}".format(quest["slug"], quest["title"]))
         lanes = render.quest_lanes(ctx.conn, quest["slug"])
-        for lane_name in ("active", "queued", "blocked"):
+        for lane_name in ("active", "queued", "blocked", "discarded"):
             if lanes[lane_name]:
                 lines.append("  {}: {}".format(lane_name, ", ".join(lanes[lane_name])))
 

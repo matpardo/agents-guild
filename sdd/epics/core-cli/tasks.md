@@ -155,3 +155,16 @@ updated: 2026-10-25
 **Acceptance:**
 - [x] The other move rules (same project, same epic, both active) still apply.
 - [x] `GUILD.md` and `README.md` name an open quest as a valid destination.
+
+## T21 — Discard and restore tasks
+
+**Depends on:** T10
+**Status:** [x] done
+
+**What:** `guild task discard <quest>/<tid> --reason "..." [--force]` drops a task created by mistake, keeping its reason, author and date; `guild task restore` brings it back as queued. A discarded task is neither unfinished nor done: quest and party gates, progress totals, history, the board and free-task lists ignore it, and its tid is free for other quests. The web board has Discard and Restore actions.
+
+**Acceptance:**
+- [x] Discard refuses done, already discarded and adventurer-held tasks; active tasks, open PRs and live claims need `--force`.
+- [x] `start`, `block` and `done` refuse a discarded task.
+- [x] Drift flags a discarded task still listed in the epic's `tasks.md`.
+- [x] `GUILD.md` and `README.md` describe both commands.

@@ -14,6 +14,8 @@ _KINDS = (
     "task.started",
     "task.done",
     "task.blocked",
+    "task.discarded",
+    "task.restored",
     "pr.tracked",
     "pr.set",
     "pr.untracked",
@@ -248,7 +250,7 @@ def _quest_pr_keys(by_kind, slug):
 def _quest_activity_timestamps(by_kind, slug):
     timestamps = [
         event["ts"]
-        for kind in ("task.added", "task.started", "task.done", "task.blocked")
+        for kind in ("task.added", "task.started", "task.done", "task.blocked", "task.discarded", "task.restored")
         for event in by_kind[kind]
         if event["payload"]["quest"] == slug
     ]
@@ -332,11 +334,27 @@ def _done_tids_before(by_kind, slug, seq):
     }
 
 
+def _discarded_tids_before(by_kind, slug, seq):
+    changes = sorted(
+        (event["seq"], is_discard, event["payload"]["tid"])
+        for kind, is_discard in (("task.discarded", True), ("task.restored", False))
+        for event in by_kind[kind]
+        if event["payload"]["quest"] == slug and event["seq"] < seq
+    )
+    discarded = set()
+    for _, is_discard, tid in changes:
+        if is_discard:
+            discarded.add(tid)
+            continue
+        discarded.discard(tid)
+    return discarded
+
+
 def _incomplete_entry(by_kind, quests_by_slug, added_by_slug, mark):
     slug = mark["payload"]["slug"]
     quest = quests_by_slug.get(slug)
     added = added_by_slug.get(slug)
-    all_tids = _quest_tids(by_kind, slug)
+    all_tids = _quest_tids(by_kind, slug) - _discarded_tids_before(by_kind, slug, mark["seq"])
     not_done = all_tids - _done_tids_before(by_kind, slug, mark["seq"])
     if quest is not None:
         base = {key: quest[key] for key in ("party", "project", "title", "started_at", "done_at")}
