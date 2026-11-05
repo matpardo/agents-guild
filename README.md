@@ -1426,6 +1426,11 @@ before the first glob character) and runs `claude` there with the job's
 `command` as the first prompt, quoted for the shell the same way `guild revive`
 quotes its commands, and with `GUILD_ADVENTURER_JOB=<name>` in that process's
 environment. It refuses when tmux is missing or the window already exists.
+Guild records the window id it created (`health_window.launched`, table
+`health_windows`). After `guild adventurer done`, the `Stop` hook of that session
+closes its pane when the pane's window is a recorded one and is in the `guild`
+tmux session. A hand-started `claude`, a session in another window or any failed
+check is left open. This runs inside the session, so the web has no action for it.
 
 The `SessionStart` hook reads `GUILD_ADVENTURER_JOB`: in a new (`startup`)
 session that is not a party leader or an adventurer yet, it starts the
@@ -1528,7 +1533,7 @@ launch button.
 inside a Claude Code session. It opens a tmux window named
 `solo-<job>-<owner>-<repo>` the same way `guild adventurer launch` does, even
 when the player is not due. `<owner/repo> <job>` is matched across all projects, so it works from any directory, like in `status`, `stop` and `resume`.
-It closes the finished window a player left open before launching, and refuses a running player or a stalled one (dismiss it first).
+A player closes its own window after `guild adventurer done` (see `guild adventurer launch`), so its prompt ends with one short `guild solo say` instead of the long final report. Launch still closes a finished window left open before launching, and refuses a running player or a stalled one (dismiss it first).
 `guild solo launch --all` launches every configured player and `guild solo launch
 --project <name>` those of one project, whatever their trigger, skipping the
 running and the stalled ones. They print one line per player (`<name> launched`,
@@ -2505,7 +2510,7 @@ transaction: `parties`, `leaders`, `quests`, `quest_tasks`, `epics`, `tasks`,
 `prs`, `cards`, `asks`, `notices`, `claims`, `raid_members`, `pr_shared_areas`, `pr_files`,
 `merge_queue_pins`, `main_status`, `raid_pauses`, `findings`, `session_status`,
 `cost_samples`, `resource_samples`, `resource_machine`,
-`leader_windows`, `cursors`, `transcript_cursors`. `guild rebuild` drops every
+`leader_windows`, `health_windows`, `cursors`, `transcript_cursors`. `guild rebuild` drops every
 projection and replays all events from scratch — the only exceptions are
 `cursors` and `transcript_cursors`, which are read positions (per session and
 per transcript), not domain state, and are left untouched by rebuild. Events of
