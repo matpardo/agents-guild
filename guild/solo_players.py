@@ -225,9 +225,16 @@ def _run_duration(row):
     return int((timeutil.from_iso(row["done_at"]) - timeutil.from_iso(row["started_at"])).total_seconds())
 
 
+def _run_prs(conn, adventurer_id):
+    rows = conn.execute(
+        "SELECT repo, number, lifecycle FROM prs WHERE adventurer = ? ORDER BY repo, number", (adventurer_id,)
+    ).fetchall()
+    return [{"ref": "{}#{}".format(row["repo"], row["number"]), "lifecycle": row["lifecycle"]} for row in rows]
+
+
 def runs(conn, project, health_job, live_ids, limit):
     rows = conn.execute(
-        "SELECT session_id, state, started_at, done_at, pending FROM adventurers"
+        "SELECT id, session_id, state, started_at, done_at, pending FROM adventurers"
         " WHERE project = ? AND health_job = ? ORDER BY id DESC LIMIT ?",
         (project, health_job, limit),
     ).fetchall()
@@ -238,6 +245,7 @@ def runs(conn, project, health_job, live_ids, limit):
             "state": _run_state(row, live_ids),
             "duration": _run_duration(row),
             "pending": row["pending"],
+            "prs": _run_prs(conn, row["id"]),
         }
         for row in rows
     ]

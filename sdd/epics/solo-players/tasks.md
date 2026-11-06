@@ -294,3 +294,14 @@ updated: 2026-11-02
 - [x] The `Stop` hook kills the pane only for a done adventurer in a recorded window of the `guild` session.
 - [x] An unset pane, an unrecorded or other window, an active adventurer or a failed tmux lookup leave the pane open.
 - [x] The solo prompts ask for one short chat message before `adventurer done`.
+
+## T25 — Outcome per solo run
+
+**Depends on:** T24
+**Status:** [x] done
+
+**What:** Each run of a solo player lists the PRs its adventurer tracked, with their lifecycle: `runs` entries carry `prs` (`ref`, `lifecycle`), `guild solo runs` prints them and the web shows them in the run line.
+
+**Acceptance:**
+- [x] A run with tracked PRs shows each ref with its lifecycle, ordered by repo and number; a run without PRs has an empty list.
+- [x] `guild solo runs` and the web run line print the same PRs.
