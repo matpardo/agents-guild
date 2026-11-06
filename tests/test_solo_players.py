@@ -1443,5 +1443,30 @@ class SoloRunsTests(SoloPlayersTestCase):
         self.assertIn("done", out)
         self.assertIn("all good", out)
 
+    def track_pr_on_latest_run(self, number, lifecycle):
+        conn = self.db()
+        adventurer_id = conn.execute("SELECT MAX(id) FROM adventurers").fetchone()[0]
+        conn.execute(
+            "INSERT INTO prs (repo, number, party, what, lifecycle, seeded, adventurer) VALUES (?, ?, 'p1', 'w', ?, 0, ?)",
+            ("acme/app", number, lifecycle, adventurer_id),
+        )
+        conn.commit()
+
+    def test_a_run_lists_the_prs_it_tracked_with_their_lifecycle(self):
+        self.finish_job("red-main-acme-app", "fixed")
+        self.track_pr_on_latest_run(9, "ready")
+        self.track_pr_on_latest_run(7, "draft")
+        self.assertEqual(
+            self.runs()[0]["prs"],
+            [{"ref": "acme/app#7", "lifecycle": "draft"}, {"ref": "acme/app#9", "lifecycle": "ready"}],
+        )
+        code, out, err = self.cli(["solo", "runs", "acme/app", "red-main"], None)
+        self.assertEqual(code, 0, err)
+        self.assertIn("PRs: acme/app#7 draft, acme/app#9 ready", out)
+
+    def test_a_run_without_prs_has_an_empty_list(self):
+        self.finish_job("red-main-acme-app", "nothing")
+        self.assertEqual(self.runs()[0]["prs"], [])
+
     def test_runs_command_refuses_an_unknown_player(self):
         self.assertEqual(self.cli(["solo", "runs", "acme/app", "nope"], None)[0], 1)

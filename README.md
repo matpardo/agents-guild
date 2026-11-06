@@ -1584,8 +1584,8 @@ messages newest first. The web shows the latest 20 as a read-only feed at the
 top of the solo players section (the board JSON key `solo_channel`). Every item carries its `project`. `guild solo list` and `guild solo channel` group by project and take `--project <name>` to show one; the text board groups the same way.
 `guild solo runs <owner/repo> <job>` prints the last runs of a player, read
 from its adventurers: start time, `running`, `stalled` or `done`, duration and
-pending report. The web lists the last 5 per player under a collapsible
-`runs`; the board JSON carries them as `runs` on each player.
+pending report, then the PRs the run tracked with their lifecycle. The web
+lists the last 5 per player under a collapsible `runs`, with the same PRs; the board JSON carries them as `runs` on each player.
 
 ### Marking notices seen
 

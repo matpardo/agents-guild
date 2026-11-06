@@ -222,7 +222,10 @@ def channel(ctx, limit, project):
 
 def _format_run(run):
     duration = "-" if run["duration"] is None else "{}s".format(run["duration"])
-    return "  {} {} {} {}".format(run["started_at"], run["state"], duration, run["pending"] or "")
+    line = "  {} {} {} {}".format(run["started_at"], run["state"], duration, run["pending"] or "")
+    if not run["prs"]:
+        return line
+    return "{}\n    PRs: {}".format(line, ", ".join("{} {}".format(pr["ref"], pr["lifecycle"]) for pr in run["prs"]))
 
 
 def runs(ctx, repo, job_name):

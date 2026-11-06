@@ -2105,6 +2105,16 @@ realmDoctorLines: [],
     if (run.pending !== null) {
       parts.push(run.pending);
     }
+    if (run.prs.length > 0) {
+      parts.push(
+        "PRs: " +
+          run.prs
+            .map(function (pr) {
+              return pr.ref + " " + pr.lifecycle;
+            })
+            .join(", ")
+      );
+    }
     return parts.join(" \u00b7 ");
   }
 

@@ -542,6 +542,7 @@ class WebSoloPlayerBehaviorTests(unittest.TestCase):
             "state": "running",
             "duration": None,
             "pending": None,
+            "prs": [],
         }
         player = _solo_player(
             last_done="2026-11-01T10:00:00+00:00", retry_at="2026-11-02T10:00:00+00:00", state="cooling", runs=[run]
@@ -578,6 +579,7 @@ class WebSoloPlayerBehaviorTests(unittest.TestCase):
             "state": "done",
             "duration": 1200,
             "pending": "<img src=x onerror=alert(1)>",
+            "prs": [{"ref": "acme/app#7", "lifecycle": "converging"}, {"ref": "acme/app#9", "lifecycle": "ready"}],
         }
         running = {
             "started_at": "2026-11-02T09:00:00+00:00",
@@ -585,6 +587,7 @@ class WebSoloPlayerBehaviorTests(unittest.TestCase):
             "state": "running",
             "duration": None,
             "pending": None,
+            "prs": [],
         }
         board = dict(_BOARD, solo_players=[_solo_player(runs=[running, run])])
         tree = _render(board, "all", "all", "solo-players", "tree")
@@ -592,7 +595,7 @@ class WebSoloPlayerBehaviorTests(unittest.TestCase):
         self.assertIn("<img src=x onerror=alert(1)>", tree)
         self.assertNotIn('"tag":"img"', tree)
         text = _render(board, "all", "all", "solo-players", "text")
-        for expected in ("runs", "running", "done", "20m"):
+        for expected in ("runs", "running", "done", "20m", "PRs: acme/app#7 converging, acme/app#9 ready"):
             self.assertIn(expected, text)
 
     def test_player_without_runs_has_no_details(self):
