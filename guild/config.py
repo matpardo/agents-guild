@@ -2,7 +2,7 @@ import fnmatch
 import json
 from pathlib import Path
 
-from guild import names, timeutil
+from guild import names, solo_players, timeutil
 from guild.errors import GuildError
 
 _REQUIRED_KEYS = ("name", "paths", "github")
@@ -231,15 +231,18 @@ def _validate_lifecycle_config(data):
         _validate_lifecycle_entry(event, entry)
 
 
+def _validate_health_command(command):
+    if not isinstance(command, str) or not command.strip() or command.startswith("-"):
+        raise GuildError("'command' must be a non-empty string that does not start with '-'", 1)
+
+
 def _validate_health_job(job):
     if not isinstance(job, dict) or set(job) != {"name", "command", "every"}:
         raise GuildError("entries must be objects with exactly 'name', 'command' and 'every'", 1)
     if not isinstance(job["name"], str) or not job["name"]:
         raise GuildError("'name' must be a non-empty string", 1)
     names.validate_name(job["name"], "health job name")
-    command = job["command"]
-    if not isinstance(command, str) or not command.strip() or command.startswith("-"):
-        raise GuildError("'command' must be a non-empty string that does not start with '-'", 1)
+    _validate_health_command(job["command"])
     if not isinstance(job["every"], str):
         raise GuildError("'every' must be a duration like 12h or 3d", 1)
     timeutil.parse_duration(job["every"])
@@ -261,18 +264,46 @@ def _validate_health_jobs_config(data):
         raise GuildError("project config 'health_jobs' names must be unique", 1)
 
 
-_SOLO_PLAYER_JOBS = ("red-main", "dependabot")
+_SOLO_PLAYER_KEYS = {"repo", "job", "name", "class", "command", "trigger"}
+_SOLO_PLAYER_CUSTOM_KEYS = ("command", "trigger", "class")
+_SOLO_TRIGGER_KINDS = ("main-red", "dependabot")
+
+
+def _validate_solo_trigger(trigger):
+    if trigger in _SOLO_TRIGGER_KINDS:
+        return
+    if not isinstance(trigger, str) or not trigger.startswith("every "):
+        raise GuildError("'trigger' must be main-red, dependabot or 'every <duration>'", 1)
+    if timeutil.parse_duration(trigger[len("every ") :]) < timeutil.parse_duration(solo_players.COOLDOWN):
+        raise GuildError("'trigger' interval must be at least {}".format(solo_players.COOLDOWN), 1)
+
+
+def _validate_solo_custom_player(player):
+    missing = [key for key in _SOLO_PLAYER_CUSTOM_KEYS if key not in player]
+    if missing:
+        raise GuildError("custom job '{}' requires {}".format(player["job"], ", ".join(missing)), 1)
+    names.validate_name(player["job"], "solo player job")
+    _validate_health_command(player["command"])
+    _validate_solo_trigger(player["trigger"])
 
 
 def _validate_solo_player(player, repos):
-    if not isinstance(player, dict) or not {"repo", "job"} <= set(player) <= {"repo", "job", "name"}:
-        raise GuildError("entries must be objects with 'repo', 'job' and optionally 'name'", 1)
-    if player["job"] not in _SOLO_PLAYER_JOBS:
-        raise GuildError("'job' must be one of: {}".format(", ".join(_SOLO_PLAYER_JOBS)), 1)
+    if not isinstance(player, dict) or not {"repo", "job"} <= set(player) <= _SOLO_PLAYER_KEYS:
+        raise GuildError(
+            "entries must be objects with 'repo', 'job' and optionally 'name', 'class', 'command', 'trigger'", 1
+        )
+    if not isinstance(player["job"], str):
+        raise GuildError("'job' must be a string", 1)
+    if player["job"] in solo_players.BUILTIN:
+        if "command" in player or "trigger" in player:
+            raise GuildError("built-in job '{}' does not take 'command' or 'trigger'".format(player["job"]), 1)
+    else:
+        _validate_solo_custom_player(player)
     if player["repo"] not in repos:
         raise GuildError("'repo' must be one of the project's github.repos", 1)
-    if "name" in player and (not isinstance(player["name"], str) or not player["name"].strip()):
-        raise GuildError("'name' must be a non-empty string", 1)
+    for key in ("name", "class"):
+        if key in player and (not isinstance(player[key], str) or not player[key].strip()):
+            raise GuildError("'{}' must be a non-empty string".format(key), 1)
 
 
 def _validate_solo_players_config(data):

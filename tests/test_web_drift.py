@@ -439,6 +439,7 @@ def _solo_player(**overrides):
         "name": "mender",
         "health_job": "red-main-acme-app",
         "trigger": "main red: checks failing: lint",
+        "schedule": "main-red",
         "state": "due",
         "last_done": None,
         "last_pending": None,
@@ -462,6 +463,10 @@ class WebSoloPlayerBehaviorTests(unittest.TestCase):
         for expected in ("mender", "cleric", "acme/app", "due", "main red: checks failing: lint", "never", "none"):
             self.assertIn(expected, out)
         self.assertIn("guild solo launch acme/app red-main", out)
+
+    def test_player_shows_its_schedule(self):
+        out = self._text([_solo_player(schedule="every 7d", trigger=None, state="idle")])
+        self.assertIn("on every 7d", out)
 
     def test_idle_player_shows_no_trigger_and_launch_command(self):
         out = self._text([_solo_player(trigger=None, state="idle")])
