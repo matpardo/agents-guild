@@ -1441,9 +1441,10 @@ text and refuses a job text, `--task` or a name missing from `health_jobs`.
 
 ### Solo players
 
-`solo_players` in the project config (see "Project config") declares built-in
-fixers of one repo. The identity of a solo player is `(repo, job)`; the job
-comes from a fixed set, and each job carries its prompt and a display class:
+`solo_players` in the project config (see "Project config") declares the
+per-repo players. The identity of a solo player is `(repo, job)`. A job is
+either built in, with its own prompt, class and trigger, or defined in the
+config (see "Custom solo players"). The built-in jobs:
 
 | job | class | what its session does |
 |---|---|---|
@@ -1461,13 +1462,43 @@ that way, and the skill stays usable without guild. `guild solo launch` and the
 tick open the window in that clone; without a local clone, in the project's
 first path with the built-in steps.
 
-`name` is only a label for the board. Each solo player is also a health job
+`name` is only a label for the board, and `class` on a built-in entry replaces
+its class. Each solo player is also a health job
 named `<job>-<owner>-<repo>` (the repo with `/` turned into `-`, for example
 `red-main-acme-app`), so two repos with the same name under different owners
 do not collide. That job has `every` `1h` and the built-in prompt; `guild
 adventurer start --job <that name>` and the `GUILD_ADVENTURER_JOB` binding of
 the `SessionStart` hook accept it. The `HEALTH JOBS` section lists only the jobs
 written in `health_jobs`.
+
+#### Custom solo players
+
+An entry with a `job` that is not built in defines its own player. Every key is
+required, nothing is defaulted, and `repo` is the home repo: the repo whose
+clone is the working directory of the session. Put the repo a command targets
+inside the command.
+
+```json
+{"repo": "acme/app", "job": "sec-audit", "name": "warden", "class": "red",
+ "command": "/security-audit acme/api quick", "trigger": "every 7d"}
+```
+
+- `job`: a slug like other names, not `red-main` or `dependabot`.
+- `command`: the prompt the session starts with, a non-empty string that does
+  not start with `-`. Guild appends the same rules every built-in prompt
+  carries: never merge, track PRs with `guild pr track` without `--task`
+  (plus `--fixes-main` when the trigger is `main-red`), `guild solo say` only
+  for important things, one short message before `guild adventurer done`.
+- `class` and `name`: free labels shown on the board.
+- `trigger`: when the player is due. `main-red` and `dependabot` behave like
+  the built-in jobs of that name (including the `fixing` hold and the
+  `to merge` list); `every <duration>` (for example `every 7d`, at least `1h`)
+  is due when it has no report and no launch yet, or the last report or launch
+  is older than the interval, and never backs off for 24h.
+
+Built-in entries accept `repo`, `job`, `name` and `class`; `command` and
+`trigger` are refused there. The board and `guild solo list` show the schedule
+of each player (`on main-red`, `on every 7d`).
 
 Triggers come from facts the sync stores:
 
@@ -2442,7 +2473,7 @@ All keys. The loader rejects a wrong type with a clear error for every key excep
 - `migration_paths` (list of globs, absent: the migration clash check is skipped and no extra `gh` call is made): matched with `fnmatch` against changed file paths, e.g. `db/migrate/*`. See "Migration version clash" under `sync`.
 - `fast_forward_base` (boolean, absent or `false`: no clone is ever modified): `true` makes `sync --source gh` fast-forward the local base branch of merged repos (see "Base branch fast-forward" under `sync`).
 - `health_jobs` (list of `{"name", "command", "every"}`, absent: no jobs): recurring jobs that keep the project healthy (see "Health jobs"). `name` is a unique slug, `command` a non-empty string that does not start with `-`, the prompt or skill the job's session runs first, and `every` a duration like `30m`, `12h` or `3d`. Any other shape fails to load with an error naming `health_jobs`.
-- `solo_players` (list of `{"repo", "job", "name"}`, absent: none): built-in per-repo fixers (see "Solo players"). `job` is `red-main` or `dependabot`, `repo` one of `github.repos`, `name` an optional non-empty display label, and each `(repo, job)` pair appears once. Any other shape fails to load with an error naming `solo_players`.
+- `solo_players` (list of `{"repo", "job", "name", "class", "command", "trigger"}`, absent: none): per-repo solo players (see "Solo players"). `repo` is one of `github.repos`, each `(repo, job)` pair appears once, `name` and `class` are optional non-empty labels on built-in jobs (`red-main`, `dependabot`, which refuse `command` and `trigger`), and any other `job` is a custom player that requires `command`, `trigger` (`main-red`, `dependabot` or `every <duration>` of at least 1h) and `class`. Any other shape fails to load with an error naming `solo_players`.
 - `lifecycle` (object, absent: no command ever runs): commands run on PR lifecycle events (see "Lifecycle commands"). Keys are `on_pr_merged` and `on_pr_closed`, any other key fails to load. Each value has exactly `command` (non-empty list of non-empty strings, never a shell string) and `timeout_minutes` (integer from 1 to 1440, required).
 
 ### SDD parsing rules

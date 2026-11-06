@@ -9,7 +9,7 @@ def _player_rows(ctx):
 
 
 def format_row(row):
-    line = "  {} [{}] {} {} {}{} trigger: {} last done: {} last pending: {}".format(
+    line = "  {} [{}] {} {} {}{} trigger: {} last done: {} last pending: {} schedule: {}".format(
         row["name"],
         row["class"],
         row["repo"],
@@ -19,6 +19,7 @@ def format_row(row):
         row["trigger"] or "none",
         row["last_done"] or "never",
         row["last_pending"] or "none",
+        row["schedule"],
     )
     return "\n".join([line, *solo_players.to_merge_lines(row)])
 
@@ -67,11 +68,11 @@ def _find_player(project_data, repo, job_name):
 
 def _launch_player(ctx, project, project_data, repo, job_name, tmux):
     health_job = solo_players.health_job_name(repo, job_name)
-    job = solo_players.launch_job(project_data, repo, job_name)
+    player = _find_player(project_data, repo, job_name)
+    job = solo_players.launch_job(project_data, player)
     cwd = job["cwd"] or adventurer_commands.first_path(project_data)
     message = adventurer_commands.launch_window(ctx, project, cwd, job, _window_name(health_job), tmux)
-    player = _find_player(project_data, repo, job_name)
-    trigger = solo_players.current_trigger(ctx.conn, repo, job_name)
+    trigger = solo_players.current_trigger(ctx.conn, ctx.now, project, player)
     with db.writing(ctx.conn):
         events.record(
             ctx.conn,
@@ -92,7 +93,7 @@ def _launch_player(ctx, project, project_data, repo, job_name, tmux):
             project,
             player,
             "{} ({}) started on {}: {}".format(
-                solo_players.player_name(player), solo_players.JOBS[job_name]["class"], repo, trigger or "manual launch"
+                solo_players.player_name(player), solo_players.player_class(player), repo, trigger or "manual launch"
             ),
         )
     return message

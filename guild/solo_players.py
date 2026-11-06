@@ -45,13 +45,25 @@ _SKILL_STEPS = (
 )
 
 
-def _job(job_class, goal, steps, rules):
-    return {"class": job_class, "goal": goal, "rules": rules, "prompt": goal + steps + rules}
+_GENERIC_RULES = (
+    "Never merge. Track every PR you open with `guild pr track ...` without `--task`{fixes_main}."
+    ' Tell the dev only important things with `guild solo say "<text>"`, no routine progress.'
+    " Before finishing, post one short `guild solo say` with the PRs you touched and what needs a human;"
+    " skip the long final report, the chat is the record."
+    ' End with `guild adventurer done --pending "<text>"`; the window closes after it.'
+)
+_MAIN_RED = "main-red"
+_DEPENDABOT = "dependabot"
+_EVERY = "every"
 
 
-JOBS = {
-    "red-main": _job("cleric", _RED_MAIN_GOAL, _RED_MAIN_STEPS, _RED_MAIN_RULES),
-    "dependabot": _job("artificer", _DEPENDABOT_GOAL, _DEPENDABOT_STEPS, _DEPENDABOT_RULES),
+def _job(job_class, trigger, goal, steps, rules):
+    return {"class": job_class, "trigger": trigger, "goal": goal, "rules": rules, "prompt": goal + steps + rules}
+
+
+BUILTIN = {
+    "red-main": _job("cleric", _MAIN_RED, _RED_MAIN_GOAL, _RED_MAIN_STEPS, _RED_MAIN_RULES),
+    "dependabot": _job("artificer", _DEPENDABOT, _DEPENDABOT_GOAL, _DEPENDABOT_STEPS, _DEPENDABOT_RULES),
 }
 
 
@@ -74,11 +86,34 @@ def player_name(player):
     return player.get("name", player["job"])
 
 
+def player_class(player):
+    if "class" in player:
+        return player["class"]
+    return BUILTIN[player["job"]]["class"]
+
+
+def player_trigger(player):
+    if "trigger" in player:
+        return player["trigger"]
+    return BUILTIN[player["job"]]["trigger"]
+
+
+def trigger_kind(player):
+    return player_trigger(player).split(" ")[0]
+
+
+def _prompt(player):
+    if "command" not in player:
+        return BUILTIN[player["job"]]["prompt"].format(repo=player["repo"])
+    fixes_main = " and add `--fixes-main`" if trigger_kind(player) == _MAIN_RED else ""
+    return player["command"] + "\n\n" + _GENERIC_RULES.format(fixes_main=fixes_main)
+
+
 def jobs(project_data):
     return [
         {
             "name": health_job_name(player["repo"], player["job"]),
-            "command": JOBS[player["job"]]["prompt"].format(repo=player["repo"]),
+            "command": _prompt(player),
             "every": COOLDOWN,
         }
         for player in _players(project_data)
@@ -93,14 +128,20 @@ def _clone_path(project_data, repo):
 
 
 def _repo_skill_prompt(job_name, repo):
-    job = JOBS[job_name]
+    job = BUILTIN[job_name]
     return "/{} {}\n\n".format(job_name, repo) + (job["goal"] + _SKILL_STEPS + job["rules"]).format(repo=repo)
 
 
-def launch_job(project_data, repo, job_name):
+def launch_job(project_data, player):
+    repo = player["repo"]
+    job_name = player["job"]
     clone = _clone_path(project_data, repo)
-    skill = clone is not None and Path(clone, ".claude", "skills", job_name, "SKILL.md").is_file()
-    command = _repo_skill_prompt(job_name, repo) if skill else JOBS[job_name]["prompt"].format(repo=repo)
+    skill = (
+        "command" not in player
+        and clone is not None
+        and Path(clone, ".claude", "skills", job_name, "SKILL.md").is_file()
+    )
+    command = _repo_skill_prompt(job_name, repo) if skill else _prompt(player)
     return {"name": health_job_name(repo, job_name), "command": command, "every": COOLDOWN, "cwd": clone}
 
 
@@ -125,9 +166,6 @@ def _dependabot_trigger(conn, repo):
     return ", ".join(reasons) or None
 
 
-_TRIGGERS = {"red-main": _red_main_trigger, "dependabot": _dependabot_trigger}
-
-
 def _last_report(conn, project, health_job):
     row = conn.execute(
         "SELECT done_at, pending FROM adventurers WHERE project = ? AND health_job = ?"
@@ -146,19 +184,38 @@ def _last_launch(conn, health_job):
     return row["launched_at"], row["trigger"]
 
 
-def current_trigger(conn, repo, job):
-    return _TRIGGERS[job](conn, repo)
+def _every_trigger(conn, now, project, player):
+    trigger = player_trigger(player)
+    interval = timeutil.parse_duration(trigger[len(_EVERY) + 1 :])
+    health_job = health_job_name(player["repo"], player["job"])
+    stamps = [
+        stamp for stamp in (_last_report(conn, project, health_job)[0], _last_launch(conn, health_job)[0]) if stamp
+    ]
+    if not stamps:
+        return trigger
+    if max(timeutil.from_iso(stamp) for stamp in stamps) + interval > now:
+        return None
+    return trigger
 
 
-def _fix_prs(conn, repo, job):
-    if job != "red-main":
+def current_trigger(conn, now, project, player):
+    kind = trigger_kind(player)
+    if kind == _MAIN_RED:
+        return _red_main_trigger(conn, player["repo"])
+    if kind == _DEPENDABOT:
+        return _dependabot_trigger(conn, player["repo"])
+    return _every_trigger(conn, now, project, player)
+
+
+def _fix_prs(conn, player):
+    if trigger_kind(player) != _MAIN_RED:
         return []
     rows = conn.execute(
         "SELECT number FROM prs WHERE repo = ? AND fixes_main = 1 AND lifecycle NOT IN ('merged', 'closed')"
         " ORDER BY number",
-        (repo,),
+        (player["repo"],),
     ).fetchall()
-    return ["{}#{}".format(repo, row["number"]) for row in rows]
+    return ["{}#{}".format(player["repo"], row["number"]) for row in rows]
 
 
 def active_adventurer(conn, project, health_job):
@@ -172,8 +229,9 @@ def is_paused(conn, health_job):
     return conn.execute("SELECT 1 FROM solo_pauses WHERE health_job = ?", (health_job,)).fetchone() is not None
 
 
-def _retry_at(now, trigger, last_done, last_launch, last_launch_trigger):
-    cooldown = timeutil.parse_duration(REPEAT_COOLDOWN if trigger == last_launch_trigger else COOLDOWN)
+def _retry_at(now, kind, trigger, last_done, last_launch, last_launch_trigger):
+    repeats = kind != _EVERY and trigger == last_launch_trigger
+    cooldown = timeutil.parse_duration(REPEAT_COOLDOWN if repeats else COOLDOWN)
     ends = [timeutil.from_iso(stamp) + cooldown for stamp in (last_done, last_launch) if stamp is not None]
     pending = [end for end in ends if end > now]
     if not pending:
@@ -181,7 +239,7 @@ def _retry_at(now, trigger, last_done, last_launch, last_launch_trigger):
     return max(pending)
 
 
-def _state(now, active, live_ids, paused, trigger, fix_prs, last_done, last_launch, last_launch_trigger):
+def _state(now, active, live_ids, paused, kind, trigger, fix_prs, last_done, last_launch, last_launch_trigger):
     if active is not None and active["session_id"] in live_ids:
         return "running"
     if active is not None:
@@ -192,15 +250,15 @@ def _state(now, active, live_ids, paused, trigger, fix_prs, last_done, last_laun
         return "fixing"
     if trigger is None:
         return "idle"
-    if _retry_at(now, trigger, last_done, last_launch, last_launch_trigger) is not None:
+    if _retry_at(now, kind, trigger, last_done, last_launch, last_launch_trigger) is not None:
         return "cooling"
     return "due"
 
 
-def _repeat_retry(now, state, trigger, last_done, last_launch, last_launch_trigger):
+def _repeat_retry(now, state, kind, trigger, last_done, last_launch, last_launch_trigger):
     if state != "cooling" or trigger != last_launch_trigger:
         return None
-    return timeutil.to_iso(_retry_at(now, trigger, last_done, last_launch, last_launch_trigger))
+    return timeutil.to_iso(_retry_at(now, kind, trigger, last_done, last_launch, last_launch_trigger))
 
 
 def state_detail(row):
@@ -257,9 +315,10 @@ def models(conn, now, projects_by_name, live_ids):
     for project in sorted(projects_by_name):
         for player in _players(projects_by_name[project]):
             health_job = health_job_name(player["repo"], player["job"])
-            trigger = _TRIGGERS[player["job"]](conn, player["repo"])
+            kind = trigger_kind(player)
+            trigger = current_trigger(conn, now, project, player)
             active = active_adventurer(conn, project, health_job)
-            fix_prs = _fix_prs(conn, player["repo"], player["job"])
+            fix_prs = _fix_prs(conn, player)
             last_done, last_pending = _last_report(conn, project, health_job)
             last_launch, last_launch_trigger = _last_launch(conn, health_job)
             state = _state(
@@ -267,6 +326,7 @@ def models(conn, now, projects_by_name, live_ids):
                 active,
                 live_ids,
                 is_paused(conn, health_job),
+                kind,
                 trigger,
                 fix_prs,
                 last_done,
@@ -278,20 +338,19 @@ def models(conn, now, projects_by_name, live_ids):
                     "project": project,
                     "repo": player["repo"],
                     "job": player["job"],
-                    "class": JOBS[player["job"]]["class"],
+                    "class": player_class(player),
                     "name": player_name(player),
                     "health_job": health_job,
                     "trigger": trigger,
+                    "schedule": player_trigger(player),
                     "state": state,
-                    "retry_at": _repeat_retry(now, state, trigger, last_done, last_launch, last_launch_trigger),
+                    "retry_at": _repeat_retry(now, state, kind, trigger, last_done, last_launch, last_launch_trigger),
                     "stalled_adventurer": None if active is None or active["session_id"] in live_ids else active["id"],
                     "waits_on": fix_prs,
                     "last_done": last_done,
                     "last_pending": last_pending,
                     "runs": runs(conn, project, health_job, live_ids, RUNS_SHOWN),
-                    "to_merge": [
-                        entry for entry in ready if player["job"] == "dependabot" and entry["repo"] == player["repo"]
-                    ],
+                    "to_merge": [entry for entry in ready if kind == _DEPENDABOT and entry["repo"] == player["repo"]],
                     "launch": (RESUME_COMMAND if state == "paused" else LAUNCH_COMMAND).format(
                         player["repo"], player["job"]
                     ),
@@ -304,7 +363,7 @@ def ready_to_merge(conn, projects_by_name):
     names = {}
     for project in sorted(projects_by_name):
         for player in _players(projects_by_name[project]):
-            if player["job"] == "dependabot":
+            if trigger_kind(player) == _DEPENDABOT:
                 names.setdefault(player["repo"], player_name(player))
     rows = conn.execute("SELECT repo, number, title FROM dependabot_ready ORDER BY repo, number").fetchall()
     return [

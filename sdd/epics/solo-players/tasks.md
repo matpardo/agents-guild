@@ -305,3 +305,17 @@ updated: 2026-11-02
 **Acceptance:**
 - [x] A run with tracked PRs shows each ref with its lifecycle, ordered by repo and number; a run without PRs has an empty list.
 - [x] `guild solo runs` and the web run line print the same PRs.
+
+## T26 — Config-defined solo players
+
+**Depends on:** T25
+**Status:** [x] done
+
+**What:** `solo_players` entries can define their own job: a slug with a `command`, a `class` and a `trigger` (`main-red`, `dependabot` or `every <duration>` of at least 1h). Built-in jobs keep their prompt and accept a `class` override. The identity stays `(repo, job)`, and rows carry the `schedule`.
+
+**Acceptance:**
+- [x] Config accepts built-in entries and complete custom entries, and refuses the rest naming `solo_players`.
+- [x] A custom player runs its command plus the generic rules; `--fixes-main` is added for a `main-red` trigger.
+- [x] An `every` player is due with no history and again once the interval passed since its last report or launch.
+- [x] `main-red` and `dependabot` custom players hold, list and sync like the built-in ones.
+- [x] The board, `guild solo list` and the web show the schedule of each player.

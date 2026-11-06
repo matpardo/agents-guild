@@ -16,7 +16,7 @@ def _names_by_health_job(projects_by_name):
             health_job = solo_players.health_job_name(player["repo"], player["job"])
             names[health_job] = (
                 solo_players.player_name(player),
-                solo_players.JOBS[player["job"]]["class"],
+                solo_players.player_class(player),
                 project_name,
             )
     return names

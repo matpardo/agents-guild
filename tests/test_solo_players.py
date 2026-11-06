@@ -13,6 +13,14 @@ from tests.testutil import GuildTestCase
 _BASE = {"name": "acme", "paths": ["/tmp/acme/*"], "github": {"repos": ["acme/app", "other/app"]}}
 _RED = {"repo": "acme/app", "job": "red-main", "name": "mender"}
 _DEP = {"repo": "acme/app", "job": "dependabot"}
+_CUSTOM = {
+    "repo": "acme/app",
+    "job": "sec-audit",
+    "name": "warden",
+    "class": "red",
+    "command": "/security-audit other/app quick",
+    "trigger": "every 2h",
+}
 _GREEN_PR = {
     "number": 1,
     "title": "Bump x",
@@ -32,6 +40,12 @@ class SoloPlayersConfigTests(GuildTestCase):
         config.validate_project_config(_BASE)
         config.validate_project_config(_with_players([_RED, _DEP, dict(_RED, repo="other/app")]))
 
+    def test_custom_and_overridden_players_load(self):
+        config.validate_project_config(
+            _with_players([_CUSTOM, dict(_DEP, **{"class": "tinkerer"}), dict(_CUSTOM, job="scan", trigger="main-red")])
+        )
+        config.validate_project_config(_with_players([dict(_CUSTOM, trigger="dependabot"), dict(_CUSTOM, job="b")]))
+
     def test_invalid_shapes_fail_naming_the_key(self):
         bad = [
             "x",
@@ -47,6 +61,22 @@ class SoloPlayersConfigTests(GuildTestCase):
             [dict(_RED, name="  ")],
             [dict(_RED, name=3)],
             [_RED, dict(_RED, name="other")],
+            [dict(_RED, command="/x")],
+            [dict(_RED, trigger="every 2h")],
+            [dict(_CUSTOM, job="Bad Slug")],
+            [dict(_CUSTOM, job="../x")],
+            [{k: v for k, v in _CUSTOM.items() if k != "command"}],
+            [{k: v for k, v in _CUSTOM.items() if k != "trigger"}],
+            [{k: v for k, v in _CUSTOM.items() if k != "class"}],
+            [dict(_CUSTOM, trigger="hourly")],
+            [dict(_CUSTOM, trigger="every 30m")],
+            [dict(_CUSTOM, trigger="every soon")],
+            [dict(_CUSTOM, trigger=3)],
+            [dict(_CUSTOM, command="-rf")],
+            [dict(_CUSTOM, command="  ")],
+            [dict(_CUSTOM, command=3)],
+            [dict(_CUSTOM, **{"class": ""})],
+            [dict(_RED, **{"class": 3})],
         ]
         for players in bad:
             with self.assertRaises(GuildError, msg=players) as raised:
@@ -1109,23 +1139,23 @@ class DependabotAnnounceTests(SoloPlayersTestCase):
         self.assertEqual(reducers._REQUIRED_KEYS["dependabot.announced"], ("repo", "number"))
 
     def test_prompt_leaves_the_ready_announcement_to_guild(self):
-        prompt = solo_players.JOBS["dependabot"]["prompt"]
+        prompt = solo_players.BUILTIN["dependabot"]["prompt"]
         self.assertNotIn("ready to merge", prompt)
         self.assertIn("needs a human", prompt)
 
     def test_prompt_closes_a_stale_single_dependency_pr_through_dependabot(self):
-        prompt = solo_players.JOBS["dependabot"]["prompt"]
+        prompt = solo_players.BUILTIN["dependabot"]["prompt"]
         self.assertIn("stale", prompt)
         self.assertIn("@dependabot close", prompt)
         self.assertIn("single-dependency", prompt)
 
     def test_prompt_drops_stale_dependencies_from_a_multi_dependency_pr(self):
-        prompt = solo_players.JOBS["dependabot"]["prompt"]
+        prompt = solo_players.BUILTIN["dependabot"]["prompt"]
         self.assertIn("multi-dependency", prompt)
         self.assertIn("never update a stale dependency", prompt)
 
     def test_prompt_keeps_the_stale_comment_free_of_guild_words(self):
-        prompt = solo_players.JOBS["dependabot"]["prompt"]
+        prompt = solo_players.BUILTIN["dependabot"]["prompt"]
         self.assertIn("no guild", prompt)
 
 
@@ -1401,7 +1431,7 @@ class SoloChannelTests(SoloPlayersTestCase):
         self.assertEqual(reducers.required_keys("solo.message"), ("repo", "job", "text"))
 
     def test_built_in_prompts_tell_the_player_to_post_only_important_messages(self):
-        for job in solo_players.JOBS.values():
+        for job in solo_players.BUILTIN.values():
             self.assertIn("guild solo say", job["prompt"])
             self.assertIn("only important", job["prompt"])
 
@@ -1470,3 +1500,128 @@ class SoloRunsTests(SoloPlayersTestCase):
 
     def test_runs_command_refuses_an_unknown_player(self):
         self.assertEqual(self.cli(["solo", "runs", "acme/app", "nope"], None)[0], 1)
+
+
+class SoloPlayersCustomTests(SoloPlayersTestCase):
+    def setUp(self):
+        super().setUp()
+        self.set_players([_RED, _DEP, _CUSTOM])
+
+    def custom(self):
+        return self.players()[("acme/app", "sec-audit")]
+
+    def custom_job(self):
+        data = config.load_project(self.config_home / "guild" / "projects", "acme")
+        return {job["name"]: job for job in solo_players.jobs(data)}["sec-audit-acme-app"]
+
+    def test_legacy_rows_gain_only_the_schedule(self):
+        rows = self.players()
+        self.assertEqual(rows[("acme/app", "red-main")]["schedule"], "main-red")
+        self.assertEqual(rows[("acme/app", "red-main")]["class"], "cleric")
+        self.assertEqual(rows[("acme/app", "dependabot")]["schedule"], "dependabot")
+        self.assertEqual(rows[("acme/app", "dependabot")]["class"], "artificer")
+
+    def test_custom_row_uses_its_class_name_and_schedule(self):
+        row = self.custom()
+        self.assertEqual((row["class"], row["name"], row["schedule"]), ("red", "warden", "every 2h"))
+
+    def test_class_override_replaces_the_built_in_class(self):
+        self.set_players([dict(_DEP, **{"class": "tinkerer"})])
+        self.assertEqual(self.players()[("acme/app", "dependabot")]["class"], "tinkerer")
+
+    def test_every_player_is_due_with_no_history(self):
+        row = self.custom()
+        self.assertEqual((row["state"], row["trigger"]), ("due", "every 2h"))
+        self.assertEqual(row["launch"], "guild solo launch acme/app sec-audit")
+
+    def test_every_player_waits_for_its_interval_after_a_launch(self):
+        with mock.patch("guild.tmux_windows.Tmux", return_value=FakeTmux(True, [], [])):
+            self.assertEqual(self.cli(["solo", "launch", "acme/app", "sec-audit"], None)[0], 0)
+        row = self.custom()
+        self.assertEqual((row["state"], row["trigger"], row["retry_at"]), ("idle", None, None))
+        self.assertEqual(row["schedule"], "every 2h")
+
+    def test_every_player_waits_for_its_interval_after_a_report(self):
+        self.finish_job("sec-audit-acme-app", "none")
+        self.assertEqual(self.custom()["state"], "idle")
+        self.age_reports(1)
+        self.assertEqual(self.custom()["state"], "idle")
+        self.age_reports(3)
+        self.assertEqual(self.custom()["state"], "due")
+
+    def test_every_player_is_due_again_after_the_interval_from_a_launch(self):
+        with mock.patch("guild.tmux_windows.Tmux", return_value=FakeTmux(True, [], [])):
+            self.cli(["solo", "launch", "acme/app", "sec-audit"], None)
+        old = timeutil.to_iso(timeutil.utcnow() - timedelta(hours=3))
+        conn = self.db()
+        conn.execute("UPDATE solo_launches SET launched_at = ?", (old,))
+        conn.commit()
+        row = self.custom()
+        self.assertEqual((row["state"], row["retry_at"]), ("due", None))
+
+    def test_every_trigger_backs_off_one_hour_not_a_day(self):
+        now = timeutil.utcnow()
+        old = timeutil.to_iso(now - timedelta(minutes=30))
+        retry = solo_players._retry_at(now, "every", "every 2h", None, old, "every 2h")
+        self.assertEqual(retry, timeutil.from_iso(old) + timedelta(hours=1))
+
+    def test_custom_prompt_is_the_command_plus_generic_rules(self):
+        command = self.custom_job()["command"]
+        self.assertTrue(command.startswith("/security-audit other/app quick\n\n"))
+        self.assertIn("Never merge", command)
+        self.assertIn("guild solo say", command)
+        self.assertIn("guild adventurer done --pending", command)
+        self.assertNotIn("--fixes-main", command)
+
+    def test_main_red_custom_prompt_adds_fixes_main(self):
+        self.set_players([dict(_CUSTOM, trigger="main-red")])
+        self.assertIn("--fixes-main", self.custom_job()["command"])
+
+    def test_main_red_custom_player_is_due_then_held_by_a_fixing_pr(self):
+        self.set_players([dict(_CUSTOM, trigger="main-red")])
+        self.red("ci down")
+        self.assertEqual(self.custom()["state"], "due")
+        conn = self.db()
+        conn.execute(
+            "INSERT INTO prs (repo, number, party, what, lifecycle, seeded, fixes_main)"
+            " VALUES ('acme/app', 9, 'p', 'fix', 'ready', 0, 1)"
+        )
+        conn.commit()
+        row = self.custom()
+        self.assertEqual((row["state"], row["waits_on"]), ("fixing", ["acme/app#9"]))
+
+    def test_dependabot_custom_player_lists_to_merge_rows(self):
+        self.set_players([dict(_CUSTOM, trigger="dependabot")])
+        conn = self.db()
+        conn.execute("INSERT INTO dependabot_ready VALUES ('acme/app', 4, 'Bump y')")
+        conn.commit()
+        self.assertEqual([entry["ref"] for entry in self.custom()["to_merge"]], ["acme/app#4"])
+
+    def test_dependabot_custom_player_selects_the_sync_repo(self):
+        from guild.commands import sync
+
+        data = {"solo_players": [dict(_CUSTOM, trigger="dependabot"), _RED]}
+        with mock.patch.object(sync, "_sync_repo_dependabot") as repo_sync:
+            sync._sync_dependabot(mock.Mock(), [data], [])
+        self.assertEqual([call.args[2] for call in repo_sync.call_args_list], ["acme/app"])
+
+    def test_launch_runs_the_custom_prompt_in_the_clone(self):
+        tmux = FakeTmux(True, [], [])
+        with mock.patch("guild.tmux_windows.Tmux", return_value=tmux):
+            code, out, err = self.cli(["solo", "launch", "acme/app", "sec-audit"], None)
+        self.assertEqual(code, 0, err)
+        call = next(c for c in tmux.calls if c[0] == "new-session")
+        self.assertEqual(call[call.index("-n") + 1], "solo-sec-audit-acme-app")
+        self.assertTrue(call[-1].startswith("GUILD_ADVENTURER_JOB=sec-audit-acme-app claude "))
+        self.assertIn("/security-audit other/app quick", call[-1])
+        self.assertIn("warden (red) started on acme/app: every 2h", self.channel_texts())
+
+    def test_start_by_custom_job_name_binds_the_adventurer(self):
+        code, out, err = self.cli(
+            ["adventurer", "start", "--job", "sec-audit-acme-app", "--reason", "test reason"], "adv-1"
+        )
+        self.assertEqual(code, 0, err)
+
+    def test_list_and_board_show_the_schedule(self):
+        self.assertIn("schedule: every 2h", self.cli(["solo", "list"], None)[1])
+        self.assertIn("warden [red] acme/app due every 2h · on every 2h", self.cli(["board"], None)[1])

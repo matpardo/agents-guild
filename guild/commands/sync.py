@@ -16,6 +16,7 @@ from guild import (
     raid_members,
     sanitize,
     solo_channel,
+    solo_players,
     timeutil,
     trace_validator,
 )
@@ -725,7 +726,13 @@ def _sync_repo_dependabot(ctx, project, repo, failures):
 
 def _sync_dependabot(ctx, projects, failures):
     for project in projects:
-        repos = sorted({player["repo"] for player in project.get("solo_players", []) if player["job"] == "dependabot"})
+        repos = sorted(
+            {
+                player["repo"]
+                for player in project.get("solo_players", [])
+                if solo_players.trigger_kind(player) == "dependabot"
+            }
+        )
         for repo in repos:
             _sync_repo_dependabot(ctx, project, repo, failures)
 

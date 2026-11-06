@@ -2058,7 +2058,7 @@ realmDoctorLines: [],
     } else if (player.waits_on.length > 0) {
       state += ": waits on " + player.waits_on.join(", ");
     }
-    var parts = [player.class, player.repo, state, player.trigger === null ? "no trigger" : player.trigger];
+    var parts = [player.class, player.repo, state, "on " + player.schedule, player.trigger === null ? "no trigger" : player.trigger];
     parts.push("last done " + (player.last_done === null ? "never" : shortLocalDate(player.last_done)));
     parts.push("last pending " + (player.last_pending === null ? "none" : player.last_pending));
     return parts.join(" \u00b7 ");
