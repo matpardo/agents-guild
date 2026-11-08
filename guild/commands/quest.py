@@ -185,7 +185,7 @@ def _require_new_slug(ctx, slug):
         raise GuildError("quest '{}' already exists".format(slug), 1)
 
 
-def _record_added(ctx, party, project, slug, title, epic, tasks, followups_of, reason):
+def _record_added(ctx, party, project, slug, title, epic, tasks, followups_of, left_by, reason):
     payload = {
         "slug": slug,
         "project": project,
@@ -194,6 +194,7 @@ def _record_added(ctx, party, project, slug, title, epic, tasks, followups_of, r
         "title": title,
         "tasks": tasks,
         "followups_of": followups_of,
+        "left_by": left_by,
     }
     if reason is not None:
         pii.validate_reason(reason, ctx.projects_dir, project)
@@ -224,7 +225,7 @@ def add_open(ctx, project, slug, title, epic, tids):
     if not tids:
         raise GuildError("select at least one task", 1)
     tasks = _resolve_epic_tasks(ctx.conn, project, epic, ",".join(tids))
-    return _record_added(ctx, None, project, slug, title, epic, tasks, None, None)
+    return _record_added(ctx, None, project, slug, title, epic, tasks, None, None, None)
 
 
 def add(ctx, slug, title, epic, tasks_csv, titles_csv, no_epic, followups_of, open_quest, reason):
@@ -243,6 +244,7 @@ def add(ctx, slug, title, epic, tasks_csv, titles_csv, no_epic, followups_of, op
     _require_new_slug(ctx, slug)
     binding = None if open_quest else identity.require_binding(ctx.conn, ctx.session_id)
     party = None if open_quest else binding["party"]
+    left_by = identity.resolve_actor(ctx.conn, ctx.session_id)[0] if open_quest else None
     project = config.require_project(ctx.cwd, ctx.projects_dir)
     if followups_of is not None:
         _require_followup_source(ctx, binding, followups_of)
@@ -251,7 +253,7 @@ def add(ctx, slug, title, epic, tasks_csv, titles_csv, no_epic, followups_of, op
         tasks = _free_tasks(tasks_csv, titles_csv)
     if not free:
         tasks = _resolve_epic_tasks(ctx.conn, project, epic, tasks_csv or "")
-    return _record_added(ctx, party, project, slug, title, epic, tasks, followups_of, reason)
+    return _record_added(ctx, party, project, slug, title, epic, tasks, followups_of, left_by, reason)
 
 
 def _load_quest(conn, slug):

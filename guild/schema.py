@@ -440,6 +440,7 @@ _COLUMN_MIGRATIONS = (
     ("leaders", "handoff_path", "TEXT"),
     ("quests", "created_at", "TEXT"),
     ("quests", "updated_at", "TEXT"),
+    ("quests", "left_by", "TEXT"),
     ("quest_tasks", "created_at", "TEXT"),
     ("quest_tasks", "updated_at", "TEXT"),
     ("quest_tasks", "no_sdd", "INTEGER NOT NULL DEFAULT 0"),

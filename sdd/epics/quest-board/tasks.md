@@ -78,3 +78,14 @@ updated: 2026-10-23
 
 **Acceptance:**
 - [x] `GUILD.md` names `quest take` and `quest add --open`.
+
+## T08 — Quests remember who left them
+
+**Depends on:** T03
+**Status:** [x] done
+
+**What:** `quests.left_by` holds the party or adventurer that ran `quest add --open`, or the party that released the quest. The quest board and the party block, in the CLI and the web, show it; the final report reads it instead of guessing by session.
+
+**Acceptance:**
+- [x] A session that led two parties reports each left quest only under the party that left it.
+- [x] Taking a quest keeps who left it; releasing it records the releasing party.

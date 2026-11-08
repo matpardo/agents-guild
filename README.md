@@ -2283,6 +2283,14 @@ and claim.
   skips it and `task start` refuses it until `adventurer done`.
 - `guild quest release <slug>` returns the quest to the board. The owner only,
   and only while every task is queued with no open PR and no claim.
+- A quest remembers who left it: the party or adventurer that ran `quest add
+  --open`, or the party that released it (nothing when the human created it).
+  `guild quest board` and the web quest board print `left by <name>` on each
+  open quest, so parked follow-ups stay visible after the party closes. The
+  party block of `guild board` and of the web board lists what the party left,
+  as `left: <slug> — <title> (no party yet | taken by <party> | done)`, and the
+  final report uses the same list. Quests created before this existed have no
+  author.
 - `guild next` answers `take open quest <slug>` (oldest first) to a party with
   no queued task.
 - An adventurer always starts on a task (`adventurer start --task`, required

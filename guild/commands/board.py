@@ -7,6 +7,7 @@ from guild import (
     ask_legibility,
     config,
     ctx_pressure,
+    final_report,
     health_jobs,
     ideas,
     identity,
@@ -599,6 +600,17 @@ def _discarded_count(conn, quest_slug):
     ).fetchone()[0]
 
 
+def _followup_models(conn, party):
+    return [
+        {
+            "slug": row["slug"],
+            "title": sanitize.strip_control_sequences(row["title"]),
+            "state": final_report.left_quest_state(row),
+        }
+        for row in final_report.left_quests(conn, party)
+    ]
+
+
 def _quest_lines(ctx, repo_clones, painter, quest_row, prs_by_task):
     title = sanitize.strip_control_sequences(quest_row["title"])
     lines = [
@@ -921,6 +933,10 @@ def _party_section(ctx, repo_clones, painter, party_row, project_config):
     for idea in ideas.linked_ideas(ctx, party_row["name"]):
         lines.append(
             painter.paint("  ideas: #{} {}".format(idea["id"], sanitize.strip_control_sequences(idea["title"])), "dim")
+        )
+    for followup in _followup_models(ctx.conn, party_row["name"]):
+        lines.append(
+            painter.paint("  left: {} — {} ({})".format(followup["slug"], followup["title"], followup["state"]), "dim")
         )
     raids = raid_members.member_raids(ctx.conn, ctx.now, party_row["name"])
     if raids:
@@ -1519,6 +1535,7 @@ def _party_model(ctx, repo_clones, party_row, project_config):
             {"id": row["id"], "title": sanitize.strip_control_sequences(row["title"])}
             for row in ideas.linked_ideas(ctx, party_row["name"])
         ],
+        "followups": _followup_models(ctx.conn, party_row["name"]),
         "prs": [_pr_model(ctx, repo_clones, pr_row, project_config) for pr_row in orphan_prs],
         "raids": [
             {

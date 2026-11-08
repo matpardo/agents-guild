@@ -146,8 +146,8 @@ def _quest_marked_incomplete(conn, event):
 def _quest_added(conn, event):
     payload = event["payload"]
     conn.execute(
-        "INSERT INTO quests (slug, project, party, epic, title, state, created_at, updated_at)"
-        " VALUES (?, ?, ?, ?, ?, 'active', ?, ?)",
+        "INSERT INTO quests (slug, project, party, epic, title, state, created_at, updated_at, left_by)"
+        " VALUES (?, ?, ?, ?, ?, 'active', ?, ?, ?)",
         (
             payload["slug"],
             payload["project"],
@@ -156,6 +156,7 @@ def _quest_added(conn, event):
             payload["title"],
             event["ts"],
             event["ts"],
+            payload.get("left_by"),
         ),
     )
     for task in payload["tasks"]:
@@ -174,8 +175,10 @@ def _quest_taken(conn, event):
 
 
 def _quest_released(conn, event):
+    payload = event["payload"]
     conn.execute(
-        "UPDATE quests SET party = NULL, updated_at = ? WHERE slug = ?", (event["ts"], event["payload"]["slug"])
+        "UPDATE quests SET party = NULL, left_by = ?, updated_at = ? WHERE slug = ?",
+        (payload["party"], event["ts"], payload["slug"]),
     )
 
 
@@ -1075,7 +1078,7 @@ _REQUIRED_KEYS = {
     "quest.added": ("slug", "project", "party", "epic", "title", "tasks"),
     "quest.done": ("slug",),
     "quest.taken": ("party", "slug"),
-    "quest.released": ("slug",),
+    "quest.released": ("slug", "party"),
     "quest.marked_incomplete": (),
     "task.added": ("quest", "tid", "title"),
     "task.started": ("summary", "quest", "tid"),

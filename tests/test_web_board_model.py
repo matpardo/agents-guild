@@ -290,6 +290,7 @@ class BoardModelShapeTests(BoardModelTestCase):
                 "raids",
                 "claims",
                 "ideas",
+                "followups",
                 "remaining",
                 "drift",
                 "waits",

@@ -159,6 +159,7 @@ _BOARD = {
             "leader_session_name": None,
             "waits": [],
             "ideas": [],
+            "followups": [],
             "daily_tasks": [],
             "blocked_groups": [],
         }
@@ -1540,6 +1541,7 @@ _QUEST_BOARD = {
             "slug": "pre",
             "epic": "demo",
             "title": "Pre work",
+            "left_by": "alpha",
             "dates": "created 2026-10-24 09:00",
             "tasks": [
                 {"tid": "T01", "title": "First", "adventurer": None},
@@ -1623,6 +1625,19 @@ class WebQuestBoardBehaviorTests(unittest.TestCase):
         self.assertIn("created 2026-10-24 09:00", self._text(_QUEST_BOARD))
         undated = dict(_QUEST_BOARD, open_quests=[dict(_QUEST_BOARD["open_quests"][0], dates=None)])
         self.assertNotIn("created", self._text(undated))
+
+    def test_open_quest_shows_who_left_it_only_when_known(self):
+        self.assertIn("left by alpha", self._text(_QUEST_BOARD))
+        unknown = dict(_QUEST_BOARD, open_quests=[dict(_QUEST_BOARD["open_quests"][0], left_by=None)])
+        self.assertNotIn("left by", self._text(unknown))
+
+    def test_party_lists_the_quests_it_left(self):
+        followup = {"slug": "later", "title": "Later work", "state": "no party yet"}
+        with_followup = dict(_BOARD, parties=[dict(_BOARD["parties"][0], followups=[followup])])
+        self.assertIn(
+            "left: later — Later work (no party yet)", _render(with_followup, "all", "all", "parties", "text")
+        )
+        self.assertNotIn("left: ", _render(_BOARD, "all", "all", "parties", "text"))
 
     def test_party_quest_and_task_show_dates_only_when_known(self):
         def rendered(quest_dates, task_dates):
