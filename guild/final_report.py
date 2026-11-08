@@ -34,24 +34,22 @@ def _created_idea_lines(ctx, label, linked_ids):
     return ["idea #{} created: {}".format(row["id"], row["title"]) for row in rows if row["id"] not in linked_ids]
 
 
-def _open_quest_lines(ctx, session_ids):
-    placeholders = ", ".join("?" for _ in session_ids)
-    rows = ctx.conn.execute(
-        "SELECT quests.slug AS slug, quests.party AS party, quests.state AS state FROM events"
-        " JOIN quests ON quests.slug = json_extract(events.payload, '$.slug')"
-        " WHERE events.kind = 'quest.added' AND json_extract(events.payload, '$.party') IS NULL"
-        " AND events.session_id IN ({}) ORDER BY quests.slug".format(placeholders),
-        tuple(session_ids),
+def left_quests(conn, actor):
+    return conn.execute(
+        "SELECT slug, title, party, state FROM quests WHERE left_by = ? ORDER BY slug", (actor,)
     ).fetchall()
-    return [_open_quest_line(row) for row in rows]
+
+
+def left_quest_state(row):
+    if row["state"] == "done":
+        return "done"
+    return "no party yet" if row["party"] is None else "taken by " + row["party"]
 
 
 def _open_quest_line(row):
     if row["state"] == "done":
         return "quest {} done".format(row["slug"])
-    return "open quest {}: {}".format(
-        row["slug"], "no party yet" if row["party"] is None else "taken by " + row["party"]
-    )
+    return "open quest {}: {}".format(row["slug"], left_quest_state(row))
 
 
 def _notice_lines(ctx, label):
@@ -65,11 +63,11 @@ def _notice_lines(ctx, label):
     ]
 
 
-def _generated_lines(ctx, label, session_ids, linked_ids):
+def _generated_lines(ctx, label, linked_ids):
     return (
         _ask_lines(ctx, label)
         + _created_idea_lines(ctx, label, linked_ids)
-        + _open_quest_lines(ctx, session_ids)
+        + [_open_quest_line(row) for row in left_quests(ctx.conn, label)]
         + _notice_lines(ctx, label)
     )
 
@@ -112,13 +110,7 @@ def party_report(ctx, party, pending):
     )
     linked = ideas.linked_ideas(ctx, party)
     lines.extend("idea #{}: {}".format(row["id"], row["title"]) for row in linked)
-    session_ids = [
-        row["session_id"]
-        for row in ctx.conn.execute(
-            "SELECT session_id FROM leaders WHERE party = ? AND session_id IS NOT NULL", (party,)
-        )
-    ]
-    lines.extend(_generated_lines(ctx, party, session_ids, {row["id"] for row in linked}))
+    lines.extend(_generated_lines(ctx, party, {row["id"] for row in linked}))
     lines.append("pending: {}".format(pending))
     return "\n".join(lines)
 
@@ -148,7 +140,7 @@ def adventurer_report(ctx, adventurer, pending):
     linked = ideas.linked_ideas_for_adventurer(ctx, adventurer["id"])
     lines.extend("idea #{}: {}".format(row["id"], row["title"]) for row in linked)
     label = identity.adventurer_label(adventurer["id"])
-    generated = _generated_lines(ctx, label, [ctx.session_id], {row["id"] for row in linked})
+    generated = _generated_lines(ctx, label, {row["id"] for row in linked})
     lines.extend(generated)
     lines.extend(_closed_task_quest_line(ctx, adventurer, generated))
     lines.extend(_open_work_warning(ctx, label, prs))

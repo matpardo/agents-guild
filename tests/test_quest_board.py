@@ -221,6 +221,54 @@ class TakeReleaseTests(QuestBoardTestCase):
         code, out, err = self.cli(["quest", "release", "pre"], "sess-1")
         self.assertEqual(code, 1)
 
+    def left_quest(self, slug, session_id):
+        self.ok(
+            ["quest", "add", slug, "--open", "--no-epic", "--title", slug, "--tasks", "T01", "--titles", "one"],
+            session_id,
+        )
+
+    def left_by(self, slug):
+        return self.rows("SELECT left_by FROM quests WHERE slug = '{}'".format(slug))[0]["left_by"]
+
+    def test_open_quest_records_who_left_it(self):
+        self.start_party("alpha", "sess-1")
+        self.ok(["adventurer", "start", "job", "--task", "demo-epic/T02", "--reason", "test reason"], "adv-1")
+        self.left_quest("from-party", "sess-1")
+        self.left_quest("from-adventurer", "adv-1")
+        self.left_quest("from-human", None)
+        self.assertEqual(self.left_by("from-party"), "alpha")
+        self.assertEqual(self.left_by("from-adventurer"), "adventurer 1")
+        self.assertIsNone(self.left_by("from-human"))
+
+    def test_take_keeps_who_left_and_release_records_the_releasing_party(self):
+        self.start_party("alpha", "sess-1")
+        self.start_party("beta", "sess-2")
+        self.left_quest("later", "sess-1")
+        self.ok(["quest", "take", "later"], "sess-2")
+        self.assertEqual(self.left_by("later"), "alpha")
+        self.ok(["quest", "release", "later"], "sess-2")
+        self.assertEqual(self.left_by("later"), "beta")
+
+    def test_boards_show_what_a_party_left(self):
+        self.start_party("alpha", "sess-1")
+        self.left_quest("later", "sess-1")
+        self.assertIn("left by alpha", self.ok(["quest", "board"], "sess-1"))
+        board = self.ok(["board"], None)
+        self.assertIn("left by alpha", board)
+        self.assertIn("left: later — later (no party yet)", board)
+
+    def test_final_report_lists_a_left_quest_only_under_the_party_that_left_it(self):
+        self.start_party("alpha", "sess-1")
+        self.left_quest("from-alpha", "sess-1")
+        self.assertIn(
+            "open quest from-alpha: no party yet", self.ok(["party", "close", "alpha", "--pending", "none"], None)
+        )
+        self.start_party("beta", "sess-1")
+        self.left_quest("from-beta", "sess-1")
+        out = self.ok(["party", "close", "beta", "--pending", "none"], None)
+        self.assertIn("open quest from-beta: no party yet", out)
+        self.assertNotIn("from-alpha", out)
+
     def test_release_refuses_started_work_open_pr_and_claim(self):
         self.open_quest("pre", "T02,T03", None)
         self.start_party("alpha", "sess-1")

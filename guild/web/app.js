@@ -2367,6 +2367,9 @@ realmDoctorLines: [],
     if (quest.dates) {
       article.appendChild(classedText("p", quest.dates, "muted"));
     }
+    if (quest.left_by !== null) {
+      article.appendChild(classedText("p", "left by " + quest.left_by, "muted"));
+    }
     var list = el("ul");
     list.className = "task-list";
     appendAll(
@@ -3421,6 +3424,12 @@ realmDoctorLines: [],
 
     if (party.ideas.length > 0) {
       details.appendChild(textEl("p", "ideas: " + party.ideas.map(ideaSummary).join(", ")));
+    }
+
+    if (party.followups.length > 0) {
+      details.appendChild(textEl("p", "left: " + party.followups.map(function (followup) {
+        return followup.slug + " — " + followup.title + " (" + followup.state + ")";
+      }).join(", ")));
     }
 
     appendAll(details, party.quests.map(renderQuest));
