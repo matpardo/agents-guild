@@ -28,6 +28,25 @@ class AdventurerBoardTests(AdventurerTestCase):
         self.assertEqual(code, 0, err)
         return out
 
+    def _start_two_adventurers(self):
+        self.start("adv-1", "older job", "--task", "demo-epic/T02")
+        self.start("adv-2", "newer job", "--task", "demo-epic/T03")
+
+    def test_model_lists_newest_adventurer_first(self):
+        self._start_two_adventurers()
+        self.assertEqual([entry["id"] for entry in self._model()["adventurers"]], [2, 1])
+
+    def test_board_text_lists_newest_adventurer_first(self):
+        self._start_two_adventurers()
+        board = self._board_text()
+        self.assertLess(board.index("newer job"), board.index("older job"))
+
+    def test_adventurers_command_lists_newest_active_first(self):
+        self._start_two_adventurers()
+        code, out, err = self.cli(["adventurers"], None)
+        self.assertEqual(code, 0, err)
+        self.assertLess(out.index("newer job"), out.index("older job"))
+
     def test_model_carries_linked_ideas_both_ways(self):
         self.start("adv-1", "fix typo", "--task", "demo-epic/T02")
         self.cli(["idea", "add", "Dark mode", "--description", "d"], None)

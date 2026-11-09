@@ -209,7 +209,7 @@ guild adventurer promote <party> --reason "<why>" --goal "<text>" --done-when "<
 guild adventurer launch <name>                          # human terminal only: tmux window running a health job in the project's first path
 guild adventurer done --pending "<text>"                # ends it; `--pending none` is the explicit empty report
 guild adventurer dismiss <id>                           # removes a done adventurer, or an active one whose session is gone, from the board
-guild adventurers [<id>]                                # active ones, then recent done ones; <id> shows one in full
+guild adventurers [<id>]                                # active ones newest first, then recent done ones; <id> shows one in full
 guild solo list [--project <name>]                     # solo players of the project config with trigger and state
 guild solo status [<owner/repo> <job> | --project <name>]    # same rows as list; one player adds its last 5 runs and 10 channel messages
 guild solo launch <owner/repo> <job> | --all | --project <name>  # human terminal only: tmux window running a solo player, due or not
@@ -1379,7 +1379,7 @@ taken (`held by adventurer <id>`) until the adventurer is done.
 `guild adventurer done --pending "<text>"` ends it. `--pending` is required;
 `none` is the explicit empty report. The text goes through the same email,
 secret and project-pattern checks as `handoff --learned`. `guild adventurers`
-lists the active adventurers and the ten most recent finished ones with job,
+lists the active adventurers, newest first, and the ten most recent finished ones with job,
 task, project, state and pending report; `guild adventurers <id>` shows one.
 `adventurer done` also prints a final report block: job, task, the PRs the
 adventurer tracked (`<repo>#<n> | what | state`, refreshed from GitHub first),
@@ -1397,7 +1397,7 @@ that needs a party (quests, tasks, handoff, claims, `next`) refuses with
 task is done when the SDD says so. Adventurer ids, jobs and pending reports are
 local: do not copy them into PRs, commits or cards.
 
-`guild board` and the web board list adventurers in their own section (`guild
+`guild board` and the web board list adventurers, newest first, in their own section (`guild
 board` hides it under `--party` and `--raid`): id, job, project, task, live or
 stopped, pending report once done, and their PRs. A done adventurer stays
 listed until `guild adventurer dismiss <id>` (the web Dismiss button calls the

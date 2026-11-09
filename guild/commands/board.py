@@ -973,7 +973,7 @@ def _party_stopped_without_report(ctx, party_row):
 
 
 def _adventurer_rows(conn):
-    return conn.execute("SELECT * FROM adventurers WHERE state IN ('active', 'done') ORDER BY id ASC").fetchall()
+    return conn.execute("SELECT * FROM adventurers WHERE state IN ('active', 'done') ORDER BY id DESC").fetchall()
 
 
 def _adventurer_pr_rows(conn, adventurer_id):
