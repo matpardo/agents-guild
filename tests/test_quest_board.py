@@ -51,7 +51,10 @@ class QuestBoardTestCase(GuildTestCase):
         )
 
     def start_party(self, name, session_id):
-        self.ok(["party", "start", name, "--reason", "test reason"], session_id)
+        self.ok(
+            ["party", "start", name, "--reason", "test reason", "--goal", "test goal", "--done-when", "test done"],
+            session_id,
+        )
 
 
 class OpenQuestSchemaTests(GuildTestCase):
@@ -139,13 +142,13 @@ class OpenQuestAddTests(QuestBoardTestCase):
         self.open_quest("pre", "T02", None)
         self.start_party("alpha", "sess-1")
         self.ok(["quest", "add", "mine", "--title", "m", "--epic", "demo-epic"], "sess-1")
-        code, out, err = self.cli(["task", "add", "mine/T02", "--title", "t"], "sess-1")
+        code, out, err = self.cli(["task", "add", "mine/T02", "--title", "t", "--reason", "serves the goal"], "sess-1")
         self.assertEqual(code, 1)
         self.assertIn("in open quest pre", err)
         code, out, err = self.cli(["claim", "task:demo-epic/T02", "--ttl", "1h"], "sess-1")
         self.assertEqual(code, 1)
         self.assertIn("open quest pre", err)
-        code, out, err = self.cli(["task", "add", "pre/T09", "--title", "t"], "sess-1")
+        code, out, err = self.cli(["task", "add", "pre/T09", "--title", "t", "--reason", "serves the goal"], "sess-1")
         self.assertEqual(code, 1)
         self.assertIn("open", err)
 
@@ -313,7 +316,11 @@ class TakeReleaseTests(QuestBoardTestCase):
 
     def test_take_for_party_refuses_other_project_and_closed_party(self):
         other = self.register_project("beta", ["acme/other"])
-        self.run_cli(["party", "start", "gamma", "--reason", "test reason"], "sess-9", other)
+        self.run_cli(
+            ["party", "start", "gamma", "--reason", "test reason", "--goal", "test goal", "--done-when", "test done"],
+            "sess-9",
+            other,
+        )
         self.open_quest("pre", "T02", None)
         with self.assertRaises(GuildError):
             quest_commands.take_for_party(self.ctx(), "pre", "gamma")

@@ -100,7 +100,11 @@ class ManualMarkTests(_MainStatusCase):
         self.assertEqual(code, 1)
 
     def test_bound_session_is_recorded_as_the_actor(self):
-        self.run_cli(["party", "start", "alpha", "--reason", "test reason"], "sess-1", self.repo_dir)
+        self.run_cli(
+            ["party", "start", "alpha", "--reason", "test reason", "--goal", "test goal", "--done-when", "test done"],
+            "sess-1",
+            self.repo_dir,
+        )
         code, out, err = self.run_cli(["main", "red", "acme/app", "--reason", "x"], "sess-1", self.repo_dir)
         self.assertEqual(code, 0, err)
         conn = sqlite3.connect(str(self.data_home / "guild" / "guild.db"))

@@ -8,7 +8,7 @@ class AskFlagTests(MergeQueueTestCase):
         super().setUp()
         self.start_party("alpha", "sess-1")
         self.run_cli(["quest", "add", "qa", "--title", "qa", "--no-epic"], "sess-1", self.repo_dir)
-        self.run_cli(["task", "add", "qa/T01", "--title", "t"], "sess-1", self.repo_dir)
+        self.run_cli(["task", "add", "qa/T01", "--title", "t", "--reason", "serves the goal"], "sess-1", self.repo_dir)
         self.track("sess-1", 1, "qa/T01", "ready")
         self.assertEqual(self.sync_gh("sess-1")[0], 0)
 
@@ -86,7 +86,7 @@ class RedMainPushTests(MergeQueueTestCase):
         self.init_repo(self.worktree, "feature/wt")
         self.start_party("alpha", "sess-1")
         self.run_cli(["quest", "add", "qa", "--title", "qa", "--no-epic"], "sess-1", self.repo_dir)
-        self.run_cli(["task", "add", "qa/T01", "--title", "t"], "sess-1", self.repo_dir)
+        self.run_cli(["task", "add", "qa/T01", "--title", "t", "--reason", "serves the goal"], "sess-1", self.repo_dir)
         self.write_gh_fixture("list_feature-fix", [])
 
     def push(self):

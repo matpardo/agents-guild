@@ -8,7 +8,10 @@ class QuestIncompleteTests(GuildTestCase):
     def setUp(self):
         super().setUp()
         self.repo_dir = self.register_project("acme", ["acme/app"])
-        self._cli(["party", "start", "alpha", "--reason", "test reason"], "sess-1")
+        self._cli(
+            ["party", "start", "alpha", "--reason", "test reason", "--goal", "test goal", "--done-when", "test done"],
+            "sess-1",
+        )
         self._cli(["quest", "add", "demo", "--title", "Demo", "--no-epic", "--tasks", "T01,T02"], "sess-1")
 
     def _cli(self, argv, session):
@@ -57,7 +60,10 @@ class QuestIncompleteTests(GuildTestCase):
 
     def test_refuses_other_party(self):
         self._finish()
-        self._cli(["party", "start", "beta", "--reason", "test reason"], "sess-2")
+        self._cli(
+            ["party", "start", "beta", "--reason", "test reason", "--goal", "test goal", "--done-when", "test done"],
+            "sess-2",
+        )
         code, out, err = self._cli(["quest", "incomplete", "demo", "--reason", "x"], "sess-2")
         self.assertEqual(code, 1)
         self.assertIn("not owned by party 'beta'", err)

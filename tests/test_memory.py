@@ -9,8 +9,16 @@ class MemoryTests(GuildTestCase):
     def setUp(self):
         super().setUp()
         self.repo_dir = self.register_project("acme", ["acme/app"])
-        self.run_cli(["party", "start", "alpha", "--reason", "test reason"], "sess-1", self.repo_dir)
-        self.run_cli(["party", "start", "beta", "--reason", "test reason"], "sess-2", self.repo_dir)
+        self.run_cli(
+            ["party", "start", "alpha", "--reason", "test reason", "--goal", "test goal", "--done-when", "test done"],
+            "sess-1",
+            self.repo_dir,
+        )
+        self.run_cli(
+            ["party", "start", "beta", "--reason", "test reason", "--goal", "test goal", "--done-when", "test done"],
+            "sess-2",
+            self.repo_dir,
+        )
 
     def _ctx(self, session_id):
         return context.RunContext(

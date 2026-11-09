@@ -14,7 +14,11 @@ class PinTestCase(MergeQueueTestCase):
         self.add_quest("sess-2", "qb", "demo-epic", "T02")
         self.run_cli(["quest", "add", "qc", "--title", "qc", "--no-epic"], "sess-3", self.repo_dir)
         for tid in ("T01", "T02", "T03"):
-            self.run_cli(["task", "add", "qc/{}".format(tid), "--title", tid], "sess-3", self.repo_dir)
+            self.run_cli(
+                ["task", "add", "qc/{}".format(tid), "--title", tid, "--reason", "serves the goal"],
+                "sess-3",
+                self.repo_dir,
+            )
         self.track("sess-1", 1, "qa/T01", "ready")
         self.track("sess-1", 2, "qa/T03", "ready")
         self.track("sess-2", 3, "qb/T02", "ready")

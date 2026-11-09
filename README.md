@@ -141,8 +141,9 @@ guild init-project <name> --config <file.json>
 guild wire-settings   # merge guild hooks and permission rules into ~/.claude/settings.json
 guild unwire-settings   # remove guild hooks and permission rules from ~/.claude/settings.json
 
-guild party start <name> --reason "<why>"       # no permission prompt; refused while this session leads another active party
+guild party start <name> --reason "<why>" --goal "<what it is for>" --done-when "<condition that ends it>"   # no permission prompt; refused while this session leads another active party
 guild party resume <party> [--session <name>]   # --session: from a human terminal only
+guild party set <party> [--goal "<text>"] [--done-when "<text>"]   # change the goal or the done condition (at least one); also the Edit goal button on the web party card
 guild party park <party> --reason "<what it waits on>"   # human terminal or web: mark a party as waiting on something outside development
 guild party unpark <party>   # clear the mark; a session resuming the party clears it too
 guild party close [<party>] --pending "<text>" [--force]  # <party>: from a terminal, or your own party; --pending none when nothing is left; --force overrides the quest done gate and the open ask and PR check
@@ -204,7 +205,7 @@ guild ideas [<id> | --project <name>]   # sorted by deadline, no deadline last; 
 
 guild adventurer start "<job>" --task <epic>/<tid> --reason "<why>"   # this session becomes an adventurer; no permission prompt; --task required
 guild adventurer start --job <name> --reason "<why>"    # the same for a health job of the project config; no job text, no --task
-guild adventurer promote <party> --reason "<why>"       # the active adventurer becomes the leader of a new party; its PRs move to it
+guild adventurer promote <party> --reason "<why>" --goal "<text>" --done-when "<text>"   # the active adventurer becomes the leader of a new party; its PRs move to it
 guild adventurer launch <name>                          # human terminal only: tmux window running a health job in the project's first path
 guild adventurer done --pending "<text>"                # ends it; `--pending none` is the explicit empty report
 guild adventurer dismiss <id>                           # removes a done adventurer, or an active one whose session is gone, from the board
@@ -1363,7 +1364,7 @@ job is an adventurer, several PRs or quests a party. `--reason` is required on
 checks as `--pending`), is stored on the event and shown on the board, in
 `guild adventurers <id>` and in the web with the start time. Neither start
 raises a permission prompt. When the work outgrows one job,
-`guild adventurer promote <party> --reason "<why>"` makes the same session the
+`guild adventurer promote <party> --reason "<why>" --goal "..." --done-when "..."` makes the same session the
 leader of a new party: the adventurer ends as `promoted`, its PRs move to the
 party and the party records the adventurer it came from. The adventurer's task
 is not moved: the leader adds it to a quest with `guild quest add ... --tasks`.
@@ -2182,9 +2183,22 @@ party; the link is recorded in the `quest.added` event payload
 (`followups_of`). `--tasks` and `--titles` work as with `--no-epic`. Combining
 it with `--epic` or `--no-epic` is rejected.
 
+### Party goal and done condition
+
+`guild party start` and `guild adventurer promote` require `--goal` (what the
+party is for) and `--done-when` (the condition that ends it); both follow the
+same checks as `--reason`. `guild party set <party> [--goal ...] [--done-when ...]`
+(at least one; refused on a closed party) and the Edit goal button on the web
+party card change them. The board header and the web party card show `goal:`
+and `done when:` (`no goal` for a party started before this existed), the board
+JSON carries `goal` and `done_when`, `guild revive --list` prints `goal:`, and
+`guild brief` and the handoff file (`## Goal`) carry them to the next session.
+While a party has a done condition, `guild task add` requires `--reason` and the
+reason must state how the task serves that condition.
+
 ### Tasks on epic quests
 
-`guild task add <quest>/<tid> --title "..."` works on any **active** quest of
+`guild task add <quest>/<tid> --title "..." [--reason "..."]` works on any **active** quest of
 your own party, epic quests included; a done quest is refused (`quest '<q>' is
 done`). On an epic quest the same overlap check as `quest add` applies: if
 the tid is held by an active quest of another party, or task-claimed by
@@ -2359,7 +2373,7 @@ message, a wrong type `400`.
 
 Actor resolution: `CLAUDE_CODE_SESSION_ID` (or, for hooks, the `session_id`
 field on stdin) → `leaders` table → party. An unbound session cannot write;
-it gets refused with a hint to run `guild party start <name> --reason "<why>"`,
+it gets refused with a hint to run `guild party start <name> --reason "<why>" --goal "<goal>" --done-when "<condition>"`,
 `guild adventurer start "<job>" --task <epic>/<tid> --reason "<why>"` or `guild party resume <party>`.
 Reads always work.
 

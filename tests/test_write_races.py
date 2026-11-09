@@ -29,8 +29,14 @@ class WriteRaceCase(GuildTestCase):
     def setUp(self):
         super().setUp()
         self.repo_dir = self.register_project("acme", ["acme/app"])
-        self.cli("sess-1", ["party", "start", "alpha", "--reason", "test reason"])
-        self.cli("sess-2", ["party", "start", "beta", "--reason", "test reason"])
+        self.cli(
+            "sess-1",
+            ["party", "start", "alpha", "--reason", "test reason", "--goal", "test goal", "--done-when", "test done"],
+        )
+        self.cli(
+            "sess-2",
+            ["party", "start", "beta", "--reason", "test reason", "--goal", "test goal", "--done-when", "test done"],
+        )
 
     def cli(self, session_id, argv):
         return self.run_cli(argv, session_id, self.repo_dir)
@@ -185,7 +191,9 @@ class TaskAddRaceTests(WriteRaceCase):
         with competing_write_before_transaction(
             lambda: self.cli("sess-2", ["claim", "task:demo-epic/T02", "--ttl", "30m"])
         ):
-            code, out, err = self.cli("sess-1", ["task", "add", "wave/T02", "--title", "Second"])
+            code, out, err = self.cli(
+                "sess-1", ["task", "add", "wave/T02", "--title", "Second", "--reason", "serves the goal"]
+            )
         self.assertEqual(code, 1)
         self.assertIn("claimed by party beta", err)
         self.assertEqual(self.rows("SELECT tid FROM quest_tasks WHERE quest = 'wave'"), [("T01",)])
@@ -238,7 +246,7 @@ class QuestDoneRaceTests(WriteRaceCase):
         self.add_quest("sess-1", "demo", "T01")
         self.cli("sess-1", ["task", "done", "demo/T01"])
         with competing_write_before_transaction(
-            lambda: self.cli("sess-1", ["task", "add", "demo/T02", "--title", "Second"])
+            lambda: self.cli("sess-1", ["task", "add", "demo/T02", "--title", "Second", "--reason", "serves the goal"])
         ):
             code, out, err = self.cli("sess-1", ["quest", "done", "demo"])
         self.assertEqual(code, 1)

@@ -497,6 +497,8 @@ _COLUMN_MIGRATIONS = (
     ("parties", "parked", "TEXT"),
     ("parties", "parked_at", "TEXT"),
     ("parties", "from_adventurer", "INTEGER"),
+    ("parties", "goal", "TEXT"),
+    ("parties", "done_when", "TEXT"),
     ("adventurers", "reason", "TEXT"),
 )
 

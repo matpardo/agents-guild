@@ -1281,7 +1281,7 @@ class SoloTodoTests(SoloPlayersTestCase):
 
     def test_party_filter_hides_solo_rows(self):
         self.sync()
-        self.cli(["party", "start", "p1", "--reason", "t"], "lead-1")
+        self.cli(["party", "start", "p1", "--reason", "t", "--goal", "test goal", "--done-when", "test done"], "lead-1")
         out = self.cli(["board", "--party", "p1"], None)[1]
         self.assertNotIn("from dependabot", out)
 

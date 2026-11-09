@@ -7,9 +7,15 @@ class PrTrackTests(GuildTestCase):
     def setUp(self):
         super().setUp()
         self.repo_dir = self.register_project("acme", ["acme/app"])
-        self.run_cli(["party", "start", "alpha", "--reason", "test reason"], "sess-1", self.repo_dir)
+        self.run_cli(
+            ["party", "start", "alpha", "--reason", "test reason", "--goal", "test goal", "--done-when", "test done"],
+            "sess-1",
+            self.repo_dir,
+        )
         self.run_cli(["quest", "add", "demo", "--title", "Demo", "--no-epic"], "sess-1", self.repo_dir)
-        self.run_cli(["task", "add", "demo/T01", "--title", "First"], "sess-1", self.repo_dir)
+        self.run_cli(
+            ["task", "add", "demo/T01", "--title", "First", "--reason", "serves the goal"], "sess-1", self.repo_dir
+        )
 
     def test_track_rejects_repo_outside_project_config(self):
         code, out, err = self.run_cli(
@@ -201,7 +207,11 @@ class PrTrackCardTests(GuildTestCase):
         )
 
     def _start_party_with_task(self):
-        self.run_cli(["party", "start", "alpha", "--reason", "test reason"], "sess-1", self.repo_dir)
+        self.run_cli(
+            ["party", "start", "alpha", "--reason", "test reason", "--goal", "test goal", "--done-when", "test done"],
+            "sess-1",
+            self.repo_dir,
+        )
         self.run_cli(
             ["quest", "add", "demo", "--title", "Demo", "--no-epic", "--tasks", "T01"], "sess-1", self.repo_dir
         )
@@ -243,9 +253,15 @@ class PrSetTests(GuildTestCase):
     def setUp(self):
         super().setUp()
         self.repo_dir = self.register_project("acme", ["acme/app"])
-        self.run_cli(["party", "start", "alpha", "--reason", "test reason"], "sess-1", self.repo_dir)
+        self.run_cli(
+            ["party", "start", "alpha", "--reason", "test reason", "--goal", "test goal", "--done-when", "test done"],
+            "sess-1",
+            self.repo_dir,
+        )
         self.run_cli(["quest", "add", "demo", "--title", "Demo", "--no-epic"], "sess-1", self.repo_dir)
-        self.run_cli(["task", "add", "demo/T01", "--title", "First"], "sess-1", self.repo_dir)
+        self.run_cli(
+            ["task", "add", "demo/T01", "--title", "First", "--reason", "serves the goal"], "sess-1", self.repo_dir
+        )
         self.write_gh_fixture(
             "view_acme-app_1",
             {"state": "OPEN", "isDraft": True, "headRefName": "feature/x", "title": "t"},
@@ -363,10 +379,18 @@ class PrRelinkTests(GuildTestCase):
     def setUp(self):
         super().setUp()
         self.repo_dir = self.register_project("acme", ["acme/app"])
-        self.run_cli(["party", "start", "alpha", "--reason", "test reason"], "sess-1", self.repo_dir)
+        self.run_cli(
+            ["party", "start", "alpha", "--reason", "test reason", "--goal", "test goal", "--done-when", "test done"],
+            "sess-1",
+            self.repo_dir,
+        )
         self.run_cli(["quest", "add", "demo", "--title", "Demo", "--no-epic"], "sess-1", self.repo_dir)
-        self.run_cli(["task", "add", "demo/T01", "--title", "First"], "sess-1", self.repo_dir)
-        self.run_cli(["task", "add", "demo/T02", "--title", "Second"], "sess-1", self.repo_dir)
+        self.run_cli(
+            ["task", "add", "demo/T01", "--title", "First", "--reason", "serves the goal"], "sess-1", self.repo_dir
+        )
+        self.run_cli(
+            ["task", "add", "demo/T02", "--title", "Second", "--reason", "serves the goal"], "sess-1", self.repo_dir
+        )
         self.write_gh_fixture(
             "view_acme-app_1",
             {"state": "OPEN", "isDraft": True, "headRefName": "feature/x", "title": "t"},
@@ -405,16 +429,26 @@ class PrRelinkTests(GuildTestCase):
 
     def test_set_task_of_another_party_is_refused(self):
         self.write_session(2, "sess-2", "beta-session")
-        self.run_cli(["party", "start", "beta", "--reason", "test reason"], "sess-2", self.repo_dir)
+        self.run_cli(
+            ["party", "start", "beta", "--reason", "test reason", "--goal", "test goal", "--done-when", "test done"],
+            "sess-2",
+            self.repo_dir,
+        )
         self.run_cli(["quest", "add", "other", "--title", "Other", "--no-epic"], "sess-2", self.repo_dir)
-        self.run_cli(["task", "add", "other/T01", "--title", "Theirs"], "sess-2", self.repo_dir)
+        self.run_cli(
+            ["task", "add", "other/T01", "--title", "Theirs", "--reason", "serves the goal"], "sess-2", self.repo_dir
+        )
         code, out, err = self.run_cli(["pr", "set", "acme/app#1", "--task", "other/T01"], "sess-1", self.repo_dir)
         self.assertEqual(code, 1)
         self.assertIn("does not belong", err)
 
     def test_foreign_party_cannot_relink_or_untrack(self):
         self.write_session(2, "sess-2", "beta-session")
-        self.run_cli(["party", "start", "beta", "--reason", "test reason"], "sess-2", self.repo_dir)
+        self.run_cli(
+            ["party", "start", "beta", "--reason", "test reason", "--goal", "test goal", "--done-when", "test done"],
+            "sess-2",
+            self.repo_dir,
+        )
         code, out, err = self.run_cli(["pr", "set", "acme/app#1", "--card", "DEMO-7"], "sess-2", self.repo_dir)
         self.assertEqual(code, 1)
         self.assertIn("belongs to another session", err)

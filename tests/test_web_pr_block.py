@@ -116,7 +116,9 @@ class WebPrBlockTests(WebWriteTestCase):
         self.assertEqual(self._link(), ("T01", "DEMO-7"))
 
     def test_relink_moves_the_task(self):
-        self.run_cli(["task", "add", "demo/T02", "--title", "Second"], "sess-1", self.repo_dir)
+        self.run_cli(
+            ["task", "add", "demo/T02", "--title", "Second", "--reason", "serves the goal"], "sess-1", self.repo_dir
+        )
         response, payload = self._post_json("/api/prs/acme/app/1/relink", self._good_headers(), {"task": "demo/T02"})
         self.assertEqual(response.status, 200, payload)
         self.assertEqual(self._link(), ("T02", None))

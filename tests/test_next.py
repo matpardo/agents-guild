@@ -12,7 +12,11 @@ class NextTestCase(GuildTestCase):
     def setUp(self):
         super().setUp()
         self.repo_dir = self.register_project("acme", ["acme/app"])
-        self.run_cli(["party", "start", "alpha", "--reason", "test reason"], "sess-1", self.repo_dir)
+        self.run_cli(
+            ["party", "start", "alpha", "--reason", "test reason", "--goal", "test goal", "--done-when", "test done"],
+            "sess-1",
+            self.repo_dir,
+        )
 
     def _set_next_config(self, stale_hours):
         config_file = self.config_home / "guild" / "projects" / "acme.json"
@@ -32,7 +36,9 @@ class Tier1Tests(NextTestCase):
     def setUp(self):
         super().setUp()
         self.run_cli(["quest", "add", "demo", "--title", "Demo", "--no-epic"], "sess-1", self.repo_dir)
-        self.run_cli(["task", "add", "demo/T01", "--title", "First"], "sess-1", self.repo_dir)
+        self.run_cli(
+            ["task", "add", "demo/T01", "--title", "First", "--reason", "serves the goal"], "sess-1", self.repo_dir
+        )
         self.write_gh_fixture(
             "view_acme-app_1",
             {"state": "OPEN", "isDraft": True, "headRefName": "feature/x", "title": "t"},
@@ -173,7 +179,9 @@ class Tier2Tests(NextTestCase):
     def setUp(self):
         super().setUp()
         self.run_cli(["quest", "add", "demo", "--title", "Demo", "--no-epic"], "sess-1", self.repo_dir)
-        self.run_cli(["task", "add", "demo/T01", "--title", "First"], "sess-1", self.repo_dir)
+        self.run_cli(
+            ["task", "add", "demo/T01", "--title", "First", "--reason", "serves the goal"], "sess-1", self.repo_dir
+        )
         self.write_gh_fixture(
             "view_acme-app_1",
             {"state": "OPEN", "isDraft": True, "headRefName": "feature/x", "title": "t"},
@@ -211,7 +219,9 @@ class Tier3Tests(NextTestCase):
     def setUp(self):
         super().setUp()
         self.run_cli(["quest", "add", "demo", "--title", "Demo", "--no-epic"], "sess-1", self.repo_dir)
-        self.run_cli(["task", "add", "demo/T01", "--title", "First"], "sess-1", self.repo_dir)
+        self.run_cli(
+            ["task", "add", "demo/T01", "--title", "First", "--reason", "serves the goal"], "sess-1", self.repo_dir
+        )
         self.write_gh_fixture(
             "view_acme-app_1",
             {"state": "OPEN", "isDraft": True, "headRefName": "feature/x", "title": "t"},
@@ -291,7 +301,9 @@ class Tier4Tests(NextTestCase):
         self.run_cli(["task", "start", "wave1/T03"], "sess-1", self.repo_dir)
         self.run_cli(["task", "done", "wave1/T03"], "sess-1", self.repo_dir)
         self._sync_all_done()
-        code, out, err = self.run_cli(["task", "add", "wave1/T09", "--title", "Extra"], "sess-1", self.repo_dir)
+        code, out, err = self.run_cli(
+            ["task", "add", "wave1/T09", "--title", "Extra", "--reason", "serves the goal"], "sess-1", self.repo_dir
+        )
         self.assertEqual(code, 0, err)
         code, out, err = self.run_cli(["next"], "sess-1", self.repo_dir)
         self.assertIn('task wave1/T09: "Extra" — ready', out)
@@ -318,7 +330,11 @@ class Tier4Tests(NextTestCase):
         self.assertIn("wave1/T02: open ask #1", out)
 
     def test_claim_by_other_party_blocks_task(self):
-        self.run_cli(["party", "start", "beta", "--reason", "test reason"], "sess-2", self.repo_dir)
+        self.run_cli(
+            ["party", "start", "beta", "--reason", "test reason", "--goal", "test goal", "--done-when", "test done"],
+            "sess-2",
+            self.repo_dir,
+        )
         self.run_cli(["claim", "task:compliance/T02", "--ttl", "8h"], "sess-2", self.repo_dir)
         code, out, err = self.run_cli(["next"], "sess-1", self.repo_dir)
         self.assertIn("nothing actionable", out)
@@ -404,10 +420,16 @@ class RaidMemberWorkTests(NextTestCase):
     def setUp(self):
         super().setUp()
         self.run_cli(["raid", "join", "ci", "--until-leave"], "sess-1", self.repo_dir)
-        self.run_cli(["party", "start", "beta", "--reason", "test reason"], "sess-2", self.repo_dir)
+        self.run_cli(
+            ["party", "start", "beta", "--reason", "test reason", "--goal", "test goal", "--done-when", "test done"],
+            "sess-2",
+            self.repo_dir,
+        )
         self.run_cli(["raid", "join", "ci", "--until-leave"], "sess-2", self.repo_dir)
         self.run_cli(["quest", "add", "bq", "--title", "B", "--no-epic"], "sess-2", self.repo_dir)
-        self.run_cli(["task", "add", "bq/T01", "--title", "First"], "sess-2", self.repo_dir)
+        self.run_cli(
+            ["task", "add", "bq/T01", "--title", "First", "--reason", "serves the goal"], "sess-2", self.repo_dir
+        )
 
     def _beta_asks(self):
         self.run_cli(["ask", "ready?", "--context", "x", "--ref", "task:bq/T01"], "sess-2", self.repo_dir)
@@ -463,7 +485,9 @@ class HasWorkTests(NextTestCase):
 
     def _track_pr_with_comments(self):
         self.run_cli(["quest", "add", "demo", "--title", "Demo", "--no-epic"], "sess-1", self.repo_dir)
-        self.run_cli(["task", "add", "demo/T01", "--title", "First"], "sess-1", self.repo_dir)
+        self.run_cli(
+            ["task", "add", "demo/T01", "--title", "First", "--reason", "serves the goal"], "sess-1", self.repo_dir
+        )
         self.run_cli(["task", "start", "demo/T01"], "sess-1", self.repo_dir)
         self.write_gh_fixture(
             "view_acme-app_1",
@@ -487,7 +511,9 @@ class HasWorkTests(NextTestCase):
 
     def test_true_with_queued_task(self):
         self.run_cli(["quest", "add", "demo", "--title", "Demo", "--no-epic"], "sess-1", self.repo_dir)
-        self.run_cli(["task", "add", "demo/T01", "--title", "First"], "sess-1", self.repo_dir)
+        self.run_cli(
+            ["task", "add", "demo/T01", "--title", "First", "--reason", "serves the goal"], "sess-1", self.repo_dir
+        )
         self.assertTrue(self._has_work())
 
     def test_true_with_unseen_comments_without_acknowledging_or_writing(self):
@@ -499,7 +525,9 @@ class HasWorkTests(NextTestCase):
 
     def test_false_when_raid_paused(self):
         self.run_cli(["quest", "add", "demo", "--title", "Demo", "--no-epic"], "sess-1", self.repo_dir)
-        self.run_cli(["task", "add", "demo/T01", "--title", "First"], "sess-1", self.repo_dir)
+        self.run_cli(
+            ["task", "add", "demo/T01", "--title", "First", "--reason", "serves the goal"], "sess-1", self.repo_dir
+        )
         self.run_cli(["raid", "join", "ci", "--until-leave"], "sess-1", self.repo_dir)
         self.run_cli(["raid", "pause", "ci"], "sess-1", self.repo_dir)
         self.assertFalse(self._has_work())
@@ -514,7 +542,9 @@ class NextTaskItemTests(NextTestCase):
 
     def _add_task(self):
         self.run_cli(["quest", "add", "demo", "--title", "Demo", "--no-epic"], "sess-1", self.repo_dir)
-        self.run_cli(["task", "add", "demo/T01", "--title", "First"], "sess-1", self.repo_dir)
+        self.run_cli(
+            ["task", "add", "demo/T01", "--title", "First", "--reason", "serves the goal"], "sess-1", self.repo_dir
+        )
 
     def test_returns_queued_task(self):
         self._add_task()
@@ -539,7 +569,9 @@ class Tier0Tests(NextTestCase):
     def setUp(self):
         super().setUp()
         self.run_cli(["quest", "add", "demo", "--title", "Demo", "--no-epic"], "sess-1", self.repo_dir)
-        self.run_cli(["task", "add", "demo/T01", "--title", "First"], "sess-1", self.repo_dir)
+        self.run_cli(
+            ["task", "add", "demo/T01", "--title", "First", "--reason", "serves the goal"], "sess-1", self.repo_dir
+        )
 
     def _track(self, number, extra):
         self.write_gh_fixture(
@@ -626,7 +658,11 @@ class MaxOpenPrsTests(NextTestCase):
         super().setUp()
         self.run_cli(["quest", "add", "demo", "--title", "Demo", "--no-epic"], "sess-1", self.repo_dir)
         for tid in ("T01", "T02", "T03"):
-            self.run_cli(["task", "add", "demo/{}".format(tid), "--title", tid], "sess-1", self.repo_dir)
+            self.run_cli(
+                ["task", "add", "demo/{}".format(tid), "--title", tid, "--reason", "serves the goal"],
+                "sess-1",
+                self.repo_dir,
+            )
         self._track(1, "T01")
         self._track(2, "T02")
         self.run_cli(["task", "start", "demo/T01"], "sess-1", self.repo_dir)
@@ -727,7 +763,11 @@ class WipOneTests(NextTestCase):
         super().setUp()
         self.run_cli(["quest", "add", "demo", "--title", "Demo", "--no-epic"], "sess-1", self.repo_dir)
         for tid in ("T01", "T02"):
-            self.run_cli(["task", "add", "demo/{}".format(tid), "--title", tid], "sess-1", self.repo_dir)
+            self.run_cli(
+                ["task", "add", "demo/{}".format(tid), "--title", tid, "--reason", "serves the goal"],
+                "sess-1",
+                self.repo_dir,
+            )
         self.run_cli(["task", "start", "demo/T01"], "sess-1", self.repo_dir)
 
     def _track(self, lifecycle, extra_args):

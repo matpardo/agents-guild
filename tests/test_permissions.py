@@ -9,18 +9,30 @@ def _mode(path):
 
 class DbPermissionsTests(GuildTestCase):
     def test_db_file_is_owner_only_readable_writable(self):
-        self.run_cli(["party", "start", "alpha", "--reason", "test reason"], "sess-1", None)
+        self.run_cli(
+            ["party", "start", "alpha", "--reason", "test reason", "--goal", "test goal", "--done-when", "test done"],
+            "sess-1",
+            None,
+        )
         db_path = self.data_home / "guild" / "guild.db"
         self.assertTrue(db_path.is_file())
         self.assertEqual(_mode(db_path), 0o600)
 
     def test_db_directory_is_owner_only(self):
-        self.run_cli(["party", "start", "alpha", "--reason", "test reason"], "sess-1", None)
+        self.run_cli(
+            ["party", "start", "alpha", "--reason", "test reason", "--goal", "test goal", "--done-when", "test done"],
+            "sess-1",
+            None,
+        )
         db_dir = self.data_home / "guild"
         self.assertEqual(_mode(db_dir), 0o700)
 
     def test_wal_and_shm_files_are_owner_only_when_present(self):
-        self.run_cli(["party", "start", "alpha", "--reason", "test reason"], "sess-1", None)
+        self.run_cli(
+            ["party", "start", "alpha", "--reason", "test reason", "--goal", "test goal", "--done-when", "test done"],
+            "sess-1",
+            None,
+        )
         db_dir = self.data_home / "guild"
         for suffix in ("-wal", "-shm"):
             sibling = db_dir / ("guild.db" + suffix)
@@ -28,7 +40,11 @@ class DbPermissionsTests(GuildTestCase):
                 self.assertEqual(_mode(sibling), 0o600)
 
     def test_fixes_preexisting_world_readable_db_on_next_run(self):
-        self.run_cli(["party", "start", "alpha", "--reason", "test reason"], "sess-1", None)
+        self.run_cli(
+            ["party", "start", "alpha", "--reason", "test reason", "--goal", "test goal", "--done-when", "test done"],
+            "sess-1",
+            None,
+        )
         db_path = self.data_home / "guild" / "guild.db"
         db_dir = self.data_home / "guild"
         db_path.chmod(0o666)
@@ -40,16 +56,24 @@ class DbPermissionsTests(GuildTestCase):
 
 class DirectoryPermissionsTests(GuildTestCase):
     def test_state_dir_is_owner_only(self):
-        self.run_cli(["party", "start", "alpha", "--reason", "test reason"], "sess-1", None)
+        self.run_cli(
+            ["party", "start", "alpha", "--reason", "test reason", "--goal", "test goal", "--done-when", "test done"],
+            "sess-1",
+            None,
+        )
         state_dir = self.state_home / "guild"
         self.assertTrue(state_dir.is_dir())
         self.assertEqual(_mode(state_dir), 0o700)
 
     def test_handoffs_dir_is_owner_only(self):
         repo_dir = self.register_project("acme", ["acme/app"])
-        self.run_cli(["party", "start", "alpha", "--reason", "test reason"], "sess-1", repo_dir)
+        self.run_cli(
+            ["party", "start", "alpha", "--reason", "test reason", "--goal", "test goal", "--done-when", "test done"],
+            "sess-1",
+            repo_dir,
+        )
         self.run_cli(["quest", "add", "demo", "--title", "Demo", "--no-epic"], "sess-1", repo_dir)
-        self.run_cli(["task", "add", "demo/T01", "--title", "First"], "sess-1", repo_dir)
+        self.run_cli(["task", "add", "demo/T01", "--title", "First", "--reason", "serves the goal"], "sess-1", repo_dir)
         self.run_cli(["handoff", "--in-flight", "x", "--learned", "y"], "sess-1", repo_dir)
         handoffs_dir = self.data_home / "guild" / "handoffs"
         self.assertTrue(handoffs_dir.is_dir())

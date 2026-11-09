@@ -78,7 +78,10 @@ class IdeaAdventurerLinkTests(AdventurerTestCase):
         self.assertEqual(self.cli(["idea", "link", "1", "--adventurer", "1"], "adv-1")[0], 0)
 
     def test_party_session_cannot_pass_adventurer(self):
-        self.cli(["party", "start", "alpha", "--reason", "test reason"], "sess-1")
+        self.cli(
+            ["party", "start", "alpha", "--reason", "test reason", "--goal", "test goal", "--done-when", "test done"],
+            "sess-1",
+        )
         code, out, err = self.cli(["idea", "link", "1", "--adventurer", "1"], "sess-1")
         self.assertEqual(code, 1)
         self.assertIn("only for its own party 'alpha'", err)
@@ -98,7 +101,10 @@ class IdeaAdventurerLinkTests(AdventurerTestCase):
 
     def test_promote_moves_the_link_to_the_party(self):
         self.cli(["idea", "link", "1"], "adv-1")
-        code, out, err = self.cli(["adventurer", "promote", "alpha", "--reason", "grew"], "adv-1")
+        code, out, err = self.cli(
+            ["adventurer", "promote", "alpha", "--reason", "grew", "--goal", "test goal", "--done-when", "test done"],
+            "adv-1",
+        )
         self.assertEqual(code, 0, err)
         self.assertEqual(self._links(), [])
         self.assertIn("worked by: alpha", self.cli(["ideas", "1"], None)[1])

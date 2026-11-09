@@ -32,9 +32,15 @@ class CostCliTests(GuildTestCase):
         return [line.split() for line in stdout.splitlines()]
 
     def _seed(self):
-        self.run_cli(["party", "start", "alpha", "--reason", "test reason"], "sess-1", self.repo_dir)
+        self.run_cli(
+            ["party", "start", "alpha", "--reason", "test reason", "--goal", "test goal", "--done-when", "test done"],
+            "sess-1",
+            self.repo_dir,
+        )
         self.run_cli(["quest", "add", "qa", "--title", "qa"], "sess-1", self.repo_dir)
-        self.run_cli(["task", "add", "qa", "T01", "--title", "t"], "sess-1", self.repo_dir)
+        self.run_cli(
+            ["task", "add", "qa", "T01", "--title", "t", "--reason", "serves the goal"], "sess-1", self.repo_dir
+        )
         ctx = _build_context("sess-1", self.root)
         with db.writing(ctx.conn):
             events.record(
@@ -48,7 +54,11 @@ class CostCliTests(GuildTestCase):
                 "local",
                 {"quest": "qa", "tid": "T01", "summary": "s"},
             )
-        self.run_cli(["party", "start", "beta", "--reason", "test reason"], "sess-2", self.other_dir)
+        self.run_cli(
+            ["party", "start", "beta", "--reason", "test reason", "--goal", "test goal", "--done-when", "test done"],
+            "sess-2",
+            self.other_dir,
+        )
         self._transcript(
             "sess-1",
             [
@@ -71,7 +81,11 @@ class CostCliTests(GuildTestCase):
         self.assertEqual(rows[-1][0], "total")
 
     def test_totals_are_in_million_tokens(self):
-        self.run_cli(["party", "start", "alpha", "--reason", "test reason"], "sess-1", self.repo_dir)
+        self.run_cli(
+            ["party", "start", "alpha", "--reason", "test reason", "--goal", "test goal", "--done-when", "test done"],
+            "sess-1",
+            self.repo_dir,
+        )
         self._transcript("sess-1", [assistant_line("m1", self.recent, _OPUS, 1500000, 0, 2500000, 500000)])
         _, stdout, _ = self._cost("--by", "party")
         self.assertEqual(self._rows(stdout)[1], ["alpha", "1.500", "0.000", "2.500", "0.500"])
@@ -107,7 +121,11 @@ class CostCliTests(GuildTestCase):
         self.assertEqual(keys, ["alpha", "total"])
 
     def test_since_excludes_older_days(self):
-        self.run_cli(["party", "start", "alpha", "--reason", "test reason"], "sess-1", self.repo_dir)
+        self.run_cli(
+            ["party", "start", "alpha", "--reason", "test reason", "--goal", "test goal", "--done-when", "test done"],
+            "sess-1",
+            self.repo_dir,
+        )
         self._transcript(
             "sess-1",
             [

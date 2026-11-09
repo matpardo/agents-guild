@@ -10,7 +10,11 @@ class SessionStatusTests(GuildTestCase):
     def setUp(self):
         super().setUp()
         repo_dir = self.register_project("acme", ["acme/app"])
-        self.run_cli(["party", "start", "alpha", "--reason", "test reason"], "sess-1", repo_dir)
+        self.run_cli(
+            ["party", "start", "alpha", "--reason", "test reason", "--goal", "test goal", "--done-when", "test done"],
+            "sess-1",
+            repo_dir,
+        )
         self.ctx = _build_context("sess-1", self.root)
 
     def _record(self, kind, payload):

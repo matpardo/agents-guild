@@ -34,7 +34,9 @@ class PartyCloseGateTests(DriftTestCase):
 
     def test_close_refuses_when_quest_has_unfinished_tasks(self):
         self.run_cli(["quest", "add", "loose", "--title", "Loose", "--no-epic"], "sess-1", self.repo_dir)
-        self.run_cli(["task", "add", "loose/T01", "--title", "Open"], "sess-1", self.repo_dir)
+        self.run_cli(
+            ["task", "add", "loose/T01", "--title", "Open", "--reason", "serves the goal"], "sess-1", self.repo_dir
+        )
         code, out, err = self.run_cli(["party", "close", "alpha", "--pending", "none"], None, None)
         self.assertEqual(code, 1)
         self.assertIn("quest 'loose' has tasks not done", err)

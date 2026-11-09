@@ -54,6 +54,7 @@ _MEMORY_ACTION_RE = re.compile(r"^/api/memory/([^/]+)/([1-9][0-9]*)/rm$")
 _TASK_MOVE_RE = re.compile(r"^/api/quests/([^/]+)/tasks/([^/]+)/move$")
 _TASK_DISCARD_RE = re.compile(r"^/api/quests/([^/]+)/tasks/([^/]+)/(discard|restore)$")
 _PARTY_HANDOFF_RE = re.compile(r"^/api/parties/([^/]+)/hand-off$")
+_PARTY_GOAL_RE = re.compile(r"^/api/parties/([^/]+)/goal$")
 _PARTY_PARK_RE = re.compile(r"^/api/parties/([^/]+)/(park|unpark)$")
 _IDEA_ACTION_RE = re.compile(r"^/api/ideas/([^/]+)/(edit|delete|link|unlink)$")
 _IDEA_CREATE_PATH = "/api/ideas/create"
@@ -297,6 +298,14 @@ def _run_party_handoff_action(party):
         ctx.conn.close()
 
 
+def _run_party_goal_action(party, payload):
+    ctx = _action_context()
+    try:
+        return party_commands.set_goal(ctx, party, payload.get("goal"), payload.get("done_when"))
+    finally:
+        ctx.conn.close()
+
+
 def _run_party_park_action(action, party, payload):
     ctx = _action_context()
     try:
@@ -525,6 +534,8 @@ class BoardRequestHandler(http_server.BaseHTTPRequestHandler):
             raise _RequestRejected(400, "reason must be a string and force a boolean")
         if action in ("block", "park") and not isinstance(payload.get("reason"), str):
             raise _RequestRejected(400, "reason must be a string")
+        if action == "set-goal" and not all(isinstance(payload.get(key, ""), str) for key in ("goal", "done_when")):
+            raise _RequestRejected(400, "goal and done_when must be strings")
         if action == "relink" and not all(isinstance(payload.get(key, ""), str) for key in ("task", "card")):
             raise _RequestRejected(400, "task and card must be strings")
         return payload
@@ -620,6 +631,10 @@ class BoardRequestHandler(http_server.BaseHTTPRequestHandler):
         if party_handoff_match is not None:
             party = party_handoff_match.group(1)
             return self._post_action("hand-off", lambda payload: _run_party_handoff_action(party))
+        party_goal_match = _PARTY_GOAL_RE.match(path)
+        if party_goal_match is not None:
+            party = party_goal_match.group(1)
+            return self._post_action("set-goal", lambda payload: _run_party_goal_action(party, payload))
         party_park_match = _PARTY_PARK_RE.match(path)
         if party_park_match is not None:
             party, action = party_park_match.groups()

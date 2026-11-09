@@ -66,7 +66,9 @@ class AskWaitTests(WaitTestCase):
     def setUp(self):
         super().setUp()
         self.run_cli(["quest", "add", "demo", "--title", "Demo", "--no-epic"], "sess-1", self.repo_dir)
-        self.run_cli(["task", "add", "demo/T01", "--title", "First"], "sess-1", self.repo_dir)
+        self.run_cli(
+            ["task", "add", "demo/T01", "--title", "First", "--reason", "serves the goal"], "sess-1", self.repo_dir
+        )
         code, out, err = self.run_cli(
             ["ask", "Which?", "--context", "ctx", "--ref", "task:demo/T01"], "sess-1", self.repo_dir
         )
@@ -158,7 +160,9 @@ class PrWaitTests(WaitTestCase):
         super().setUp()
         self.refreshes = 0
         self.run_cli(["quest", "add", "demo", "--title", "Demo", "--no-epic"], "sess-1", self.repo_dir)
-        self.run_cli(["task", "add", "demo/T01", "--title", "First"], "sess-1", self.repo_dir)
+        self.run_cli(
+            ["task", "add", "demo/T01", "--title", "First", "--reason", "serves the goal"], "sess-1", self.repo_dir
+        )
         self.track("sess-1", 7, "demo/T01", "ready")
         self._set_project_config({"human_ready": {"notice_comments": [{"author": "notifier", "text": "usage notice"}]}})
         self.view = dict(

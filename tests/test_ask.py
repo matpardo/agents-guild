@@ -10,9 +10,15 @@ class AskTests(GuildTestCase):
     def setUp(self):
         super().setUp()
         self.repo_dir = self.register_project("acme", ["acme/app"])
-        self.run_cli(["party", "start", "alpha", "--reason", "test reason"], "sess-1", self.repo_dir)
+        self.run_cli(
+            ["party", "start", "alpha", "--reason", "test reason", "--goal", "test goal", "--done-when", "test done"],
+            "sess-1",
+            self.repo_dir,
+        )
         self.run_cli(["quest", "add", "demo", "--title", "Demo", "--no-epic"], "sess-1", self.repo_dir)
-        self.run_cli(["task", "add", "demo/T01", "--title", "First"], "sess-1", self.repo_dir)
+        self.run_cli(
+            ["task", "add", "demo/T01", "--title", "First", "--reason", "serves the goal"], "sess-1", self.repo_dir
+        )
         self.conn = db.connect(paths.db_path())
 
     def _create_ask_event(self, party, question, ref_list, seconds_offset):
@@ -266,7 +272,9 @@ class AskTests(GuildTestCase):
         self.assertIn("NEEDS YOU · nothing", out)
 
     def test_asks_listed_in_ascending_id_regardless_of_blocked_count(self):
-        self.run_cli(["task", "add", "demo/T02", "--title", "Second"], "sess-1", self.repo_dir)
+        self.run_cli(
+            ["task", "add", "demo/T02", "--title", "Second", "--reason", "serves the goal"], "sess-1", self.repo_dir
+        )
         self.run_cli(["ask", "single ref?", "--context", "x", "--ref", "task:demo/T01"], "sess-1", self.repo_dir)
         self.run_cli(
             [
@@ -292,7 +300,9 @@ class AskTests(GuildTestCase):
         self.assertLess(out.index("created later?"), out.index("created earlier?"))
 
     def test_board_summary_lists_asks_in_ascending_id(self):
-        self.run_cli(["task", "add", "demo/T02", "--title", "Second"], "sess-1", self.repo_dir)
+        self.run_cli(
+            ["task", "add", "demo/T02", "--title", "Second", "--reason", "serves the goal"], "sess-1", self.repo_dir
+        )
         self.run_cli(["ask", "single ref?", "--context", "x", "--ref", "task:demo/T01"], "sess-1", self.repo_dir)
         self.run_cli(
             [
@@ -364,7 +374,9 @@ class AskTests(GuildTestCase):
         self.assertLess(out.index("first?"), out.index("second?"))
 
     def test_board_summary_shows_blocks_count(self):
-        self.run_cli(["task", "add", "demo/T02", "--title", "Second"], "sess-1", self.repo_dir)
+        self.run_cli(
+            ["task", "add", "demo/T02", "--title", "Second", "--reason", "serves the goal"], "sess-1", self.repo_dir
+        )
         self.run_cli(
             [
                 "ask",
@@ -443,9 +455,13 @@ class AnswerPiiScopeTests(GuildTestCase):
         data = json.loads(config_file.read_text())
         data["pii_patterns"] = [r"\bID-\d{6}\b"]
         config_file.write_text(json.dumps(data))
-        self.run_cli(["party", "start", "alpha", "--reason", "test reason"], "sess-1", repo_dir)
+        self.run_cli(
+            ["party", "start", "alpha", "--reason", "test reason", "--goal", "test goal", "--done-when", "test done"],
+            "sess-1",
+            repo_dir,
+        )
         self.run_cli(["quest", "add", "demo", "--title", "Demo", "--no-epic"], "sess-1", repo_dir)
-        self.run_cli(["task", "add", "demo/T01", "--title", "First"], "sess-1", repo_dir)
+        self.run_cli(["task", "add", "demo/T01", "--title", "First", "--reason", "serves the goal"], "sess-1", repo_dir)
         self.run_cli(["ask", "who?", "--context", "c", "--ref", "task:demo/T01"], "sess-1", repo_dir)
         outside = self.root / "elsewhere"
         outside.mkdir()

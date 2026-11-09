@@ -101,7 +101,10 @@ class AdventurerBoardTests(AdventurerTestCase):
         self.assertNotIn("stopped without report", text)
 
     def test_party_without_live_leader_is_flagged_until_handed_off(self):
-        self.cli(["party", "start", "alpha", "--reason", "test reason"], "sess-1")
+        self.cli(
+            ["party", "start", "alpha", "--reason", "test reason", "--goal", "test goal", "--done-when", "test done"],
+            "sess-1",
+        )
         party = self._model()["parties"][0]
         self.assertTrue(party["stopped_without_report"])
         self.assertIn("stopped without report", self._board_text())
@@ -111,7 +114,10 @@ class AdventurerBoardTests(AdventurerTestCase):
         self.assertFalse(party["stopped_without_report"])
 
     def test_party_with_live_leader_is_not_flagged(self):
-        self.cli(["party", "start", "alpha", "--reason", "test reason"], "sess-1")
+        self.cli(
+            ["party", "start", "alpha", "--reason", "test reason", "--goal", "test goal", "--done-when", "test done"],
+            "sess-1",
+        )
         self.write_session(os.getpid(), "sess-1", "lead")
         self.assertFalse(self._model()["parties"][0]["stopped_without_report"])
 
@@ -119,7 +125,10 @@ class AdventurerBoardTests(AdventurerTestCase):
 class PartyClosePendingTests(AdventurerTestCase):
     def setUp(self):
         super().setUp()
-        self.cli(["party", "start", "alpha", "--reason", "test reason"], "sess-1")
+        self.cli(
+            ["party", "start", "alpha", "--reason", "test reason", "--goal", "test goal", "--done-when", "test done"],
+            "sess-1",
+        )
 
     def test_close_without_pending_fails(self):
         code, out, err = self.cli(["party", "close", "alpha"], None)

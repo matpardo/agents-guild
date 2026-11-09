@@ -44,8 +44,16 @@ class FileOpenPrCapTestCase(GuildTestCase):
         ):
             subprocess.run(command, cwd=str(self.repo_dir), check=True)
         self._set_cap(2)
-        self.run_cli(["party", "start", "alpha", "--reason", "test reason"], "sess-1", self.repo_dir)
-        self.run_cli(["party", "start", "beta", "--reason", "test reason"], "sess-2", self.repo_dir)
+        self.run_cli(
+            ["party", "start", "alpha", "--reason", "test reason", "--goal", "test goal", "--done-when", "test done"],
+            "sess-1",
+            self.repo_dir,
+        )
+        self.run_cli(
+            ["party", "start", "beta", "--reason", "test reason", "--goal", "test goal", "--done-when", "test done"],
+            "sess-2",
+            self.repo_dir,
+        )
         self.write_gh_fixture("list_feature-mine", [])
         self.write_gh_fixture("branch_checks_acme-app_main", {"check_runs": []})
 

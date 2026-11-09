@@ -29,8 +29,16 @@ class PreCommitHookTests(GuildTestCase):
         data["shared_areas"] = ["config/routes.rb", "db/migrate/*"]
         data["shared_area_claim_ttl"] = "2h"
         config_file.write_text(json.dumps(data))
-        self.run_cli(["party", "start", "alpha", "--reason", "test reason"], "sess-1", self.repo_dir)
-        self.run_cli(["party", "start", "beta", "--reason", "test reason"], "sess-2", self.repo_dir)
+        self.run_cli(
+            ["party", "start", "alpha", "--reason", "test reason", "--goal", "test goal", "--done-when", "test done"],
+            "sess-1",
+            self.repo_dir,
+        )
+        self.run_cli(
+            ["party", "start", "beta", "--reason", "test reason", "--goal", "test goal", "--done-when", "test done"],
+            "sess-2",
+            self.repo_dir,
+        )
 
     def _stage(self, directory, relative_path):
         target = directory / relative_path

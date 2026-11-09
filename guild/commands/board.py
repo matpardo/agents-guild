@@ -879,6 +879,17 @@ def _claim_text(ctx, row):
     return "{} ({}{})".format(row["area"], timeutil.time_left_label(ctx.now, row["expires_at"]), suffix)
 
 
+def _party_goal_lines(painter, party_row):
+    if not party_row["goal"]:
+        return [painter.paint("  no goal", "dim")]
+    lines = painter.wrap("goal: {}".format(sanitize.strip_control_sequences(party_row["goal"])), "  ")
+    if party_row["done_when"]:
+        lines.extend(
+            painter.wrap("done when: {}".format(sanitize.strip_control_sequences(party_row["done_when"])), "  ")
+        )
+    return lines
+
+
 def _party_section(ctx, repo_clones, painter, party_row, project_config):
     lines = [
         "{} {}  {}".format(
@@ -892,6 +903,7 @@ def _party_section(ctx, repo_clones, painter, party_row, project_config):
         lines.append(painter.paint("  " + dates, "dim"))
     if party_row["reason"]:
         lines.extend(painter.wrap("reason: {}".format(sanitize.strip_control_sequences(party_row["reason"])), "  "))
+    lines.extend(_party_goal_lines(painter, party_row))
     status = party_status.derive(ctx, party_row)
     lines.append(
         painter.paint(
@@ -1517,6 +1529,8 @@ def _party_model(ctx, repo_clones, party_row, project_config):
         "state": party_row["state"],
         "generation": party_row["generation"],
         "reason": _optional_text(party_row["reason"]),
+        "goal": _optional_text(party_row["goal"]),
+        "done_when": _optional_text(party_row["done_when"]),
         "parked": _optional_text(party_row["parked"]),
         "from_adventurer": party_row["from_adventurer"],
         "dates": _party_dates(ctx.conn, party_row),

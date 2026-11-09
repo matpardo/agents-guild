@@ -41,7 +41,11 @@ class SeenCommandTests(NoticeSeenTestCase):
         self.assertEqual((code, out, err), (0, "notice #1 unseen\n", ""))
 
     def test_bound_session_can_mark_seen_and_unseen(self):
-        self.run_cli(["party", "start", "alpha", "--reason", "test reason"], "sess-1", self.repo_dir)
+        self.run_cli(
+            ["party", "start", "alpha", "--reason", "test reason", "--goal", "test goal", "--done-when", "test done"],
+            "sess-1",
+            self.repo_dir,
+        )
         self._create("pipeline down", "5h")
         code, out, err = self.run_cli(["notice", "seen", "1"], "sess-1", self.repo_dir)
         self.assertEqual(code, 0, err)
@@ -218,7 +222,11 @@ class SeenBoardTests(NoticeSeenTestCase):
         self.assertNotIn("new", out)
 
     def test_party_board_counts_only_that_partys_notices(self):
-        self.run_cli(["party", "start", "alpha", "--reason", "test reason"], "sess-1", self.repo_dir)
+        self.run_cli(
+            ["party", "start", "alpha", "--reason", "test reason", "--goal", "test goal", "--done-when", "test done"],
+            "sess-1",
+            self.repo_dir,
+        )
         self.run_cli(["notice", "create", "mine", "--to", "guild", "--ttl", "2h"], "sess-1", self.repo_dir)
         self._create("theirs", "2h")
         out = self._board("--party", "alpha")
@@ -233,7 +241,11 @@ class SeenBoardTests(NoticeSeenTestCase):
 class SeenNeverChangesDeliveryTests(NoticeSeenTestCase):
     def setUp(self):
         super().setUp()
-        self.run_cli(["party", "start", "beta", "--reason", "test reason"], "sess-2", self.repo_dir)
+        self.run_cli(
+            ["party", "start", "beta", "--reason", "test reason", "--goal", "test goal", "--done-when", "test done"],
+            "sess-2",
+            self.repo_dir,
+        )
         self._create("pipeline down", "5h")
         self.run_cli(["notice", "seen", "1"], None, None)
         self.payload = {"session_id": "sess-2", "cwd": str(self.repo_dir)}

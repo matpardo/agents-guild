@@ -169,7 +169,11 @@ class SecurityHeaderTests(WebServerTestCase):
 class BoardEndpointTests(WebServerTestCase):
     def test_board_json_shape(self):
         repo_dir = self.register_project("acme", ["acme/app"])
-        self.run_cli(["party", "start", "alpha", "--reason", "test reason"], "sess-1", repo_dir)
+        self.run_cli(
+            ["party", "start", "alpha", "--reason", "test reason", "--goal", "test goal", "--done-when", "test done"],
+            "sess-1",
+            repo_dir,
+        )
         self.write_session(os.getpid(), "sess-1", "alpha-g1")
 
         response, body = self._get("/api/board", "127.0.0.1:{}".format(self.port))

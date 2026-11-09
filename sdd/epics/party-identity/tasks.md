@@ -3,7 +3,7 @@ epic: party-identity
 type: tasks
 title: A session leads one party for its whole life
 status: done
-updated: 2026-10-28
+updated: 2026-11-09
 ---
 
 # Tasks: A session leads one party for its whole life
@@ -48,3 +48,14 @@ updated: 2026-10-28
 
 **Acceptance:**
 - [x] Starting or promoting onto a closed party's name fails with `already exists`.
+
+## T05 — Party goal and done condition
+
+**Depends on:** T01
+**Status:** [x] done
+
+**What:** `party start` and `adventurer promote` require `--goal` and `--done-when`; `guild party set` and the web party card change them; the board, `revive --list`, `brief` and the handoff file show them; `task add` requires `--reason` while the party has a done condition. Decisión del dev, 2026-11-09.
+
+**Acceptance:**
+- [x] Starting or promoting without both flags fails; a party started before this replays with no goal and the board says `no goal`.
+- [x] `task add` without `--reason` is refused on a party with a done condition.

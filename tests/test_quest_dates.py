@@ -50,7 +50,7 @@ class QuestDatesTests(QuestBoardTestCase):
         self.assertEqual(self.quest_row("q1")["updated_at"], moved)
         self.assertEqual(self.quest_row("q2")["updated_at"], moved)
 
-        self.at(20, ["task", "add", "q2/T04", "--title", "extra"], "sess-1")
+        self.at(20, ["task", "add", "q2/T04", "--title", "extra", "--reason", "serves the goal"], "sess-1")
         added = (_T0 + timedelta(minutes=20)).isoformat()
         self.assertEqual(tuple(self.task_row("q2", "T04")), (added, added))
         self.assertEqual(tuple(self.quest_row("q2")), (created, added))

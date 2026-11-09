@@ -6,7 +6,11 @@ from tests.test_web_write import WebWriteTestCase
 class WebTaskMoveTests(WebWriteTestCase):
     def setUp(self):
         super().setUp()
-        self.run_cli(["party", "start", "beta", "--reason", "test reason"], "sess-2", self.repo_dir)
+        self.run_cli(
+            ["party", "start", "beta", "--reason", "test reason", "--goal", "test goal", "--done-when", "test done"],
+            "sess-2",
+            self.repo_dir,
+        )
         self.run_cli(["quest", "add", "other", "--title", "Other", "--no-epic"], "sess-2", self.repo_dir)
 
     def _move(self, tid, data, headers=None):
