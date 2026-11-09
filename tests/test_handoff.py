@@ -13,6 +13,7 @@ from guild.commands import handoff as handoff_commands
 from guild.commands import memory as memory_commands
 from guild.commands import party as party_commands
 from guild.errors import GuildError
+from tests.test_handoff_respawn import FakeTmux
 from tests.testutil import GuildTestCase
 
 
@@ -37,6 +38,29 @@ class HandoffTests(GuildTestCase):
         row = conn.execute("SELECT * FROM leaders WHERE party = 'alpha' ORDER BY generation DESC LIMIT 1").fetchone()
         conn.close()
         return row
+
+    def _handoff_with_tmux(self, installed):
+        fake = FakeTmux(installed, {}, {}, False, 0)
+        with mock.patch("guild.tmux_windows.Tmux", return_value=fake):
+            return self.run_cli(["handoff", "--in-flight", "x", "--learned", "y"], "sess-1", self.repo_dir)
+
+    def test_prints_revive_command_then_raw_fallback_when_tmux_installed(self):
+        code, out, err = self._handoff_with_tmux(True)
+        self.assertEqual(code, 0)
+        self.assertIn("guild revive --party alpha", out)
+        self.assertIn("GUILD_RESUME=alpha claude -n alpha-g2", out)
+        self.assertLess(out.index("guild revive --party alpha"), out.index("GUILD_RESUME=alpha"))
+
+    def test_prints_raw_command_only_when_tmux_not_installed(self):
+        code, out, err = self._handoff_with_tmux(False)
+        self.assertEqual(code, 0)
+        self.assertNotIn("guild revive", out)
+        self.assertIn("GUILD_RESUME=alpha claude -n alpha-g2", out)
+
+    def test_raw_command_carries_recorded_permission_mode(self):
+        self.run_hook("prompt-submit", {"session_id": "sess-1", "cwd": str(self.repo_dir), "permission_mode": "auto"})
+        code, out, err = self._handoff_with_tmux(False)
+        self.assertIn("--permission-mode auto", out)
 
     def test_rejects_empty_in_flight(self):
         code, out, err = self.run_cli(["handoff", "--in-flight", "  ", "--learned", "x"], "sess-1", self.repo_dir)
@@ -192,7 +216,7 @@ class ResumeCommandShellTests(GuildTestCase):
 
     def test_printed_command_runs_nothing_and_passes_prompt_intact(self):
         code, out, err = self.run_cli(["handoff", "--in-flight", "x", "--learned", "y"], "sess-1", self.repo_dir)
-        command = out.splitlines()[0]
+        command = next(line for line in out.splitlines() if line.startswith("GUILD_RESUME="))
         marker = self.root / "executed"
         script = 'guild() {{ touch "{}"; }}; claude() {{ printf "%s\\n" "$GUILD_RESUME" "$@"; }}; {}'.format(
             marker, command
@@ -218,7 +242,8 @@ class ResumeModelFlagTests(GuildTestCase):
             self.repo_dir,
         )
         self.assertEqual(code, 0)
-        self.assertIn("claude -n alpha-g2 --model opus 'Continue", out.splitlines()[0])
+        raw = next(line for line in out.splitlines() if line.startswith("GUILD_RESUME="))
+        self.assertIn("claude -n alpha-g2 --model opus 'Continue", raw)
 
     def test_resume_command_has_no_model_without_flag(self):
         code, out, err = self.run_cli(["handoff", "--in-flight", "x", "--learned", "y"], "sess-1", self.repo_dir)

@@ -195,11 +195,21 @@ def _close(ctx, binding, tmux, tmux_pane):
     return _with_reminder("handoff written for {}; closing this pane".format(label)), pane
 
 
-def _respawn(ctx, binding, model, recorded_window, tmux, tmux_pane, sleep):
-    party, generation = binding["party"], binding["generation"]
-    leader = ctx.conn.execute(
+def _leader_row(conn, party, generation):
+    return conn.execute(
         "SELECT cwd, permission_mode FROM leaders WHERE party = ? AND generation = ?", (party, generation)
     ).fetchone()
+
+
+def _manual_text(binding, command, tmux):
+    if not tmux.installed():
+        return _with_reminder(command)
+    return _with_reminder("guild revive --party {}\nwithout tmux, run instead:\n{}".format(binding["party"], command))
+
+
+def _respawn(ctx, binding, model, recorded_window, tmux, tmux_pane, sleep):
+    party, generation = binding["party"], binding["generation"]
+    leader = _leader_row(ctx.conn, party, generation)
     command = resume.fresh_command(party, generation + 1, model, leader["permission_mode"], resume.RESUME_PROMPT)
     blocker = _launch_blocker(tmux, leader["cwd"])
     if blocker is None:
@@ -253,14 +263,15 @@ def run(ctx, in_flight, learned, parked, model, respawn, close, tmux, tmux_pane,
         return _respawn(ctx, binding, model, recorded_window, tmux, tmux_pane, sleep)
     if close:
         return _close(ctx, binding, tmux, tmux_pane)
+    leader = _leader_row(ctx.conn, binding["party"], binding["generation"])
     command = resume.fresh_command(
         binding["party"],
         binding["generation"] + 1,
         model,
-        None,
+        None if leader is None else leader["permission_mode"],
         resume.RESUME_PROMPT,
     )
-    return _with_reminder(command), None
+    return _manual_text(binding, command, tmux), None
 
 
 def _dry_run_text(ctx):

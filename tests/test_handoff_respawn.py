@@ -4,6 +4,7 @@ from unittest import mock
 from guild import db, events, paths, timeutil
 from guild.cli import _build_context
 from guild.commands import handoff as handoff_commands
+from guild.commands import hook as hook_commands
 from guild.commands import memory as memory_commands
 from guild.errors import GuildError
 from tests.testutil import GuildTestCase
@@ -417,3 +418,37 @@ class HandoffCloseCliTests(RespawnBase):
         self.assertEqual(code, 1)
         self.assertIn("--respawn", err)
         self.assertIn("--close", err)
+
+
+class WindowAdoptionTests(RespawnBase):
+    def _session_start(self, tmux, pane):
+        env = {} if pane is None else {"TMUX_PANE": pane}
+        with mock.patch("guild.tmux_windows.Tmux", return_value=tmux), mock.patch.dict("os.environ", env):
+            self.run_hook("session-start", {"session_id": "sess-1", "cwd": str(self.repo_dir), "source": "compact"})
+
+    def _nudge(self):
+        return hook_commands._nudge_text(
+            _build_context("sess-1", self.repo_dir), {"party": "alpha", "generation": 1}, "x"
+        )
+
+    def test_adopts_current_window_in_guild_session(self):
+        self._session_start(self._fake(), "%5")
+        self.assertEqual(self._window_rows(), [(1, "@1")])
+        self.assertIn("guild handoff --respawn", self._nudge())
+
+    def test_pane_outside_guild_session_records_nothing(self):
+        self._session_start(self._fake(pane_windows={"%5": "@7"}), "%5")
+        self.assertEqual(self._window_rows(), [])
+        nudge = self._nudge()
+        self.assertNotIn("--respawn", nudge)
+        self.assertIn("auto-respawn off: this generation runs outside a guild tmux window", nudge)
+        self.assertIn("guild revive --party alpha", nudge)
+
+    def test_no_pane_records_nothing(self):
+        self._session_start(self._fake(), None)
+        self.assertEqual(self._window_rows(), [])
+
+    def test_recorded_window_is_kept(self):
+        self._record_window(1, "@9")
+        self._session_start(self._fake(), "%5")
+        self.assertEqual(self._window_rows(), [(1, "@9")])

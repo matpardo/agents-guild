@@ -1898,6 +1898,18 @@ for a leader (still active, closed, unknown or an invalid name), nothing is
 bound and the context says why (`GUILD_RESUME=<party> not applied: ...`). A
 session that already leads that party (e.g. after `/clear`) is left alone.
 
+A generation started by pasting the raw command into a terminal adopts its
+window: at `SessionStart`, when no window is recorded for it and `$TMUX_PANE`
+sits in a window of the `guild` tmux session, guild records that window
+(`leader.window_recorded`, same `leader_windows` table), so the chain offers
+`--respawn` again. A plain `guild handoff` prints `guild revive --party <party>`
+first (it relaunches in the `guild` tmux session and records the window) and
+then the raw `GUILD_RESUME=<party> claude ...` command for a terminal without
+tmux; when tmux is not installed it prints only the raw command. The raw
+command carries `--permission-mode` from the mode guild recorded for the
+leader, which `UserPromptSubmit` keeps current because `SessionStart` does not
+always receive it.
+
 `guild handoff --respawn` (only for a generation running in a window guild
 launched, i.e. one recorded by `guild revive` or an earlier respawn; any other
 session gets `--respawn needs a window guild launched` before anything is
@@ -1915,8 +1927,10 @@ missing, the cwd is gone or tmux cannot create the window it prints `respawn
 failed: <reason>; old session kept` plus the manual command; if the new
 generation does not bind in time the old window is kept and the new one is left
 running. Nothing else is ever killed. The context nudge asks for it when the
-session runs in such a window; every other session gets the plain handoff nudge
-and the human relaunches with `guild revive`. The nudge also comes right after a
+session runs in such a window; every other session gets the plain handoff nudge,
+which says `auto-respawn off: this generation runs outside a guild tmux window`
+and asks it to give the human the printed `guild revive --party <party>`
+command. The nudge also comes right after a
 compaction (`SessionStart` with source `compact`), because Claude Code compacts
 far below `handoff_threshold`.
 

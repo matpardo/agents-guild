@@ -189,3 +189,17 @@ updated: 2026-10-18
 **Acceptance:**
 - [x] A pre-compact whose statusline percentage is 30 minutes old or more records nothing.
 - [x] A pre-compact right after activity still records the percentage.
+
+## T16 — Handoff chain keeps permission mode and auto-respawn
+
+**Depends on:** T10
+**Status:** [x] done
+
+**What:** A generation relaunched by pasting the printed command lost the permission mode (`SessionStart` does not receive it) and had no recorded window, so the chain stayed manual. `UserPromptSubmit` now records the mode, `guild handoff` carries it, `SessionStart` adopts the current tmux window of the `guild` session, and a plain handoff prints `guild revive --party <party>` before the raw command. Decisión del dev, 2026-11-09.
+
+**Acceptance:**
+- [x] A `UserPromptSubmit` with a permission mode records it for the leader.
+- [x] `guild handoff` without `--respawn` prints the recorded mode in the raw command.
+- [x] A `SessionStart` from a pane in the `guild` session with no recorded window records that window; a pane elsewhere records nothing.
+- [x] A plain handoff prints `guild revive --party <party>` first and the raw command as fallback; without tmux it prints the raw command only.
+- [x] The nudge of a generation without a recorded window says auto-respawn is off and points to the revive command.

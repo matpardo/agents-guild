@@ -272,7 +272,8 @@ class CompactNudgeTests(GuildTestCase):
     PLAIN = (
         "Start nothing new; let in-flight runs finish, then run "
         '`guild handoff --in-flight "..." --learned "..."`. '
-        "Give the human the printed command, then nothing."
+        "auto-respawn off: this generation runs outside a guild tmux window. "
+        "Give the human the printed `guild revive --party alpha` command, then nothing."
     )
     RESPAWN = (
         "Start nothing new; let in-flight runs finish, then run "
@@ -1746,3 +1747,15 @@ class PreAnswerHookTests(GuildTestCase):
         decision = json.loads(out)["hookSpecificOutput"]
         self.assertEqual(decision["permissionDecision"], "deny")
         self.assertIn("boom", decision["permissionDecisionReason"])
+
+
+class PromptSubmitPermissionModeTests(GuildTestCase):
+    def test_prompt_submit_records_permission_mode_missing_at_session_start(self):
+        repo_dir = self.register_project("acme", ["acme/app"])
+        self.run_cli(["party", "start", "alpha", "--reason", "test reason"], "sess-1", repo_dir)
+        self.run_hook("session-start", {"session_id": "sess-1", "cwd": str(repo_dir), "source": "startup"})
+        self.run_hook("prompt-submit", {"session_id": "sess-1", "cwd": str(repo_dir), "permission_mode": "auto"})
+        conn = db.connect(paths.db_path())
+        row = conn.execute("SELECT permission_mode FROM leaders WHERE party = 'alpha'").fetchone()
+        conn.close()
+        self.assertEqual(row["permission_mode"], "auto")
