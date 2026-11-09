@@ -15,6 +15,7 @@ from guild import (
     ctx_pressure,
     db,
     due_jobs,
+    events,
     identity,
     localbase,
     names,
@@ -304,7 +305,29 @@ def notification(ctx, notification_type, message, push_runner):
     _run_push(ctx, binding, wait, push_runner)
 
 
-def session_start(ctx, resume_party, health_job, permission_mode, source):
+def _adopt_tmux_window(ctx, binding, tmux, tmux_pane):
+    if tmux_pane is None:
+        return
+    if tmux_windows.recorded_window(ctx.conn, binding["party"], binding["generation"]) is not None:
+        return
+    window_id = tmux_windows.window_id_of_pane(tmux, tmux_pane)
+    if window_id is None or not tmux_windows.window_in_session(tmux, window_id):
+        return
+    with db.writing(ctx.conn):
+        events.record(
+            ctx.conn,
+            ctx.now,
+            ctx.origin,
+            binding["party"],
+            ctx.session_id,
+            binding["project"],
+            "leader.window_recorded",
+            "local",
+            {"party": binding["party"], "generation": binding["generation"], "window_id": window_id},
+        )
+
+
+def session_start(ctx, resume_party, health_job, permission_mode, source, tmux, tmux_pane):
     if source in ("startup", "resume") and ctx.session_id is not None:
         background.clear_subagents(ctx.state_dir, ctx.session_id)
     lines = _auto_resume_lines(ctx, resume_party, permission_mode)
@@ -312,6 +335,7 @@ def session_start(ctx, resume_party, health_job, permission_mode, source):
     binding = identity.resolve_binding(ctx.conn, ctx.session_id)
     if binding is not None:
         party_commands.locate_if_changed(ctx, binding, permission_mode)
+        _adopt_tmux_window(ctx, binding, tmux, tmux_pane)
         lines.extend(_resume_lines(ctx, binding))
         with db.writing(ctx.conn):
             _mark_working(ctx, binding)
@@ -378,13 +402,16 @@ def _nudge_text(ctx, binding, lead):
     return (
         "{}. Start nothing new; let in-flight runs finish, then run "
         '`guild handoff --in-flight "..." --learned "..."`. '
-        "Give the human the printed command, then nothing.".format(lead)
+        "auto-respawn off: this generation runs outside a guild tmux window. "
+        "Give the human the printed `guild revive --party {}` command, then nothing.".format(lead, binding["party"])
     )
 
 
-def prompt_submit(ctx):
+def prompt_submit(ctx, permission_mode):
     _spawn_due_jobs(ctx)
     binding = identity.resolve_binding(ctx.conn, ctx.session_id)
+    if binding is not None:
+        party_commands.locate_if_changed(ctx, binding, permission_mode)
     adventurer = identity.resolve_adventurer(ctx.conn, ctx.session_id)
     message_lines, seq = inbox_commands.new_lines(ctx, binding)
     lines = inbox_commands.framed(message_lines)

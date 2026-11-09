@@ -2053,6 +2053,8 @@ def _run_pre_edit_hook(stdin_data):
 
 
 def _run_stateful_hook(hook_name, stdin_data):
+    from guild import tmux_windows
+
     try:
         session_id = stdin_data.get("session_id")
         cwd = _hook_cwd(stdin_data)
@@ -2064,6 +2066,8 @@ def _run_stateful_hook(hook_name, stdin_data):
                 os.environ.get("GUILD_ADVENTURER_JOB") or None,
                 stdin_data.get("permission_mode"),
                 stdin_data.get("source"),
+                tmux_windows.Tmux(),
+                os.environ.get("TMUX_PANE"),
             )
         elif hook_name == "post-tool-use":
             text = hook_commands.post_tool_use(ctx)
@@ -2073,8 +2077,6 @@ def _run_stateful_hook(hook_name, stdin_data):
             )
             text = None
         elif hook_name == "stop":
-            from guild import tmux_windows
-
             hook_commands.stop(ctx, tmux_windows.Tmux(), os.environ.get("TMUX_PANE"))
             text = None
         elif hook_name == "subagent-start":
@@ -2087,7 +2089,7 @@ def _run_stateful_hook(hook_name, stdin_data):
             hook_commands.pre_compact(ctx)
             text = None
         else:
-            text = hook_commands.prompt_submit(ctx)
+            text = hook_commands.prompt_submit(ctx, stdin_data.get("permission_mode"))
     except Exception as error:
         sys.stdout.write("guild hook error: {}\n".format(error))
         return 0
