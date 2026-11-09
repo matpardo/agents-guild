@@ -7,6 +7,7 @@ import time
 from unittest import mock
 
 from guild import background, ctx_pressure, db, events, notify, paths, pii, statusline_state, timeutil
+from guild.commands import hook as hook_commands
 from guild.commands import memory as memory_commands
 from tests.testutil import GuildTestCase
 
@@ -333,6 +334,49 @@ class CompactNudgeTests(GuildTestCase):
         code, out, err = self._pre_compact("sess-1")
         self.assertEqual("", out)
         self.assertIsNone(statusline_state.latest_compact_pct(paths.state_dir()))
+
+    def test_pre_compact_bound_prints_summary_instructions(self):
+        repo_dir = self._bound()
+        statusline_state.record_ctx(paths.state_dir(), "sess-1", 27)
+        code, out, err = self.run_hook("pre-compact", {"session_id": "sess-1", "cwd": str(repo_dir), "trigger": "auto"})
+        self.assertEqual(0, code)
+        self.assertEqual(hook_commands.COMPACTION_INSTRUCTIONS, out.rstrip("\n"))
+        self.assertEqual(27, statusline_state.latest_compact_pct(paths.state_dir()))
+
+    def test_pre_compact_adventurer_prints_summary_instructions(self):
+        repo_dir = self.register_project("acme", ["acme/app"])
+        config_path = self.config_home / "guild" / "projects" / "acme.json"
+        data = json.loads(config_path.read_text())
+        data["health_jobs"] = [{"name": "red-main", "command": "/check-main", "every": "1d"}]
+        config_path.write_text(json.dumps(data))
+        self.run_cli(["adventurer", "start", "--job", "red-main", "--reason", "test reason"], "sess-1", repo_dir)
+        code, out, err = self.run_hook("pre-compact", {"session_id": "sess-1", "cwd": str(repo_dir), "trigger": "auto"})
+        self.assertEqual(hook_commands.COMPACTION_INSTRUCTIONS, out.rstrip("\n"))
+
+    def test_pre_compact_unbound_prints_nothing(self):
+        statusline_state.record_ctx(paths.state_dir(), "sess-1", 27)
+        code, out, err = self._pre_compact("sess-1")
+        self.assertEqual("", out)
+        self.assertEqual(27, statusline_state.latest_compact_pct(paths.state_dir()))
+
+    def test_compact_session_start_reinjects_brief_and_memory_before_nudge(self):
+        repo_dir = self._bound()
+        self.run_cli(["quest", "add", "demo", "--title", "Demo", "--no-epic"], "sess-1", repo_dir)
+        self.run_cli(["task", "add", "demo/T01", "--title", "First"], "sess-1", repo_dir)
+        self.run_cli(["task", "start", "demo/T01"], "sess-1", repo_dir)
+        self.run_cli(["memory", "add", "watch ci flakes"], "sess-1", repo_dir)
+        out = self._start(repo_dir, "compact")
+        self.assertIn("guild brief alpha/demo/T01", out)
+        self.assertIn("watch ci flakes", out)
+        self.assertLess(out.index("guild brief alpha/demo/T01"), out.index("watch ci flakes"))
+        self.assertLess(out.index("watch ci flakes"), out.index("Context was compacted"))
+
+    def test_startup_first_generation_does_not_reinject_brief(self):
+        repo_dir = self._bound()
+        self.run_cli(["quest", "add", "demo", "--title", "Demo", "--no-epic"], "sess-1", repo_dir)
+        self.run_cli(["task", "add", "demo/T01", "--title", "First"], "sess-1", repo_dir)
+        self.run_cli(["task", "start", "demo/T01"], "sess-1", repo_dir)
+        self.assertNotIn("guild brief alpha/demo/T01", self._start(repo_dir, "startup"))
 
     def test_compact_session_start_records_nothing(self):
         repo_dir = self._bound()

@@ -2086,8 +2086,7 @@ def _run_stateful_hook(hook_name, stdin_data):
             hook_commands.subagent_stop(ctx, stdin_data.get("agent_id"), stdin_data.get("agent_transcript_path"))
             text = None
         elif hook_name == "pre-compact":
-            hook_commands.pre_compact(ctx)
-            text = None
+            text = hook_commands.pre_compact(ctx)
         else:
             text = hook_commands.prompt_submit(ctx, stdin_data.get("permission_mode"))
     except Exception as error:
