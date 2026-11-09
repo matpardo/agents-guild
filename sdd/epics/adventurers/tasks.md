@@ -3,7 +3,7 @@ epic: adventurers
 type: tasks
 title: Adventurers do one job and report what is pending
 status: done
-updated: 2026-10-24
+updated: 2026-11-09
 ---
 
 # Tasks: Adventurers do one job and report what is pending
@@ -192,3 +192,13 @@ updated: 2026-10-24
 
 **Acceptance:**
 - [x] A promoted adventurer's PR links to a task of the party.
+
+## T18 — List adventurers newest first
+
+**Status:** [x] done
+
+**What:** `guild board`, the web board and `guild adventurers` show the most recent adventurer first.
+
+**Acceptance:**
+- [x] The board text and the web model list adventurers from newest to oldest.
+- [x] `guild adventurers` lists active adventurers from newest to oldest, then the recent finished ones.

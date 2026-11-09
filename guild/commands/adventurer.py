@@ -283,7 +283,7 @@ def _list_line(row):
 
 
 def list_adventurers(ctx):
-    active = ctx.conn.execute("SELECT * FROM adventurers WHERE state = 'active' ORDER BY id ASC").fetchall()
+    active = ctx.conn.execute("SELECT * FROM adventurers WHERE state = 'active' ORDER BY id DESC").fetchall()
     recent = ctx.conn.execute(
         "SELECT * FROM adventurers WHERE state = 'done' ORDER BY done_at DESC, id DESC LIMIT ?",
         (_RECENT_DONE_LIMIT,),
