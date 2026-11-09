@@ -34,7 +34,9 @@ class ItemDatesTests(QuestBoardTestCase):
     def track_pr(self):
         self.write_gh_fixture("view_acme-app_1", dict(_OPEN_VIEW))
         self.at(0, ["quest", "add", "q1", "--open", "--title", "q1", "--epic", "demo-epic", "--tasks", "T02"], None)
-        self.at(0, ["party", "start", "alpha", "--reason", "r"], "sess-1")
+        self.at(
+            0, ["party", "start", "alpha", "--reason", "r", "--goal", "test goal", "--done-when", "test done"], "sess-1"
+        )
         self.at(1, ["quest", "take", "q1"], "sess-1")
         self.at(
             2,
@@ -61,7 +63,9 @@ class ItemDatesTests(QuestBoardTestCase):
         self.assertEqual(self.claim_row("area:x"), ("beta", _iso(120), _iso(120)))
 
     def test_party_updated_moves_on_handoff_resume_and_close(self):
-        self.at(0, ["party", "start", "alpha", "--reason", "r"], "sess-1")
+        self.at(
+            0, ["party", "start", "alpha", "--reason", "r", "--goal", "test goal", "--done-when", "test done"], "sess-1"
+        )
         self.assertEqual(self.party_updated("alpha"), _iso(0))
         self.at(5, ["handoff", "--in-flight", "a", "--learned", "b"], "sess-1")
         self.assertEqual(self.party_updated("alpha"), _iso(5))
@@ -101,7 +105,9 @@ class AskAdventurerDatesTests(ItemDatesTests):
         return board_commands.board_model(self.ctx())["asks"]
 
     def test_open_ask_shows_created_and_answered_adds_updated(self):
-        self.at(0, ["party", "start", "alpha", "--reason", "r"], "sess-1")
+        self.at(
+            0, ["party", "start", "alpha", "--reason", "r", "--goal", "test goal", "--done-when", "test done"], "sess-1"
+        )
         self.at(1, ["ask", "Ship it?", "--context", "x", "--ref", "card:ABC-1"], "sess-1")
         created = timeutil.issued_label(_iso(1))
         self.assertEqual(self.ask_models()[0]["dates"], "created " + created)

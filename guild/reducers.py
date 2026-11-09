@@ -8,13 +8,15 @@ def _party_started(conn, event):
     payload = event["payload"]
     conn.execute(
         "INSERT INTO parties (name, project, leader_session_id, generation, state, reason, from_adventurer,"
-        " updated_at) VALUES (?, ?, ?, 1, 'active', ?, ?, ?)",
+        " goal, done_when, updated_at) VALUES (?, ?, ?, 1, 'active', ?, ?, ?, ?, ?)",
         (
             payload["party"],
             event["project"],
             event["session_id"],
             payload.get("reason"),
             payload.get("from_adventurer"),
+            payload.get("goal"),
+            payload.get("done_when"),
             event["ts"],
         ),
     )
@@ -93,6 +95,20 @@ def _set_parked(conn, ts, party, reason):
 
 def _party_parked(conn, event):
     _set_parked(conn, event["ts"], event["payload"]["party"], event["payload"]["reason"])
+
+
+def _party_goal_set(conn, event):
+    payload = event["payload"]
+    current = conn.execute("SELECT goal, done_when FROM parties WHERE name = ?", (payload["party"],)).fetchone()
+    conn.execute(
+        "UPDATE parties SET goal = ?, done_when = ?, updated_at = ? WHERE name = ?",
+        (
+            payload.get("goal", current["goal"]),
+            payload.get("done_when", current["done_when"]),
+            event["ts"],
+            payload["party"],
+        ),
+    )
 
 
 def _party_unparked(conn, event):
@@ -974,6 +990,7 @@ _REDUCERS = {
     "party.handed_off": _party_handed_off,
     "party.parked": _party_parked,
     "party.unparked": _party_unparked,
+    "party.goal_set": _party_goal_set,
     "handoff.pruned": _handoff_pruned,
     "leader.located": _leader_located,
     "leader.window_launched": _leader_window_launched,
@@ -1072,6 +1089,7 @@ _REQUIRED_KEYS = {
     "party.handed_off": ("party", "handoff_path", "generation"),
     "party.parked": ("party", "reason"),
     "party.unparked": ("party",),
+    "party.goal_set": ("party",),
     "handoff.pruned": ("party", "generation"),
     "leader.located": ("cwd", "permission_mode", "party", "generation"),
     "leader.window_launched": ("party", "generation", "window_id"),

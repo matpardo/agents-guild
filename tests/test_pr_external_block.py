@@ -11,7 +11,11 @@ class ExternalBlockTestCase(MergeQueueTestCase):
         self.start_party("alpha", "sess-1")
         self.run_cli(["quest", "add", "qa", "--title", "qa", "--no-epic"], "sess-1", self.repo_dir)
         for tid in ("T01", "T02", "T03"):
-            self.run_cli(["task", "add", "qa/{}".format(tid), "--title", tid], "sess-1", self.repo_dir)
+            self.run_cli(
+                ["task", "add", "qa/{}".format(tid), "--title", tid, "--reason", "serves the goal"],
+                "sess-1",
+                self.repo_dir,
+            )
         for number in (1, 2, 3):
             self.track("sess-1", number, "qa/T0{}".format(number), "ready")
         self.sync_gh("sess-1")

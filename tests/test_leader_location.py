@@ -18,7 +18,11 @@ class LeaderLocationHookTests(GuildTestCase):
     def setUp(self):
         super().setUp()
         self.repo_dir = self.register_project("acme", ["acme/app"])
-        self.run_cli(["party", "start", "alpha", "--reason", "test reason"], "sess-1", self.repo_dir)
+        self.run_cli(
+            ["party", "start", "alpha", "--reason", "test reason", "--goal", "test goal", "--done-when", "test done"],
+            "sess-1",
+            self.repo_dir,
+        )
         self.other_dir = self.root / "elsewhere"
         self.other_dir.mkdir()
 
@@ -116,7 +120,11 @@ class LeaderLocationHookTests(GuildTestCase):
 class LeaderLocationProjectionTests(GuildTestCase):
     def test_rebuild_replays_location(self):
         repo_dir = self.register_project("acme", ["acme/app"])
-        self.run_cli(["party", "start", "alpha", "--reason", "test reason"], "sess-1", repo_dir)
+        self.run_cli(
+            ["party", "start", "alpha", "--reason", "test reason", "--goal", "test goal", "--done-when", "test done"],
+            "sess-1",
+            repo_dir,
+        )
         self.run_hook("session-start", {"session_id": "sess-1", "cwd": str(self.root), "permission_mode": "plan"})
         before = dict(_leader(db.connect(paths.db_path()), "alpha", 1))
         code, out, err = self.run_cli(["rebuild"], None, None)
@@ -128,7 +136,11 @@ class LeaderLocationProjectionTests(GuildTestCase):
 
     def test_export_skips_local_location_events(self):
         repo_dir = self.register_project("acme", ["acme/app"])
-        self.run_cli(["party", "start", "alpha", "--reason", "test reason"], "sess-1", repo_dir)
+        self.run_cli(
+            ["party", "start", "alpha", "--reason", "test reason", "--goal", "test goal", "--done-when", "test done"],
+            "sess-1",
+            repo_dir,
+        )
         code, out, err = self.run_cli(["export", "--visibility", "guild"], None, None)
         self.assertNotIn("leader.located", out)
 

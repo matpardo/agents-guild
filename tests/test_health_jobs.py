@@ -224,7 +224,10 @@ class HealthJobHookTests(HealthJobsTestCase):
         self.assertEqual(self.rows("SELECT * FROM adventurers"), [])
 
     def test_bound_or_already_adventurer_session_is_left_alone(self):
-        self.cli(["party", "start", "alpha", "--reason", "test reason"], "sess-1")
+        self.cli(
+            ["party", "start", "alpha", "--reason", "test reason", "--goal", "test goal", "--done-when", "test done"],
+            "sess-1",
+        )
         self.session_start("sess-1", "red-main", "startup")
         self.session_start("adv-1", "red-main", "startup")
         self.session_start("adv-1", "red-main", "compact")

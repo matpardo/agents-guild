@@ -13,6 +13,16 @@ def pr_line(row):
     return "{} — waits: {}".format(line, row["waits"])
 
 
+def party_goal_lines(conn, party):
+    row = conn.execute("SELECT goal, done_when FROM parties WHERE name = ?", (party,)).fetchone()
+    if not row["goal"]:
+        return ["no goal"]
+    lines = ["goal: {}".format(row["goal"])]
+    if row["done_when"]:
+        lines.append("done when: {}".format(row["done_when"]))
+    return lines
+
+
 def quest_lanes(conn, quest_slug):
     rows = conn.execute("SELECT * FROM quest_tasks WHERE quest = ? ORDER BY tid ASC", (quest_slug,)).fetchall()
     lanes = {"active": [], "queued": [], "blocked": [], "discarded": []}

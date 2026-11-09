@@ -86,7 +86,7 @@ def require_new_name(conn, name):
         raise GuildError("party '{}' already exists: use `guild party resume {}`".format(name, name), 1)
 
 
-def record_started(ctx, name, project, reason, from_adventurer):
+def record_started(ctx, name, project, reason, goal, done_when, from_adventurer):
     session_name = session_info.read_session_name(ctx.sessions_dir, ctx.session_id)
     events.record(
         ctx.conn,
@@ -97,12 +97,25 @@ def record_started(ctx, name, project, reason, from_adventurer):
         project,
         "party.started",
         "local",
-        {"party": name, "session_name": session_name, "reason": reason, "from_adventurer": from_adventurer},
+        {
+            "party": name,
+            "session_name": session_name,
+            "reason": reason,
+            "goal": goal.strip(),
+            "done_when": done_when.strip(),
+            "from_adventurer": from_adventurer,
+        },
     )
     record_location(ctx, name, project, 1, ctx.session_id, None)
 
 
-def start(ctx, name, reason):
+def validate_goal_field(value, field_name, projects_dir, project):
+    if value.strip() == "":
+        raise GuildError("{} must not be empty".format(field_name), 1)
+    pii.validate_field(value, field_name, pii.REASON_MAX_LENGTH, pii.project_patterns(projects_dir, project))
+
+
+def start(ctx, name, reason, goal, done_when):
     names.validate_name(name, "party name")
     if ctx.session_id is None:
         raise GuildError("party start requires a Claude Code session", 1)
@@ -111,8 +124,10 @@ def start(ctx, name, reason):
     projects = config.load_all_projects(ctx.projects_dir)
     project = config.resolve_project(ctx.cwd, projects)
     pii.validate_reason(reason, ctx.projects_dir, project)
+    validate_goal_field(goal, "--goal", ctx.projects_dir, project)
+    validate_goal_field(done_when, "--done-when", ctx.projects_dir, project)
     with db.writing(ctx.conn):
-        record_started(ctx, name, project, reason, None)
+        record_started(ctx, name, project, reason, goal, done_when, None)
     return "party '{}' started, generation 1".format(name)
 
 
@@ -325,6 +340,24 @@ def park(ctx, name, reason):
             {"party": name, "reason": reason.strip()},
         )
     return "party '{}' parked".format(name)
+
+
+def set_goal(ctx, name, goal, done_when):
+    if goal is None and done_when is None:
+        raise GuildError("party set needs --goal or --done-when", 1)
+    row = _active_party_row(ctx.conn, name)
+    payload = {"party": name}
+    if goal is not None:
+        validate_goal_field(goal, "--goal", ctx.projects_dir, row["project"])
+        payload["goal"] = goal.strip()
+    if done_when is not None:
+        validate_goal_field(done_when, "--done-when", ctx.projects_dir, row["project"])
+        payload["done_when"] = done_when.strip()
+    with db.writing(ctx.conn):
+        events.record(
+            ctx.conn, ctx.now, ctx.origin, None, ctx.session_id, row["project"], "party.goal_set", "local", payload
+        )
+    return "party '{}' goal updated".format(name)
 
 
 def unpark(ctx, name):

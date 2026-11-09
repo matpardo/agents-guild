@@ -147,6 +147,8 @@ _BOARD = {
             "state": "active",
             "generation": 1,
             "reason": None,
+            "goal": None,
+            "done_when": None,
             "parked": None,
             "from_adventurer": None,
             "dates": "created 2026-10-24 10:00",
@@ -1266,6 +1268,26 @@ class WebPartyParkBehaviorTests(unittest.TestCase):
 
     def test_closed_party_has_no_park_button(self):
         self.assertNotIn("Park", self._rendered("closed", None, {"name": "closed", "label": "closed"}))
+
+
+@unittest.skipIf(shutil.which("node") is None, "node not installed")
+class WebPartyGoalBehaviorTests(unittest.TestCase):
+    def _rendered(self, state, goal, done_when):
+        party = dict(_BOARD["parties"][0], name="a", state=state, goal=goal, done_when=done_when)
+        return _render(dict(_BOARD, parties=[party]), "all", "all", "parties", "text").strip()
+
+    def test_party_shows_goal_done_when_and_the_edit_button(self):
+        text = self._rendered("active", "ship it", "all merged")
+        self.assertIn("goal: ship it", text)
+        self.assertIn("done when: all merged", text)
+        self.assertIn("Edit goal", text)
+        self.assertNotIn("no goal", text)
+
+    def test_party_without_goal_says_no_goal(self):
+        self.assertIn("no goal", self._rendered("active", None, None))
+
+    def test_closed_party_has_no_edit_button(self):
+        self.assertNotIn("Edit goal", self._rendered("closed", "g", "d"))
 
 
 @unittest.skipIf(shutil.which("node") is None, "node not installed")

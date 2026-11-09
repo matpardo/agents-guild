@@ -15,7 +15,11 @@ class CardPrViewsTestCase(GuildTestCase):
         data = json.loads(config_file.read_text())
         data["tracker"] = {"kind": "jira-acli", "browse_url": "https://tracker.example/browse/"}
         config_file.write_text(json.dumps(data))
-        self.run_cli(["party", "start", "alpha", "--reason", "test reason"], "sess-1", self.repo_dir)
+        self.run_cli(
+            ["party", "start", "alpha", "--reason", "test reason", "--goal", "test goal", "--done-when", "test done"],
+            "sess-1",
+            self.repo_dir,
+        )
         self.write_gh_fixture("view_acme-app_1", _OPEN_VIEW)
         self.track_legacy_card_pr("alpha", "acme/app", 1, "ABC-123", "fix ci", "review", "feature/x")
 
@@ -103,7 +107,9 @@ class CardPrBoardTests(CardPrViewsTestCase):
 
     def test_web_model_has_no_card_for_a_task_pr(self):
         self.run_cli(["quest", "add", "demo", "--title", "Demo", "--no-epic"], "sess-1", self.repo_dir)
-        self.run_cli(["task", "add", "demo/T01", "--title", "First"], "sess-1", self.repo_dir)
+        self.run_cli(
+            ["task", "add", "demo/T01", "--title", "First", "--reason", "serves the goal"], "sess-1", self.repo_dir
+        )
         self.run_cli(["task", "start", "demo/T01"], "sess-1", self.repo_dir)
         self.write_gh_fixture("view_acme-app_2", _OPEN_VIEW)
         self.run_cli(

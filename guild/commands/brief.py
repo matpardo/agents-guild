@@ -65,6 +65,7 @@ def render_brief(ctx):
         return lines
 
     lines = ["party: {} (generation {})".format(binding["party"], binding["generation"])]
+    lines.extend(render.party_goal_lines(ctx.conn, binding["party"]))
     quests = ctx.conn.execute(
         "SELECT slug, title FROM quests WHERE party = ? AND state = 'active'", (binding["party"],)
     ).fetchall()

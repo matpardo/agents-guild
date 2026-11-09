@@ -10,7 +10,8 @@ UNBOUND_HINT = (
     "session not bound: continuing a party's work \u2192 `guild party resume <party>`;"
     " otherwise, when the work will change a repo, pick yourself: one PR job \u2192"
     ' `guild adventurer start "<job>" --task <epic>/<tid> --reason "<why>"`, several PRs \u2192'
-    ' `guild party start <name> --reason "<why>"`; ask the human only when unsure;'
+    ' `guild party start <name> --reason "<why>" --goal "<goal>" --done-when "<condition>"`;'
+    " ask the human only when unsure;"
     " questions and commands stay unbound"
 )
 ADVENTURER_REFUSAL = "adventurers do one job; quests and tasks belong to parties"

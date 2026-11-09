@@ -60,6 +60,13 @@ def add(ctx, quest, tid, title, reason, no_sdd):
             task_holders.reject_taken_tasks(
                 ctx.conn, ctx.now, quest_row["project"], quest_row["epic"], [{"tid": tid}], binding["party"], False
             )
+        done_when = ctx.conn.execute("SELECT done_when FROM parties WHERE name = ?", (binding["party"],)).fetchone()[
+            "done_when"
+        ]
+        if done_when and reason is None:
+            raise GuildError(
+                "party has a done condition ({}): --reason must state how the task serves it".format(done_when), 1
+            )
         payload = {"quest": quest, "tid": tid, "title": title}
         if no_sdd:
             payload["no_sdd"] = True

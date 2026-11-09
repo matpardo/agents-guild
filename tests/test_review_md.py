@@ -16,7 +16,11 @@ class ReviewMdTestCase(MergeQueueTestCase):
         for session, slug in (("sess-1", "qa"), ("sess-2", "qb")):
             self.run_cli(["quest", "add", slug, "--title", slug, "--no-epic"], session, self.repo_dir)
             for tid in ("T01", "T02", "T03", "T04", "T05", "T06"):
-                self.run_cli(["task", "add", "{}/{}".format(slug, tid), "--title", tid], session, self.repo_dir)
+                self.run_cli(
+                    ["task", "add", "{}/{}".format(slug, tid), "--title", tid, "--reason", "serves the goal"],
+                    session,
+                    self.repo_dir,
+                )
 
     def track_ready(self, session, number, task, **view):
         self.track(session, number, task, "ready")

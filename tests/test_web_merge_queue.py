@@ -23,7 +23,7 @@ class MergeQueueModelTestCase(MergeQueueTestCase):
         self.add_quest("sess-1", "qa", "demo-epic", "T03")
         self.add_quest("sess-2", "qb", "demo-epic", "T02")
         self.run_cli(["quest", "add", "qc", "--title", "qc", "--no-epic"], "sess-3", self.repo_dir)
-        self.run_cli(["task", "add", "qc/T01", "--title", "t"], "sess-3", self.repo_dir)
+        self.run_cli(["task", "add", "qc/T01", "--title", "t", "--reason", "serves the goal"], "sess-3", self.repo_dir)
         self.track("sess-1", 1, "qa/T03", "ready")
         self.track("sess-2", 2, "qb/T02", "ready")
         self.track("sess-2", 3, "qb/T02", "draft")

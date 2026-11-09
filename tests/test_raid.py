@@ -24,7 +24,11 @@ class RaidJoinLeaveTests(GuildTestCase):
     def setUp(self):
         super().setUp()
         self.repo_dir = self.register_project("acme", ["acme/app"])
-        self.run_cli(["party", "start", "alpha", "--reason", "test reason"], "sess-1", self.repo_dir)
+        self.run_cli(
+            ["party", "start", "alpha", "--reason", "test reason", "--goal", "test goal", "--done-when", "test done"],
+            "sess-1",
+            self.repo_dir,
+        )
 
     def test_join_requires_binding(self):
         code, out, err = self.run_cli(["raid", "join", "ci", "--ttl", "1h"], None, None)
@@ -150,8 +154,16 @@ class RaidNoticeTests(GuildTestCase):
     def setUp(self):
         super().setUp()
         self.repo_dir = self.register_project("acme", ["acme/app"])
-        self.run_cli(["party", "start", "alpha", "--reason", "test reason"], "sess-1", self.repo_dir)
-        self.run_cli(["party", "start", "beta", "--reason", "test reason"], "sess-2", self.repo_dir)
+        self.run_cli(
+            ["party", "start", "alpha", "--reason", "test reason", "--goal", "test goal", "--done-when", "test done"],
+            "sess-1",
+            self.repo_dir,
+        )
+        self.run_cli(
+            ["party", "start", "beta", "--reason", "test reason", "--goal", "test goal", "--done-when", "test done"],
+            "sess-2",
+            self.repo_dir,
+        )
 
     def test_notice_to_empty_raid_fails(self):
         code, out, err = self.run_cli(
@@ -234,7 +246,11 @@ class RaidNoticeTests(GuildTestCase):
 class RaidBoardTests(GuildTestCase):
     def test_board_shows_raid_scope_and_party_membership(self):
         repo_dir = self.register_project("acme", ["acme/app"])
-        self.run_cli(["party", "start", "alpha", "--reason", "test reason"], "sess-1", repo_dir)
+        self.run_cli(
+            ["party", "start", "alpha", "--reason", "test reason", "--goal", "test goal", "--done-when", "test done"],
+            "sess-1",
+            repo_dir,
+        )
         self.run_cli(["raid", "join", "ci", "--ttl", "5h"], "sess-1", repo_dir)
         self.run_cli(["notice", "create", "ci flaky", "--to", "raid:ci", "--ttl", "1h"], "sess-1", repo_dir)
         code, out, err = self.run_cli(["board"], None, None)
@@ -245,7 +261,11 @@ class RaidBoardTests(GuildTestCase):
 
     def test_board_shows_until_leave_membership(self):
         repo_dir = self.register_project("acme", ["acme/app"])
-        self.run_cli(["party", "start", "alpha", "--reason", "test reason"], "sess-1", repo_dir)
+        self.run_cli(
+            ["party", "start", "alpha", "--reason", "test reason", "--goal", "test goal", "--done-when", "test done"],
+            "sess-1",
+            repo_dir,
+        )
         self.run_cli(["raid", "join", "ci", "--until-leave"], "sess-1", repo_dir)
         code, out, err = self.run_cli(["board"], None, None)
         self.assertEqual(code, 0, err)
@@ -256,8 +276,16 @@ class BoardRaidFilterTests(GuildTestCase):
     def setUp(self):
         super().setUp()
         self.repo_dir = self.register_project("acme", ["acme/app"])
-        self.run_cli(["party", "start", "alpha", "--reason", "test reason"], "sess-1", self.repo_dir)
-        self.run_cli(["party", "start", "beta", "--reason", "test reason"], "sess-2", self.repo_dir)
+        self.run_cli(
+            ["party", "start", "alpha", "--reason", "test reason", "--goal", "test goal", "--done-when", "test done"],
+            "sess-1",
+            self.repo_dir,
+        )
+        self.run_cli(
+            ["party", "start", "beta", "--reason", "test reason", "--goal", "test goal", "--done-when", "test done"],
+            "sess-2",
+            self.repo_dir,
+        )
         self.run_cli(["raid", "join", "ci", "--ttl", "1h"], "sess-1", self.repo_dir)
 
     def test_shows_only_raid_member_parties(self):
@@ -268,10 +296,14 @@ class BoardRaidFilterTests(GuildTestCase):
 
     def test_shows_asks_only_from_raid_members(self):
         self.run_cli(["quest", "add", "demo-a", "--title", "A", "--no-epic"], "sess-1", self.repo_dir)
-        self.run_cli(["task", "add", "demo-a/T01", "--title", "First"], "sess-1", self.repo_dir)
+        self.run_cli(
+            ["task", "add", "demo-a/T01", "--title", "First", "--reason", "serves the goal"], "sess-1", self.repo_dir
+        )
         self.run_cli(["ask", "alpha ready?", "--context", "x", "--ref", "task:demo-a/T01"], "sess-1", self.repo_dir)
         self.run_cli(["quest", "add", "demo-b", "--title", "B", "--no-epic"], "sess-2", self.repo_dir)
-        self.run_cli(["task", "add", "demo-b/T01", "--title", "First"], "sess-2", self.repo_dir)
+        self.run_cli(
+            ["task", "add", "demo-b/T01", "--title", "First", "--reason", "serves the goal"], "sess-2", self.repo_dir
+        )
         self.run_cli(["ask", "beta ready?", "--context", "x", "--ref", "task:demo-b/T01"], "sess-2", self.repo_dir)
         code, out, err = self.run_cli(["board", "--raid", "ci"], None, None)
         self.assertEqual(code, 0, err)
@@ -316,7 +348,11 @@ class RaidPartyCloseTests(GuildTestCase):
     def setUp(self):
         super().setUp()
         self.repo_dir = self.register_project("acme", ["acme/app"])
-        self.run_cli(["party", "start", "alpha", "--reason", "test reason"], "sess-1", self.repo_dir)
+        self.run_cli(
+            ["party", "start", "alpha", "--reason", "test reason", "--goal", "test goal", "--done-when", "test done"],
+            "sess-1",
+            self.repo_dir,
+        )
         self.run_cli(["raid", "join", "ci", "--ttl", "5h"], "sess-1", self.repo_dir)
         self.run_cli(["raid", "join", "ci-ul", "--until-leave"], "sess-1", self.repo_dir)
 
@@ -352,8 +388,16 @@ class RaidWithoutLeadTests(GuildTestCase):
     def setUp(self):
         super().setUp()
         self.repo_dir = self.register_project("acme", ["acme/app"])
-        self.run_cli(["party", "start", "alpha", "--reason", "test reason"], "sess-1", self.repo_dir)
-        self.run_cli(["party", "start", "beta", "--reason", "test reason"], "sess-2", self.repo_dir)
+        self.run_cli(
+            ["party", "start", "alpha", "--reason", "test reason", "--goal", "test goal", "--done-when", "test done"],
+            "sess-1",
+            self.repo_dir,
+        )
+        self.run_cli(
+            ["party", "start", "beta", "--reason", "test reason", "--goal", "test goal", "--done-when", "test done"],
+            "sess-2",
+            self.repo_dir,
+        )
         self.run_cli(["raid", "join", "ci", "--ttl", "1h"], "sess-1", self.repo_dir)
         self.run_cli(["raid", "join", "ci", "--ttl", "1h"], "sess-2", self.repo_dir)
 
@@ -375,7 +419,9 @@ class RaidWithoutLeadTests(GuildTestCase):
 
     def test_member_ask_does_not_reach_other_members(self):
         self.run_cli(["quest", "add", "demo", "--title", "Demo", "--no-epic"], "sess-2", self.repo_dir)
-        self.run_cli(["task", "add", "demo/T01", "--title", "First"], "sess-2", self.repo_dir)
+        self.run_cli(
+            ["task", "add", "demo/T01", "--title", "First", "--reason", "serves the goal"], "sess-2", self.repo_dir
+        )
         self.run_cli(["ask", "ready?", "--context", "x", "--ref", "task:demo/T01"], "sess-2", self.repo_dir)
         code, out, err = self.run_cli(["inbox", "--since-last"], "sess-1", self.repo_dir)
         self.assertEqual(out, "")

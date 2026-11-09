@@ -104,7 +104,7 @@ class TaskRestoreTests(TaskDiscardTestCase):
 
     def test_restore_refuses_when_another_party_took_the_tid(self):
         self._discard("src/T01")
-        self._cli("sess-2", ["task", "add", "dst/T01", "--title", "Again"])
+        self._cli("sess-2", ["task", "add", "dst/T01", "--title", "Again", "--reason", "serves the goal"])
         code, out, err = self._cli("sess-1", ["task", "restore", "src/T01"])
         self.assertEqual(code, 1)
 
@@ -169,7 +169,9 @@ class DiscardedTaskIgnoredTests(TaskDiscardTestCase):
 
     def test_discarded_tid_is_free_for_another_party(self):
         self._discard("src/T01")
-        code, out, err = self._cli("sess-2", ["task", "add", "dst/T01", "--title", "Again"])
+        code, out, err = self._cli(
+            "sess-2", ["task", "add", "dst/T01", "--title", "Again", "--reason", "serves the goal"]
+        )
         self.assertEqual(code, 0, err)
 
 

@@ -21,7 +21,11 @@ class QueueCliTestCase(MergeQueueTestCase):
         self.add_quest("sess-2", "qb", "demo-epic", "T02")
         for session, slug in (("sess-3", "qc"), ("sess-4", "qd")):
             self.run_cli(["quest", "add", slug, "--title", slug, "--no-epic"], session, self.repo_dir)
-            self.run_cli(["task", "add", "{}/T01".format(slug), "--title", "t"], session, self.repo_dir)
+            self.run_cli(
+                ["task", "add", "{}/T01".format(slug), "--title", "t", "--reason", "serves the goal"],
+                session,
+                self.repo_dir,
+            )
         self.track("sess-1", 1, "qa/T01", "ready")
         self.track("sess-1", 3, "qa/T03", "ready")
         self.track("sess-2", 2, "qb/T02", "ready")
@@ -103,7 +107,7 @@ class OutputTests(QueueCliTestCase):
     def test_party_without_synced_data_says_never_synced(self):
         self.start_party("zeta", "sess-6")
         self.run_cli(["quest", "add", "qz", "--title", "qz", "--no-epic"], "sess-6", self.repo_dir)
-        self.run_cli(["task", "add", "qz/T01", "--title", "t"], "sess-6", self.repo_dir)
+        self.run_cli(["task", "add", "qz/T01", "--title", "t", "--reason", "serves the goal"], "sess-6", self.repo_dir)
         self.track("sess-6", 8, "qz/T01", "ready")
         code, out, err = self.queue(["--party", "zeta"], None)
         self.assertEqual(out.splitlines()[0], "merge queue \u00b7 party zeta \u00b7 never synced")
@@ -169,7 +173,11 @@ class OutputTests(QueueCliTestCase):
         self.assertIn("qc/T01 [draft] [needs-ask-answer]", out)
 
     def test_party_with_no_open_prs_says_so(self):
-        self.run_cli(["party", "start", "epsilon", "--reason", "test reason"], "sess-5", self.repo_dir)
+        self.run_cli(
+            ["party", "start", "epsilon", "--reason", "test reason", "--goal", "test goal", "--done-when", "test done"],
+            "sess-5",
+            self.repo_dir,
+        )
         code, out, err = self.queue(["--party", "epsilon"], None)
         self.assertEqual(code, 0, err)
         self.assertIn("no open tracked PRs", out)

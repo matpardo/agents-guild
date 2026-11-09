@@ -136,11 +136,23 @@ class ReviveBase(GuildTestCase):
         self.work_a.mkdir()
         self.work_b = self.repo_dir.parent / "work-b"
         self.work_b.mkdir()
-        self.run_cli(["party", "start", "alpha", "--reason", "test reason"], "sess-a", self.work_a)
-        self.run_cli(["party", "start", "beta", "--reason", "test reason"], "sess-b", self.work_b)
+        self.run_cli(
+            ["party", "start", "alpha", "--reason", "test reason", "--goal", "test goal", "--done-when", "test done"],
+            "sess-a",
+            self.work_a,
+        )
+        self.run_cli(
+            ["party", "start", "beta", "--reason", "test reason", "--goal", "test goal", "--done-when", "test done"],
+            "sess-b",
+            self.work_b,
+        )
         self.run_cli(["quest", "add", "demo", "--title", "Demo", "--no-epic"], "sess-a", self.work_a)
-        self.run_cli(["task", "add", "demo/T01", "--title", "First"], "sess-a", self.work_a)
-        self.run_cli(["task", "add", "demo/T02", "--title", "Second"], "sess-a", self.work_a)
+        self.run_cli(
+            ["task", "add", "demo/T01", "--title", "First", "--reason", "serves the goal"], "sess-a", self.work_a
+        )
+        self.run_cli(
+            ["task", "add", "demo/T02", "--title", "Second", "--reason", "serves the goal"], "sess-a", self.work_a
+        )
         self.conn = db.connect(paths.db_path())
 
     def _set_leader(self, party, cwd, mode):

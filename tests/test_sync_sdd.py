@@ -33,7 +33,11 @@ class SyncSddTests(GuildTestCase):
             "## T02 — Add validation\n\n**Deps:** T01\n\n**Status:** [ ] pending\n"
         )
         self._write_project_config()
-        self.run_cli(["party", "start", "alpha", "--reason", "test reason"], "sess-1", self.repo_dir)
+        self.run_cli(
+            ["party", "start", "alpha", "--reason", "test reason", "--goal", "test goal", "--done-when", "test done"],
+            "sess-1",
+            self.repo_dir,
+        )
 
     def _write_project_config(self, sdd_config=None):
         projects_dir = self.config_home / "guild" / "projects"
@@ -259,7 +263,11 @@ class SyncSddGitTests(GuildTestCase):
         self.repo_dir = self.project_root / "repo"
         self.repo_dir.mkdir(parents=True)
         self._write_project_config()
-        self.run_cli(["party", "start", "alpha", "--reason", "test reason"], "sess-1", self.repo_dir)
+        self.run_cli(
+            ["party", "start", "alpha", "--reason", "test reason", "--goal", "test goal", "--done-when", "test done"],
+            "sess-1",
+            self.repo_dir,
+        )
 
         self.origin_dir = self.root / "origin.git"
         _git(["init", "--bare", str(self.origin_dir)], self.root)

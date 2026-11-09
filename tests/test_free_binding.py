@@ -12,8 +12,30 @@ class ReasonOnStartTests(AdventurerTestCase):
         self.assertEqual(self.cli(["adventurer", "start", "fix typo"], "adv-1")[0], 2)
 
     def test_empty_or_sensitive_reason_is_refused(self):
-        self.assertEqual(self.cli(["party", "start", "alpha", "--reason", "  "], "sess-1")[0], 1)
-        self.assertEqual(self.cli(["party", "start", "alpha", "--reason", "mail me@x.com"], "sess-1")[0], 1)
+        self.assertEqual(
+            self.cli(
+                ["party", "start", "alpha", "--reason", "  ", "--goal", "test goal", "--done-when", "test done"],
+                "sess-1",
+            )[0],
+            1,
+        )
+        self.assertEqual(
+            self.cli(
+                [
+                    "party",
+                    "start",
+                    "alpha",
+                    "--reason",
+                    "mail me@x.com",
+                    "--goal",
+                    "test goal",
+                    "--done-when",
+                    "test done",
+                ],
+                "sess-1",
+            )[0],
+            1,
+        )
         self.assertEqual(
             self.cli(["adventurer", "start", "x", "--task", "demo-epic/T90", "--reason", "  "], "adv-1")[0], 1
         )
@@ -21,7 +43,10 @@ class ReasonOnStartTests(AdventurerTestCase):
         self.assertEqual(self.rows("SELECT * FROM adventurers"), [])
 
     def test_reason_is_stored_for_party_and_adventurer(self):
-        self.cli(["party", "start", "alpha", "--reason", "several PRs"], "sess-1")
+        self.cli(
+            ["party", "start", "alpha", "--reason", "several PRs", "--goal", "test goal", "--done-when", "test done"],
+            "sess-1",
+        )
         self.cli(["adventurer", "start", "fix typo", "--task", "demo-epic/T90", "--reason", "one PR job"], "adv-1")
         party = self.rows("SELECT reason, from_adventurer FROM parties")[0]
         self.assertEqual((party["reason"], party["from_adventurer"]), ("several PRs", None))
@@ -30,7 +55,9 @@ class ReasonOnStartTests(AdventurerTestCase):
         self.assertIn("reason: one PR job", out)
 
     def test_old_event_without_reason_projects_null(self):
-        self.cli(["party", "start", "alpha", "--reason", "r"], "sess-1")
+        self.cli(
+            ["party", "start", "alpha", "--reason", "r", "--goal", "test goal", "--done-when", "test done"], "sess-1"
+        )
         conn = db.connect(paths.db_path())
         self.addCleanup(conn.close)
         payload = json.loads(conn.execute("SELECT payload FROM events WHERE kind = 'party.started'").fetchone()[0])
@@ -46,7 +73,20 @@ class PromoteTests(AdventurerTestCase):
         self.cli(["pr", "track", "acme/app#2", "--task", "demo-epic/T02", "--what", "typo", "--waits", "r"], "adv-1")
 
     def test_promote_turns_the_adventurer_into_a_party_leader(self):
-        code, out, err = self.cli(["adventurer", "promote", "alpha", "--reason", "grew to several PRs"], "adv-1")
+        code, out, err = self.cli(
+            [
+                "adventurer",
+                "promote",
+                "alpha",
+                "--reason",
+                "grew to several PRs",
+                "--goal",
+                "test goal",
+                "--done-when",
+                "test done",
+            ],
+            "adv-1",
+        )
         self.assertEqual(code, 0, err)
         self.assertIn("adventurer 1 promoted to party 'alpha'", out)
         self.assertIn("demo-epic/T02", out)
@@ -68,7 +108,20 @@ class PromoteTests(AdventurerTestCase):
         self.assertIn("adventurers do one job", err)
 
     def test_promoted_pr_links_to_a_party_task(self):
-        self.cli(["adventurer", "promote", "alpha", "--reason", "grew to several PRs"], "adv-1")
+        self.cli(
+            [
+                "adventurer",
+                "promote",
+                "alpha",
+                "--reason",
+                "grew to several PRs",
+                "--goal",
+                "test goal",
+                "--done-when",
+                "test done",
+            ],
+            "adv-1",
+        )
         self.cli(["quest", "add", "q", "--title", "Q", "--no-epic", "--tasks", "A", "--titles", "First"], "adv-1")
         code, out, err = self.cli(["pr", "set", "acme/app#2", "--task", "q/A"], "adv-1")
         self.assertEqual(code, 0, err)
@@ -78,30 +131,64 @@ class PromoteTests(AdventurerTestCase):
     def test_promote_without_task_prints_no_task_hint(self):
         self.cli(["adventurer", "done", "--pending", "none"], "adv-1")
         self.start_health_job("adv-2")
-        code, out, err = self.cli(["adventurer", "promote", "beta", "--reason", "grew"], "adv-2")
+        code, out, err = self.cli(
+            ["adventurer", "promote", "beta", "--reason", "grew", "--goal", "test goal", "--done-when", "test done"],
+            "adv-2",
+        )
         self.assertEqual(code, 0, err)
         self.assertNotIn("add task", out)
 
     def test_promote_refuses_name_of_a_closed_party(self):
-        self.cli(["party", "start", "gone", "--reason", "r"], "sess-1")
+        self.cli(
+            ["party", "start", "gone", "--reason", "r", "--goal", "test goal", "--done-when", "test done"], "sess-1"
+        )
         self.assertEqual(self.cli(["party", "close", "--pending", "none"], "sess-1")[0], 0)
-        code, out, err = self.cli(["adventurer", "promote", "gone", "--reason", "r"], "adv-1")
+        code, out, err = self.cli(
+            ["adventurer", "promote", "gone", "--reason", "r", "--goal", "test goal", "--done-when", "test done"],
+            "adv-1",
+        )
         self.assertEqual(code, 1)
         self.assertIn("already exists", err)
 
     def test_promote_refusals(self):
-        self.assertEqual(self.cli(["adventurer", "promote", "alpha", "--reason", "r"], "sess-9")[0], 1)
-        self.cli(["party", "start", "taken", "--reason", "r"], "sess-1")
-        self.assertEqual(self.cli(["adventurer", "promote", "alpha", "--reason", "r"], "sess-1")[0], 1)
-        code, out, err = self.cli(["adventurer", "promote", "taken", "--reason", "r"], "adv-1")
+        self.assertEqual(
+            self.cli(
+                ["adventurer", "promote", "alpha", "--reason", "r", "--goal", "test goal", "--done-when", "test done"],
+                "sess-9",
+            )[0],
+            1,
+        )
+        self.cli(
+            ["party", "start", "taken", "--reason", "r", "--goal", "test goal", "--done-when", "test done"], "sess-1"
+        )
+        self.assertEqual(
+            self.cli(
+                ["adventurer", "promote", "alpha", "--reason", "r", "--goal", "test goal", "--done-when", "test done"],
+                "sess-1",
+            )[0],
+            1,
+        )
+        code, out, err = self.cli(
+            ["adventurer", "promote", "taken", "--reason", "r", "--goal", "test goal", "--done-when", "test done"],
+            "adv-1",
+        )
         self.assertEqual(code, 1)
         self.assertIn("already exists", err)
-        self.assertEqual(self.cli(["adventurer", "promote", "alpha", "--reason", " "], "adv-1")[0], 1)
+        self.assertEqual(
+            self.cli(
+                ["adventurer", "promote", "alpha", "--reason", " ", "--goal", "test goal", "--done-when", "test done"],
+                "adv-1",
+            )[0],
+            1,
+        )
         self.assertEqual(self.cli(["adventurer", "promote", "alpha"], "adv-1")[0], 2)
         self.assertEqual(self.rows("SELECT state FROM adventurers")[0]["state"], "active")
 
     def test_board_shows_origin_and_drops_the_promoted_adventurer(self):
-        self.cli(["adventurer", "promote", "alpha", "--reason", "grew"], "adv-1")
+        self.cli(
+            ["adventurer", "promote", "alpha", "--reason", "grew", "--goal", "test goal", "--done-when", "test done"],
+            "adv-1",
+        )
         conn = db.connect(paths.db_path())
         self.addCleanup(conn.close)
         ctx = context.RunContext(
@@ -148,24 +235,26 @@ class AdventurerBoardReasonTests(AdventurerTestCase):
 class AddReasonTests(AdventurerTestCase):
     def setUp(self):
         super().setUp()
-        self.cli(["party", "start", "alpha", "--reason", "r"], "sess-1")
+        self.cli(
+            ["party", "start", "alpha", "--reason", "r", "--goal", "test goal", "--done-when", "test done"], "sess-1"
+        )
 
     def _payloads(self, kind):
         return [
             json.loads(row["payload"]) for row in self.rows("SELECT payload FROM events WHERE kind = '{}'".format(kind))
         ]
 
-    def test_quest_and_task_add_record_reason_only_when_given(self):
+    def test_quest_add_records_reason_only_when_given_and_task_add_always(self):
         self.cli(["quest", "add", "q1", "--title", "Q", "--no-epic", "--reason", "found on the fly"], "sess-1")
         self.cli(["quest", "add", "q2", "--title", "Q", "--no-epic"], "sess-1")
         self.cli(["task", "add", "q1/T01", "--title", "t", "--reason", "needed"], "sess-1")
-        self.cli(["task", "add", "q1/T02", "--title", "t"], "sess-1")
+        self.cli(["task", "add", "q1/T02", "--title", "t", "--reason", "serves the goal"], "sess-1")
         quests = self._payloads("quest.added")
         self.assertEqual(quests[0]["reason"], "found on the fly")
         self.assertNotIn("reason", quests[1])
         tasks = self._payloads("task.added")
         self.assertEqual(tasks[0]["reason"], "needed")
-        self.assertNotIn("reason", tasks[1])
+        self.assertEqual(tasks[1]["reason"], "serves the goal")
 
     def test_invalid_reason_is_refused(self):
         self.assertEqual(self.cli(["quest", "add", "q1", "--title", "Q", "--no-epic", "--reason", " "], "sess-1")[0], 1)

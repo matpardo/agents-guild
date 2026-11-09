@@ -100,7 +100,14 @@ def _handle_init_project(ctx, args):
 def _handle_party_start(ctx, args):
     from guild.commands import party as party_commands
 
-    _print(party_commands.start(ctx, args.name, args.reason))
+    _print(party_commands.start(ctx, args.name, args.reason, args.goal, args.done_when))
+    return 0
+
+
+def _handle_party_set(ctx, args):
+    from guild.commands import party as party_commands
+
+    _print(party_commands.set_goal(ctx, args.name, args.goal, args.done_when))
     return 0
 
 
@@ -526,7 +533,7 @@ def _handle_adventurer_start(ctx, args):
 def _handle_adventurer_promote(ctx, args):
     from guild.commands import adventurer as adventurer_commands
 
-    _print(adventurer_commands.promote(ctx, args.party, args.reason))
+    _print(adventurer_commands.promote(ctx, args.party, args.reason, args.goal, args.done_when))
     return 0
 
 
@@ -1092,12 +1099,20 @@ def _add_party_parser(subparsers):
     start = actions.add_parser("start", help="start a party and bind this session to it")
     start.add_argument("name")
     start.add_argument("--reason", required=True, help="why this work is a party")
+    start.add_argument("--goal", required=True, help="what the party is for")
+    start.add_argument("--done-when", required=True, help="the condition that ends the party")
     start.set_defaults(handler=_handle_party_start)
 
     resume = actions.add_parser("resume", help="resume a party in this session")
     resume.add_argument("party")
     resume.add_argument("--session", help="session name; from a human terminal only")
     resume.set_defaults(handler=_handle_party_resume)
+
+    set_goal = actions.add_parser("set", help="change the goal or the done condition of a party")
+    set_goal.add_argument("name")
+    set_goal.add_argument("--goal", help="what the party is for")
+    set_goal.add_argument("--done-when", help="the condition that ends the party")
+    set_goal.set_defaults(handler=_handle_party_set)
 
     park = actions.add_parser("park", help="mark a party as waiting on something outside development")
     park.add_argument("name")
@@ -1361,6 +1376,8 @@ def _add_adventurer_parser(subparsers):
     promote = actions.add_parser("promote", help="turn this adventurer into a party led by this session")
     promote.add_argument("party")
     promote.add_argument("--reason", required=True, help="why the work outgrew one job")
+    promote.add_argument("--goal", required=True, help="what the party is for")
+    promote.add_argument("--done-when", required=True, help="the condition that ends the party")
     promote.set_defaults(handler=_handle_adventurer_promote)
 
     launch = actions.add_parser("launch", help="open a tmux window running a health job (human terminal only)")

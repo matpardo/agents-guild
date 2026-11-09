@@ -32,6 +32,7 @@ var REALM_FLAG_TEXT = "[flagged: looks like an instruction or a command] read it
   var RESOURCE_ITEMS_PER_CATEGORY = 10;
   var NO_RESOURCES_MESSAGE = "no samples yet; run guild resources collect";
   var EMPTY_REASON_MESSAGE = "write a reason first";
+  var EMPTY_GOAL_MESSAGE = "write the goal and the done condition first";
   var NOTICE_FORM_FOCUS_KEY = "notice-form";
   var NOTICE_TTLS = ["1h", "8h", "1d", "3d"];
   var RAID_PAUSE_CONFIRM_TEXT = "Pausing tells members to hand off.";
@@ -108,6 +109,10 @@ realmDoctorLines: [],
     partyParkDrafts: {},
     partyParkStatuses: {},
     partyParkBusy: {},
+    partyGoalOpen: {},
+    partyGoalDrafts: {},
+    partyGoalStatuses: {},
+    partyGoalBusy: {},
     compactStatus: "",
     compactBusy: false,
     collectStatus: "",
@@ -556,6 +561,38 @@ realmDoctorLines: [],
       return;
     }
     postPartyParkAction(partyName, "park", { reason: text });
+  }
+
+  function postPartyGoal(partyName, payload) {
+    if (sessionToken === null) {
+      state.partyGoalStatuses[partyName] = NO_SESSION_MESSAGE;
+      fetchBoard();
+      return;
+    }
+    state.partyGoalBusy[partyName] = true;
+    state.partyGoalStatuses[partyName] = "sending...";
+    fetchBoard();
+    sendPost("/api/parties/" + partyName + "/goal", payload).then(function (result) {
+      delete state.partyGoalBusy[partyName];
+      if (result.ok) {
+        delete state.partyGoalOpen[partyName];
+        delete state.partyGoalDrafts[partyName];
+        delete state.partyGoalStatuses[partyName];
+      } else {
+        state.partyGoalStatuses[partyName] = errorMessage(result.body);
+      }
+      fetchBoard();
+    });
+  }
+
+  function submitPartyGoal(partyName) {
+    var draft = state.partyGoalDrafts[partyName];
+    if (draft.goal.trim() === "" || draft.done_when.trim() === "") {
+      state.partyGoalStatuses[partyName] = EMPTY_GOAL_MESSAGE;
+      fetchBoard();
+      return;
+    }
+    postPartyGoal(partyName, { goal: draft.goal, done_when: draft.done_when });
   }
 
   function postAdventurerDismiss(adventurerId) {
@@ -3320,6 +3357,51 @@ realmDoctorLines: [],
     return controls;
   }
 
+  function renderPartyGoalInput(party, field, placeholder) {
+    var input = el("input");
+    input.type = "text";
+    input.className = "block-reason";
+    input.placeholder = placeholder;
+    input.value = state.partyGoalDrafts[party.name][field];
+    input.disabled = state.partyGoalBusy[party.name] === true;
+    input.dataset.focusKey = "goal-" + field + "|" + party.name;
+    input.addEventListener("input", function () {
+      state.partyGoalDrafts[party.name][field] = input.value;
+    });
+    return input;
+  }
+
+  function renderPartyGoalControls(party) {
+    var controls = el("span");
+    controls.className = "pr-block-controls";
+    var busy = state.partyGoalBusy[party.name] === true;
+    if (state.partyGoalOpen[party.name]) {
+      controls.appendChild(renderPartyGoalInput(party, "goal", "goal"));
+      controls.appendChild(renderPartyGoalInput(party, "done_when", "done when"));
+      var save = textEl("button", "Save goal");
+      save.type = "button";
+      save.disabled = busy;
+      save.addEventListener("click", function () {
+        submitPartyGoal(party.name);
+      });
+      controls.appendChild(save);
+    } else {
+      var edit = textEl("button", "Edit goal");
+      edit.type = "button";
+      edit.disabled = busy;
+      edit.addEventListener("click", function () {
+        state.partyGoalOpen[party.name] = true;
+        state.partyGoalDrafts[party.name] = { goal: party.goal || "", done_when: party.done_when || "" };
+        fetchBoard();
+      });
+      controls.appendChild(edit);
+    }
+    var status = textEl("span", state.partyGoalStatuses[party.name] || "");
+    status.className = "ask-status";
+    controls.appendChild(status);
+    return controls;
+  }
+
   function renderPartyWaits(waits) {
     if (waits.length === 0) {
       return null;
@@ -3347,8 +3429,13 @@ realmDoctorLines: [],
     if (party.reason !== null) {
       parts.push("reason: " + party.reason);
     }
-    if (parts.length === 0) {
-      return null;
+    if (party.goal === null) {
+      parts.push("no goal");
+    } else {
+      parts.push("goal: " + party.goal);
+    }
+    if (party.done_when !== null) {
+      parts.push("done when: " + party.done_when);
     }
     return parts.join(" · ");
   }
@@ -3409,6 +3496,7 @@ realmDoctorLines: [],
     }
     if (party.state !== "closed") {
       details.appendChild(renderPartyParkControls(party));
+      details.appendChild(renderPartyGoalControls(party));
     }
 
     if (party.caps !== null && party.caps.cap !== null) {

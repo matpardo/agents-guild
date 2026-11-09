@@ -301,7 +301,11 @@ class NoticeActionTests(NoticeWebTestCase):
 
     def test_marking_over_the_web_does_not_change_inbox_delivery(self):
         self._notice_action("seen")
-        self.run_cli(["party", "start", "beta", "--reason", "test reason"], "sess-2", self.repo_dir)
+        self.run_cli(
+            ["party", "start", "beta", "--reason", "test reason", "--goal", "test goal", "--done-when", "test done"],
+            "sess-2",
+            self.repo_dir,
+        )
         code, out, err = self.run_cli(["inbox", "--since-last"], "sess-2", self.repo_dir)
         self.assertIn("pipeline down", out)
 

@@ -25,6 +25,7 @@ class _Entry:
         cwd,
         mode,
         transcript,
+        goal,
     ):
         self.party = party
         self.project = project
@@ -37,6 +38,7 @@ class _Entry:
         self.cwd = cwd
         self.mode = mode
         self.transcript = transcript
+        self.goal = goal
 
     def resumable(self):
         return self.transcript is not None
@@ -148,6 +150,7 @@ def _entry(ctx, transcripts_dir, party):
         cwd,
         mode,
         None if party["state"] == "awaiting-leader" else transcript,
+        party["goal"],
     )
 
 
@@ -168,6 +171,7 @@ def _listing_lines(entries, with_commands):
         )
         lines.append("   quest: {} | last activity: {}".format(entry.quests, entry.last_activity or "-"))
         lines.append("   status: {}".format(entry.status))
+        lines.append("   goal: {}".format(entry.goal or "none"))
         lines.append("   session: {} | mode: {}".format(entry.session_name or "-", entry.mode_label()))
         lines.append("   cwd: {}".format(entry.cwd or "unknown"))
         if with_commands:

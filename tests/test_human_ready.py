@@ -153,7 +153,9 @@ class SyncFreshnessFactsTests(MergeQueueTestCase):
         super().setUp()
         self.start_party("alpha", "sess-1")
         self.run_cli(["quest", "add", "demo", "--title", "Demo", "--no-epic"], "sess-1", self.repo_dir)
-        self.run_cli(["task", "add", "demo/T01", "--title", "First"], "sess-1", self.repo_dir)
+        self.run_cli(
+            ["task", "add", "demo/T01", "--title", "First", "--reason", "serves the goal"], "sess-1", self.repo_dir
+        )
         self.track("sess-1", 1, "demo/T01", "ready")
 
     def _view(self, **extra):
@@ -260,7 +262,9 @@ class ChecksBillingTests(MergeQueueTestCase):
         super().setUp()
         self.start_party("alpha", "sess-1")
         self.run_cli(["quest", "add", "demo", "--title", "Demo", "--no-epic"], "sess-1", self.repo_dir)
-        self.run_cli(["task", "add", "demo/T01", "--title", "First"], "sess-1", self.repo_dir)
+        self.run_cli(
+            ["task", "add", "demo/T01", "--title", "First", "--reason", "serves the goal"], "sess-1", self.repo_dir
+        )
         self.track("sess-1", 1, "demo/T01", "ready")
 
     def _view(self, **extra):
@@ -378,7 +382,9 @@ class TraceValidatorSyncTests(MergeQueueTestCase):
         self._verdict(0, "")
         self.start_party("alpha", "sess-1")
         self.run_cli(["quest", "add", "demo", "--title", "Demo", "--no-epic"], "sess-1", self.repo_dir)
-        self.run_cli(["task", "add", "demo/T01", "--title", "First"], "sess-1", self.repo_dir)
+        self.run_cli(
+            ["task", "add", "demo/T01", "--title", "First", "--reason", "serves the goal"], "sess-1", self.repo_dir
+        )
         self.track("sess-1", 1, "demo/T01", "ready")
 
     def _verdict(self, code, message):

@@ -11,9 +11,13 @@ class AskDetailEndpointTests(WebServerTestCase):
     def setUp(self):
         super().setUp()
         repo_dir = self.register_project("acme", ["acme/app"])
-        self.run_cli(["party", "start", "alpha", "--reason", "test reason"], "sess-1", repo_dir)
+        self.run_cli(
+            ["party", "start", "alpha", "--reason", "test reason", "--goal", "test goal", "--done-when", "test done"],
+            "sess-1",
+            repo_dir,
+        )
         self.run_cli(["quest", "add", "demo", "--title", "Demo", "--no-epic"], "sess-1", repo_dir)
-        self.run_cli(["task", "add", "demo/T01", "--title", "First"], "sess-1", repo_dir)
+        self.run_cli(["task", "add", "demo/T01", "--title", "First", "--reason", "serves the goal"], "sess-1", repo_dir)
         self.run_cli(["ask", "Which?", "--context", "ctx", "--ref", "task:demo/T01"], "sess-1", repo_dir)
         self.host = "127.0.0.1:{}".format(self.port)
 

@@ -24,7 +24,11 @@ class DriftTestCase(GuildTestCase):
         self.sdd_root = self.project_root / "sdd-docs"
         self._write_project_config()
         self.write_session(1, "sess-1", "alpha-session")
-        self.run_cli(["party", "start", "alpha", "--reason", "test reason"], "sess-1", self.repo_dir)
+        self.run_cli(
+            ["party", "start", "alpha", "--reason", "test reason", "--goal", "test goal", "--done-when", "test done"],
+            "sess-1",
+            self.repo_dir,
+        )
         self.conn = db.connect(paths.db_path())
 
     def _write_project_config(self):
@@ -310,14 +314,22 @@ class PrClosedUnmergedTests(DriftTestCase):
 
 class PartyWithoutLeaderTests(DriftTestCase):
     def test_active_party_with_no_matching_session_is_a_finding(self):
-        self.run_cli(["party", "start", "beta", "--reason", "test reason"], "sess-2", self.repo_dir)
+        self.run_cli(
+            ["party", "start", "beta", "--reason", "test reason", "--goal", "test goal", "--done-when", "test done"],
+            "sess-2",
+            self.repo_dir,
+        )
         code, out, err = self._drift()
         self.assertEqual(code, 0, err)
         self.assertIn("party has no running leader (1)", out)
         self.assertIn("party beta: leader session not running: resume or hand off", out)
 
     def test_awaiting_leader_party_is_not_a_finding(self):
-        self.run_cli(["party", "start", "beta", "--reason", "test reason"], "sess-2", self.repo_dir)
+        self.run_cli(
+            ["party", "start", "beta", "--reason", "test reason", "--goal", "test goal", "--done-when", "test done"],
+            "sess-2",
+            self.repo_dir,
+        )
         self.run_cli(
             ["handoff", "--in-flight", "still going", "--learned", "nothing new"],
             "sess-2",
@@ -400,19 +412,27 @@ class QuestTaskNotInSddTests(DriftTestCase):
         )
 
     def test_task_added_to_an_epic_quest_but_not_to_the_sdd_is_a_finding(self):
-        self.run_cli(["task", "add", "wave9/T09", "--title", "Extra"], "sess-1", self.repo_dir)
+        self.run_cli(
+            ["task", "add", "wave9/T09", "--title", "Extra", "--reason", "serves the goal"], "sess-1", self.repo_dir
+        )
         code, out, err = self._drift("wave9")
         self.assertEqual(code, 0, err)
         self.assertIn("quest task not in SDD (1)", out)
         self.assertIn("task:wave9/T09: not in epic wave9 tasks.md, add it", out)
 
     def test_no_sdd_task_is_not_a_finding(self):
-        self.run_cli(["task", "add", "wave9/T09", "--title", "Extra", "--no-sdd"], "sess-1", self.repo_dir)
+        self.run_cli(
+            ["task", "add", "wave9/T09", "--title", "Extra", "--no-sdd", "--reason", "serves the goal"],
+            "sess-1",
+            self.repo_dir,
+        )
         code, out, err = self._drift("wave9")
         self.assertNotIn("quest task not in SDD", out)
 
     def test_discarded_task_missing_from_the_sdd_is_not_a_finding(self):
-        self.run_cli(["task", "add", "wave9/T09", "--title", "Extra"], "sess-1", self.repo_dir)
+        self.run_cli(
+            ["task", "add", "wave9/T09", "--title", "Extra", "--reason", "serves the goal"], "sess-1", self.repo_dir
+        )
         self.run_cli(["task", "discard", "wave9/T09", "--reason", "mistake"], "sess-1", self.repo_dir)
         code, out, err = self._drift("wave9")
         self.assertNotIn("quest task not in SDD", out)
@@ -425,7 +445,11 @@ class QuestTaskNotInSddTests(DriftTestCase):
         self.assertIn("task:wave9/T01 discarded but still listed in epic wave9 tasks.md", out)
 
     def test_discarded_no_sdd_task_is_not_a_finding(self):
-        self.run_cli(["task", "add", "wave9/T09", "--title", "Extra", "--no-sdd"], "sess-1", self.repo_dir)
+        self.run_cli(
+            ["task", "add", "wave9/T09", "--title", "Extra", "--no-sdd", "--reason", "serves the goal"],
+            "sess-1",
+            self.repo_dir,
+        )
         self.run_cli(["task", "discard", "wave9/T09", "--reason", "mistake"], "sess-1", self.repo_dir)
         code, out, err = self._drift("wave9")
         self.assertNotIn("discarded task in SDD", out)
@@ -443,21 +467,31 @@ class QuestTaskNotInSddTests(DriftTestCase):
         self.assertIn("discarded but still listed", err)
 
     def test_quest_done_passes_with_a_done_no_sdd_task(self):
-        self.run_cli(["task", "add", "wave9/T09", "--title", "Extra", "--no-sdd"], "sess-1", self.repo_dir)
+        self.run_cli(
+            ["task", "add", "wave9/T09", "--title", "Extra", "--no-sdd", "--reason", "serves the goal"],
+            "sess-1",
+            self.repo_dir,
+        )
         self.run_cli(["task", "done", "wave9/T09"], "sess-1", self.repo_dir)
         self.run_cli(["task", "done", "wave9/T01"], "sess-1", self.repo_dir)
         code, out, err = self.run_cli(["quest", "done", "wave9"], "sess-1", self.repo_dir)
         self.assertNotIn("not in epic", err)
 
     def test_quest_done_is_refused_while_a_no_sdd_task_is_open(self):
-        self.run_cli(["task", "add", "wave9/T09", "--title", "Extra", "--no-sdd"], "sess-1", self.repo_dir)
+        self.run_cli(
+            ["task", "add", "wave9/T09", "--title", "Extra", "--no-sdd", "--reason", "serves the goal"],
+            "sess-1",
+            self.repo_dir,
+        )
         self.run_cli(["task", "done", "wave9/T01"], "sess-1", self.repo_dir)
         code, out, err = self.run_cli(["quest", "done", "wave9"], "sess-1", self.repo_dir)
         self.assertEqual(code, 1)
         self.assertIn("T09", err)
 
     def test_task_present_in_the_sdd_is_not_a_finding(self):
-        self.run_cli(["task", "add", "wave9/T09", "--title", "Extra"], "sess-1", self.repo_dir)
+        self.run_cli(
+            ["task", "add", "wave9/T09", "--title", "Extra", "--reason", "serves the goal"], "sess-1", self.repo_dir
+        )
         self._write_epic(
             "wave9",
             "status: active\n",
@@ -470,12 +504,14 @@ class QuestTaskNotInSddTests(DriftTestCase):
 
     def test_no_epic_quest_task_is_not_a_finding(self):
         self.run_cli(["quest", "add", "free", "--title", "Free", "--no-epic"], "sess-1", self.repo_dir)
-        self.run_cli(["task", "add", "free/A", "--title", "A"], "sess-1", self.repo_dir)
+        self.run_cli(["task", "add", "free/A", "--title", "A", "--reason", "serves the goal"], "sess-1", self.repo_dir)
         code, out, err = self._drift("wave9")
         self.assertNotIn("quest task not in SDD", out)
 
     def test_quest_done_is_refused_while_the_task_is_missing_from_the_sdd(self):
-        self.run_cli(["task", "add", "wave9/T09", "--title", "Extra"], "sess-1", self.repo_dir)
+        self.run_cli(
+            ["task", "add", "wave9/T09", "--title", "Extra", "--reason", "serves the goal"], "sess-1", self.repo_dir
+        )
         self.run_cli(["task", "done", "wave9/T09"], "sess-1", self.repo_dir)
         self.run_cli(["task", "done", "wave9/T01"], "sess-1", self.repo_dir)
         code, out, err = self.run_cli(["quest", "done", "wave9"], "sess-1", self.repo_dir)
@@ -695,7 +731,9 @@ class CardLagTests(DriftTestCase):
     def test_relinked_merged_pr_drops_the_card_finding(self):
         self._record_cards([self._card("DEMO-90", "indeterminate", status="In Progress")])
         self.run_cli(["quest", "add", "loose", "--title", "Loose", "--no-epic"], "sess-1", self.repo_dir)
-        self.run_cli(["task", "add", "loose/T01", "--title", "Spec"], "sess-1", self.repo_dir)
+        self.run_cli(
+            ["task", "add", "loose/T01", "--title", "Spec", "--reason", "serves the goal"], "sess-1", self.repo_dir
+        )
         self._track_pr(9, "wave9", "T01")
         self._set_pr_lifecycle(9, "merged")
         code, out, err = self.run_cli(["pr", "set", "acme/app#9", "--task", "loose/T01"], "sess-1", self.repo_dir)

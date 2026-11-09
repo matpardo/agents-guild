@@ -5,7 +5,11 @@ class PartyDriftTestCase(DriftTestCase):
     def setUp(self):
         super().setUp()
         self.write_session(2, "sess-2", "beta-session")
-        self.run_cli(["party", "start", "beta", "--reason", "test reason"], "sess-2", self.repo_dir)
+        self.run_cli(
+            ["party", "start", "beta", "--reason", "test reason", "--goal", "test goal", "--done-when", "test done"],
+            "sess-2",
+            self.repo_dir,
+        )
         self._write_epic(
             "wave9",
             "status: active\n",
@@ -69,7 +73,9 @@ class NextDriftTests(PartyDriftTestCase):
     def test_drift_is_the_item_before_the_next_task(self):
         self._record_cards([self._card("DEMO-90", "new")])
         self._start_task()
-        self.run_cli(["task", "add", "wave9/T02", "--title", "Second"], "sess-1", self.repo_dir)
+        self.run_cli(
+            ["task", "add", "wave9/T02", "--title", "Second", "--reason", "serves the goal"], "sess-1", self.repo_dir
+        )
         code, out, err = self.run_cli(["next"], "sess-1", self.repo_dir)
         self.assertIn("update tracker/SDD: task:wave9/T01 started", out)
         self.assertNotIn("T02", out)
@@ -77,7 +83,9 @@ class NextDriftTests(PartyDriftTestCase):
     def test_all_lists_drift_and_task(self):
         self._record_cards([self._card("DEMO-90", "new")])
         self._start_task()
-        self.run_cli(["task", "add", "wave9/T02", "--title", "Second"], "sess-1", self.repo_dir)
+        self.run_cli(
+            ["task", "add", "wave9/T02", "--title", "Second", "--reason", "serves the goal"], "sess-1", self.repo_dir
+        )
         code, out, err = self.run_cli(["next", "--all"], "sess-1", self.repo_dir)
         self.assertIn("update tracker/SDD: ", out)
         self.assertIn("task wave9/T02", out)

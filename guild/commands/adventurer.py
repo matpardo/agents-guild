@@ -216,12 +216,14 @@ def done(ctx, pending, lifecycle_runner):
     return "\n".join(lines)
 
 
-def promote(ctx, name, reason):
+def promote(ctx, name, reason, goal, done_when):
     adventurer = identity.resolve_adventurer(ctx.conn, ctx.session_id)
     if adventurer is None:
         raise GuildError("session is not an active adventurer", 1)
     party_commands.require_new_name(ctx.conn, name)
     pii.validate_reason(reason, ctx.projects_dir, adventurer["project"])
+    party_commands.validate_goal_field(goal, "--goal", ctx.projects_dir, adventurer["project"])
+    party_commands.validate_goal_field(done_when, "--done-when", ctx.projects_dir, adventurer["project"])
     with db.writing(ctx.conn):
         events.record(
             ctx.conn,
@@ -234,7 +236,7 @@ def promote(ctx, name, reason):
             "local",
             {"id": adventurer["id"], "party": name},
         )
-        party_commands.record_started(ctx, name, adventurer["project"], reason, adventurer["id"])
+        party_commands.record_started(ctx, name, adventurer["project"], reason, goal, done_when, adventurer["id"])
     message = "adventurer {} promoted to party '{}', generation 1".format(adventurer["id"], name)
     if adventurer["task"] is None:
         return message

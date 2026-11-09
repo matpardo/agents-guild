@@ -29,9 +29,13 @@ class DailyTasksTests(QuestBoardTestCase):
 
     def setUp(self):
         super().setUp()
-        self.at(20, ["party", "start", "alpha", "--reason", "r"], "sess-1")
+        self.at(
+            20,
+            ["party", "start", "alpha", "--reason", "r", "--goal", "test goal", "--done-when", "test done"],
+            "sess-1",
+        )
         self.add_quest(16, "old", "sess-1")
-        self.at(3, ["task", "add", "old/T03", "--title", "three"], "sess-1")
+        self.at(3, ["task", "add", "old/T03", "--title", "three", "--reason", "serves the goal"], "sess-1")
         self.at(3, ["task", "done", "old/T01", "--summary", "s"], "sess-1")
         self.at(0, ["task", "done", "old/T03", "--summary", "s"], "sess-1")
 
@@ -60,7 +64,9 @@ class DailyTasksTests(QuestBoardTestCase):
         self.assertEqual(created_line.split()[-2], "0")
 
     def test_other_party_tasks_stay_out_of_the_party_counts(self):
-        self.at(10, ["party", "start", "beta", "--reason", "r"], "sess-2")
+        self.at(
+            10, ["party", "start", "beta", "--reason", "r", "--goal", "test goal", "--done-when", "test done"], "sess-2"
+        )
         self.add_quest(1, "fresh", "sess-2")
         self.assertEqual(sum(day["created"] for day in self.party_days("alpha")), 1)
         self.assertEqual(self.party_days("beta")[-2]["created"], 2)
@@ -75,7 +81,9 @@ class DailyTasksTests(QuestBoardTestCase):
         self.assertEqual(done_line.split()[1:], ["-"] * 11 + ["1", "-", "-", "1"])
 
     def test_raid_board_sums_its_member_parties(self):
-        self.at(10, ["party", "start", "beta", "--reason", "r"], "sess-2")
+        self.at(
+            10, ["party", "start", "beta", "--reason", "r", "--goal", "test goal", "--done-when", "test done"], "sess-2"
+        )
         self.add_quest(3, "fresh", "sess-2")
         self.at(1, ["raid", "join", "ci", "--ttl", "30d"], "sess-1")
         self.at(1, ["raid", "join", "ci", "--ttl", "30d"], "sess-2")
@@ -86,7 +94,9 @@ class DailyTasksTests(QuestBoardTestCase):
         self.assertEqual(created_line.split()[-5], "-")
 
     def test_days_before_the_party_started_show_x(self):
-        self.at(2, ["party", "start", "beta", "--reason", "r"], "sess-2")
+        self.at(
+            2, ["party", "start", "beta", "--reason", "r", "--goal", "test goal", "--done-when", "test done"], "sess-2"
+        )
         self.assertEqual([day["existed"] for day in self.party_days("beta")], [False] * 12 + [True] * 3)
         out = self.board(["--party", "beta"])
         created_line = next(line for line in out.splitlines() if line.strip().startswith("created"))
@@ -98,7 +108,9 @@ class DailyTasksTests(QuestBoardTestCase):
         self.assertTrue(all(day["existed"] for day in self.party_days("alpha")))
 
     def test_raid_day_exists_when_any_member_existed(self):
-        self.at(2, ["party", "start", "beta", "--reason", "r"], "sess-2")
+        self.at(
+            2, ["party", "start", "beta", "--reason", "r", "--goal", "test goal", "--done-when", "test done"], "sess-2"
+        )
         self.at(1, ["raid", "join", "ci", "--ttl", "30d"], "sess-1")
         self.at(1, ["raid", "join", "ci", "--ttl", "30d"], "sess-2")
         created_line = next(
@@ -121,7 +133,9 @@ class ProgressLinesTests(DailyTasksTests):
         self.assertLess(lines.index("PROGRESS · 2/3 tasks done (67%)"), lines.index("TASKS PER DAY · last 15 days"))
 
     def test_raid_board_sums_progress_of_members(self):
-        self.at(10, ["party", "start", "beta", "--reason", "r"], "sess-2")
+        self.at(
+            10, ["party", "start", "beta", "--reason", "r", "--goal", "test goal", "--done-when", "test done"], "sess-2"
+        )
         self.add_quest(3, "fresh", "sess-2")
         self.at(1, ["raid", "join", "ci", "--ttl", "30d"], "sess-1")
         self.at(1, ["raid", "join", "ci", "--ttl", "30d"], "sess-2")
