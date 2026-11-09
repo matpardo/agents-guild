@@ -187,6 +187,7 @@ class BoardEndpointTests(WebServerTestCase):
                 "asks",
                 "notices",
                 "ideas",
+                "exported_ideas",
                 "adventurers",
                 "health_jobs",
                 "solo_players",

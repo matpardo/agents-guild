@@ -96,3 +96,17 @@ updated: 2026-10-31
 - [x] The adventurer must be active to be linked; unlink is refused once the adventurer tracks a PR.
 - [x] `guild ideas`, the board and the web show the adventurer next to the parties; the final report lists the idea.
 - [x] `guild adventurer promote` moves the links to the new party.
+
+## T09 — Move ideas to another guild through a file
+
+**Depends on:** T08
+**Status:** [x] done
+
+**What:** `guild idea export` writes ideas, by id or by project, to an md file and hides them as exported; `idea import` reads such a file all or nothing and writes a receipt; `idea confirm-export` deletes the exported ideas the receipt lists; `idea unexport` brings one back. Human only, from the CLI and the web.
+
+**Acceptance:**
+- [x] An export never writes the requester or the links, refuses linked or already exported ideas, and a failed write leaves no idea hidden.
+- [x] An import is atomic, skips uuids already held and reports them, and the receipt lists the uuids this guild holds as live ideas.
+- [x] A confirmation deletes only ideas marked exported and reports the uuids it ignored.
+- [x] Exported ideas leave `guild ideas` and the board count, and `idea link` refuses them.
+- [x] Agents are denied the four commands by the hook, and marks and uuids survive `guild rebuild`.

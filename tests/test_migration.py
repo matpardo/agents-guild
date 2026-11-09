@@ -380,6 +380,25 @@ class MigrationTests(GuildTestCase):
         columns = {row["name"] for row in conn.execute("PRAGMA table_info(idea_adventurer_links)").fetchall()}
         self.assertEqual(columns, {"idea_id", "adventurer", "linked_at"})
 
+    def test_old_ideas_table_gains_transfer_columns(self):
+        db_path = self.data_home / "guild.db"
+        raw = sqlite3.connect(str(db_path))
+        raw.execute(
+            "CREATE TABLE ideas (id INTEGER PRIMARY KEY, title TEXT NOT NULL, description TEXT NOT NULL,"
+            " requester TEXT, deadline TEXT, project TEXT, created_at TEXT NOT NULL, updated_at TEXT NOT NULL)"
+        )
+        raw.execute("INSERT INTO ideas VALUES (1, 't', 'd', NULL, NULL, NULL, '2026-01-01', '2026-01-01')")
+        raw.commit()
+        raw.close()
+
+        conn = db.connect(db_path)
+        conn.close()
+        again = db.connect(db_path)
+
+        row = again.execute("SELECT * FROM ideas WHERE id = 1").fetchone()
+        self.assertEqual((row["uuid"], row["exported_to"], row["exported_at"]), (None, None, None))
+        self.assertEqual(row["title"], "t")
+
     def test_raid_members_lead_column_is_dropped_and_rows_kept(self):
         db_path = self.data_home / "guild.db"
         legacy = sqlite3.connect(str(db_path))

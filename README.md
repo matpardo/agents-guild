@@ -201,7 +201,11 @@ guild idea edit <id> [--title ..] [--description ..] [--requester ..|--no-reques
 guild idea delete <id>
 guild idea link <id> [--party <name> | --adventurer <id>]     # a session links itself (party or adventurer); the human terminal needs one flag
 guild idea unlink <id> [--party <name> | --adventurer <id>]   # refused once the party or adventurer tracks a PR
-guild ideas [<id> | --project <name>]   # sorted by deadline, no deadline last; overdue marked; <id> shows one in full
+guild ideas [<id> | --project <name>] [--exported]   # sorted by deadline, no deadline last; overdue marked; <id> shows one in full; --exported lists the exported ones
+guild idea export (<id>... | --project <name>) --to <destination> --out <file.md>   # human only; the ideas leave the list
+guild idea unexport <id>                         # human only; brings an exported idea back
+guild idea import <file.md> --receipt <receipt.md> [--project <name>]   # human only; writes the receipt
+guild idea confirm-export <receipt.md>           # human only; deletes the exported ideas the receipt confirms
 
 guild adventurer start "<job>" --task <epic>/<tid> --reason "<why>"   # this session becomes an adventurer; no permission prompt; --task required
 guild adventurer start --job <name> --reason "<why>"    # the same for a health job of the project config; no job text, no --task
@@ -1348,6 +1352,35 @@ card lists its ideas. `POST /api/ideas/<id>/link` and `/unlink` (body
 multi-line text box and its line breaks are kept when the idea is shown. Each
 idea shows its creation date and, after an edit, its update date; an idea with
 no linked party shows `not linked yet` (in the web and in `guild ideas`).
+
+#### Moving ideas to another guild
+
+`guild idea export` writes ideas to a new `.md` file (a heading plus one fenced
+JSON block) and hides them as exported; it never deletes them. The requester
+and the links are not written, because the requester may name a real person.
+With ids it refuses an idea that is already exported or linked to an open party or an
+active adventurer; with `--project` it takes every idea of that project and
+lists the linked ones it skipped. Each idea gets a uuid that stays the same on a
+later export. The file is at most 256 KiB, so `guild realm send` can carry it;
+a plain copy works too. `guild idea import <file> --receipt <receipt.md>` reads
+the file in one transaction (all or nothing), gives each idea a new local id,
+skips the uuids it already holds, flags text that looks like an instruction and
+writes a receipt with the uuids this guild now holds. Carry the receipt back and
+run `guild idea confirm-export <receipt.md>`: it deletes the exported ideas the
+receipt lists and reports the uuids it ignored. Check the sender that `guild
+realm fetch` prints first; there is no undo after the confirmation.
+`guild idea unexport <id>` brings an idea back, and warns that both guilds hold
+it if the other side already imported it. Exported ideas leave `guild ideas`
+and the board count; `guild ideas --exported` lists them and `idea link` refuses
+them. Agents never run these four commands.
+
+The web ideas section has an `Export` button on each idea and an export project
+action, both next to a destination field: the file is saved in `idea-exports/`
+under the guild data directory and its path is shown. A paste form imports an
+export file (the receipt is saved there too, path shown), another confirms a
+pasted receipt after a prompt, and a collapsed `exported` list offers `Unexport`
+and `Delete`. The POST routes are `/api/ideas/export`, `/api/ideas/export-project`,
+`/api/ideas/import`, `/api/ideas/confirm-export` and `/api/ideas/<id>/unexport`.
 
 ### Adventurers
 

@@ -25,6 +25,7 @@ Ideas arrive while other work is in flight. Today they go on paper or in chat an
 - The board lists ideas by deadline ascending, no deadline last, and marks the overdue ones.
 - Agents delete an idea once they turn it into code, SDD, a card or a quest.
 - An idea references the parties and adventurers working on it, and each of them references its ideas, through link entities, from the CLI and the web.
+- The human moves ideas to another guild through an md file: `idea export` hides them, `idea import` writes a receipt, `idea confirm-export` deletes the matching exported ideas; the requester and the links never leave.
 - `README.md` and `GUILD.md` change with the code.
 
 ## Out of scope

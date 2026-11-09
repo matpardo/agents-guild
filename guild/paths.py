@@ -62,6 +62,10 @@ def realm_hub_store_dir():
     return data_dir() / "realm-hub"
 
 
+def idea_exports_dir():
+    return data_dir() / "idea-exports"
+
+
 def handoffs_dir():
     return data_dir() / "handoffs"
 

@@ -44,6 +44,7 @@ _STATIC_FILES = {
 _PAGE_FILES = ("index.html", "history.html", "progress.html")
 
 _MAX_BODY_BYTES = 16384
+_PASTED_FILE_ACTIONS = ("import-idea", "confirm-export-idea")
 _INTERNAL_ERROR = {"error": "internal error"}
 _ASK_ACTION_RE = re.compile(r"^/api/asks/([^/]+)/(answer|dismiss)$")
 _NOTICE_ACTION_RE = re.compile(r"^/api/notices/([^/]+)/(seen|unseen)$")
@@ -56,8 +57,12 @@ _TASK_DISCARD_RE = re.compile(r"^/api/quests/([^/]+)/tasks/([^/]+)/(discard|rest
 _PARTY_HANDOFF_RE = re.compile(r"^/api/parties/([^/]+)/hand-off$")
 _PARTY_GOAL_RE = re.compile(r"^/api/parties/([^/]+)/goal$")
 _PARTY_PARK_RE = re.compile(r"^/api/parties/([^/]+)/(park|unpark)$")
-_IDEA_ACTION_RE = re.compile(r"^/api/ideas/([^/]+)/(edit|delete|link|unlink)$")
+_IDEA_ACTION_RE = re.compile(r"^/api/ideas/([^/]+)/(edit|delete|link|unlink|unexport)$")
 _IDEA_CREATE_PATH = "/api/ideas/create"
+_IDEA_EXPORT_PATH = "/api/ideas/export"
+_IDEA_EXPORT_PROJECT_PATH = "/api/ideas/export-project"
+_IDEA_IMPORT_PATH = "/api/ideas/import"
+_IDEA_CONFIRM_EXPORT_PATH = "/api/ideas/confirm-export"
 _QUEST_ACTION_RE = re.compile(r"^/api/quests/([^/]+)/(take|release)$")
 _QUEST_CREATE_PATH = "/api/quests/create-open"
 _ADVENTURER_DISMISS_RE = re.compile(r"^/api/adventurers/([^/]+)/dismiss$")
@@ -215,11 +220,50 @@ def _run_idea_create(payload):
         ctx.conn.close()
 
 
+def _idea_export_file(prefix):
+    directory = paths.ensure_private_dir(paths.idea_exports_dir())
+    return str(directory / "{}-{}.md".format(prefix, secrets.token_hex(4)))
+
+
+def _run_idea_export(payload):
+    ctx = _action_context()
+    try:
+        return idea_commands.export_ids(ctx, payload["ids"], payload["destination"], _idea_export_file("ideas"))
+    finally:
+        ctx.conn.close()
+
+
+def _run_idea_export_project(payload):
+    ctx = _action_context()
+    try:
+        return idea_commands.export_project(ctx, payload["project"], payload["destination"], _idea_export_file("ideas"))
+    finally:
+        ctx.conn.close()
+
+
+def _run_idea_import(payload):
+    ctx = _action_context()
+    try:
+        return idea_commands.import_text(ctx, payload["text"], _idea_export_file("receipt"), payload.get("project"))
+    finally:
+        ctx.conn.close()
+
+
+def _run_idea_confirm_export(payload):
+    ctx = _action_context()
+    try:
+        return idea_commands.confirm_export_text(ctx, payload["text"])
+    finally:
+        ctx.conn.close()
+
+
 def _run_idea_action(action, idea_id, payload):
     ctx = _action_context()
     try:
         if action == "delete":
             return idea_commands.delete(ctx, idea_id)
+        if action == "unexport":
+            return idea_commands.unexport(ctx, idea_id)
         if action == "link" and "adventurer" in payload:
             return idea_commands.link_for_adventurer(ctx, idea_id, payload["adventurer"])
         if action == "unlink" and "adventurer" in payload:
@@ -457,19 +501,19 @@ class BoardRequestHandler(http_server.BaseHTTPRequestHandler):
             return False
         return header.split(";")[0].strip().lower() == "application/json"
 
-    def _body_length(self):
+    def _body_length(self, limit):
         raw = self.headers.get("Content-Length")
         if raw is None:
             raise _RequestRejected(411, "content length required")
         if not raw.isascii() or not raw.isdigit():
             raise _RequestRejected(400, "invalid content length")
         length = int(raw)
-        if length > _MAX_BODY_BYTES:
+        if length > limit:
             raise _RequestRejected(413, "request body too large")
         return length
 
-    def _read_json_object(self):
-        raw = self.rfile.read(self._body_length())
+    def _read_json_object(self, limit):
+        raw = self.rfile.read(self._body_length(limit))
         try:
             payload = json.loads(raw.decode("utf-8"))
         except (UnicodeDecodeError, ValueError, RecursionError):
@@ -495,6 +539,23 @@ class BoardRequestHandler(http_server.BaseHTTPRequestHandler):
             if key in payload and not isinstance(payload[key], str) and payload[key] is not None:
                 raise _RequestRejected(400, "{} must be a string or null".format(key))
 
+    def _check_idea_transfer_payload(self, action, payload):
+        if action == "export-idea":
+            ids = payload.get("ids")
+            if not isinstance(ids, list) or not all(isinstance(i, int) and not isinstance(i, bool) for i in ids):
+                raise _RequestRejected(400, "ids must be a list of integers")
+        required = {
+            "export-idea": ("destination",),
+            "export-project-idea": ("project", "destination"),
+            "import-idea": ("text",),
+            "confirm-export-idea": ("text",),
+        }[action]
+        for key in required:
+            if not isinstance(payload.get(key), str):
+                raise _RequestRejected(400, "{} must be a string".format(key))
+        if action == "import-idea" and payload.get("project") is not None and not isinstance(payload["project"], str):
+            raise _RequestRejected(400, "project must be a string or null")
+
     def _check_idea_holder(self, payload):
         if ("party" in payload) == ("adventurer" in payload):
             raise _RequestRejected(400, "pass exactly one of party or adventurer")
@@ -513,13 +574,16 @@ class BoardRequestHandler(http_server.BaseHTTPRequestHandler):
             raise _RequestRejected(400, "tasks must be a list of strings")
 
     def _read_action_payload(self, action):
-        payload = self._read_json_object()
+        limit = realm_hub.INBOX_MAX_BODY if action in _PASTED_FILE_ACTIONS else _MAX_BODY_BYTES
+        payload = self._read_json_object(limit)
         if action == "answer" and not isinstance(payload.get("answer"), str):
             raise _RequestRejected(400, "answer must be a string")
         if action == "create" and not all(isinstance(payload.get(key), str) for key in ("text", "to", "ttl")):
             raise _RequestRejected(400, "text, to and ttl must be strings")
         if action in ("create-idea", "edit-idea"):
             self._check_idea_payload(action, payload)
+        if action in ("export-idea", "export-project-idea", "import-idea", "confirm-export-idea"):
+            self._check_idea_transfer_payload(action, payload)
         if action == "create-quest":
             self._check_quest_payload(payload)
         if action in ("link-idea", "unlink-idea"):
@@ -584,6 +648,14 @@ class BoardRequestHandler(http_server.BaseHTTPRequestHandler):
             return self._post_action("create", _run_notice_create)
         if path == _IDEA_CREATE_PATH:
             return self._post_action("create-idea", _run_idea_create)
+        if path == _IDEA_EXPORT_PATH:
+            return self._post_action("export-idea", _run_idea_export)
+        if path == _IDEA_EXPORT_PROJECT_PATH:
+            return self._post_action("export-project-idea", _run_idea_export_project)
+        if path == _IDEA_IMPORT_PATH:
+            return self._post_action("import-idea", _run_idea_import)
+        if path == _IDEA_CONFIRM_EXPORT_PATH:
+            return self._post_action("confirm-export-idea", _run_idea_confirm_export)
         idea_match = _IDEA_ACTION_RE.match(path)
         if idea_match is not None:
             idea_id, action = idea_match.groups()
