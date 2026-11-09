@@ -275,7 +275,7 @@ guild hook notification    # records the session status
 guild hook stop
 guild hook subagent-start  # marks a running subagent
 guild hook subagent-stop
-guild hook pre-compact     # records the context percentage before an automatic compaction
+guild hook pre-compact     # records the context percentage before an automatic compaction; bound sessions get summary instructions
 
 guild seed <file.json>
 guild rebuild
@@ -1932,7 +1932,9 @@ which says `auto-respawn off: this generation runs outside a guild tmux window`
 and asks it to give the human the printed `guild revive --party <party>`
 command. The nudge also comes right after a
 compaction (`SessionStart` with source `compact`), because Claude Code compacts
-far below `handoff_threshold`.
+far below `handoff_threshold`. A bound leader also gets its task brief and party
+memory again at that point, ahead of the nudge, so the lean summary loses nothing
+the brief holds.
 
 `guild handoff --close` writes the handoff like a plain `guild handoff` call but
 closes this same session's pane instead of printing a resume command, only when
@@ -2967,7 +2969,11 @@ Without a hooks manager, add the same call to the repository's
 - `pre-compact` (matcher `auto`, so a manual `/compact` never fires it): writes the
   session's last statusline percentage, still the pre-compact value, to the global
   `$XDG_STATE_HOME/guild/compaction-pct`. Bound or not, since the compaction point
-  comes from the user's Claude Code settings. It prints nothing. When the
+  comes from the user's Claude Code settings. For a bound session (party leader or
+  adventurer) it prints instructions for the compaction summary: keep the task ref,
+  running subagents and background commands with their ids, waits, uncommitted or
+  unpushed work and open decisions; drop exploration, file contents, tool output and
+  finished steps. An unbound session gets no output. When the
   statusline last wrote that percentage 30 minutes ago or more, the compaction is
   Claude Code's idle compaction (same `auto` trigger, fired on a quiet session
   over `CLAUDE_CODE_IDLE_COMPACT_MIN_TOKENS`), not the context limit, and nothing

@@ -203,3 +203,15 @@ updated: 2026-10-18
 - [x] A `SessionStart` from a pane in the `guild` session with no recorded window records that window; a pane elsewhere records nothing.
 - [x] A plain handoff prints `guild revive --party <party>` first and the raw command as fallback; without tmux it prints the raw command only.
 - [x] The nudge of a generation without a recorded window says auto-respawn is off and points to the revive command.
+
+## T17 — Lean compaction summary and brief after compaction
+
+**Depends on:** T15
+**Status:** [x] done
+
+**What:** `PreCompact` prints instructions for a bound session (leader or adventurer) so the summary keeps only in-flight state: task ref, running subagents and background commands with ids, waits, uncommitted or unpushed work and open decisions. `SessionStart` with source `compact` injects the leader's task brief and party memory before the handoff nudge. Decisión del dev, 2026-11-09.
+
+**Acceptance:**
+- [x] A pre-compact of a bound session prints the summary instructions and still records the percentage.
+- [x] A pre-compact of an unbound session prints nothing.
+- [x] A `SessionStart` with source `compact` of a bound leader prints the task brief and memory, then the nudge.

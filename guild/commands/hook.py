@@ -42,6 +42,12 @@ from guild.errors import GuildError
 from guild.identity import UNBOUND_HINT
 
 _IDLE_COMPACTION_SECONDS = 30 * 60
+COMPACTION_INSTRUCTIONS = (
+    "Compaction summary: keep only what is still in flight. Keep the current task ref, "
+    "running subagents and background commands with their ids, waits, uncommitted or unpushed work, "
+    "and open decisions with their ids. Drop exploration, file contents, tool output and finished steps. "
+    "The session brief and memory are injected again after the compaction."
+)
 _EDIT_TOOL_PATH_FIELDS = {
     "Edit": "file_path",
     "Write": "file_path",
@@ -59,6 +65,13 @@ def _touch_marker(marker):
     marker.touch()
 
 
+def _brief_or_failure(ctx, binding):
+    try:
+        return task_brief.render_for_binding(ctx, binding), []
+    except Exception as error:
+        return [], ["guild: task brief unavailable ({})".format(type(error).__name__)]
+
+
 def _resume_lines(ctx, binding):
     if binding["generation"] <= 1:
         return []
@@ -66,12 +79,7 @@ def _resume_lines(ctx, binding):
     if marker.exists():
         return []
     memory_lines = memory_commands.framed_memory(binding["party"])
-    failure_lines = []
-    try:
-        brief_lines = task_brief.render_for_binding(ctx, binding)
-    except Exception as error:
-        brief_lines = []
-        failure_lines = ["guild: task brief unavailable ({})".format(type(error).__name__)]
+    brief_lines, failure_lines = _brief_or_failure(ctx, binding)
     if brief_lines:
         _touch_marker(marker)
         lines = brief_lines + [""] + next_commands.run(ctx, binding, False, False)
@@ -87,6 +95,17 @@ def _resume_lines(ctx, binding):
         + failure_lines
     )
     return lines + [""] + memory_lines if memory_lines else lines
+
+
+def _compact_context_lines(ctx, binding, source):
+    if source != "compact":
+        return []
+    brief_lines, failure_lines = _brief_or_failure(ctx, binding)
+    memory_lines = memory_commands.framed_memory(binding["party"])
+    lines = brief_lines + failure_lines
+    if brief_lines and memory_lines:
+        lines = lines + [""]
+    return lines + memory_lines
 
 
 def _auto_resume_lines(ctx, resume_party, permission_mode):
@@ -337,6 +356,7 @@ def session_start(ctx, resume_party, health_job, permission_mode, source, tmux, 
         party_commands.locate_if_changed(ctx, binding, permission_mode)
         _adopt_tmux_window(ctx, binding, tmux, tmux_pane)
         lines.extend(_resume_lines(ctx, binding))
+        lines.extend(_compact_context_lines(ctx, binding, source))
         with db.writing(ctx.conn):
             _mark_working(ctx, binding)
         lines.extend(_compact_nudge_lines(ctx, binding, source))
@@ -387,9 +407,13 @@ def _idle_compaction(ctx):
 
 def pre_compact(ctx):
     pct = statusline_state.read_ctx(ctx.state_dir, ctx.session_id)
-    if pct is None or _idle_compaction(ctx):
-        return
-    statusline_state.record_compact_pct(ctx.state_dir, pct)
+    if pct is not None and not _idle_compaction(ctx):
+        statusline_state.record_compact_pct(ctx.state_dir, pct)
+    bound = (
+        identity.resolve_binding(ctx.conn, ctx.session_id) is not None
+        or identity.resolve_adventurer(ctx.conn, ctx.session_id) is not None
+    )
+    return COMPACTION_INSTRUCTIONS if bound else None
 
 
 def _nudge_text(ctx, binding, lead):
