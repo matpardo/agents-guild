@@ -12,14 +12,14 @@ def _mode_flag(permission_mode):
     return " --permission-mode {}".format(shlex.quote(permission_mode))
 
 
-def _generation_name(party, generation):
-    return shlex.quote("{}-g{}".format(party, generation))
+def generation_name(party, generation):
+    return "{}-g{}".format(party, generation)
 
 
 def resume_command(session_id, party, generation, permission_mode):
     return "claude --resume {} --name {}{}".format(
         shlex.quote(session_id),
-        _generation_name(party, generation),
+        shlex.quote(generation_name(party, generation)),
         _mode_flag(permission_mode),
     )
 
@@ -28,16 +28,17 @@ def fresh_command(party, next_generation, model, permission_mode, prompt):
     model_flag = "" if model is None else " --model {}".format(shlex.quote(model))
     return "GUILD_RESUME={} claude -n {}{}{} {}".format(
         shlex.quote(party),
-        _generation_name(party, next_generation),
+        shlex.quote(generation_name(party, next_generation)),
         model_flag,
         _mode_flag(permission_mode),
         shlex.quote(prompt),
     )
 
 
-def health_command(job_name, prompt):
+def health_command(job_name, prompt, now):
+    session_name = "health-{}-{}".format(job_name, now.astimezone().strftime("%Y%m%d-%H%M%S"))
     return "GUILD_ADVENTURER_JOB={} claude -n {} {}".format(
-        shlex.quote(job_name), shlex.quote("health-" + job_name), shlex.quote(prompt)
+        shlex.quote(job_name), shlex.quote(session_name), shlex.quote(prompt)
     )
 
 

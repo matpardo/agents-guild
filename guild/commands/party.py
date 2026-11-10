@@ -1,7 +1,20 @@
 import sqlite3
 from pathlib import Path
 
-from guild import config, db, events, final_report, handoff_prune, identity, names, paths, pii, sanitize, session_info
+from guild import (
+    config,
+    db,
+    events,
+    final_report,
+    handoff_prune,
+    identity,
+    names,
+    paths,
+    pii,
+    sanitize,
+    session_info,
+)
+from guild import resume as session_commands
 from guild.commands import claim as claim_commands
 from guild.commands import next as next_commands
 from guild.commands import quest as quest_commands
@@ -87,7 +100,9 @@ def require_new_name(conn, name):
 
 
 def record_started(ctx, name, project, reason, goal, done_when, from_adventurer):
-    session_name = session_info.read_session_name(ctx.sessions_dir, ctx.session_id)
+    session_name = session_info.name_once_titled(
+        ctx.sessions_dir, ctx.session_id, session_commands.generation_name(name, 1)
+    )
     events.record(
         ctx.conn,
         ctx.now,
@@ -154,7 +169,9 @@ def resume(ctx, name, session_name, permission_mode):
     if row["state"] == "closed":
         raise GuildError("party '{}' is closed".format(name), 1)
     generation = row["generation"] + 1
-    resolved_session_name = session_name or session_info.read_session_name(ctx.sessions_dir, session_id)
+    resolved_session_name = session_name or session_info.name_once_titled(
+        ctx.sessions_dir, session_id, session_commands.generation_name(name, generation)
+    )
     with db.writing(ctx.conn):
         current = ctx.conn.execute("SELECT generation, state FROM parties WHERE name = ?", (name,)).fetchone()
         if current["state"] == "closed":

@@ -22,6 +22,8 @@ from guild import (
     paths,
     pr_records,
     raid_members,
+    resume,
+    session_info,
     session_status,
     statusline_state,
     timeutil,
@@ -431,6 +433,18 @@ def _nudge_text(ctx, binding, lead):
     )
 
 
+def _session_title(ctx, binding, adventurer):
+    if binding is not None:
+        title = resume.generation_name(binding["party"], binding["generation"])
+    elif adventurer is not None:
+        title = identity.adventurer_label(adventurer["id"])
+    else:
+        return None
+    if not session_info.needs_title(ctx.sessions_dir, ctx.session_id, title):
+        return None
+    return title
+
+
 def prompt_submit(ctx, permission_mode):
     _spawn_due_jobs(ctx)
     binding = identity.resolve_binding(ctx.conn, ctx.session_id)
@@ -451,7 +465,19 @@ def prompt_submit(ctx, permission_mode):
     with db.writing(ctx.conn):
         inbox_commands.advance_cursor(ctx.conn, identity.cursor_key(ctx.session_id), seq)
         _mark_working(ctx, _session_actor(ctx))
-    return "\n".join(lines)
+    text = "\n".join(lines)
+    title = _session_title(ctx, binding, adventurer)
+    if title is None:
+        return text
+    return json.dumps(
+        {
+            "hookSpecificOutput": {
+                "hookEventName": "UserPromptSubmit",
+                "additionalContext": text,
+                "sessionTitle": title,
+            }
+        }
+    )
 
 
 def post_tool_use(ctx):
