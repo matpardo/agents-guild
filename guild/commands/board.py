@@ -666,6 +666,15 @@ def _leader_session_name(conn, party_name):
     return leader["session_name"]
 
 
+def _leader_text(conn, party_row):
+    session_name = _leader_session_name(conn, party_row["name"])
+    if session_name:
+        return session_name
+    if party_row["leader_session_id"]:
+        return "unnamed session {}".format(party_row["leader_session_id"][:8])
+    return "no leader"
+
+
 def _party_dates(conn, party_row):
     row = conn.execute(
         "SELECT started_at FROM leaders WHERE party = ? AND generation = 1", (party_row["name"],)
@@ -676,7 +685,7 @@ def _party_dates(conn, party_row):
 
 
 def _leader_label(ctx, party_row):
-    session_name = _leader_session_name(ctx.conn, party_row["name"]) or "no leader"
+    session_name = _leader_text(ctx.conn, party_row)
     role = raid_commands.raid_role_label(raid_members.member_raids(ctx.conn, ctx.now, party_row["name"]))
     return "{} (gen {}, {}, {})".format(session_name, party_row["generation"], party_row["state"], role)
 
@@ -1542,6 +1551,7 @@ def _party_model(ctx, repo_clones, party_row, project_config):
         "caps": _party_caps(ctx, party_row, project_config),
         "resume_command": _resume_command(ctx, party_row),
         "leader_session_name": _leader_session_name(ctx.conn, party_row["name"]),
+        "leader_session_id": party_row["leader_session_id"],
         "has_live_leader": party_status.has_live_leader(ctx, party_row),
         "stopped_without_report": _party_stopped_without_report(ctx, party_row),
         "quests": quest_models,

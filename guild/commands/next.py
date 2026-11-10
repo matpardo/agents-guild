@@ -3,16 +3,45 @@ from guild.commands import drift as drift_commands
 from guild.commands import pr as pr_commands
 
 
-def _open_quest_offer(conn, project, party):
-    if project is None or work_queue.queued_tasks(conn, project, party):
-        return None
-    row = conn.execute(
-        "SELECT slug FROM quests WHERE project = ? AND party IS NULL AND state = 'active' ORDER BY rowid ASC",
-        (project,),
+def _own_work_done(conn, party):
+    if conn.execute("SELECT 1 FROM quests WHERE party = ? LIMIT 1", (party,)).fetchone() is None:
+        return False
+    unfinished = conn.execute(
+        "SELECT 1 FROM quest_tasks WHERE state IN ('queued', 'active', 'blocked')"
+        " AND quest IN (SELECT slug FROM quests WHERE party = ? AND state = 'active') LIMIT 1",
+        (party,),
     ).fetchone()
-    if row is None:
+    if unfinished is not None:
+        return False
+    open_pr = conn.execute(
+        "SELECT 1 FROM prs WHERE party = ? AND lifecycle NOT IN ('merged', 'closed') LIMIT 1", (party,)
+    ).fetchone()
+    return open_pr is None
+
+
+def _done_line(conn, project, party):
+    if project is None or not _own_work_done(conn, party):
         return None
-    return "take open quest {}".format(row["slug"])
+    done_when = conn.execute("SELECT done_when FROM parties WHERE name = ?", (party,)).fetchone()["done_when"]
+    if not done_when:
+        return "own work done: guild party close or report to the dev"
+    return 'own work done: check done-when "{}", then guild party close or report to the dev'.format(done_when)
+
+
+def _open_quest_lines(conn, project):
+    if project is None:
+        return []
+    rows = conn.execute(
+        "SELECT slug, title, left_by FROM quests WHERE project = ? AND party IS NULL AND state = 'active'"
+        " ORDER BY rowid ASC",
+        (project,),
+    ).fetchall()
+    return [
+        "open quest {} — {} ({})".format(
+            row["slug"], row["title"], "no author" if row["left_by"] is None else "left by {}".format(row["left_by"])
+        )
+        for row in rows
+    ]
 
 
 def _task_title_display(next_task):
@@ -25,7 +54,7 @@ def _drift_line(finding):
     return "update tracker/SDD: {}".format(finding)
 
 
-def _render_all(candidates, drift, next_task, wait, offer, disagreements):
+def _render_all(candidates, drift, next_task, wait, done_line, open_quests, disagreements):
     lines = []
     for row, reason, _ in candidates:
         lines.append("PR {}: {}".format(work_queue.pr_label(row), reason))
@@ -36,8 +65,9 @@ def _render_all(candidates, drift, next_task, wait, offer, disagreements):
         )
     if wait is not None:
         lines.append(wait)
-    if offer is not None:
-        lines.append(offer)
+    if done_line is not None:
+        lines.append(done_line)
+    lines.extend(open_quests)
     for line in disagreements:
         lines.append("disagreement: {}".format(line))
     if not lines:
@@ -45,7 +75,7 @@ def _render_all(candidates, drift, next_task, wait, offer, disagreements):
     return lines
 
 
-def _render_single(ctx, candidates, drift, next_task, wait, offer, disagreements, blocked, acknowledge):
+def _render_single(ctx, candidates, drift, next_task, wait, done_line, disagreements, blocked, acknowledge):
     if candidates:
         row, reason, should_ack = candidates[0]
         if should_ack and acknowledge:
@@ -69,8 +99,8 @@ def _render_single(ctx, candidates, drift, next_task, wait, offer, disagreements
         for line in disagreements:
             lines.append("disagreement: {}".format(line))
         return lines
-    if offer is not None:
-        lines = [offer]
+    if done_line is not None:
+        lines = [done_line]
         for line in disagreements:
             lines.append("disagreement: {}".format(line))
         return lines
@@ -99,8 +129,10 @@ def run(ctx, binding, show_all, acknowledge):
     candidates, next_task, wait, disagreements, blocked = work_queue.collect(ctx, party, project)
 
     drift = _party_drift(ctx, party, project)
-    offer = _open_quest_offer(ctx.conn, project, party)
+    done_line = _done_line(ctx.conn, project, party)
 
     if show_all:
-        return _render_all(candidates, drift, next_task, wait, offer, disagreements)
-    return _render_single(ctx, candidates, drift, next_task, wait, offer, disagreements, blocked, acknowledge)
+        return _render_all(
+            candidates, drift, next_task, wait, done_line, _open_quest_lines(ctx.conn, project), disagreements
+        )
+    return _render_single(ctx, candidates, drift, next_task, wait, done_line, disagreements, blocked, acknowledge)

@@ -345,12 +345,12 @@ class Tier4Tests(NextTestCase):
         code, out, err = self.run_cli(["next"], "sess-1", self.repo_dir)
         self.assertIn('task wave1/T02: "Second task" — ready', out)
 
-    def test_nothing_queued_reports_nothing_actionable(self):
+    def test_nothing_queued_reports_own_work_done(self):
         self.run_cli(["task", "done", "wave1/T02"], "sess-1", self.repo_dir)
         self.run_cli(["task", "done", "wave1/T03"], "sess-1", self.repo_dir)
         self._sync_all_done()
         code, out, err = self.run_cli(["next"], "sess-1", self.repo_dir)
-        self.assertIn("nothing actionable", out)
+        self.assertIn("own work done", out)
 
     def test_disagreement_between_guild_and_sdd_is_surfaced(self):
         self.sync_sdd(

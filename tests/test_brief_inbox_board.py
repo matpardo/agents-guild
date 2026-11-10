@@ -558,6 +558,39 @@ class BoardTests(GuildTestCase):
         code, out, err = self.run_cli(["board"], None, None)
         self.assertIn("(gen 1, active, solo)", out)
 
+    def _board_leader_with(self, session_name):
+        repo_dir = self.register_project("acme", ["acme/app"])
+        self.run_cli(
+            ["party", "start", "alpha", "--reason", "test reason", "--goal", "test goal", "--done-when", "test done"],
+            "abcdef1234567890",
+            repo_dir,
+        )
+        conn = db.connect(paths.db_path())
+        conn.execute("UPDATE leaders SET session_name = ? WHERE party = 'alpha'", (session_name,))
+        conn.commit()
+        conn.close()
+        return self.run_cli(["board"], None, None)[1]
+
+    def test_board_header_shows_unnamed_session_when_leader_has_no_name(self):
+        self.assertIn("unnamed session abcdef12 (gen 1", self._board_leader_with(None))
+
+    def test_board_header_shows_leader_name(self):
+        self.assertIn("main-window (gen 1", self._board_leader_with("main-window"))
+
+    def test_board_header_shows_no_leader_without_leader_session(self):
+        repo_dir = self.register_project("acme", ["acme/app"])
+        self.run_cli(
+            ["party", "start", "alpha", "--reason", "test reason", "--goal", "test goal", "--done-when", "test done"],
+            "sess-1",
+            repo_dir,
+        )
+        conn = db.connect(paths.db_path())
+        conn.execute("UPDATE leaders SET session_name = NULL WHERE party = 'alpha'")
+        conn.execute("UPDATE parties SET leader_session_id = NULL WHERE name = 'alpha'")
+        conn.commit()
+        conn.close()
+        self.assertIn("no leader (gen 1", self.run_cli(["board"], None, None)[1])
+
     def test_board_header_shows_raid_name(self):
         repo_dir = self.register_project("acme", ["acme/app"])
         self.run_cli(

@@ -289,6 +289,7 @@ class BoardModelShapeTests(BoardModelTestCase):
                 "caps",
                 "resume_command",
                 "leader_session_name",
+                "leader_session_id",
                 "has_live_leader",
                 "stopped_without_report",
                 "quests",
