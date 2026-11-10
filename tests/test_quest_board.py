@@ -364,22 +364,92 @@ class QuestBoardCommandTests(QuestBoardTestCase):
     def test_board_unknown_project_fails(self):
         self.assertEqual(self.cli(["quest", "board", "--project", "nope"], None)[0], 1)
 
-    def test_next_offers_open_quest_only_without_queued_work(self):
+    def _finish_all(self, session_id, slug, tids):
+        for tid in tids:
+            self.ok(["task", "start", "{}/{}".format(slug, tid)], session_id)
+            self.ok(["task", "done", "{}/{}".format(slug, tid)], session_id)
+
+    def _finished_plain_quest(self):
+        self.ok(
+            ["quest", "add", "plain", "--no-epic", "--title", "plain", "--tasks", "T01", "--titles", "One"], "sess-1"
+        )
+        self._finish_all("sess-1", "plain", ["T01"])
+
+    def test_next_never_offers_an_open_quest(self):
         self.open_quest("old", "T02", None)
-        self.open_quest("new", "T03", None)
         self.start_party("alpha", "sess-1")
-        self.assertIn("take open quest old", self.ok(["next"], "sess-1"))
+        out = self.ok(["next"], "sess-1")
+        self.assertNotIn("take open quest", out)
+        self.assertIn("nothing actionable", out)
+
+    def test_next_without_any_quest_is_not_done(self):
+        self.start_party("alpha", "sess-1")
+        self.assertNotIn("own work done", self.ok(["next"], "sess-1"))
+
+    def test_next_with_open_tracked_pr_is_not_done(self):
+        self.start_party("alpha", "sess-1")
+        self._finished_plain_quest()
+        conn = db.connect(paths.db_path())
+        conn.execute(
+            "INSERT INTO prs (repo, number, party, what, lifecycle, seeded)"
+            " VALUES ('acme/app', 9, 'alpha', 'w', 'ready', 0)"
+        )
+        conn.commit()
+        conn.close()
+        self.assertNotIn("own work done", self.ok(["next"], "sess-1"))
+
+    def test_next_with_own_work_left_does_not_say_done(self):
+        self.open_quest("old", "T02", None)
+        self.start_party("alpha", "sess-1")
         self.ok(["quest", "take", "old"], "sess-1")
         out = self.ok(["next"], "sess-1")
         self.assertIn("old/T02", out)
-        self.assertNotIn("take open quest", out)
-        self.ok(["task", "start", "old/T02"], "sess-1")
-        self.ok(["task", "done", "old/T02"], "sess-1")
-        self.assertIn("take open quest new", self.ok(["next", "--all"], "sess-1"))
+        self.assertNotIn("own work done", out)
 
-    def test_next_nothing_without_open_quests(self):
+    def test_next_says_own_work_done_with_done_when(self):
         self.start_party("alpha", "sess-1")
-        self.assertIn("nothing actionable", self.ok(["next"], "sess-1"))
+        self._finished_plain_quest()
+        self.open_quest("left", "T03", None)
+        out = self.ok(["next"], "sess-1")
+        self.assertIn('own work done: check done-when "test done", then guild party close or report to the dev', out)
+        self.assertNotIn("take open quest", out)
+
+    def test_next_says_own_work_done_without_done_when(self):
+        self.start_party("alpha", "sess-1")
+        conn = db.connect(paths.db_path())
+        conn.execute("UPDATE parties SET done_when = NULL WHERE name = 'alpha'")
+        conn.commit()
+        conn.close()
+        self._finished_plain_quest()
+        out = self.ok(["next"], "sess-1")
+        self.assertIn("own work done: guild party close or report to the dev", out)
+
+    def test_next_all_lists_open_quests_for_information_only(self):
+        self.open_quest("left", "T02", None)
+        self.start_party("alpha", "sess-1")
+        self.start_party("beta", "sess-2")
+        self.ok(
+            ["quest", "add", "mine", "--open", "--title", "mine", "--epic", "demo-epic", "--tasks", "T03"], "sess-2"
+        )
+        out = self.ok(["next", "--all"], "sess-1")
+        self.assertIn("open quest left — left (no author)", out)
+        self.assertIn("open quest mine — mine (left by beta)", out)
+        self.assertNotIn("take open quest", out)
+
+    def test_next_with_blocked_task_is_not_done(self):
+        self.open_quest("old", "T02", None)
+        self.start_party("alpha", "sess-1")
+        self.ok(["quest", "take", "old"], "sess-1")
+        self.ok(["task", "start", "old/T02"], "sess-1")
+        self.ok(["task", "block", "old/T02", "--reason", "waiting"], "sess-1")
+        out = self.ok(["next"], "sess-1")
+        self.assertIn("nothing actionable", out)
+        self.assertNotIn("own work done", out)
+
+    def test_next_says_own_work_done_without_open_quests(self):
+        self.start_party("alpha", "sess-1")
+        self._finished_plain_quest()
+        self.assertIn("own work done", self.ok(["next"], "sess-1"))
 
 
 class OpenQuestReadersTests(QuestBoardTestCase):

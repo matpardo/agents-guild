@@ -159,6 +159,7 @@ _BOARD = {
             "caps": None,
             "drift": {"findings": [], "more": 0},
             "leader_session_name": None,
+            "leader_session_id": None,
             "waits": [],
             "ideas": [],
             "followups": [],
@@ -201,6 +202,22 @@ class WebDriftBehaviorTests(unittest.TestCase):
         )
         out = _render(board, "a", "all", "drift", "text").strip()
         self.assertEqual(out, "drift p scope: x no drift")
+
+    def _leader_text(self, name, session_id):
+        party = dict(_BOARD["parties"][0], leader_session_name=name, leader_session_id=session_id)
+        out = _render(dict(_BOARD, parties=[party]), "all", "all", "parties", "text")
+        return out
+
+    def test_party_without_session_name_shows_unnamed_session(self):
+        self.assertIn("unnamed session abcdef12", self._leader_text(None, "abcdef1234567890"))
+
+    def test_party_without_any_leader_shows_no_leader(self):
+        self.assertIn("no leader", self._leader_text(None, None))
+
+    def test_party_with_session_name_shows_the_name(self):
+        out = self._leader_text("main-window", "abcdef1234567890")
+        self.assertIn("main-window", out)
+        self.assertNotIn("unnamed session", out)
 
     def test_party_filter_renders_a_board_with_a_merge_queue(self):
         entry = {

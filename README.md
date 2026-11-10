@@ -1773,6 +1773,10 @@ length caps answer `422` with the message. `--until` is CLI-only for now.
 `resume`. The human is always allowed (no session), like `guild merge-queue
 pin`; a pause by the human is recorded with `paused_by` `human`.
 
+A party card and `guild board` label a leader session that has no name yet as
+`unnamed session <first 8 characters of the session id>`; `no leader` shows only
+when the party has no leader session at all.
+
 **Hand off a party with no leader**: a party card shows a `Hand off` button
 when it is `active` and has no live leader session (model key
 `has_live_leader`). `POST /api/parties/<name>/hand-off` (body `{}`) runs the
@@ -2321,8 +2325,16 @@ and claim.
   as `left: <slug> — <title> (no party yet | taken by <party> | done)`, and the
   final report uses the same list. Quests created before this existed have no
   author.
-- `guild next` answers `take open quest <slug>` (oldest first) to a party with
-  no queued task.
+- A party that has a quest, no unfinished task in its quests and no open tracked PR gets
+  `own work done: check done-when "<text>", then guild party close or report to
+  the dev` from `guild next` (without the `check done-when` part when the party
+  has none). `guild next` never offers an open quest: it could belong to the
+  work of another active party. `guild next --all` also lists every open quest
+  of the project, oldest first, for information only, as `open quest <slug> —
+  <title> (left by <name>)` (`no author` when none); `guild quest take` runs
+  only when the human points at a quest. A party with a blocked task still
+  gets `nothing actionable` plus the blocked lines, and so does a party with no
+  quest yet.
 - An adventurer always starts on a task (`adventurer start --task`, required
   except for health jobs): a synced SDD task `<epic>/<tid>`, a new task the PR
   adds to an epic already synced (`guild drift` reports `adventurer task not in

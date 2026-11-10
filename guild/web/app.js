@@ -348,6 +348,7 @@ realmDoctorLines: [],
       resumeCommand: "Run this to start the next generation of this party; it waits for a new leader.",
       leader: "The leader session of the party.",
       noLeader: "The party has no leader session right now.",
+      unnamedLeader: "The leader session has no name yet; the party is still led.",
       claims: "Areas this party has reserved so other parties do not edit them.",
       synced: "How fresh the PR data from GitHub is.",
       baseBranch: "The PR targets this branch instead of the default one, so it is stacked on another change.",
@@ -3464,8 +3465,16 @@ realmDoctorLines: [],
     }
     summary.appendChild(explain(textEl("span", party.state), "partyState", party.state));
     summary.appendChild(explain(textEl("span", "gen " + party.generation), "ui", "generation"));
-    var leaderKey = party.leader_session_name ? "leader" : "noLeader";
-    summary.appendChild(explain(textEl("span", party.leader_session_name || "no leader"), "ui", leaderKey));
+    var leaderKey = "noLeader";
+    var leaderText = "no leader";
+    if (party.leader_session_name) {
+      leaderKey = "leader";
+      leaderText = party.leader_session_name;
+    } else if (party.leader_session_id) {
+      leaderKey = "unnamedLeader";
+      leaderText = "unnamed session " + party.leader_session_id.slice(0, 8);
+    }
+    summary.appendChild(explain(textEl("span", leaderText), "ui", leaderKey));
     details.appendChild(summary);
 
     var statusDetail = renderStatusDetail(party.status);

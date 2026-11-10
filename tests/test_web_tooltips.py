@@ -135,6 +135,7 @@ class TooltipCoverageTests(unittest.TestCase):
                 "generation",
                 "leader",
                 "noLeader",
+                "unnamedLeader",
                 "claims",
                 "synced",
                 "ctxHigh",

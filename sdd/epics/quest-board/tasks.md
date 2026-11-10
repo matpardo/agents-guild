@@ -3,7 +3,7 @@ epic: quest-board
 type: tasks
 title: Prepare quests ahead for parties to take
 status: done
-updated: 2026-10-23
+updated: 2026-11-09
 ---
 
 # Tasks: Prepare quests ahead for parties to take
@@ -89,3 +89,15 @@ updated: 2026-10-23
 **Acceptance:**
 - [x] A session that led two parties reports each left quest only under the party that left it.
 - [x] Taking a quest keeps who left it; releasing it records the releasing party.
+
+## T09 — Next tells a party its own work is done
+
+**Depends on:** T05
+**Status:** [x] done
+
+**What:** `guild next` stops offering open quests. A party with no unfinished task and no open tracked PR gets `own work done`, with its done-when when it has one; `guild next --all` lists open quests as information only. The board labels a leader with no session name `unnamed session <id>` instead of `no leader`.
+
+**Acceptance:**
+- [x] A party whose own work is finished is never told to take an open quest left for another party.
+- [x] A party with a blocked task, an open tracked PR or no quest yet is not told its work is done.
+- [x] The CLI and the web board show `unnamed session <id>` for a leader with no name and `no leader` only without a leader session.
