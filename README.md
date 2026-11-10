@@ -1495,11 +1495,14 @@ inside the command.
   the built-in jobs of that name (including the `fixing` hold and the
   `to merge` list); `every <duration>` (for example `every 7d`, at least `1h`)
   is due when it has no report and no launch yet, or the last report or launch
-  is older than the interval, and never backs off for 24h.
+  is older than the interval, and never backs off.
+- `retry_after`: optional, how long a `main-red` or `dependabot` player waits
+  before retrying the same trigger (for example `2h`, at least `1h`). Refused
+  on an `every` trigger.
 
-Built-in entries accept `repo`, `job`, `name` and `class`; `command` and
-`trigger` are refused there. The board and `guild solo list` show the schedule
-of each player (`on main-red`, `on every 7d`).
+Built-in entries accept `repo`, `job`, `name`, `class` and `retry_after`;
+`command` and `trigger` are refused there. The board and `guild solo list` show
+the schedule of each player (`on main-red`, `on every 7d`).
 
 Triggers come from facts the sync stores:
 
@@ -1545,15 +1548,23 @@ when the trigger is on but the last report or launch is newer, `fixing` (a
 that PR merges or closes, and `idle` without a trigger.
 
 The cooldown is 1h, but when the trigger text equals the one of the last launch
-(for example a Dependabot PR that needs a human) it is 24h, so a player that
-cannot fix its trigger does not relaunch every hour. A different trigger keeps
-the 1h cooldown. A backing-off row reads `cooling: same trigger, retry after
-<time>`. A launch with no trigger (manual, main already green) or a launch
-recorded before the trigger was stored counts as a different trigger.
+(for example a Dependabot PR that needs a human) it is the player's retry wait,
+so a player that cannot fix its trigger does not relaunch every hour. The retry
+wait is `retry_after` of its config entry, by default 4h on a `main-red` trigger
+and 24h on a `dependabot` one. A different trigger keeps the 1h cooldown. A
+backing-off row reads `cooling: same trigger`. A launch with no trigger (manual,
+main already green) or a launch recorded before the trigger was stored counts as
+a different trigger.
+
+Each row also shows its retry wait and an estimated next run: the time the
+cooldown ends on a `cooling` row, the next interval on an idle `every` player,
+`next tick` on a `due` row (the background tick runs every 10 minutes while
+`guild web` or a waiting session is up) and `none` otherwise, because a
+`main-red` or `dependabot` player has no date until its trigger turns on.
 
 `guild solo list` (alias `guild solo status`) and the `SOLO PLAYERS` section of `guild board` (hidden under
 `--party` and `--raid`) and the web `solo players` show name or job, class,
-repo, trigger, state, last report time and last pending text; a due or idle row
+repo, trigger, state, retry wait, next run, last report time and last pending text; a due or idle row
 carries `guild solo launch <owner/repo> <job>` as text to copy. The web has no
 launch button.
 

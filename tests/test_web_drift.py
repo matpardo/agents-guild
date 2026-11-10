@@ -466,7 +466,9 @@ def _solo_player(**overrides):
         "launch": "guild solo launch acme/app red-main",
         "waits_on": [],
         "stalled_adventurer": None,
+        "retry_after": "4h",
         "retry_at": None,
+        "next_run_at": None,
         "runs": [],
         "to_merge": [],
     }
@@ -531,9 +533,20 @@ class WebSoloPlayerBehaviorTests(unittest.TestCase):
         self.assertIn("guild solo resume acme/app red-main", out)
 
     def test_backing_off_player_shows_the_retry_time(self):
-        out = self._text([_solo_player(state="cooling", retry_at="2026-11-02T10:00:00+00:00")])
-        self.assertRegex(out, r"cooling: same trigger, retry after \d{4}-\d{2}-\d{2} \d{2}:\d{2}")
+        stamp = "2026-11-02T10:00:00+00:00"
+        out = self._text([_solo_player(state="cooling", retry_at=stamp, next_run_at=stamp)])
+        self.assertIn("cooling: same trigger", out)
+        self.assertRegex(out, r"retry after 4h \S next run \d{4}-\d{2}-\d{2} \d{2}:\d{2}")
         self.assertNotIn("guild solo launch", out)
+
+    def test_due_player_runs_on_the_next_tick(self):
+        self.assertIn("next run next tick", self._text([_solo_player()]))
+
+    def test_idle_trigger_driven_player_has_no_next_run(self):
+        self.assertIn("next run none", self._text([_solo_player(state="idle", trigger=None)]))
+
+    def test_every_player_has_no_retry_wait(self):
+        self.assertNotIn("retry after", self._text([_solo_player(retry_after=None, schedule="every 2h")]))
 
     def _channel_text(self, channel, players):
         return _render(dict(_BOARD, solo_players=players, solo_channel=channel), "all", "all", "solo-players", "text")
@@ -570,7 +583,7 @@ class WebSoloPlayerBehaviorTests(unittest.TestCase):
             "prs": [],
         }
         player = _solo_player(
-            last_done="2026-11-01T10:00:00+00:00", retry_at="2026-11-02T10:00:00+00:00", state="cooling", runs=[run]
+            last_done="2026-11-01T10:00:00+00:00", next_run_at="2026-11-02T10:00:00+00:00", state="cooling", runs=[run]
         )
         out = self._channel_text([message], [player])
         self.assertNotIn("+00:00", out)

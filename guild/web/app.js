@@ -2087,16 +2087,27 @@ realmDoctorLines: [],
     );
   }
 
+  function soloNextRun(player) {
+    if (player.next_run_at !== null) {
+      return shortLocalDate(player.next_run_at);
+    }
+    return player.state === "due" ? "next tick" : "none";
+  }
+
   function soloPlayerMeta(player) {
     var state = player.state;
     if (player.stalled_adventurer !== null) {
       state += ": session gone, run guild adventurer dismiss " + player.stalled_adventurer;
     } else if (player.retry_at !== null) {
-      state += ": same trigger, retry after " + shortLocalDate(player.retry_at);
+      state += ": same trigger";
     } else if (player.waits_on.length > 0) {
       state += ": waits on " + player.waits_on.join(", ");
     }
     var parts = [player.class, player.repo, state, "on " + player.schedule, player.trigger === null ? "no trigger" : player.trigger];
+    if (player.retry_after !== null) {
+      parts.push("retry after " + player.retry_after);
+    }
+    parts.push("next run " + soloNextRun(player));
     parts.push("last done " + (player.last_done === null ? "never" : shortLocalDate(player.last_done)));
     parts.push("last pending " + (player.last_pending === null ? "none" : player.last_pending));
     return parts.join(" \u00b7 ");

@@ -1047,7 +1047,7 @@ def _solo_player_lines(painter, projects_by_name, ctx):
             shown_project = row["project"]
             lines.append("  {}".format(shown_project))
         lines.append(
-            "  {} [{}] {} {}{} {} · on {}".format(
+            "  {} [{}] {} {}{} {} · on {} · retry {} · next run {}".format(
                 row["name"],
                 row["class"],
                 row["repo"],
@@ -1055,6 +1055,8 @@ def _solo_player_lines(painter, projects_by_name, ctx):
                 solo_players.state_detail(row),
                 row["trigger"] or "no trigger",
                 row["schedule"],
+                row["retry_after"] or "none",
+                solo_players.next_run_label(row),
             )
         )
         lines.append(

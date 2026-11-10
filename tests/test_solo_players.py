@@ -46,6 +46,18 @@ class SoloPlayersConfigTests(GuildTestCase):
         )
         config.validate_project_config(_with_players([dict(_CUSTOM, trigger="dependabot"), dict(_CUSTOM, job="b")]))
 
+    def test_retry_after_loads_on_built_in_and_trigger_driven_players(self):
+        config.validate_project_config(
+            _with_players([dict(_RED, retry_after="1h"), dict(_CUSTOM, trigger="dependabot", retry_after="2d")])
+        )
+
+    def test_retry_after_defaults_by_trigger_kind(self):
+        self.assertEqual(solo_players.player_retry_after(_RED), "4h")
+        self.assertEqual(solo_players.player_retry_after(_DEP), "24h")
+        self.assertEqual(solo_players.player_retry_after(dict(_CUSTOM, trigger="main-red")), "4h")
+        self.assertIsNone(solo_players.player_retry_after(_CUSTOM))
+        self.assertEqual(solo_players.player_retry_after(dict(_DEP, retry_after="6h")), "6h")
+
     def test_invalid_shapes_fail_naming_the_key(self):
         bad = [
             "x",
@@ -77,6 +89,10 @@ class SoloPlayersConfigTests(GuildTestCase):
             [dict(_CUSTOM, command=3)],
             [dict(_CUSTOM, **{"class": ""})],
             [dict(_RED, **{"class": 3})],
+            [dict(_RED, retry_after="30m")],
+            [dict(_RED, retry_after="soon")],
+            [dict(_RED, retry_after=3)],
+            [dict(_CUSTOM, retry_after="4h")],
         ]
         for players in bad:
             with self.assertRaises(GuildError, msg=players) as raised:
@@ -940,7 +956,39 @@ class SoloPlayersBackoffTests(SoloPlayersTestCase):
         self.assertEqual(row["state"], "cooling")
         self.assertIsNotNone(row["retry_at"])
         out = self.cli(["board"], None)[1]
-        self.assertIn("cooling: same trigger, retry after {}".format(row["retry_at"]), out)
+        self.assertIn("cooling: same trigger", out)
+        self.assertIn("retry 4h · next run {}".format(row["next_run_at"]), out)
+
+    def test_next_run_is_when_the_retry_wait_ends(self):
+        self.age(2)
+        next_run = timeutil.from_iso(self.row()["next_run_at"])
+        self.assertAlmostEqual((next_run - timeutil.utcnow()).total_seconds(), 2 * 3600, delta=60)
+
+    def test_same_trigger_five_hours_later_is_due_for_the_default_wait(self):
+        self.age(5)
+        row = self.row()
+        self.assertEqual((row["state"], row["retry_at"], row["next_run_at"]), ("due", None, None))
+        self.assertEqual(solo_players.next_run_label(row), "next tick")
+
+    def test_retry_after_overrides_the_default_wait(self):
+        self.set_players([dict(_RED, retry_after="12h"), _DEP])
+        self.age(5)
+        row = self.row()
+        self.assertEqual((row["state"], row["retry_after"]), ("cooling", "12h"))
+        self.age(13)
+        self.assertEqual(self.row()["state"], "due")
+
+    def test_cooldown_of_a_different_trigger_has_a_next_run(self):
+        self.red("another failure")
+        row = self.row()
+        self.assertIsNone(row["retry_at"])
+        self.assertIsNotNone(row["next_run_at"])
+
+    def test_solo_list_shows_retry_and_next_run(self):
+        self.age(2)
+        out = self.cli(["solo", "list"], None)[1]
+        self.assertIn("retry: 4h next run: {}".format(self.row()["next_run_at"]), out)
+        self.assertIn("retry: 24h next run: none", out)
 
     def test_same_trigger_twenty_five_hours_later_is_due(self):
         self.age(25)
@@ -1540,6 +1588,9 @@ class SoloPlayersCustomTests(SoloPlayersTestCase):
         row = self.custom()
         self.assertEqual((row["state"], row["trigger"], row["retry_at"]), ("idle", None, None))
         self.assertEqual(row["schedule"], "every 2h")
+        self.assertIsNone(row["retry_after"])
+        next_run = timeutil.from_iso(row["next_run_at"])
+        self.assertAlmostEqual((next_run - timeutil.utcnow()).total_seconds(), 2 * 3600, delta=60)
 
     def test_every_player_waits_for_its_interval_after_a_report(self):
         self.finish_job("sec-audit-acme-app", "none")
@@ -1562,7 +1613,7 @@ class SoloPlayersCustomTests(SoloPlayersTestCase):
     def test_every_trigger_backs_off_one_hour_not_a_day(self):
         now = timeutil.utcnow()
         old = timeutil.to_iso(now - timedelta(minutes=30))
-        retry = solo_players._retry_at(now, "every", "every 2h", None, old, "every 2h")
+        retry = solo_players._retry_at(now, None, "every 2h", None, old, "every 2h")
         self.assertEqual(retry, timeutil.from_iso(old) + timedelta(hours=1))
 
     def test_custom_prompt_is_the_command_plus_generic_rules(self):
