@@ -319,3 +319,15 @@ updated: 2026-11-02
 - [x] An `every` player is due with no history and again once the interval passed since its last report or launch.
 - [x] `main-red` and `dependabot` custom players hold, list and sync like the built-in ones.
 - [x] The board, `guild solo list` and the web show the schedule of each player.
+
+## T27 — Configurable retry wait and next run date
+
+**Depends on:** T26
+**Status:** [x] done
+
+**What:** The wait before a solo player retries the same trigger comes from an optional `retry_after` per player, by default 4h on a `main-red` trigger and 24h on a `dependabot` one. The board, `guild solo list` and the web show the wait and an estimated next run.
+
+**Acceptance:**
+- [x] Config accepts `retry_after` on built-in and trigger-driven custom players, and refuses a bad value, one under 1h and one on an `every` trigger.
+- [x] A red-main player retries the same trigger after 4h, a dependabot one after 24h, and `retry_after` overrides both.
+- [x] Each row shows the retry wait and the next run: the cooldown end, the next `every` interval, `next tick` when due, `none` otherwise.

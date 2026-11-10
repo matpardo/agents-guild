@@ -264,7 +264,7 @@ def _validate_health_jobs_config(data):
         raise GuildError("project config 'health_jobs' names must be unique", 1)
 
 
-_SOLO_PLAYER_KEYS = {"repo", "job", "name", "class", "command", "trigger"}
+_SOLO_PLAYER_KEYS = {"repo", "job", "name", "class", "command", "trigger", "retry_after"}
 _SOLO_PLAYER_CUSTOM_KEYS = ("command", "trigger", "class")
 _SOLO_TRIGGER_KINDS = ("main-red", "dependabot")
 
@@ -287,10 +287,23 @@ def _validate_solo_custom_player(player):
     _validate_solo_trigger(player["trigger"])
 
 
+def _validate_solo_retry_after(player):
+    if "retry_after" not in player:
+        return
+    if not isinstance(player["retry_after"], str):
+        raise GuildError("'retry_after' must be a duration like 4h or 1d", 1)
+    if timeutil.parse_duration(player["retry_after"]) < timeutil.parse_duration(solo_players.COOLDOWN):
+        raise GuildError("'retry_after' must be at least {}".format(solo_players.COOLDOWN), 1)
+    if solo_players.player_retry_after(player) is None:
+        raise GuildError("'retry_after' does not apply to an 'every' trigger", 1)
+
+
 def _validate_solo_player(player, repos):
     if not isinstance(player, dict) or not {"repo", "job"} <= set(player) <= _SOLO_PLAYER_KEYS:
         raise GuildError(
-            "entries must be objects with 'repo', 'job' and optionally 'name', 'class', 'command', 'trigger'", 1
+            "entries must be objects with 'repo', 'job' and optionally"
+            " 'name', 'class', 'command', 'trigger', 'retry_after'",
+            1,
         )
     if not isinstance(player["job"], str):
         raise GuildError("'job' must be a string", 1)
@@ -299,6 +312,7 @@ def _validate_solo_player(player, repos):
             raise GuildError("built-in job '{}' does not take 'command' or 'trigger'".format(player["job"]), 1)
     else:
         _validate_solo_custom_player(player)
+    _validate_solo_retry_after(player)
     if player["repo"] not in repos:
         raise GuildError("'repo' must be one of the project's github.repos", 1)
     for key in ("name", "class"):

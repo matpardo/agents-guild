@@ -9,7 +9,7 @@ def _player_rows(ctx):
 
 
 def format_row(row):
-    line = "  {} [{}] {} {} {}{} trigger: {} last done: {} last pending: {} schedule: {}".format(
+    line = "  {} [{}] {} {} {}{} trigger: {} last done: {} last pending: {} schedule: {} retry: {} next run: {}".format(
         row["name"],
         row["class"],
         row["repo"],
@@ -20,6 +20,8 @@ def format_row(row):
         row["last_done"] or "never",
         row["last_pending"] or "none",
         row["schedule"],
+        row["retry_after"] or "none",
+        solo_players.next_run_label(row),
     )
     return "\n".join([line, *solo_players.to_merge_lines(row)])
 

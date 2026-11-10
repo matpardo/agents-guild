@@ -3,7 +3,6 @@ from pathlib import Path
 from guild import localbase, sanitize, timeutil
 
 COOLDOWN = "1h"
-REPEAT_COOLDOWN = "24h"
 RUNS_SHOWN = 5
 LAUNCH_COMMAND = "guild solo launch {} {}"
 RESUME_COMMAND = "guild solo resume {} {}"
@@ -55,6 +54,7 @@ _GENERIC_RULES = (
 _MAIN_RED = "main-red"
 _DEPENDABOT = "dependabot"
 _EVERY = "every"
+_RETRY_AFTER = {_MAIN_RED: "4h", _DEPENDABOT: "24h"}
 
 
 def _job(job_class, trigger, goal, steps, rules):
@@ -100,6 +100,13 @@ def player_trigger(player):
 
 def trigger_kind(player):
     return player_trigger(player).split(" ")[0]
+
+
+def player_retry_after(player):
+    kind = trigger_kind(player)
+    if kind == _EVERY:
+        return None
+    return player.get("retry_after", _RETRY_AFTER[kind])
 
 
 def _prompt(player):
@@ -184,18 +191,22 @@ def _last_launch(conn, health_job):
     return row["launched_at"], row["trigger"]
 
 
-def _every_trigger(conn, now, project, player):
-    trigger = player_trigger(player)
-    interval = timeutil.parse_duration(trigger[len(_EVERY) + 1 :])
+def _every_next_at(conn, project, player):
+    interval = timeutil.parse_duration(player_trigger(player)[len(_EVERY) + 1 :])
     health_job = health_job_name(player["repo"], player["job"])
     stamps = [
         stamp for stamp in (_last_report(conn, project, health_job)[0], _last_launch(conn, health_job)[0]) if stamp
     ]
     if not stamps:
-        return trigger
-    if max(timeutil.from_iso(stamp) for stamp in stamps) + interval > now:
         return None
-    return trigger
+    return max(timeutil.from_iso(stamp) for stamp in stamps) + interval
+
+
+def _every_trigger(conn, now, project, player):
+    next_at = _every_next_at(conn, project, player)
+    if next_at is not None and next_at > now:
+        return None
+    return player_trigger(player)
 
 
 def current_trigger(conn, now, project, player):
@@ -229,9 +240,9 @@ def is_paused(conn, health_job):
     return conn.execute("SELECT 1 FROM solo_pauses WHERE health_job = ?", (health_job,)).fetchone() is not None
 
 
-def _retry_at(now, kind, trigger, last_done, last_launch, last_launch_trigger):
-    repeats = kind != _EVERY and trigger == last_launch_trigger
-    cooldown = timeutil.parse_duration(REPEAT_COOLDOWN if repeats else COOLDOWN)
+def _retry_at(now, retry_after, trigger, last_done, last_launch, last_launch_trigger):
+    repeats = retry_after is not None and trigger == last_launch_trigger
+    cooldown = timeutil.parse_duration(retry_after if repeats else COOLDOWN)
     ends = [timeutil.from_iso(stamp) + cooldown for stamp in (last_done, last_launch) if stamp is not None]
     pending = [end for end in ends if end > now]
     if not pending:
@@ -239,7 +250,7 @@ def _retry_at(now, kind, trigger, last_done, last_launch, last_launch_trigger):
     return max(pending)
 
 
-def _state(now, active, live_ids, paused, kind, trigger, fix_prs, last_done, last_launch, last_launch_trigger):
+def _state(now, active, live_ids, paused, retry_after, trigger, fix_prs, last_done, last_launch, last_launch_trigger):
     if active is not None and active["session_id"] in live_ids:
         return "running"
     if active is not None:
@@ -250,22 +261,36 @@ def _state(now, active, live_ids, paused, kind, trigger, fix_prs, last_done, las
         return "fixing"
     if trigger is None:
         return "idle"
-    if _retry_at(now, kind, trigger, last_done, last_launch, last_launch_trigger) is not None:
+    if _retry_at(now, retry_after, trigger, last_done, last_launch, last_launch_trigger) is not None:
         return "cooling"
     return "due"
 
 
-def _repeat_retry(now, state, kind, trigger, last_done, last_launch, last_launch_trigger):
+def _repeat_retry(now, state, retry_after, trigger, last_done, last_launch, last_launch_trigger):
     if state != "cooling" or trigger != last_launch_trigger:
         return None
-    return timeutil.to_iso(_retry_at(now, kind, trigger, last_done, last_launch, last_launch_trigger))
+    return timeutil.to_iso(_retry_at(now, retry_after, trigger, last_done, last_launch, last_launch_trigger))
+
+
+def _next_run_at(state, cooling_until, every_next_at):
+    if state == "cooling":
+        return timeutil.to_iso(cooling_until)
+    if state == "idle" and every_next_at is not None:
+        return timeutil.to_iso(every_next_at)
+    return None
+
+
+def next_run_label(row):
+    if row["next_run_at"] is not None:
+        return row["next_run_at"]
+    return "next tick" if row["state"] == "due" else "none"
 
 
 def state_detail(row):
     if row["stalled_adventurer"] is not None:
         return ": session gone, run guild adventurer dismiss {}".format(row["stalled_adventurer"])
     if row["retry_at"] is not None:
-        return ": same trigger, retry after {}".format(row["retry_at"])
+        return ": same trigger"
     if row["waits_on"]:
         return ": waits on {}".format(", ".join(row["waits_on"]))
     return ""
@@ -316,6 +341,7 @@ def models(conn, now, projects_by_name, live_ids):
         for player in _players(projects_by_name[project]):
             health_job = health_job_name(player["repo"], player["job"])
             kind = trigger_kind(player)
+            retry_after = player_retry_after(player)
             trigger = current_trigger(conn, now, project, player)
             active = active_adventurer(conn, project, health_job)
             fix_prs = _fix_prs(conn, player)
@@ -326,7 +352,7 @@ def models(conn, now, projects_by_name, live_ids):
                 active,
                 live_ids,
                 is_paused(conn, health_job),
-                kind,
+                retry_after,
                 trigger,
                 fix_prs,
                 last_done,
@@ -344,7 +370,15 @@ def models(conn, now, projects_by_name, live_ids):
                     "trigger": trigger,
                     "schedule": player_trigger(player),
                     "state": state,
-                    "retry_at": _repeat_retry(now, state, kind, trigger, last_done, last_launch, last_launch_trigger),
+                    "retry_after": retry_after,
+                    "retry_at": _repeat_retry(
+                        now, state, retry_after, trigger, last_done, last_launch, last_launch_trigger
+                    ),
+                    "next_run_at": _next_run_at(
+                        state,
+                        _retry_at(now, retry_after, trigger, last_done, last_launch, last_launch_trigger),
+                        _every_next_at(conn, project, player) if kind == _EVERY else None,
+                    ),
                     "stalled_adventurer": None if active is None or active["session_id"] in live_ids else active["id"],
                     "waits_on": fix_prs,
                     "last_done": last_done,
