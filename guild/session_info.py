@@ -1,6 +1,8 @@
 import json
 import os
 
+_REPLACEABLE_NAME_SOURCES = ("derived", "auto", "hook")
+
 
 def pid_alive(pid):
     if isinstance(pid, bool) or not isinstance(pid, int) or pid <= 0:
@@ -18,7 +20,7 @@ def current_session_id():
     return os.environ.get("CLAUDE_CODE_SESSION_ID")
 
 
-def read_session_name(sessions_dir, session_id):
+def _session_entry(sessions_dir, session_id):
     if not sessions_dir.is_dir():
         return None
     for entry in sessions_dir.glob("*.json"):
@@ -27,8 +29,28 @@ def read_session_name(sessions_dir, session_id):
         except (json.JSONDecodeError, OSError):
             continue
         if data.get("sessionId") == session_id:
-            return data.get("name")
+            return data
     return None
+
+
+def read_session_name(sessions_dir, session_id):
+    entry = _session_entry(sessions_dir, session_id)
+    if entry is None:
+        return None
+    return entry.get("name")
+
+
+def needs_title(sessions_dir, session_id, title):
+    entry = _session_entry(sessions_dir, session_id)
+    if entry is None:
+        return False
+    return entry.get("nameSource") in _REPLACEABLE_NAME_SOURCES and entry.get("name") != title
+
+
+def name_once_titled(sessions_dir, session_id, title):
+    if needs_title(sessions_dir, session_id, title):
+        return title
+    return read_session_name(sessions_dir, session_id)
 
 
 def running_session_ids(sessions_dir):

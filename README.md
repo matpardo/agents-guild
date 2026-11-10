@@ -2083,6 +2083,12 @@ guild revive --list            # no tmux needed: one copy-paste command per part
   `~/.tmux.conf` is untouched.
   Claude sessions are named `<party>-g<N>` on both fresh launch and resume,
   so the prompt box and `/resume` picker show the party and its generation.
+  A session started by hand takes the same name, or `adventurer <id>`, from
+  the `UserPromptSubmit` hook on the first human prompt after it binds. Only
+  a name Claude Code generated is replaced: one set with `/rename` or `-n`
+  stays. Health job and solo player sessions are named
+  `health-<job>-YYYYMMDD-HHMMSS` in local time, so each run is distinct; their
+  tmux window keeps the name without the timestamp.
 - `--list` prints, per party, a one-liner for terminals without tmux: it sets
   the tab title with `printf '\033]0;<party>\007'`, then `cd <cwd> && claude
   --resume <id> --name <party>-g<N> ...`.

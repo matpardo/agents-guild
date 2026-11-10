@@ -181,6 +181,13 @@ class HealthJobLaunchTests(HealthJobsTestCase):
         self.assertTrue(command.startswith("GUILD_ADVENTURER_JOB=red-main claude "))
         self.assertTrue(command.endswith(" /check-main"))
 
+    def test_launch_stamps_the_session_name_but_not_the_window(self):
+        tmux = FakeTmux(True, ["guild"], [])
+        self.launch(["adventurer", "launch", "red-main"], None, tmux)
+        call = next(c for c in tmux.calls if c[0] == "new-window")
+        self.assertEqual(call[call.index("-n") + 1], "health-red-main")
+        self.assertRegex(call[-1], r"claude -n health-red-main-\d{8}-\d{6} ")
+
     def test_launch_quotes_the_command(self):
         self.set_jobs([dict(_JOB, command="check main; rm -rf $HOME")])
         tmux = FakeTmux(True, ["guild"], [])

@@ -143,7 +143,7 @@ def launch_window(ctx, project, cwd, job, window_name, tmux):
     session_is_up = tmux_windows.session_exists(tmux)
     if session_is_up and window_name in tmux_windows.window_names(tmux):
         raise GuildError("window '{}' already exists".format(window_name), 1)
-    command = resume.health_command(job["name"], job["command"])
+    command = resume.health_command(job["name"], job["command"], ctx.now)
     window_id = tmux_windows.create_window(tmux, window_name, cwd, command, session_is_up)
     if window_id is None:
         raise GuildError("tmux could not create the window", 1)
