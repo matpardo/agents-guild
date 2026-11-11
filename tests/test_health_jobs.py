@@ -49,8 +49,8 @@ class HealthJobsConfigTests(GuildTestCase):
             self.assertIn("health_jobs", raised.exception.message)
 
     def test_readme_config_example_loads(self):
-        readme = (_ROOT / "README.md").read_text()
-        section = readme.split("## Project config", 1)[1]
+        config_doc = (_ROOT / "docs" / "configuration.md").read_text()
+        section = config_doc.split("## Project config", 1)[1]
         block = re.search(r"```json\n(.*?)\n```", section, re.S).group(1)
         data = json.loads(block)
         self.assertTrue(data["health_jobs"])
