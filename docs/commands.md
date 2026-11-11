@@ -26,6 +26,14 @@ Every guild command, grouped by what you want to do. `guild --help` lists every 
 
 ## Getting started
 
+### `guild --version`
+
+Prints the installed version, from `git describe` of the clone guild runs from: `guild v0.1.0` on a release tag, `guild v0.1.0-3-g<sha>` three commits after it, a `-dirty` suffix with uncommitted changes, `unknown` outside git.
+
+```
+guild --version
+```
+
 ### `guild whoami`
 
 Shows the session, party and project you are bound to.

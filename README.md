@@ -78,6 +78,8 @@ Run from the base clone:
 ./update.sh
 ```
 
+Check what you run with `guild --version`.
+
 It refuses if the clone has local changes or is not on `main`. Otherwise it fast-forwards to `origin/main`, lists the new commits, re-runs `install.sh` and runs `guild doctor`. It never edits project configs.
 
 ## Uninstall

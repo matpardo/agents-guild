@@ -18,6 +18,7 @@ from guild import (
     session_info,
     statusline_state,
     timeutil,
+    version,
 )
 from guild.commands import hook as hook_commands
 from guild.context import RunContext
@@ -2012,7 +2013,10 @@ _COMMAND_BUILDERS = {
 def _new_parser():
     parser = argparse.ArgumentParser(
         prog="guild",
-        description="Guild coordinates parallel Claude Code sessions. See docs/commands.md for the full reference.",
+        description=(
+            "Guild coordinates parallel Claude Code sessions. See docs/commands.md for the full reference."
+            " guild --version prints the installed version."
+        ),
     )
     subparsers = parser.add_subparsers(dest="command", required=True, metavar="<command>")
     return parser, subparsers
@@ -2211,8 +2215,14 @@ def _dispatch_hook(args):
     return _run_stateful_hook(args.hook_name, stdin_data)
 
 
+_REPO_ROOT = Path(__file__).resolve().parent.parent
+
+
 def main(argv):
     os.umask(0o077)
+    if argv == ["--version"]:
+        print("guild {}".format(version.describe(_REPO_ROOT)))
+        return 0
     if argv[:1] == ["hook"]:
         return _dispatch_hook(_build_hook_parser().parse_args(argv[1:]))
     parser = _build_parser_for(argv)

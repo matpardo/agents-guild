@@ -3,7 +3,7 @@ epic: install-and-update
 type: tasks
 title: Versioned install and self-update
 status: active
-updated: 2026-10-31
+updated: 2026-11-11
 ---
 
 # Tasks: Versioned install and self-update
@@ -15,24 +15,24 @@ updated: 2026-10-31
 
 **What:** `./update.sh <installed-worktree>` refuses local changes, moves the installed checkout to `origin/main`, lists the commits it brought, re-runs `install.sh` and runs `guild doctor`. `guild doctor` reports missing hooks in `~/.claude/settings.json`, a missing `~/.claude/GUILD.md` and invalid project configs, without writing anything.
 
-## T02 — Tagged releases and guild version
+## T02 — Tagged releases and `guild --version`
 
 **Depends on:** T01
-**Status:** [x] done — #188
+**Status:** [x] done
 
-**What:** `v0.x.y` tags with a CHANGELOG; `guild version` shows the installed version and whether a newer release exists.
+**What:** semver `v0.x.y` tags with GitHub Releases, and `guild --version` from `git describe` (delivered by T18).
 
 ## T03 — Install script into a managed location
 
 **Depends on:** T02
-**Status:** [x] done — #188
+**Status:** [x] superseded by ADR 20261008_base-clone-install
 
 **What:** an install script that places guild in `~/.local/share/guild/app` pinned to the latest release tag; running it again updates.
 
 ## T04 — guild self-update and new-release hint
 
 **Depends on:** T03
-**Status:** [x] done — #188
+**Status:** [x] superseded by ADR 20261008_base-clone-install
 
 **What:** `guild self-update [--to <tag>]`, and the session-start brief mentions a newer release (checked in the background).
 
@@ -126,3 +126,10 @@ updated: 2026-10-31
 **Status:** [x] done
 
 **What:** `guild web` waits for its due-jobs ticker thread to finish before it returns, so no job writes into the state directory after the server has stopped.
+
+## T18 — Version from git tags
+
+**Depends on:** T01
+**Status:** [x] done
+
+**What:** `guild --version` prints `git describe --tags --always --dirty` of the clone guild runs from (`unknown` outside git), and `docs/development.md` describes how to cut a semver release.
