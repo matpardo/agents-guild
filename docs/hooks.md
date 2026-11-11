@@ -112,7 +112,7 @@ errors print `guild hook error: ...` and never block the commit. It never
 reads stdin.
 
 Claims taken by either guard are released when the holder's PR that touched
-them is merged, as seen by `guild sync --source gh` (see "Merge notices"), so
+them is merged, as seen by `guild sync --source gh` (see [Merge notices](commands.md#guild-sync)), so
 a raid member's `/loop` sync is what frees the area for other parties before
 the TTL runs out.
 
