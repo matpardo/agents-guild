@@ -2,7 +2,7 @@
 epic: human-docs
 type: tasks
 title: Human-friendly docs
-status: active
+status: done
 updated: 2026-11-11
 ---
 
@@ -41,9 +41,9 @@ updated: 2026-11-11
 ## T04 — Rewrite the remaining reference files
 
 **Depends on:** T01
-**Status:** [ ] pending
+**Status:** [x] done
 
 **What:** Rewrite the other `docs/` files for readers, one file at a time, keeping every key and fact documented.
 
 **Acceptance:**
-- [ ] Each `docs/` file reads on its own and keeps the facts of the verbatim version.
+- [x] Each `docs/` file reads on its own and keeps the facts of the verbatim version.

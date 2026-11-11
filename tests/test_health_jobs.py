@@ -51,10 +51,10 @@ class HealthJobsConfigTests(GuildTestCase):
     def test_readme_config_example_loads(self):
         config_doc = (_ROOT / "docs" / "configuration.md").read_text()
         section = config_doc.split("## Project config", 1)[1]
-        block = re.search(r"```json\n(.*?)\n```", section, re.S).group(1)
-        data = json.loads(block)
-        self.assertTrue(data["health_jobs"])
-        config.validate_project_config(data)
+        configs = [json.loads(block) for block in re.findall(r"```json\n(.*?)\n```", section, re.S)]
+        for data in configs:
+            config.validate_project_config(data)
+        self.assertTrue(any(data.get("health_jobs") for data in configs))
 
 
 class HealthJobsTestCase(GuildTestCase):
