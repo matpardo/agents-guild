@@ -65,7 +65,7 @@ Notice text, ask question and context, answer text and handoff `--in-flight` and
 - Length caps (`GuildError` if exceeded): notice text 500, ask question 300, ask context 2000, answer 1000, handoff `--in-flight` and `--learned` 4000 each.
 - An embedded email address is always rejected.
 - A project's `pii_patterns` (see [Configuration](configuration.md#key-reference)) are checked too, scoped to the caller's project. For an answer, the project is the one of the party that asked.
-- Every successful `notice create`, `ask` and `handoff` prints one reminder line afterward: never put names or identifiers of real people (students, guardians, staff) in these fields; use ids and roles instead.
+- Every successful `notice create`, `ask` and `handoff` prints one reminder line afterward: never put names or identifiers of real people (customers, users, staff) in these fields; use ids and roles instead.
 
 Sanitizing:
 

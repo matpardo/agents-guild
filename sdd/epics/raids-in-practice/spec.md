@@ -16,7 +16,7 @@ Several parties develop one epic in parallel without colliding: shared files are
 
 ## Problem
 
-Preparing the first real raid (three parties running `/epic-auto-full` under `/goal`, one leading) showed that the rules lived in prose: the claim instruction never reaches the `coder` subagents that actually edit, merges must be announced by hand, membership expires by TTL without warning, and nothing stops two parties from taking the same task.
+Preparing the first real raid (three parties running an autonomous epic skill under `/goal`, one leading) showed that the rules lived in prose: the claim instruction never reaches the `coder` subagents that actually edit, merges must be announced by hand, membership expires by TTL without warning, and nothing stops two parties from taking the same task.
 
 ## Scope
 
@@ -29,7 +29,7 @@ Preparing the first real raid (three parties running `/epic-auto-full` under `/g
 
 ## Out of scope
 
-- Changing `/epic-auto-full` itself; it can call `guild claim check`.
+- Changing that epic skill itself; it can call `guild claim check`.
 
 ## Success criteria
 

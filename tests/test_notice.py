@@ -75,7 +75,7 @@ class NoticeTests(GuildTestCase):
         data["pii_patterns"] = [r"Jane Doe"]
         config_file.write_text(json.dumps(data))
         code, out, err = self.run_cli(
-            ["notice", "create", "student Jane Doe missed class", "--to", "project:acme", "--ttl", "2h"],
+            ["notice", "create", "customer Jane Doe missed a payment", "--to", "project:acme", "--ttl", "2h"],
             None,
             self.repo_dir,
         )
