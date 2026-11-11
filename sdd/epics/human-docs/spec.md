@@ -2,7 +2,7 @@
 epic: human-docs
 type: spec
 title: Human-friendly docs
-status: active
+status: done
 owner: matpardo
 created: 2026-11-11
 updated: 2026-11-11
