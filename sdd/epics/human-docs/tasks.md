@@ -21,12 +21,12 @@ updated: 2026-11-11
 ## T02 — New README for humans
 
 **Depends on:** T01
-**Status:** [ ] pending
+**Status:** [x] done
 
 **What:** Rewrite the README with a plain intro, an AI-built and use-at-your-own-risk notice, a lore section, prerequisites and a quickstart.
 
 **Acceptance:**
-- [ ] A new reader can install and try guild from the README alone.
+- [x] A new reader can install and try guild from the README alone.
 
 ## T03 — Rewrite reference per docs file
 
