@@ -216,6 +216,19 @@ class GhSyncTests(_CloneFixture, _MainStatusCase):
         self._sync()
         self.assertEqual(self.rows(), [])
 
+    def test_failing_dependabot_check_on_the_base_head_does_not_mark_main_red(self):
+        self.write_gh_fixture(
+            "branch_checks_acme-app_main",
+            {
+                "check_runs": [
+                    {"name": "unit", "conclusion": "success"},
+                    {"name": "Dependabot", "conclusion": "failure"},
+                ]
+            },
+        )
+        self._sync()
+        self.assertEqual(self.rows(), [])
+
     def test_failing_head_checks_win_over_workflow_runs(self):
         self.write_gh_fixture("branch_checks_acme-app_main", _FAILED_RUNS)
         self.write_gh_fixture("branch_runs_acme-app_main", [self._run("CI", "failure", "aaaaaaa000", 9, "schedule")])
