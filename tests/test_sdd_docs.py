@@ -124,7 +124,7 @@ class EphemeralBriefDocsTests(unittest.TestCase):
             " with a task: read-only, budgeted brief for a fresh session",
             _COMMANDS,
         )
-        self.assertIn("### Task brief", _COMMANDS)
+        self.assertIn("### `guild brief`", _COMMANDS)
         self.assertIn("'Continue the work described in the guild brief.'", _COMMANDS)
         self.assertNotIn("described in the guild handoff", _USER_DOCS)
         self.assertIn(

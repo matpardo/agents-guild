@@ -28,12 +28,22 @@ updated: 2026-11-11
 **Acceptance:**
 - [x] A new reader can install and try guild from the README alone.
 
-## T03 — Rewrite reference per docs file
+## T03 — Rewrite the commands reference
+
+**Depends on:** T01
+**Status:** [x] done
+
+**What:** Rewrite `docs/commands.md` for readers: grouped by job, one short section per command, design notes moved to decisions, every flag and behavior kept.
+
+**Acceptance:**
+- [x] Every command, flag and behavior of the verbatim version is still documented.
+
+## T04 — Rewrite the remaining reference files
 
 **Depends on:** T01
 **Status:** [ ] pending
 
-**What:** Rewrite each `docs/` file for readers, one file at a time, keeping every command and key documented.
+**What:** Rewrite the other `docs/` files for readers, one file at a time, keeping every key and fact documented.
 
 **Acceptance:**
 - [ ] Each `docs/` file reads on its own and keeps the facts of the verbatim version.
