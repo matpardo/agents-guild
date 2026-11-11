@@ -8,6 +8,11 @@ _SDD_ROOT = Path(__file__).resolve().parent.parent / "sdd"
 _EPICS_DIR = _SDD_ROOT / "epics"
 _DECISIONS_DIR = _SDD_ROOT / "decisions"
 _README = (_SDD_ROOT.parent / "README.md").read_text()
+_DOCS_DIR = _SDD_ROOT.parent / "docs"
+_CONCEPTS = (_DOCS_DIR / "concepts.md").read_text()
+_COMMANDS = (_DOCS_DIR / "commands.md").read_text()
+_CONFIGURATION = (_DOCS_DIR / "configuration.md").read_text()
+_USER_DOCS = _README + "".join(path.read_text() for path in sorted(_DOCS_DIR.glob("*.md")))
 _GUILD_MD = (_SDD_ROOT.parent / "GUILD.md").read_text()
 _SHORT_SESSIONS_VOCABULARY = "20261004_vocabulary-short-sessions"
 _NEW_VOCABULARY = "20261023_adventurers-and-open-quests"
@@ -100,7 +105,7 @@ class VocabularyDecisionTests(unittest.TestCase):
             self.assertIn("| {} |".format(term), new)
 
     def test_readme_glossary_matches(self):
-        glossary = _README.split("## Glossary")[1].split("## Install")[0]
+        glossary = _CONCEPTS.split("## Glossary")[1].split("## Identity")[0]
         self.assertIn("the live session of a party: zero or one", glossary)
         for term in ("generation", "brief"):
             self.assertIn("- **{}**".format(term), glossary)
@@ -117,15 +122,16 @@ class EphemeralBriefDocsTests(unittest.TestCase):
         self.assertIn(
             "guild brief [<party>/<quest>/<tid>]   # no argument: per-session view;"
             " with a task: read-only, budgeted brief for a fresh session",
-            _README,
+            _COMMANDS,
         )
-        self.assertIn("### Task brief", _README)
-        self.assertIn("'Continue the work described in the guild brief.'", _README)
-        self.assertNotIn("described in the guild handoff", _README)
+        self.assertIn("### Task brief", _COMMANDS)
+        self.assertIn("'Continue the work described in the guild brief.'", _COMMANDS)
+        self.assertNotIn("described in the guild handoff", _USER_DOCS)
         self.assertIn(
-            "Recommended: 40, so sessions stay short and each fresh generation starts from the brief.", _README
+            "Recommended: 40, so sessions stay short and each fresh generation starts from the brief.",
+            _CONFIGURATION,
         )
-        self.assertIn('"handoff_threshold": 40,', _README)
+        self.assertIn('"handoff_threshold": 40,', _CONFIGURATION)
 
     def test_guild_md_says_sessions_are_short(self):
         self.assertIn(
@@ -157,7 +163,7 @@ class DispatcherRetirementDocsTests(unittest.TestCase):
         )
 
     def test_docs_no_longer_mention_the_dispatcher_commands(self):
-        for text in (_README, _GUILD_MD):
+        for text in (_USER_DOCS, _GUILD_MD):
             self.assertNotIn("guild dispatch", text)
             self.assertNotIn("dispatch-timer", text)
 

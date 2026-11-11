@@ -213,5 +213,5 @@ def run(ctx, scan_prs):
     healthy = all(passed for passed, _ in checks)
     lines = [line for _, line in checks]
     if not healthy:
-        lines.append("see README (Hooks, Install) for the missing pieces")
+        lines.append("see docs/hooks.md and the README Install section for the missing pieces")
     return "\n".join(lines), 0 if healthy else 1

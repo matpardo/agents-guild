@@ -2012,7 +2012,7 @@ _COMMAND_BUILDERS = {
 def _new_parser():
     parser = argparse.ArgumentParser(
         prog="guild",
-        description="Guild coordinates parallel Claude Code sessions. See the README Commands section for the full reference.",
+        description="Guild coordinates parallel Claude Code sessions. See docs/commands.md for the full reference.",
     )
     subparsers = parser.add_subparsers(dest="command", required=True, metavar="<command>")
     return parser, subparsers

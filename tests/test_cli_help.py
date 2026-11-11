@@ -35,7 +35,7 @@ class CliHelpTest(unittest.TestCase):
             "track PRs and set their state",
             "relaunch active parties after a reboot",
             "serve the local board in a browser",
-            "see the README Commands section",
+            "see docs/commands.md",
         ):
             self.assertIn(expected.lower(), text.lower())
 
