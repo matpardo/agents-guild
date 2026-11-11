@@ -168,3 +168,13 @@ updated: 2026-10-25
 - [x] `start`, `block` and `done` refuse a discarded task.
 - [x] Drift flags a discarded task still listed in the epic's `tasks.md`.
 - [x] `GUILD.md` and `README.md` describe both commands.
+
+## T22 — uv 0.13.7
+
+**Depends on:** T19
+**Status:** [x] done
+
+**What:** `required-version` in `pyproject.toml` pins uv `==0.13.7`, the version Dependabot's `uv` job now bundles, so its ruff update runs again (ADR `20261101_seven-day-dependency-cooldown.md`).
+
+**Acceptance:**
+- [x] `uv lock --locked` passes with uv 0.13.7.
