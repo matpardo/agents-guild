@@ -197,7 +197,10 @@ _CREATE_STATEMENTS = (
         deadline TEXT,
         project TEXT,
         created_at TEXT NOT NULL,
-        updated_at TEXT NOT NULL
+        updated_at TEXT NOT NULL,
+        uuid TEXT,
+        exported_to TEXT,
+        exported_at TEXT
     )
     """,
     """
@@ -500,6 +503,9 @@ _COLUMN_MIGRATIONS = (
     ("parties", "goal", "TEXT"),
     ("parties", "done_when", "TEXT"),
     ("adventurers", "reason", "TEXT"),
+    ("ideas", "uuid", "TEXT"),
+    ("ideas", "exported_to", "TEXT"),
+    ("ideas", "exported_at", "TEXT"),
 )
 
 

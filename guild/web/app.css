@@ -995,7 +995,8 @@ li.finding-guard {
   display: inline;
 }
 
-.idea-description {
+.idea-description,
+.idea-note {
   white-space: pre-wrap;
 }
 

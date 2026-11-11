@@ -121,6 +121,7 @@ _BOARD = {
     "asks": [],
     "notices": [],
     "ideas": [],
+    "exported_ideas": [],
     "adventurers": [],
     "health_jobs": [],
     "solo_players": [],
@@ -1041,6 +1042,23 @@ class WebNoticeAndRaidBehaviorTests(unittest.TestCase):
         ):
             self.assertIn(expected, out)
 
+    def test_exported_ideas_have_their_own_section_and_stay_out_of_the_list_and_count(self):
+        exported = self._idea(id=2, title="Gone away", exported_to="beta")
+        board = dict(self._board(False), ideas=[self._idea()], exported_ideas=[exported])
+        out = self._rendered(board, "ideas")
+        self.assertIn("ideas (1)", out)
+        self.assertIn("exported (1)", out)
+        self.assertIn("#2 Gone away", out)
+        self.assertIn("exported to beta", out)
+        self.assertIn("Unexport", out)
+        sidebar = self._rendered(board, "sidebar")
+        self.assertIn("ideas (1)", sidebar)
+
+    def test_transfer_controls_render_in_the_ideas_section(self):
+        out = self._rendered(dict(self._board(False)), "ideas")
+        for expected in ("Export project", "Import", "Confirm export"):
+            self.assertIn(expected, out)
+
     def test_idea_shows_linked_parties_with_unlink_and_link_choices(self):
         idea = self._idea(parties=[{"name": "a", "state": "active"}, {"name": "old", "state": "closed"}])
         board = dict(self._board(False), ideas=[idea])
@@ -1161,7 +1179,7 @@ class WebNoticeAndRaidBehaviorTests(unittest.TestCase):
 
     def test_idea_project_select_lists_every_registered_project_and_names_the_empty_choice(self):
         options = [n["text"] for n in self._idea_form_inputs() if n["tag"] == "option"]
-        self.assertEqual(options, ["no project", "acme", "zeta"])
+        self.assertEqual(options, ["no project", "acme", "zeta"] * 3)
 
     def test_ideas_survive_the_party_filter(self):
         out = _render(dict(self._board(False), ideas=[self._idea()]), "a", "all", "ideas", "text")

@@ -988,6 +988,11 @@ _ANSWER_DENY_REASON = "guild: agents cannot answer or dismiss an ask; only a hum
 _REALM_DENY_REASON = (
     "guild: agents cannot run realm commands other than status and doctor; only a human may run this outside a session"
 )
+_IDEA_TRANSFER_SUBCOMMANDS = ("export", "unexport", "import", "confirm-export")
+_IDEA_TRANSFER_DENY_REASON = (
+    "guild: agents cannot export, import or confirm ideas; only a human may run this outside a session"
+)
+_IDEA_TRANSFER_RE = re.compile(r"\bidea\b.*\b(export|unexport|import|confirm-export)\b")
 _PYTHON_RE = re.compile(r"python(3(\.\d+)?)?")
 _GUILD_MODULES = ("guild", "guild.cli")
 _REALM_WRAPPERS = ("nohup", "time", "exec", "xargs", "env", "command", "sudo", "timeout", "nice", "stdbuf")
@@ -1071,6 +1076,8 @@ def _segment_deny_reason(tokens):
         return _ANSWER_DENY_REASON
     if words[:1] == ["realm"] and words[1:2] not in (["status"], ["doctor"]):
         return _REALM_DENY_REASON
+    if words[:1] == ["idea"] and words[1:2] and words[1] in _IDEA_TRANSFER_SUBCOMMANDS:
+        return _IDEA_TRANSFER_DENY_REASON
     return None
 
 
@@ -1081,6 +1088,8 @@ def _unparseable_deny_reason(command):
         return _ANSWER_DENY_REASON
     if re.search(r"\brealm\b", command):
         return _REALM_DENY_REASON
+    if _IDEA_TRANSFER_RE.search(command):
+        return _IDEA_TRANSFER_DENY_REASON
     return None
 
 

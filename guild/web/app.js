@@ -92,6 +92,11 @@ realmDoctorLines: [],
     ideaDrafts: {},
     ideaStatuses: {},
     ideaBusy: {},
+    ideaNotes: {},
+    ideaExportDraft: { destination: "", project: "" },
+    ideaImportDraft: { text: "", project: "" },
+    ideaConfirmDraft: { text: "" },
+    exportedIdeasOpen: false,
     ideaLinkChoices: {},
     questForms: {},
     questStatuses: {},
@@ -1669,7 +1674,7 @@ realmDoctorLines: [],
       delete state.ideaBusy[key];
       state.ideaStatuses[key] = result.ok ? "" : errorMessage(result.body);
       if (result.ok) {
-        onSuccess();
+        onSuccess(result.body);
       }
       fetchBoard();
     });
@@ -1729,6 +1734,20 @@ realmDoctorLines: [],
     fields.appendChild(ideaInput(draft, key, "deadline", "text", "deadline YYYY-MM-DD", busy));
     fields.appendChild(ideaProjectSelect(draft, projectNames, busy));
     return fields;
+  }
+
+  function ideaTextArea(draft, key, placeholder, disabled) {
+    var area = el("textarea");
+    area.dataset.focusKey = "idea-" + key + "-text";
+    area.rows = 4;
+    area.className = "answer-field idea-description";
+    area.placeholder = placeholder;
+    area.value = draft.text;
+    area.disabled = disabled;
+    area.addEventListener("input", function () {
+      draft.text = area.value;
+    });
+    return area;
   }
 
   function ideaActionButton(label, busy, handler) {
@@ -1899,6 +1918,13 @@ realmDoctorLines: [],
     return links;
   }
 
+  function exportIdea(idea) {
+    var destination = state.ideaExportDraft.destination;
+    postIdea("/api/ideas/export", { ids: [idea.id], destination: destination }, "transfer", function (body) {
+      state.ideaNotes.transfer = body.message;
+    });
+  }
+
   function renderIdeaView(article, idea, partyNames, adventurerIds) {
     var busy = state.ideaBusy[idea.id] === true;
     article.appendChild(textEl("h3", "#" + idea.id + " " + idea.title));
@@ -1919,6 +1945,9 @@ realmDoctorLines: [],
         fetchBoard();
       })
     );
+    actions.appendChild(ideaActionButton("Export", busy, function () {
+      exportIdea(idea);
+    }));
     actions.appendChild(
       ideaActionButton("Delete", busy, function () {
         postIdea("/api/ideas/" + idea.id + "/delete", {}, idea.id, function () {});
@@ -1962,7 +1991,110 @@ realmDoctorLines: [],
     return article;
   }
 
-  function renderIdeas(ideas, projectNames, partyNames, adventurerIds) {
+  function renderExportedIdea(idea) {
+    var busy = state.ideaBusy[idea.id] === true;
+    var article = el("article");
+    article.className = "card idea";
+    article.appendChild(textEl("h3", "#" + idea.id + " " + idea.title));
+    article.appendChild(classedText("p", "exported to " + idea.exported_to + " · " + ideaMeta(idea), "muted"));
+    var actions = el("div");
+    actions.className = "notice-actions";
+    actions.appendChild(
+      ideaActionButton("Unexport", busy, function () {
+        postIdea("/api/ideas/" + idea.id + "/unexport", {}, idea.id, function (body) {
+          state.ideaNotes.transfer = body.message;
+        });
+      })
+    );
+    actions.appendChild(
+      ideaActionButton("Delete", busy, function () {
+        postIdea("/api/ideas/" + idea.id + "/delete", {}, idea.id, function () {});
+      })
+    );
+    actions.appendChild(classedText("span", state.ideaStatuses[idea.id] || "", "ask-status"));
+    article.appendChild(actions);
+    return article;
+  }
+
+  function renderExportedIdeas(exportedIdeas) {
+    var details = el("details");
+    details.className = "ideas-section";
+    details.open = state.exportedIdeasOpen;
+    details.addEventListener("toggle", function () {
+      state.exportedIdeasOpen = details.open;
+    });
+    var summary = el("summary");
+    summary.appendChild(textEl("h3", "exported (" + exportedIdeas.length + ")"));
+    details.appendChild(summary);
+    appendAll(details, exportedIdeas.map(renderExportedIdea));
+    return details;
+  }
+
+  function ideaTransferRow(children) {
+    var row = el("div");
+    row.className = "notice-actions";
+    appendAll(row, children);
+    return row;
+  }
+
+  function renderIdeaTransfer(projectNames) {
+    var busy = state.ideaBusy.transfer === true;
+    var panel = el("div");
+    panel.className = "idea-form";
+    var exportDraft = state.ideaExportDraft;
+    panel.appendChild(
+      ideaTransferRow([
+        ideaInput(exportDraft, "transfer", "destination", "text", "export destination", busy),
+        ideaProjectSelect(exportDraft, projectNames, busy),
+        ideaActionButton("Export project", busy, function () {
+          postIdea(
+            "/api/ideas/export-project",
+            { project: exportDraft.project, destination: exportDraft.destination },
+            "transfer",
+            function (body) {
+              state.ideaNotes.transfer = body.message;
+            }
+          );
+        }),
+      ])
+    );
+    var importDraft = state.ideaImportDraft;
+    panel.appendChild(ideaTextArea(importDraft, "import", "paste an idea export file", busy));
+    panel.appendChild(
+      ideaTransferRow([
+        ideaProjectSelect(importDraft, projectNames, busy),
+        ideaActionButton("Import", busy, function () {
+          var payload = { text: importDraft.text, project: importDraft.project === "" ? null : importDraft.project };
+          postIdea("/api/ideas/import", payload, "transfer", function (body) {
+            importDraft.text = "";
+            state.ideaNotes.transfer = body.message;
+          });
+        }),
+      ])
+    );
+    var confirmDraft = state.ideaConfirmDraft;
+    panel.appendChild(ideaTextArea(confirmDraft, "confirm", "paste an idea receipt file", busy));
+    panel.appendChild(
+      ideaTransferRow([
+        ideaActionButton("Confirm export", busy, function () {
+          if (!window.confirm("Delete the exported ideas listed in this receipt? This cannot be undone.")) {
+            return;
+          }
+          postIdea("/api/ideas/confirm-export", { text: confirmDraft.text }, "transfer", function (body) {
+            confirmDraft.text = "";
+            state.ideaNotes.transfer = body.message;
+          });
+        }),
+        classedText("span", state.ideaStatuses.transfer || "", "ask-status"),
+      ])
+    );
+    if (state.ideaNotes.transfer) {
+      panel.appendChild(classedText("pre", state.ideaNotes.transfer, "idea-note"));
+    }
+    return panel;
+  }
+
+  function renderIdeas(ideas, exportedIdeas, projectNames, partyNames, adventurerIds) {
     var section = document.getElementById("ideas");
     clear(section);
     var details = el("details");
@@ -1975,12 +2107,14 @@ realmDoctorLines: [],
     summary.appendChild(textEl("h2", "ideas (" + ideas.length + ")"));
     details.appendChild(summary);
     details.appendChild(renderIdeaForm(projectNames));
+    details.appendChild(renderIdeaTransfer(projectNames));
     appendAll(
       details,
       ideas.map(function (idea) {
         return renderIdea(idea, projectNames, partyNames, adventurerIds);
       })
     );
+    details.appendChild(renderExportedIdeas(exportedIdeas));
     section.appendChild(details);
   }
 
@@ -3604,6 +3738,7 @@ realmDoctorLines: [],
     return {
       generated_at: data.generated_at,
       ideas: data.ideas,
+      exported_ideas: data.exported_ideas,
       adventurers: data.adventurers,
       health_jobs: data.health_jobs,
       solo_players: data.solo_players,
@@ -3663,6 +3798,7 @@ realmDoctorLines: [],
     return {
       generated_at: data.generated_at,
       ideas: data.ideas,
+      exported_ideas: data.exported_ideas,
       adventurers: data.adventurers,
       health_jobs: data.health_jobs,
       solo_players: data.solo_players,
@@ -4624,7 +4760,12 @@ realmDoctorLines: [],
     renderSection("notices", [filtered.notices, filtered.projects, filtered.raids], renderNotices, onlyIfChanged);
     renderSection(
       "ideas",
-      [filtered.ideas, data.project_names, activePartyNames(data.parties), activeAdventurerIds(data.adventurers)],
+      [
+        filtered.ideas,
+        filtered.exported_ideas,
+        data.project_names,
+        activePartyNames(data.parties), activeAdventurerIds(data.adventurers),
+      ],
       renderIdeas,
       onlyIfChanged
     );

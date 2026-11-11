@@ -511,15 +511,55 @@ def _handle_idea_unlink(ctx, args):
     return 0
 
 
+def _handle_idea_export(ctx, args):
+    from guild.commands import idea as idea_commands
+
+    if (args.ids == []) == (args.project is None):
+        raise GuildError("pass idea ids or --project, not both and not neither", 1)
+    if args.project is not None:
+        _print(idea_commands.export_project(ctx, args.project, args.to, args.out))
+        return 0
+    _print(idea_commands.export_ids(ctx, args.ids, args.to, args.out))
+    return 0
+
+
+def _handle_idea_unexport(ctx, args):
+    from guild.commands import idea as idea_commands
+
+    _print(idea_commands.unexport(ctx, args.id))
+    return 0
+
+
+def _read_text_file(path):
+    try:
+        return Path(path).read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError) as error:
+        raise GuildError("cannot read {}: {}".format(path, error), 1) from error
+
+
+def _handle_idea_import(ctx, args):
+    from guild.commands import idea as idea_commands
+
+    _print(idea_commands.import_text(ctx, _read_text_file(args.file), args.receipt, args.project))
+    return 0
+
+
+def _handle_idea_confirm_export(ctx, args):
+    from guild.commands import idea as idea_commands
+
+    _print(idea_commands.confirm_export_text(ctx, _read_text_file(args.receipt)))
+    return 0
+
+
 def _handle_ideas(ctx, args):
     from guild.commands import idea as idea_commands
 
     if args.idea_id is not None:
-        if args.project is not None:
+        if args.project is not None or args.exported:
             raise GuildError("guild ideas <id> takes no filters", 1)
         _print_lines(idea_commands.show(ctx, args.idea_id))
         return 0
-    _print_lines(idea_commands.list_ideas(ctx, args.project))
+    _print_lines(idea_commands.list_ideas(ctx, args.project, args.exported))
     return 0
 
 
@@ -1358,6 +1398,31 @@ def _add_idea_parser(subparsers):
         parser_.add_argument("--adventurer", type=int, help="the adventurer working on it; a session uses its own")
         parser_.set_defaults(handler=handler)
 
+    _add_idea_transfer_parsers(actions)
+
+
+def _add_idea_transfer_parsers(actions):
+    export = actions.add_parser("export", help="write ideas to an md file for another guild")
+    export.add_argument("ids", type=int, nargs="*")
+    export.add_argument("--project", help="export every idea of this project")
+    export.add_argument("--to", required=True, help="where the file goes, kept as a label")
+    export.add_argument("--out", required=True, help="new .md file to write")
+    export.set_defaults(handler=_handle_idea_export)
+
+    unexport = actions.add_parser("unexport", help="bring an exported idea back")
+    unexport.add_argument("id", type=int)
+    unexport.set_defaults(handler=_handle_idea_unexport)
+
+    import_ = actions.add_parser("import", help="import ideas from an export file")
+    import_.add_argument("file")
+    import_.add_argument("--receipt", required=True, help="new .md receipt file to write")
+    import_.add_argument("--project", help="registered project for every imported idea")
+    import_.set_defaults(handler=_handle_idea_import)
+
+    confirm = actions.add_parser("confirm-export", help="delete exported ideas the other side confirmed")
+    confirm.add_argument("receipt")
+    confirm.set_defaults(handler=_handle_idea_confirm_export)
+
 
 def _add_adventurer_parser(subparsers):
     parser = subparsers.add_parser("adventurer", help="start or finish a one-job session")
@@ -1709,6 +1774,7 @@ def _add_ideas_parser(subparsers):
     ideas = subparsers.add_parser("ideas", help="list ideas, or show one in detail")
     ideas.add_argument("idea_id", type=int, nargs="?")
     ideas.add_argument("--project", help="only ideas of this project")
+    ideas.add_argument("--exported", action="store_true", help="list the exported ideas instead")
     ideas.set_defaults(handler=_handle_ideas)
 
 

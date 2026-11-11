@@ -1992,6 +1992,28 @@ class PreAnswerHookTests(GuildTestCase):
         self._assert_realm_denied("guild realm doctor2")
         self._assert_realm_denied("guild realm push")
 
+    def test_idea_transfer_commands_are_denied(self):
+        for command in (
+            "guild idea export 1 --to b --out x.md",
+            "guild idea unexport 1",
+            "guild idea import f.md --receipt r.md",
+            "cd /foo && guild idea confirm-export r.md",
+            "python3 -m guild idea export --project acme --to b --out x.md",
+            "bash -lc 'guild idea import f.md --receipt r.md'",
+        ):
+            code, out, err = self._bash("sess-1", command)
+            decision = json.loads(out)["hookSpecificOutput"]
+            self.assertEqual(decision["permissionDecision"], "deny", command)
+            self.assertIn("agents cannot export, import or confirm ideas", decision["permissionDecisionReason"])
+
+    def test_unparseable_idea_transfer_is_denied(self):
+        code, out, err = self._bash("sess-1", "guild idea export 1 --to 'oops")
+        self.assertEqual(json.loads(out)["hookSpecificOutput"]["permissionDecision"], "deny")
+
+    def test_other_idea_commands_are_silent(self):
+        self._assert_silent("sess-1", "guild idea add t --description d")
+        self._assert_silent("sess-1", "guild ideas --exported")
+
     def test_realm_status_is_silent(self):
         self._assert_silent("sess-1", "guild realm status")
         self._assert_silent("sess-1", "echo guild realm send")

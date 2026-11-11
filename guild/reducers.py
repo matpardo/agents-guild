@@ -610,6 +610,37 @@ def _idea_created(conn, event):
     )
 
 
+def _idea_imported(conn, event):
+    payload = event["payload"]
+    conn.execute(
+        "INSERT INTO ideas (id, title, description, requester, deadline, project, created_at, updated_at, uuid)"
+        " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        (
+            payload["id"],
+            payload["title"],
+            payload["description"],
+            payload["requester"],
+            payload["deadline"],
+            payload["project"],
+            event["ts"],
+            event["ts"],
+            payload["uuid"],
+        ),
+    )
+
+
+def _idea_exported(conn, event):
+    payload = event["payload"]
+    conn.execute(
+        "UPDATE ideas SET uuid = ?, exported_to = ?, exported_at = ? WHERE id = ?",
+        (payload["uuid"], payload["destination"], event["ts"], payload["id"]),
+    )
+
+
+def _idea_unexported(conn, event):
+    conn.execute("UPDATE ideas SET exported_to = NULL, exported_at = NULL WHERE id = ?", (event["payload"]["id"],))
+
+
 def _idea_edited(conn, event):
     payload = event["payload"]
     columns = [column for column in _IDEA_COLUMNS if column in payload["fields"]]
@@ -1024,6 +1055,9 @@ _REDUCERS = {
     "notice.seen": _notice_seen,
     "notice.unseen": _notice_unseen,
     "idea.created": _idea_created,
+    "idea.imported": _idea_imported,
+    "idea.exported": _idea_exported,
+    "idea.unexported": _idea_unexported,
     "idea.edited": _idea_edited,
     "idea.deleted": _idea_deleted,
     "idea.linked": _idea_linked,
@@ -1148,6 +1182,9 @@ _REQUIRED_KEYS = {
     "notice.seen": ("id",),
     "notice.unseen": ("id",),
     "idea.created": ("id", "title", "description", "requester", "deadline", "project"),
+    "idea.imported": ("id", "title", "description", "requester", "deadline", "project", "uuid"),
+    "idea.exported": ("id", "uuid", "destination"),
+    "idea.unexported": ("id",),
     "idea.edited": ("fields", "id"),
     "idea.deleted": ("id",),
     "idea.linked": ("id", "party"),

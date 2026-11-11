@@ -1381,6 +1381,7 @@ def _idea_model(ctx, row):
         "requester": row["requester"],
         "deadline": row["deadline"],
         "project": row["project"],
+        "exported_to": row["exported_to"],
         "dates": timeutil.dates_label(row["created_at"], row["updated_at"]),
         "overdue": idea_commands.is_overdue(ctx.now, row["deadline"]),
         "parties": [
@@ -1615,7 +1616,8 @@ def board_model(ctx):
         "asks": [_ask_model(ctx.conn, row) for row in ask_rows],
         "notices": [_notice_model(ctx, row) for row in notice_rows],
         "new_notice_count": notice_commands.count_new(notice_rows),
-        "ideas": [_idea_model(ctx, row) for row in idea_commands.sorted_rows(ctx, None)],
+        "ideas": [_idea_model(ctx, row) for row in idea_commands.sorted_rows(ctx, None, False)],
+        "exported_ideas": [_idea_model(ctx, row) for row in idea_commands.sorted_rows(ctx, None, True)],
         "adventurers": [
             _adventurer_model(ctx, repo_clones, row, live_ids, projects_by_name) for row in _adventurer_rows(ctx.conn)
         ],
