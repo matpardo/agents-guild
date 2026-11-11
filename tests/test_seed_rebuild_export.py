@@ -13,8 +13,8 @@ _SEED = {
             "epic": "compliance",
             "title": "Wave 1",
             "tasks": [
-                {"tid": "T09", "title": "Flags per school", "state": "active", "summary": "in review"},
-                {"tid": "T04", "title": "Guardian scoping", "state": "queued"},
+                {"tid": "T09", "title": "Flags per region", "state": "active", "summary": "in review"},
+                {"tid": "T04", "title": "Role scoping", "state": "queued"},
                 {"tid": "T05", "title": "Blocked one", "state": "blocked", "reason": "waiting on ci"},
                 {"tid": "T06", "title": "Shipped one", "state": "done", "summary": "merged"},
             ],
@@ -27,7 +27,7 @@ _SEED = {
             "party": "alpha",
             "task_quest": "wave1",
             "task_tid": "T09",
-            "what": "per-school flags",
+            "what": "per-region flags",
             "waits": "one more review",
             "lifecycle": "draft",
             "needs_ask_answer": True,
@@ -55,7 +55,7 @@ class SeedTests(GuildTestCase):
         self.assertEqual(code, 0)
         code, out, err = self.run_cli(["board"], None, None)
         self.assertIn("━━ alpha", out)
-        self.assertIn("▶ T09  Flags per school", out)
+        self.assertIn("▶ T09  Flags per region", out)
         self.assertIn("in review", out)
         self.assertIn("queued: T04", out)
         self.assertIn("blocked: T05 — waiting on ci", out)

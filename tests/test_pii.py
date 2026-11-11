@@ -27,11 +27,11 @@ class ValidateFieldTests(unittest.TestCase):
 
     def test_rejects_text_matching_project_pattern(self):
         with self.assertRaises(GuildError):
-            pii.validate_field("student Jane Doe missed class", "notice text", 500, [r"Jane Doe"])
+            pii.validate_field("customer Jane Doe missed a payment", "notice text", 500, [r"Jane Doe"])
 
     def test_error_names_field_but_not_matched_text_for_project_pattern(self):
         try:
-            pii.validate_field("student Jane Doe missed class", "notice text", 500, [r"Jane Doe"])
+            pii.validate_field("customer Jane Doe missed a payment", "notice text", 500, [r"Jane Doe"])
         except GuildError as error:
             self.assertIn("notice text", error.message)
             self.assertNotIn("Jane Doe", error.message)

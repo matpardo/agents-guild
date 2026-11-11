@@ -47,3 +47,13 @@ updated: 2026-11-11
 
 **Acceptance:**
 - [x] Each `docs/` file reads on its own and keeps the facts of the verbatim version.
+
+## T05 — Prepare the repo for public release
+
+**Depends on:** —
+**Status:** [x] done
+
+**What:** Name the copyright holder in `LICENSE`, make test fixtures and doc examples domain-neutral, and drop references to private skills from the specs.
+
+**Acceptance:**
+- [x] No client-domain wording or private skill names remain in the tree.
