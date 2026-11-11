@@ -495,6 +495,7 @@ _COLUMN_MIGRATIONS = (
     ("prs", "blocked_external", "TEXT"),
     ("prs", "head_sha", "TEXT"),
     ("notices", "unbound", "INTEGER"),
+    ("notices", "system", "INTEGER"),
     ("main_status", "external", "TEXT"),
     ("parties", "reason", "TEXT"),
     ("parties", "parked", "TEXT"),

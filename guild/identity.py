@@ -3,6 +3,7 @@ from guild.errors import GuildError
 
 HUMAN_LABEL = "human"
 UNBOUND_SESSION_LABEL = "unbound session"
+GUILD_LABEL = "guild"
 
 ADVENTURER_LABEL = "adventurer {}"
 
@@ -96,3 +97,9 @@ def actor_label(party, unbound):
     if unbound:
         return UNBOUND_SESSION_LABEL
     return HUMAN_LABEL
+
+
+def notice_author(party, unbound, system):
+    if system and party is None:
+        return GUILD_LABEL
+    return actor_label(party, unbound)

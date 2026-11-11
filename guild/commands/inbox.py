@@ -50,6 +50,7 @@ def new_lines(ctx, binding):
                         event["ts"],
                         payload["text"],
                         payload.get("unbound", False),
+                        payload.get("system", False),
                     )
                 )
         elif event["kind"] in ("ask.answered", "ask.dismissed") and caller_party is not None:

@@ -561,7 +561,7 @@ def _notice_created(conn, event):
     payload = event["payload"]
     conn.execute(
         "INSERT INTO notices (id, party, scope, text, until_condition, expires_at, state, created_at,"
-        " announces, unbound) VALUES (?, ?, ?, ?, ?, ?, 'active', ?, ?, ?)",
+        " announces, unbound, system) VALUES (?, ?, ?, ?, ?, ?, 'active', ?, ?, ?, ?)",
         (
             payload["id"],
             payload["party"],
@@ -572,6 +572,7 @@ def _notice_created(conn, event):
             event["ts"],
             payload.get("announces"),
             payload.get("unbound", False),
+            payload.get("system", False),
         ),
     )
 
