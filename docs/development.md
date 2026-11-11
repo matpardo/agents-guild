@@ -45,6 +45,22 @@ uv run coverage run -m unittest discover -s tests
 uv run coverage report
 ```
 
+## Releasing
+
+Releases are semver tags `vX.Y.Z` with a GitHub Release. Cut one when something worth updating to has landed, not on every merge.
+
+- While on `0.x`: bump the minor for a new feature or a breaking change to config, the database or hooks; bump the patch for fixes only.
+- Tag merged `main` and publish:
+
+  ```
+  git fetch origin
+  git tag -a vX.Y.Z -m "vX.Y.Z" origin/main
+  git push origin vX.Y.Z
+  gh release create vX.Y.Z --generate-notes --verify-tag
+  ```
+
+- `./update.sh` follows `main` and pulls tags with it, so between releases `guild --version` shows `vX.Y.Z-N-g<sha>`.
+
 ## Status
 
 Every feature is specified as an epic under [`sdd/epics/`](../sdd/README.md), with its `status` in `spec.md`. Those files are the source of truth; this section only summarizes them.

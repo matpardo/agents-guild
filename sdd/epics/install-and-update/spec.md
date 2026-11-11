@@ -5,7 +5,7 @@ title: Versioned install and self-update
 status: active
 owner: matpardo
 created: 2026-09-29
-updated: 2026-09-29
+updated: 2026-11-11
 ---
 
 # Spec: Versioned install and self-update
@@ -20,15 +20,14 @@ Today the installed copy is a worktree (`agents-guild-live`) moved by hand after
 
 ## Scope
 
-- Tagged releases (`v0.x.y`) with a CHANGELOG.
-- `guild version`: installed version and whether a newer release exists.
-- An install script that places guild in `~/.local/share/guild/app` pinned to the latest release tag and links `guild` and `GUILD.md`; running it again updates.
-- `guild self-update`: move the install to the latest release (or `--to <tag>`); data and config untouched; the database migrates on the next run as it already does.
-- The session-start brief mentions a newer release, checked in the background so hooks stay fast.
+- Semver release tags (`v0.x.y`) with a GitHub Release whose notes come from PR titles.
+- `guild --version`: the installed version, from `git describe` of the clone.
+- Install from a base clone kept on `main` (`./install.sh`); update with `./update.sh` (ADR `20261021_worktrees-inside-base-clone.md`).
 
 ## Out of scope
 
 - Packaging for pip or other package managers.
+- A managed install directory pinned to a release, `guild self-update` and a newer-release hint: superseded by the base-clone install (ADR `20261008_base-clone-install.md`).
 - Automatic updates without the user running a command.
 
 ## Success criteria
