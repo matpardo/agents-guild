@@ -521,8 +521,15 @@ _BILLING_FAILURE_TEXT = "recent account payments have failed"
 _BILLING_MAX_UNSTARTED_SECONDS = 5
 
 
+_DEPENDABOT_CHECK_NAME = "Dependabot"
+
+
 def _branch_red_reason(checks):
-    failing = [check["name"] for check in checks if check["conclusion"] in _FAILING_CONCLUSIONS]
+    failing = [
+        check["name"]
+        for check in checks
+        if check["conclusion"] in _FAILING_CONCLUSIONS and check["name"] != _DEPENDABOT_CHECK_NAME
+    ]
     if not failing:
         return None
     return "checks failing: {}".format(", ".join(sorted(failing)))

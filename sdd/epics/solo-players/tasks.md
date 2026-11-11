@@ -3,7 +3,7 @@ epic: solo-players
 type: tasks
 title: Built-in per-repo solo players
 status: done
-updated: 2026-11-02
+updated: 2026-11-11
 ---
 
 # Tasks: Built-in per-repo solo players
@@ -331,3 +331,10 @@ updated: 2026-11-02
 - [x] Config accepts `retry_after` on built-in and trigger-driven custom players, and refuses a bad value, one under 1h and one on an `every` trigger.
 - [x] A red-main player retries the same trigger after 4h, a dependabot one after 24h, and `retry_after` overrides both.
 - [x] Each row shows the retry wait and the next run: the cooldown end, the next `every` interval, `next tick` when due, `none` otherwise.
+
+## T28 — Dependabot check runs never mark main red
+
+**Depends on:** —
+**Status:** [x] done
+
+**What:** A failing `Dependabot` check run on the base head commit is Dependabot's own update job, not CI: `guild sync --source gh` ignores it when deciding whether main is red, as it already does for Dependabot workflow runs.
