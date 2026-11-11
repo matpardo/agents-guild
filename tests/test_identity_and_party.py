@@ -27,6 +27,18 @@ class ResolveActorTests(GuildTestCase):
         self.assertEqual(identity.actor_label(party, unbound), "unbound session")
 
 
+class NoticeAuthorTests(GuildTestCase):
+    def test_system_notice_without_party_is_guild(self):
+        self.assertEqual(identity.notice_author(None, False, True), "guild")
+
+    def test_system_notice_with_party_keeps_party(self):
+        self.assertEqual(identity.notice_author("alpha", False, True), "alpha")
+
+    def test_non_system_notice_uses_actor_label(self):
+        self.assertEqual(identity.notice_author(None, False, False), "human")
+        self.assertEqual(identity.notice_author(None, True, False), "unbound session")
+
+
 class WhoamiTests(GuildTestCase):
     def test_unbound_session_reports_unbound(self):
         code, out, err = self.run_cli(["whoami"], "sess-1", None)

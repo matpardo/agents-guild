@@ -494,7 +494,7 @@ def _raid_scoped_notices(ctx, raid_name):
 
 
 def _notice_flagged(row):
-    author = identity.actor_label(row["party"], bool(row["unbound"]))
+    author = identity.notice_author(row["party"], bool(row["unbound"]), bool(row["system"]))
     return author != identity.HUMAN_LABEL and pii.looks_instruction_like(row["text"])
 
 
@@ -513,7 +513,7 @@ def _notices_section(ctx, painter, rows):
             "  {}{} {}{} · {}".format(
                 marker,
                 painter.paint("#{}".format(row["id"]), "yellow"),
-                painter.paint(identity.actor_label(row["party"], bool(row["unbound"])), "cyan"),
+                painter.paint(identity.notice_author(row["party"], bool(row["unbound"]), bool(row["system"])), "cyan"),
                 flag,
                 painter.paint(
                     "{} · {} · {}".format(
@@ -1361,7 +1361,7 @@ def _notice_model(ctx, row):
     return {
         "id": row["id"],
         "party": row["party"],
-        "author": identity.actor_label(row["party"], bool(row["unbound"])),
+        "author": identity.notice_author(row["party"], bool(row["unbound"]), bool(row["system"])),
         "scope": row["scope"],
         "text": sanitize.strip_control_sequences(row["text"]),
         "issued_at": row["created_at"],

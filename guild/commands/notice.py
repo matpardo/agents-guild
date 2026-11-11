@@ -86,6 +86,7 @@ def append_announcing(ctx, actor_party, text, to, ttl, announces):
             "until_condition": None,
             "expires_at": expires_at,
             "announces": announces,
+            "system": True,
         },
     )
     return notice_id
@@ -178,8 +179,8 @@ def count_new(rows):
     return len([row for row in rows if is_new(row)])
 
 
-def format_notice_line(notice_id, party, issued_at, text, unbound):
-    author = identity.actor_label(party, unbound)
+def format_notice_line(notice_id, party, issued_at, text, unbound, system):
+    author = identity.notice_author(party, unbound, system)
     clean_text = sanitize.escape_quotes(sanitize.collapse_to_single_line(text))
     line = '- notice #{} from {} at {}: "{}"'.format(notice_id, author, timeutil.issued_label(issued_at), clean_text)
     if author != identity.HUMAN_LABEL and pii.looks_instruction_like(text):
@@ -188,7 +189,7 @@ def format_notice_line(notice_id, party, issued_at, text, unbound):
 
 
 def _list_line(ctx, row):
-    author = identity.actor_label(row["party"], bool(row["unbound"]))
+    author = identity.notice_author(row["party"], bool(row["unbound"]), bool(row["system"]))
     prefix = "new " if is_new(row) else ""
     return "{}#{} [{}] {} ({}, {}, {})".format(
         prefix,

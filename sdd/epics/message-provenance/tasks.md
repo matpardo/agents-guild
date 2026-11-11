@@ -3,7 +3,7 @@ epic: message-provenance
 type: tasks
 title: Messages show who wrote them and cannot pass as the human
 status: draft
-updated: 2026-10-12
+updated: 2026-11-11
 ---
 # Tasks: Messages show who wrote them and cannot pass as the human
 
@@ -41,3 +41,10 @@ updated: 2026-10-12
 **Status:** [x] done — #140
 
 **What:** flag patterns in non-human text, shown never blocked; test that "decisión del dev" is not flagged.
+
+## T06 — Label notices guild creates as guild
+
+**Depends on:** T03
+**Status:** [x] done
+
+**What:** notices guild creates carry a `system` flag; label them "guild" in the inbox, brief, list, board and web. Old events read as before.

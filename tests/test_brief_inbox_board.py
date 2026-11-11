@@ -3,7 +3,11 @@ import os
 import sqlite3
 
 from guild import ctx_pressure, db, events, paths, statusline_state, timeutil
+from guild import notices as notices_module
+from guild.cli import _build_context
+from guild.commands import board as board_commands
 from guild.commands import inbox as inbox_commands
+from guild.commands import notice as notice_commands
 from tests.testutil import GuildTestCase
 
 
@@ -358,6 +362,47 @@ class ProvenanceLabelTests(GuildTestCase):
         code, out, err = self.run_cli(["notices"], None, None)
         self.assertEqual(code, 0, err)
         self.assertIn("[human]", out)
+
+    def _announce(self):
+        ctx = _build_context(None, self.root)
+        notice_commands.create_announcing(ctx, None, "main is red", "guild", "2h", "test:1")
+        return ctx
+
+    def test_announced_notice_reads_guild_in_inbox(self):
+        self._announce()
+        code, out, err = self.run_cli(["inbox", "--since-last"], "sess-2", self.repo_dir)
+        self.assertEqual(code, 0, err)
+        self.assertIn("- notice #1 from guild at", out)
+
+    def test_announced_notice_reads_guild_in_notices_list(self):
+        self._announce()
+        code, out, err = self.run_cli(["notices"], None, None)
+        self.assertEqual(code, 0, err)
+        self.assertIn("[guild]", out)
+
+    def test_announced_notice_reads_guild_on_board(self):
+        self._announce()
+        code, out, err = self.run_cli(["board"], None, None)
+        self.assertEqual(code, 0, err)
+        self.assertIn("guild", out.split("NOTICES", 1)[1])
+        self.assertNotIn("human", out.split("NOTICES", 1)[1])
+
+    def test_announced_notice_author_in_board_model_is_guild(self):
+        ctx = self._announce()
+        rows = notices_module.active_notices(ctx.conn, ctx.now)
+        self.assertEqual(board_commands._notice_model(ctx, rows[0])["author"], "guild")
+
+    def test_announced_notice_reads_guild_in_brief(self):
+        self._announce()
+        code, out, err = self.run_cli(["brief"], "sess-2", self.repo_dir)
+        self.assertEqual(code, 0, err)
+        self.assertIn("from guild at", out)
+
+    def test_bound_party_notice_still_reads_its_party(self):
+        self.run_cli(["notice", "create", "heads up", "--to", "guild", "--ttl", "2h"], "sess-1", self.repo_dir)
+        code, out, err = self.run_cli(["notices"], None, None)
+        self.assertEqual(code, 0, err)
+        self.assertIn("[alpha]", out)
 
 
 class InboxSessionWaitingTests(GuildTestCase):

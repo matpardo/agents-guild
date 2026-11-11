@@ -45,6 +45,13 @@ class FindingTests(GuildTestCase):
         self.assertEqual(len(self._rows()), 1)
         self.assertIn("1 PR(s)", out)
 
+    def test_guard_notice_is_authored_by_guild(self):
+        self._set_threshold(1)
+        self._record(1)
+        code, out, err = self.run_cli(["notices"], None, None)
+        self.assertEqual(code, 0, err)
+        self.assertIn("[guild]", out)
+
     def test_notice_fires_once_at_threshold(self):
         self._set_threshold(2)
         self._record(1)

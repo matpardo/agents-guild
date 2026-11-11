@@ -5,7 +5,7 @@ title: Messages show who wrote them and cannot pass as the human
 status: draft
 owner: matpardo
 created: 2026-10-12
-updated: 2026-10-12
+updated: 2026-11-11
 ---
 
 # Spec: Messages show who wrote them and cannot pass as the human
@@ -22,13 +22,14 @@ Notices, asks, answers and handoffs are injected into every session. `notice cre
 
 - Secret patterns in `validate_field` (token prefixes, private key headers) next to the email and project patterns.
 - Escaped quotes and an end marker in the inbox; the raw handoff fallback and `party resume` framed and stripped.
-- Provenance labels: no session means "human", a bound session its party, an unbound session "unbound session". Applies to the inbox, board and web.
+- Provenance labels: no session means "human", a bound session its party, an unbound session "unbound session", a notice guild creates itself "guild". Applies to the inbox, board and web.
 - A PreToolUse hook denies `guild answer` and `guild dismiss` from an agent's tool call. Dev orders count only through an answer given by a human.
 - Instruction-like text from non-human sources is shown with a flag, never blocked.
 
 ## Out of scope
 
 - Authenticating the web token against local processes: documented as a known limit, since guild is single-user and not a sandbox.
+- Labels are not authentication: any process without a Claude session reads as "human" (dev decision 2026-11-11).
 
 ## Success criteria
 

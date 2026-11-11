@@ -23,7 +23,7 @@ def targeting_lines(rows, project, raid_member_of):
     matched = notices.targeting(rows, project, True, raid_member_of)
     lines = [
         notice_commands.format_notice_line(
-            row["id"], row["party"], row["created_at"], row["text"], bool(row["unbound"])
+            row["id"], row["party"], row["created_at"], row["text"], bool(row["unbound"]), bool(row["system"])
         )
         for row in matched
     ]
