@@ -1,5 +1,6 @@
 import hmac
 import json
+import os
 import re
 import secrets
 import sqlite3
@@ -820,29 +821,48 @@ class BoardRequestHandler(http_server.BaseHTTPRequestHandler):
         self._dispatch("DELETE")
 
 
-def start(port):
+_TOKEN_PATTERN = re.compile(r"[A-Za-z0-9_-]{43}")
+
+
+def _load_or_create_session_token(state_dir):
+    token_path = state_dir / "web-token"
+    if token_path.is_file() and not token_path.is_symlink():
+        token = token_path.read_text().removesuffix("\n")
+        if _TOKEN_PATTERN.fullmatch(token):
+            token_path.chmod(0o600)
+            return token
+    token = secrets.token_urlsafe(32)
+    state_dir.mkdir(parents=True, exist_ok=True)
+    token_path.unlink(missing_ok=True)
+    descriptor = os.open(str(token_path), os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
+    with os.fdopen(descriptor, "w") as handle:
+        handle.write(token + "\n")
+    return token
+
+
+def start(port, state_dir):
     server = http_server.ThreadingHTTPServer(("127.0.0.1", port), BoardRequestHandler)
     server.daemon_threads = True
-    server.session_token = secrets.token_urlsafe(32)
+    server.session_token = _load_or_create_session_token(state_dir)
     names = _PAGE_FILES + tuple(name for name, _ in _STATIC_FILES.values())
     server.static_bodies = {name: (_WEB_DIR / name).read_bytes() for name in names}
     return server
 
 
-def _start_due_jobs_ticker():
+def _start_due_jobs_ticker(state_dir):
     stop_event = threading.Event()
     thread = threading.Thread(
         target=due_jobs.tick_until_stopped,
-        args=(stop_event, _DUE_JOBS_TICK_SECONDS, paths.state_dir(), Path.home(), due_jobs.spawn_detached),
+        args=(stop_event, _DUE_JOBS_TICK_SECONDS, state_dir, Path.home(), due_jobs.spawn_detached),
         daemon=True,
     )
     thread.start()
     return stop_event, thread
 
 
-def serve_forever(port):
-    server = start(port)
-    ticker_stop, ticker_thread = _start_due_jobs_ticker()
+def serve_forever(port, state_dir):
+    server = start(port, state_dir)
+    ticker_stop, ticker_thread = _start_due_jobs_ticker(state_dir)
     actual_port = server.server_address[1]
     print("guild web: http://127.0.0.1:{}/#t={}".format(actual_port, server.session_token), flush=True)
     try:
