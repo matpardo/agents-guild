@@ -210,6 +210,7 @@ class BoardEndpointTests(WebServerTestCase):
                 "quest_boards",
                 "realm",
                 "guild_name",
+                "version",
             },
         )
         self.assertEqual([party["name"] for party in payload["parties"]], ["alpha"])

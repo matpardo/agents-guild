@@ -29,6 +29,7 @@ from guild import (
     solo_channel,
     solo_players,
     timeutil,
+    version,
     work_queue,
 )
 from guild.commands import base_pause as base_pause_commands
@@ -1645,4 +1646,5 @@ def board_model(ctx):
         "quest_boards": quest_board.models(ctx, projects_by_name),
         "realm": _realm_model(),
         "guild_name": config.load_global(paths.global_config_path()).get("name"),
+        "version": version.describe(version.REPO_ROOT),
     }

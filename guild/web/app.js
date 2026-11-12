@@ -4737,6 +4737,7 @@ realmDoctorLines: [],
     rememberFocus();
     document.getElementById("generated-at").textContent = "generated at " + data.generated_at;
     document.getElementById("board-title").textContent = data.guild_name ? "guild board · " + data.guild_name : "guild board";
+    document.getElementById("guild-version").textContent = data.version || "";
     var view = currentView();
     applyView(view);
     if (view.hash !== state.renderedHash && view.kind === "solo-players" && view.name !== "") {

@@ -90,6 +90,11 @@ class RealmBoardModelTests(_RealmFiles, WebWriteTestCase):
         response, body = self._get("/api/board", self._host())
         self.assertEqual(json.loads(body)["guild_name"], "forge")
 
+    def test_board_carries_the_installed_version(self):
+        with mock.patch("guild.version.describe", return_value="v9.9.9"):
+            response, body = self._get("/api/board", self._host())
+        self.assertEqual(json.loads(body)["version"], "v9.9.9")
+
     def test_missing_cache_is_empty(self):
         self._write_config()
         self.assertEqual(self._realm(), {"fetched_at": None, "realm": None, "guilds": [], "dropped": 0, "inbox": []})
@@ -286,6 +291,7 @@ class RealmPanelBehaviorTests(unittest.TestCase):
                 "clicks": clicks or [],
                 "replies": replies or {},
                 "guild_name": guild_name,
+                "version": "v0.2.0-3-gabc1234",
             },
         )
 
@@ -308,6 +314,11 @@ class RealmPanelBehaviorTests(unittest.TestCase):
     def test_header_shows_the_guild_name_when_set(self):
         self.assertEqual(self._panel(_MODEL, None, guild_name="forge")["title"], "guild board · forge")
         self.assertEqual(self._panel(_MODEL, None)["title"], "guild board")
+
+    def test_header_shows_the_installed_version(self):
+        out = self._panel(_MODEL, None, guild_name="forge")
+        self.assertEqual(out["version"], "v0.2.0-3-gabc1234")
+        self.assertEqual(out["title"], "guild board · forge")
 
     def test_green_main_has_no_marker(self):
         out = self._panel(dict(_MODEL, guilds=[_GUILD]), None)

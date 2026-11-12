@@ -131,6 +131,12 @@ h3, h4 {
   margin: 0.5rem 0 0.25rem 0;
 }
 
+.guild-version {
+  color: var(--muted);
+  font-size: 0.8rem;
+  font-weight: normal;
+}
+
 .muted {
   color: var(--muted);
   font-size: 0.85rem;
