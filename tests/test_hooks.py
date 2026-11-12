@@ -1585,7 +1585,7 @@ class SessionLivenessHookTests(GuildTestCase):
             "notification_type": "permission_prompt",
             "message": "x",
         }
-        for hook_name in ("notification", "stop"):
+        for hook_name in ("notification", "stop", "stop-failure"):
             code, out, err = self.run_hook(hook_name, payload)
             self.assertEqual((code, out), (0, ""))
         self.run_hook("post-tool-use", payload)
@@ -1599,6 +1599,66 @@ class SessionLivenessHookTests(GuildTestCase):
         self.assertEqual(self._status(), ("stopped", None))
         self.run_hook("stop", self._payload(repo_dir))
         self.assertEqual(self._count("session.stopped"), 1)
+
+    def _stop_failure(self, repo_dir, error, **extra):
+        return self.run_hook("stop-failure", self._payload(repo_dir, error=error, **extra))
+
+    def test_stop_failure_rate_limit_records_waiting_limit_once(self):
+        repo_dir = self._bound()
+        code, out, err = self._stop_failure(repo_dir, "rate_limit")
+        self.assertEqual((code, out), (0, ""))
+        self.assertEqual(self._status(), ("waiting-limit", "rate_limit"))
+        self._stop_failure(repo_dir, "rate_limit")
+        self.assertEqual(self._count("session.waiting"), 1)
+
+    def test_stop_failure_billing_error_records_waiting_limit(self):
+        repo_dir = self._bound()
+        self._stop_failure(repo_dir, "billing_error")
+        self.assertEqual(self._status(), ("waiting-limit", "billing_error"))
+
+    def test_stop_failure_other_error_records_stopped(self):
+        repo_dir = self._bound()
+        self._stop_failure(repo_dir, "server_error")
+        self.assertEqual(self._status(), ("stopped", None))
+
+    def test_stop_failure_missing_error_records_stopped(self):
+        repo_dir = self._bound()
+        self.run_hook("stop-failure", self._payload(repo_dir))
+        self.assertEqual(self._status(), ("stopped", None))
+
+    def test_stop_failure_unbound_records_nothing(self):
+        self.run_hook("stop-failure", {"session_id": "sess-9", "cwd": str(self.root), "error": "rate_limit"})
+        self.assertEqual(self._rows().execute("SELECT COUNT(*) AS n FROM events").fetchone()["n"], 0)
+
+    def test_stop_failure_never_stores_details_or_last_message(self):
+        repo_dir = self._bound()
+        self._stop_failure(
+            repo_dir, "rate_limit", error_details="secret-details", last_assistant_message="secret-message"
+        )
+        payloads = [row["payload"] for row in self._rows().execute("SELECT payload FROM events")]
+        self.assertFalse([text for text in payloads if "secret" in text])
+
+    def test_stop_failure_adventurer_records_waiting_limit(self):
+        repo_dir = self.register_project("acme", ["acme/app"])
+        config_path = self.config_home / "guild" / "projects" / "acme.json"
+        data = json.loads(config_path.read_text())
+        data["health_jobs"] = [{"name": "red-main", "command": "/check-main", "every": "1d"}]
+        config_path.write_text(json.dumps(data))
+        self.run_cli(["adventurer", "start", "--job", "red-main", "--reason", "test reason"], "sess-1", repo_dir)
+        self._stop_failure(repo_dir, "rate_limit")
+        self.assertEqual(self._status(), ("waiting-limit", "rate_limit"))
+
+    def test_prompt_submit_after_waiting_limit_marks_working(self):
+        repo_dir = self._bound()
+        self._stop_failure(repo_dir, "rate_limit")
+        self.run_hook("prompt-submit", self._payload(repo_dir))
+        self.assertEqual(self._status(), ("working", None))
+
+    def test_post_tool_use_after_waiting_limit_marks_working(self):
+        repo_dir = self._bound()
+        self._stop_failure(repo_dir, "rate_limit")
+        self.run_hook("post-tool-use", self._payload(repo_dir))
+        self.assertEqual(self._status(), ("working", None))
 
     def test_post_tool_use_after_stopped_records_one_working(self):
         repo_dir = self._bound()
@@ -1712,6 +1772,22 @@ class NotificationPushTests(GuildTestCase):
         self._notify("permission_prompt")
         self._notify("idle_prompt")
         self.assertEqual(self.runner.call_count, 1)
+
+    def test_limit_wait_runs_command(self):
+        self._configure(["notify-send", "guild"])
+        self._hook("stop-failure", error="rate_limit")
+        self.runner.assert_called_once_with(["notify-send", "guild", "alpha", "limit"])
+
+    def test_limit_repeat_does_not_run_command_again(self):
+        self._configure(["notify-send", "guild"])
+        self._hook("stop-failure", error="rate_limit")
+        self._hook("stop-failure", error="rate_limit")
+        self.assertEqual(self.runner.call_count, 1)
+
+    def test_other_stop_failure_does_not_run_command(self):
+        self._configure(["notify-send", "guild"])
+        self._hook("stop-failure", error="server_error")
+        self.runner.assert_not_called()
 
     def test_no_notify_config_does_not_run_command(self):
         self._notify("permission_prompt")

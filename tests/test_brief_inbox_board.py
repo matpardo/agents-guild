@@ -722,6 +722,12 @@ class BoardSessionStatusTests(GuildTestCase):
         self.assertIn("NEEDS YOU · nothing", out)
         self.assertRegex(out, r"\n  status: waiting-input \d+s\n")
 
+    def test_waiting_limit_is_shown_and_not_listed_as_blocked(self):
+        self.run_hook("stop-failure", {"session_id": "sess-1", "cwd": str(self.repo_dir), "error": "rate_limit"})
+        code, out, err = self.run_cli(["board"], None, None)
+        self.assertIn("NEEDS YOU · nothing", out)
+        self.assertRegex(out, r"\n  status: waiting-limit \d+s\n")
+
     def _context_high(self):
         statusline_state.record_ctx(paths.state_dir(), "sess-1", ctx_pressure.DEFAULT_HANDOFF_THRESHOLD + 6)
 

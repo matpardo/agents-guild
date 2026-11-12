@@ -627,6 +627,14 @@ class BoardModelSessionStatusTests(BoardModelTestCase):
         self.assertEqual(blocked["since"], status["since"])
         self.assertEqual(blocked["label"], status["label"])
 
+    def test_party_status_waiting_limit_is_not_blocked(self):
+        self.run_hook("stop-failure", {"session_id": "sess-1", "cwd": str(self.repo_dir), "error": "rate_limit"})
+        model = self._model()
+        status = model["parties"][0]["status"]
+        self.assertEqual((status["name"], status["detail"]), ("waiting-limit", "rate_limit"))
+        self.assertRegex(status["label"], r"^waiting-limit \d+s$")
+        self.assertEqual(model["blocked"], [])
+
     def test_blocked_empty_when_not_waiting_on_permission(self):
         self._notify("idle_prompt", "idle")
         self.assertEqual(self._model()["blocked"], [])

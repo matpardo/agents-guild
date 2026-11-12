@@ -786,6 +786,7 @@ main.history-main {
   color: var(--bg);
 }
 
+.status-waiting-limit,
 .status-waiting-ask {
   background: var(--lifecycle-converging-bg);
   color: var(--lifecycle-converging-fg);
