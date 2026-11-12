@@ -4,19 +4,22 @@ import io
 import json
 import os
 import shutil
+import stat
 import tempfile
 import threading
 from pathlib import Path
 from unittest import mock
 
-from guild import webserver
+from guild import paths, webserver
 from tests.testutil import GuildTestCase
 
 
 class WebServerTestCase(GuildTestCase):
     def setUp(self):
         super().setUp()
-        self.server = webserver.start(0)
+        self.state_dir = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, self.state_dir)
+        self.server = webserver.start(0, self.state_dir)
         self.port = self.server.server_address[1]
         self.thread = threading.Thread(target=self.server.serve_forever, daemon=True)
         self.thread.start()
@@ -231,11 +234,16 @@ class ClientHangUpTests(GuildTestCase):
 
 
 class ServeForeverTests(GuildTestCase):
+    def setUp(self):
+        super().setUp()
+        self.state_dir = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, self.state_dir)
+
     def test_prints_url_and_returns_0_on_keyboard_interrupt(self):
         stdout = io.StringIO()
         with mock.patch("http.server.ThreadingHTTPServer.serve_forever", side_effect=KeyboardInterrupt):
             with contextlib.redirect_stdout(stdout):
-                exit_code = webserver.serve_forever(0)
+                exit_code = webserver.serve_forever(0, self.state_dir)
         self.assertEqual(exit_code, 0)
         self.assertRegex(stdout.getvalue(), r"guild web: http://127\.0\.0\.1:\d+/#t=[A-Za-z0-9_-]{40,}\n")
 
@@ -250,8 +258,79 @@ class ServeForeverTests(GuildTestCase):
         with mock.patch("guild.webserver.due_jobs.tick_until_stopped", side_effect=slow_ticker):
             with mock.patch("http.server.ThreadingHTTPServer.serve_forever", side_effect=KeyboardInterrupt):
                 with contextlib.redirect_stdout(io.StringIO()):
-                    webserver.serve_forever(0)
+                    webserver.serve_forever(0, self.state_dir)
         self.assertTrue(finished.is_set())
+
+
+class SessionTokenPersistenceTests(GuildTestCase):
+    def setUp(self):
+        super().setUp()
+        self.state_dir = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, self.state_dir)
+        self.token_path = self.state_dir / "web-token"
+
+    def _start_token(self):
+        server = webserver.start(0, self.state_dir)
+        self.addCleanup(server.server_close)
+        return server.session_token
+
+    def test_two_starts_share_the_token(self):
+        self.assertEqual(self._start_token(), self._start_token())
+
+    def test_token_from_first_start_is_accepted_by_second_server(self):
+        first = self._start_token()
+        second = webserver.start(0, self.state_dir)
+        thread = threading.Thread(target=second.serve_forever, daemon=True)
+        thread.start()
+        self.addCleanup(thread.join, 5)
+        self.addCleanup(second.server_close)
+        self.addCleanup(second.shutdown)
+        port = second.server_address[1]
+        conn = http.client.HTTPConnection("127.0.0.1", port, timeout=5)
+        conn.request("GET", "/api/board", headers={"Host": "127.0.0.1:{}".format(port), "X-Guild-Token": first})
+        status = conn.getresponse().status
+        conn.close()
+        self.assertEqual(status, 200)
+
+    def test_token_file_is_private(self):
+        self._start_token()
+        self.assertEqual(stat.S_IMODE(self.token_path.stat().st_mode), 0o600)
+
+    def test_broad_permissions_are_tightened(self):
+        token = self._start_token()
+        self.token_path.chmod(0o644)
+        self.assertEqual(self._start_token(), token)
+        self.assertEqual(stat.S_IMODE(self.token_path.stat().st_mode), 0o600)
+
+    def test_invalid_content_is_replaced(self):
+        for content in ("", "short", "!" * 43, "a" * 44, "a" * 43 + "\n\n"):
+            self.token_path.write_text(content)
+            token = self._start_token()
+            self.assertRegex(token, r"^[A-Za-z0-9_-]{43}$")
+            self.assertEqual(self.token_path.read_text().strip(), token)
+
+    def test_trailing_newline_is_accepted(self):
+        self.token_path.write_text("a" * 43 + "\n")
+        self.assertEqual(self._start_token(), "a" * 43)
+
+    def test_symlink_is_replaced_without_following_it(self):
+        target = self.state_dir / "elsewhere"
+        target.write_text("b" * 43)
+        self.token_path.symlink_to(target)
+        token = self._start_token()
+        self.assertNotEqual(token, "b" * 43)
+        self.assertFalse(self.token_path.is_symlink())
+        self.assertEqual(target.read_text(), "b" * 43)
+        self.assertEqual(self.token_path.read_text().strip(), token)
+
+    def test_token_is_printed_only_in_the_url_fragment(self):
+        stdout = io.StringIO()
+        with mock.patch("http.server.ThreadingHTTPServer.serve_forever", side_effect=KeyboardInterrupt):
+            with contextlib.redirect_stdout(stdout):
+                webserver.serve_forever(0, self.state_dir)
+        token = self.token_path.read_text().strip()
+        self.assertEqual(stdout.getvalue().count(token), 1)
+        self.assertIn("/#t=" + token, stdout.getvalue())
 
 
 class CliWiringTests(GuildTestCase):
@@ -259,13 +338,13 @@ class CliWiringTests(GuildTestCase):
         with mock.patch("guild.commands.web.webserver.serve_forever", return_value=0) as mocked:
             code, out, err = self.run_cli(["web", "--port", "0"], None, None)
         self.assertEqual(code, 0)
-        mocked.assert_called_once_with(0)
+        mocked.assert_called_once_with(0, paths.state_dir())
 
     def test_port_defaults_to_8765(self):
         with mock.patch("guild.commands.web.webserver.serve_forever", return_value=0) as mocked:
             code, out, err = self.run_cli(["web"], None, None)
         self.assertEqual(code, 0)
-        mocked.assert_called_once_with(8765)
+        mocked.assert_called_once_with(8765, paths.state_dir())
 
 
 if __name__ == "__main__":
@@ -283,7 +362,9 @@ class StaticSnapshotTests(GuildTestCase):
         patcher = mock.patch.object(webserver, "_WEB_DIR", web_dir)
         patcher.start()
         self.addCleanup(patcher.stop)
-        server = webserver.start(0)
+        state_dir = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, state_dir)
+        server = webserver.start(0, state_dir)
         thread = threading.Thread(target=server.serve_forever, daemon=True)
         thread.start()
         self.addCleanup(thread.join, 5)

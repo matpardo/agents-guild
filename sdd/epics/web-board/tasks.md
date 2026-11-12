@@ -3,7 +3,7 @@ epic: web-board
 type: tasks
 title: Web view of the guild board
 status: done
-updated: 2026-10-04
+updated: 2026-11-11
 ---
 
 # Tasks: Web view of the guild board
@@ -189,3 +189,14 @@ updated: 2026-10-04
 **Acceptance:**
 - [x] Party, status and detail are separated by ` · `.
 - [x] Without a detail there is no trailing separator.
+
+## T26 — Keep the web session token across restarts
+
+**Depends on:** —
+**Status:** [x] done
+
+**What:** the web session token is stored in `<state dir>/web-token` with mode 0600 and reused at each start, so an open browser tab keeps working after a restart.
+
+**Acceptance:**
+- [x] Two starts with the same state dir share the token.
+- [x] The token file is private, and an invalid file or a symlink is replaced by a fresh token.

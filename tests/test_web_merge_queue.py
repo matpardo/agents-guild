@@ -1,6 +1,8 @@
 import http.client
 import json
+import shutil
 import sys
+import tempfile
 import threading
 from pathlib import Path
 
@@ -209,7 +211,9 @@ class MergeQueueModelTests(MergeQueueModelTestCase):
 
 class ServerMergeQueueTests(MergeQueueModelTestCase):
     def test_api_board_serves_merge_queues(self):
-        server = webserver.start(0)
+        state_dir = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, state_dir)
+        server = webserver.start(0, state_dir)
         port = server.server_address[1]
         thread = threading.Thread(target=server.serve_forever, daemon=True)
         thread.start()
