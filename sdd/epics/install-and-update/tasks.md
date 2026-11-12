@@ -3,7 +3,7 @@ epic: install-and-update
 type: tasks
 title: Versioned install and self-update
 status: active
-updated: 2026-11-11
+updated: 2026-11-12
 ---
 
 # Tasks: Versioned install and self-update
@@ -133,3 +133,10 @@ updated: 2026-11-11
 **Status:** [x] done
 
 **What:** `guild --version` prints `git describe --tags --always --dirty` of the clone guild runs from (`unknown` outside git), and `docs/development.md` describes how to cut a semver release.
+
+## T19 — Version in the web header
+
+**Depends on:** T18
+**Status:** [x] done
+
+**What:** the web board shows the installed version next to its title, from the same `git describe` as `guild --version` (`version` in `GET /api/board`).

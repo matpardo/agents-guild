@@ -2219,13 +2219,10 @@ def _dispatch_hook(args):
     return _run_stateful_hook(args.hook_name, stdin_data)
 
 
-_REPO_ROOT = Path(__file__).resolve().parent.parent
-
-
 def main(argv):
     os.umask(0o077)
     if argv == ["--version"]:
-        print("guild {}".format(version.describe(_REPO_ROOT)))
+        print("guild {}".format(version.describe(version.REPO_ROOT)))
         return 0
     if argv[:1] == ["hook"]:
         return _dispatch_hook(_build_hook_parser().parse_args(argv[1:]))

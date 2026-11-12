@@ -28,7 +28,7 @@ Every guild command, grouped by what you want to do. `guild --help` lists every 
 
 ### `guild --version`
 
-Prints the installed version, from `git describe` of the clone guild runs from: `guild v0.1.0` on a release tag, `guild v0.1.0-3-g<sha>` three commits after it, a `-dirty` suffix with uncommitted changes, `unknown` outside git.
+Prints the installed version, from `git describe` of the clone guild runs from: `guild v0.1.0` on a release tag, `guild v0.1.0-3-g<sha>` three commits after it, a `-dirty` suffix with uncommitted changes, `unknown` outside git. The web board shows the same value next to its title (`version` in `GET /api/board`).
 
 ```
 guild --version

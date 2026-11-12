@@ -1,7 +1,10 @@
 import os
 import subprocess
+from pathlib import Path
 
 _UNKNOWN = "unknown"
+
+REPO_ROOT = Path(__file__).resolve().parent.parent
 
 
 def describe(repo_root):
