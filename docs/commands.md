@@ -163,17 +163,21 @@ GUILD_RESUME=<party> claude -n <party>-g<N+1> 'Continue the work described in th
 
 ### `guild revive`
 
-Relaunches active parties and parties that handed off (`awaiting-leader`) after a reboot, one tmux window per party in a tmux session called `guild`.
+Relaunches active parties, parties that handed off (`awaiting-leader`) and stopped adventurers after a reboot, one tmux window per party or adventurer in a tmux session called `guild`.
 
 ```
 guild revive                   # TTY: prompts "numbers to revive (e.g. 1,3)"; no TTY: lists and exits
 guild revive --party alpha --party beta
+guild revive --adventurer 3
 guild revive --all
 guild revive --list            # no tmux needed: one copy-paste command per party
 ```
 
-It lists parties numbered (party, project, quest progress, status, last activity, leader session name, cwd, permission mode, and `resume` or `fresh`) and starts the ones you pick.
+It lists parties, then adventurers, with continuing numbers (party, project, quest progress, status, last activity, leader session name, cwd, permission mode, and `resume` or `fresh`) and starts the ones you pick.
 
+- A session that is still running is skipped with `leader session is live` (party) or `session is live` (adventurer), so `--all` never starts a duplicate of a leader that runs outside tmux.
+- An adventurer is listed when it is `active`, is not a health job or solo player (they have their own relaunch path) and has a transcript. It always resumes: `claude --resume <session-id> --name adventurer-<id> [--permission-mode <mode>]` in the cwd read from the transcript, in a window named `adventurer-<id>`. With no transcript, a missing cwd or an existing window it is skipped with the reason printed (`guild adventurer dismiss <id>` removes it). An adventurer id that is not active and revivable is an error, like an unknown party. With nothing to relaunch the output is `nothing to revive`.
+- The web board has a `Revive all` button (two clicks: `Revive all`, then `Confirm revive all`; shown only when something is revivable) and a `Revive` button on each revivable party card and adventurer card (model key `revivable`). `POST /api/revive`, `POST /api/parties/<name>/revive` and `POST /api/adventurers/<id>/revive` (body `{}`) run the same command and answer its output as `message`; an unknown party or adventurer answers `422`.
 - `resume` (the leader transcript exists under `~/.claude/projects`) runs `claude --resume <session-id> --name <party>-g<N> [--permission-mode <mode>]` in the recorded cwd. `fresh` runs the handoff resume command (`GUILD_RESUME=<party> claude -n <party>-g<N+1> ...`) from the same cwd.
 - cwd and permission mode come from the leader row recorded by the `SessionStart` hook. When missing, the first lines of the transcript are read. An unknown mode is never invented.
 - Only `default`, `acceptEdits`, `plan`, `auto` and `dontAsk` are carried over. `bypassPermissions` and any other value are dropped, so a relaunched session never starts with permission checks off. This also covers `guild handoff --respawn`.
@@ -1002,6 +1006,7 @@ guild web: http://127.0.0.1:<port>/#t=<token>
   - `POST /api/notices/<id>/seen`, `POST /api/notices/<id>/unseen`, `POST /api/notices/seen-all` (body `{}`) and `POST /api/notices/create`;
   - `POST /api/raids/<name>/pause` and `POST /api/raids/<name>/resume`;
   - `POST /api/parties/<name>/hand-off` (body `{}`);
+  - `POST /api/revive`, `POST /api/parties/<name>/revive` and `POST /api/adventurers/<id>/revive` (body `{}`);
   - `POST /api/quests/create-open`, `POST /api/quests/<slug>/take` and `POST /api/quests/<slug>/release`;
   - `POST /api/prs/<owner>/<repo>/<n>/block` (body `{"reason": "<text>"}`) and `.../unblock`;
   - the idea, base and other routes listed in their sections.

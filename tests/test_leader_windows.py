@@ -91,7 +91,7 @@ class ReviveRecordsWindowsTests(LeaderWindowsBase):
 
     def _revive(self, party):
         ctx = _build_context(None, self.root)
-        return revive.run(ctx, [party], False, False, self.claude_projects_dir, FakeTmux(True, (), ()), None)
+        return revive.run(ctx, [party], [], False, False, self.claude_projects_dir, FakeTmux(True, (), ()), None)
 
     def _windows_of(self, party):
         rows = self.conn.execute(

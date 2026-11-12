@@ -94,3 +94,11 @@ def resolve_session_id(sessions_dir, session_name):
         if data.get("name") == session_name:
             return data.get("sessionId")
     return None
+
+
+def adventurer_stopped(row, live_ids):
+    return row["state"] == "active" and row["session_id"] not in live_ids
+
+
+def adventurer_revivable(row, live_ids):
+    return adventurer_stopped(row, live_ids) and row["health_job"] is None

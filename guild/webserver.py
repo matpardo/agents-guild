@@ -10,7 +10,7 @@ from http import server as http_server
 from pathlib import Path
 from urllib.parse import parse_qs, urlsplit
 
-from guild import ask_detail, context, db, due_jobs, origin, paths, timeutil
+from guild import ask_detail, context, db, due_jobs, origin, paths, timeutil, tmux_windows
 from guild.commands import adventurer as adventurer_commands
 from guild.commands import ask as ask_commands
 from guild.commands import base_pause as base_pause_commands
@@ -27,6 +27,7 @@ from guild.commands import quest as quest_commands
 from guild.commands import raid_pause as raid_pause_commands
 from guild.commands import realm as realm_commands
 from guild.commands import resources as resources_commands
+from guild.commands import revive as revive_commands
 from guild.commands import task as task_commands
 from guild.errors import GuildError
 from guild.realm import hub as realm_hub
@@ -56,6 +57,7 @@ _MEMORY_ACTION_RE = re.compile(r"^/api/memory/([^/]+)/([1-9][0-9]*)/rm$")
 _TASK_MOVE_RE = re.compile(r"^/api/quests/([^/]+)/tasks/([^/]+)/move$")
 _TASK_DISCARD_RE = re.compile(r"^/api/quests/([^/]+)/tasks/([^/]+)/(discard|restore)$")
 _PARTY_HANDOFF_RE = re.compile(r"^/api/parties/([^/]+)/hand-off$")
+_PARTY_REVIVE_RE = re.compile(r"^/api/parties/([^/]+)/revive$")
 _PARTY_GOAL_RE = re.compile(r"^/api/parties/([^/]+)/goal$")
 _PARTY_PARK_RE = re.compile(r"^/api/parties/([^/]+)/(park|unpark)$")
 _IDEA_ACTION_RE = re.compile(r"^/api/ideas/([^/]+)/(edit|delete|link|unlink|unexport)$")
@@ -67,6 +69,8 @@ _IDEA_CONFIRM_EXPORT_PATH = "/api/ideas/confirm-export"
 _QUEST_ACTION_RE = re.compile(r"^/api/quests/([^/]+)/(take|release)$")
 _QUEST_CREATE_PATH = "/api/quests/create-open"
 _ADVENTURER_DISMISS_RE = re.compile(r"^/api/adventurers/([^/]+)/dismiss$")
+_ADVENTURER_REVIVE_RE = re.compile(r"^/api/adventurers/([^/]+)/revive$")
+_REVIVE_ALL_PATH = "/api/revive"
 _COMPACT_PATH = "/api/compact"
 _RESOURCES_COLLECT_PATH = "/api/resources/collect"
 _REALM_REFRESH_PATH = "/api/realm/refresh"
@@ -303,6 +307,16 @@ def _run_adventurer_dismiss(adventurer_id):
     ctx = _action_context()
     try:
         return adventurer_commands.dismiss(ctx, adventurer_id)
+    finally:
+        ctx.conn.close()
+
+
+def _run_revive(party_names, adventurer_ids, select_all):
+    ctx = _action_context()
+    try:
+        return revive_commands.run(
+            ctx, party_names, adventurer_ids, select_all, False, paths.claude_projects_dir(), tmux_windows.Tmux(), None
+        )
     finally:
         ctx.conn.close()
 
@@ -676,6 +690,18 @@ class BoardRequestHandler(http_server.BaseHTTPRequestHandler):
             if not _ASK_ID_RE.match(adventurer_id):
                 return self._not_found()
             return self._post_action("dismiss-adventurer", lambda payload: _run_adventurer_dismiss(int(adventurer_id)))
+        if path == _REVIVE_ALL_PATH:
+            return self._post_action("revive-all", lambda payload: _run_revive([], [], True))
+        adventurer_revive_match = _ADVENTURER_REVIVE_RE.match(path)
+        if adventurer_revive_match is not None:
+            adventurer_id = adventurer_revive_match.group(1)
+            if not _ASK_ID_RE.match(adventurer_id):
+                return self._not_found()
+            return self._post_action("revive-adventurer", lambda payload: _run_revive([], [int(adventurer_id)], False))
+        party_revive_match = _PARTY_REVIVE_RE.match(path)
+        if party_revive_match is not None:
+            party = party_revive_match.group(1)
+            return self._post_action("revive-party", lambda payload: _run_revive([party], [], False))
         if path == _COMPACT_PATH:
             return self._post_action("compact", lambda payload: _run_compact())
         if path == _RESOURCES_COLLECT_PATH:

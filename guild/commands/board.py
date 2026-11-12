@@ -993,10 +993,6 @@ def _adventurer_pr_rows(conn, adventurer_id):
     ).fetchall()
 
 
-def _adventurer_stopped(row, live_ids):
-    return row["state"] == "active" and row["session_id"] not in live_ids
-
-
 def _adventurer_lines(ctx, repo_clones, painter):
     rows = _adventurer_rows(ctx.conn)
     if not rows:
@@ -1015,7 +1011,7 @@ def _adventurer_lines(ctx, repo_clones, painter):
         if row["reason"]:
             lines.extend(painter.wrap("reason: {}".format(sanitize.strip_control_sequences(row["reason"])), "    "))
         lines.append(painter.paint("    " + timeutil.dates_label(row["started_at"], row["done_at"]), "dim"))
-        if _adventurer_stopped(row, live_ids):
+        if session_info.adventurer_stopped(row, live_ids):
             lines.append(painter.paint("    " + STOPPED_WITHOUT_REPORT, "red"))
         if row["state"] == "done":
             lines.extend(painter.wrap("pending: {}".format(sanitize.strip_control_sequences(row["pending"])), "    "))
@@ -1409,7 +1405,8 @@ def _adventurer_model(ctx, repo_clones, row, live_ids, projects_by_name):
         "reason": _optional_text(row["reason"]),
         "dates": timeutil.dates_label(row["started_at"], row["done_at"]),
         "live": row["session_id"] in live_ids,
-        "stopped_without_report": _adventurer_stopped(row, live_ids),
+        "stopped_without_report": session_info.adventurer_stopped(row, live_ids),
+        "revivable": session_info.adventurer_revivable(row, live_ids),
         "ideas": [
             {"id": idea["id"], "title": sanitize.strip_control_sequences(idea["title"])}
             for idea in ideas.linked_ideas_for_adventurer(ctx, row["id"])
@@ -1558,6 +1555,7 @@ def _party_model(ctx, repo_clones, party_row, project_config):
         "leader_session_name": _leader_session_name(ctx.conn, party_row["name"]),
         "leader_session_id": party_row["leader_session_id"],
         "has_live_leader": party_status.has_live_leader(ctx, party_row),
+        "revivable": party_status.revivable(ctx, party_row),
         "stopped_without_report": _party_stopped_without_report(ctx, party_row),
         "quests": quest_models,
         "ideas": [

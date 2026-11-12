@@ -28,6 +28,10 @@ def has_live_leader(ctx, party_row):
     return party_row["leader_session_id"] in session_info.live_session_ids(ctx.sessions_dir)
 
 
+def revivable(ctx, party_row):
+    return party_row["state"] in ("active", "awaiting-leader") and not has_live_leader(ctx, party_row)
+
+
 def _blocked_detail(groups):
     total = sum(len(group["tids"]) for group in groups)
     parts = ["{} — {}".format(len(group["tids"]), group["reason"] or "no reason") for group in groups]

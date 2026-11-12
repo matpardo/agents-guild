@@ -58,6 +58,7 @@ async function render({ src, data, hash, outId, mode, responses, open, click, st
   }
   if (open) await openDetails(out, open);
   if (click) for (const node of walk(out)) if (node.tag === "button" && node._text === click) node.h.click();
+  if (click) { await tick(); await tick(); }
   if (mode === "hash") return ctx.location.hash;
   if (mode === "hidden") return JSON.stringify(Object.keys(byId).filter((id) => byId[id].hidden === true).sort());
   return mode === "tree" ? JSON.stringify(tree(out)) : out.textContent;

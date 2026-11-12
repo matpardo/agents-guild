@@ -291,6 +291,7 @@ class BoardModelShapeTests(BoardModelTestCase):
                 "leader_session_name",
                 "leader_session_id",
                 "has_live_leader",
+                "revivable",
                 "stopped_without_report",
                 "quests",
                 "prs",

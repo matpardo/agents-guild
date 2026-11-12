@@ -131,7 +131,7 @@ More in [Concepts](docs/concepts.md).
 A normal day takes two commands, from any folder:
 
 1. `guild web` opens the board in your browser. Asks, PRs and the merge order are all there.
-2. `guild revive --all` relaunches every active party. Each one runs in its own window of a tmux session named `guild`, in the folder it was working in.
+2. `guild revive --all` relaunches every active party and every stopped adventurer. Each one runs in its own window of a tmux session named `guild`, in the folder it was working in. The web board does the same with its `Revive all` button (it asks for a second click), and each party or stopped adventurer has its own `Revive` button. A session that is still running is never relaunched.
 
 The sessions run in the background: closing the terminal does not stop them. To watch them, run `tmux attach -t guild` (`tmux switch-client -t guild` when you are already in tmux). There, `Ctrl-b w` picks a window and `Ctrl-b d` leaves them running.
 

@@ -2,16 +2,20 @@ import json
 import os
 from pathlib import Path
 
-from guild import db, events, localbase, party_status, resume, sanitize, tmux_windows, transcripts
+from guild import db, events, localbase, party_status, resume, sanitize, session_info, tmux_windows, transcripts
 from guild.errors import GuildError
 
 TRANSCRIPT_LINE_LIMIT = 200
-_NO_SELECTION_HINT = "select with --party <name> (repeatable), --all, or --list for copy-paste commands"
+_NO_SELECTION_HINT = (
+    "select with --party <name> or --adventurer <id> (repeatable), --all, or --list for copy-paste commands"
+)
 _GOAL_REMINDER = "re-issue /goal in each revived session that used it: it is not restored"
 _TMUX_MISSING = "tmux not found: install tmux (e.g. sudo apt install tmux) or use --list"
 
 
-class _Entry:
+class _PartyEntry:
+    live_reason = "leader session is live"
+
     def __init__(
         self,
         party,
@@ -26,8 +30,11 @@ class _Entry:
         mode,
         transcript,
         goal,
+        live,
     ):
         self.party = party
+        self.window = party
+        self.live = live
         self.project = project
         self.generation = generation
         self.session_id = session_id
@@ -43,6 +50,42 @@ class _Entry:
     def resumable(self):
         return self.transcript is not None
 
+    def label(self):
+        return "resume" if self.resumable() else "fresh"
+
+    def missing_transcript_reason(self):
+        return None
+
+    def cwd_advice(self):
+        return "start a fresh session from the project path"
+
+    def record_window(self, ctx, window_id):
+        with db.writing(ctx.conn):
+            events.record(
+                ctx.conn,
+                ctx.now,
+                ctx.origin,
+                self.party,
+                None,
+                self.project,
+                "leader.window_launched",
+                "local",
+                {"party": self.party, "generation": self.launch_generation(), "window_id": window_id},
+            )
+
+    def listing_lines(self, number, with_commands):
+        lines = [
+            "{}. {} ({}) [{}]".format(number, self.party, self.project or "-", self.label()),
+            "   quest: {} | last activity: {}".format(self.quests, self.last_activity or "-"),
+            "   status: {}".format(self.status),
+            "   goal: {}".format(self.goal or "none"),
+            "   session: {} | mode: {}".format(self.session_name or "-", self.mode_label()),
+            "   cwd: {}".format(self.cwd or "unknown"),
+        ]
+        if with_commands:
+            lines.append("   tab: {}".format(_tab_line(self)))
+        return lines
+
     def launch_generation(self):
         if self.resumable():
             return self.generation
@@ -55,6 +98,50 @@ class _Entry:
         if self.resumable():
             return resume.resume_command(self.session_id, self.party, self.generation, self.mode)
         return resume.fresh_command(self.party, self.generation + 1, None, self.mode, resume.RESUME_PROMPT)
+
+
+class _AdventurerEntry:
+    live_reason = "session is live"
+
+    def __init__(self, row, live, cwd, mode, transcript):
+        self.adventurer_id = row["id"]
+        self.window = "adventurer-{}".format(row["id"])
+        self.project = row["project"]
+        self.job = sanitize.strip_control_sequences(row["job"])
+        self.task = row["task"]
+        self.session_id = row["session_id"]
+        self.live = live
+        self.cwd = cwd
+        self.mode = mode
+        self.transcript = transcript
+
+    def label(self):
+        return "resume"
+
+    def missing_transcript_reason(self):
+        if self.transcript is not None:
+            return None
+        return "no transcript; {}".format(self.cwd_advice())
+
+    def cwd_advice(self):
+        return "dismiss it with guild adventurer dismiss {}".format(self.adventurer_id)
+
+    def command(self):
+        return resume.named_resume_command(self.session_id, self.window, self.mode)
+
+    def record_window(self, ctx, window_id):
+        return None
+
+    def listing_lines(self, number, with_commands):
+        lines = [
+            "{}. adventurer {} {} ({}) [resume]".format(number, self.adventurer_id, self.job, self.project),
+            "   task: {}".format(self.task or "-"),
+            "   mode: {}".format("unknown" if self.mode is None else self.mode),
+            "   cwd: {}".format(self.cwd or "unknown"),
+        ]
+        if with_commands:
+            lines.append("   tab: {}".format(_tab_line(self)))
+        return lines
 
 
 def read_location(transcript):
@@ -138,7 +225,7 @@ def _entry(ctx, transcripts_dir, party):
     last_activity = ctx.conn.execute("SELECT MAX(ts) AS ts FROM events WHERE party = ?", (party["name"],)).fetchone()[
         "ts"
     ]
-    return _Entry(
+    return _PartyEntry(
         party["name"],
         party["project"],
         party["generation"],
@@ -151,38 +238,44 @@ def _entry(ctx, transcripts_dir, party):
         mode,
         None if party["state"] == "awaiting-leader" else transcript,
         party["goal"],
+        party_status.has_live_leader(ctx, party),
     )
+
+
+def _adventurer_entry(ctx, transcripts_dir, live_ids, row):
+    transcript = transcripts.find_transcript(transcripts_dir, row["session_id"])
+    cwd, mode = (None, None) if transcript is None else read_location(transcript)
+    return _AdventurerEntry(row, row["session_id"] in live_ids, cwd, mode, transcript)
 
 
 def _entries(ctx, transcripts_dir):
     parties = ctx.conn.execute(
         "SELECT * FROM parties WHERE state IN ('active', 'awaiting-leader') ORDER BY name ASC"
     ).fetchall()
-    return [_entry(ctx, transcripts_dir, party) for party in parties]
+    adventurers = ctx.conn.execute(
+        "SELECT * FROM adventurers WHERE state = 'active' AND health_job IS NULL ORDER BY id ASC"
+    ).fetchall()
+    live_ids = session_info.live_session_ids(ctx.sessions_dir)
+    return [
+        *[_entry(ctx, transcripts_dir, party) for party in parties],
+        *[_adventurer_entry(ctx, transcripts_dir, live_ids, row) for row in adventurers],
+    ]
 
 
 def _listing_lines(entries, with_commands):
     lines = []
     for number, entry in enumerate(entries, start=1):
-        lines.append(
-            "{}. {} ({}) [{}]".format(
-                number, entry.party, entry.project or "-", "resume" if entry.resumable() else "fresh"
-            )
-        )
-        lines.append("   quest: {} | last activity: {}".format(entry.quests, entry.last_activity or "-"))
-        lines.append("   status: {}".format(entry.status))
-        lines.append("   goal: {}".format(entry.goal or "none"))
-        lines.append("   session: {} | mode: {}".format(entry.session_name or "-", entry.mode_label()))
-        lines.append("   cwd: {}".format(entry.cwd or "unknown"))
-        if with_commands:
-            lines.append("   tab: {}".format(_tab_line(entry)))
+        lines.extend(entry.listing_lines(number, with_commands))
     return lines
 
 
 def _tab_line(entry):
     if entry.cwd is None:
         return "cwd unknown"
-    return resume.tab_command(entry.party, entry.cwd, entry.command())
+    reason = entry.missing_transcript_reason()
+    if reason is not None:
+        return reason
+    return resume.tab_command(entry.window, entry.cwd, entry.command())
 
 
 def _parse_numbers(answer, entries):
@@ -196,47 +289,42 @@ def _parse_numbers(answer, entries):
     return selected
 
 
-def _select_by_name(entries, party_names):
-    by_name = {entry.party: entry for entry in entries}
+def _select(entries, party_names, adventurer_ids):
+    parties = {entry.party: entry for entry in entries if isinstance(entry, _PartyEntry)}
+    adventurers = {entry.adventurer_id: entry for entry in entries if isinstance(entry, _AdventurerEntry)}
     for name in party_names:
-        if name not in by_name:
+        if name not in parties:
             raise GuildError("party '{}' is not active".format(name), 1)
-    return [entry for entry in entries if entry.party in party_names]
+    for adventurer_id in adventurer_ids:
+        if adventurer_id not in adventurers:
+            raise GuildError("adventurer {} is not active".format(adventurer_id), 1)
+    chosen = [*[parties[name] for name in party_names], *[adventurers[i] for i in adventurer_ids]]
+    return [entry for entry in entries if entry in chosen]
 
 
 def _skip_reason(entry, windows):
-    if entry.party in windows:
+    if entry.live:
+        return entry.live_reason
+    if entry.window in windows:
         return "window already exists"
+    transcript_reason = entry.missing_transcript_reason()
+    if transcript_reason is not None:
+        return transcript_reason
     if entry.cwd is None:
-        return "cwd unknown; start a fresh session from the project path"
+        return "cwd unknown; {}".format(entry.cwd_advice())
     if not os.path.isdir(entry.cwd):
-        return "cwd missing ({}); start a fresh session from the project path".format(entry.cwd)
+        return "cwd missing ({}); {}".format(entry.cwd, entry.cwd_advice())
     return None
 
 
-def _record_window(ctx, entry, window_id):
-    with db.writing(ctx.conn):
-        events.record(
-            ctx.conn,
-            ctx.now,
-            ctx.origin,
-            entry.party,
-            None,
-            entry.project,
-            "leader.window_launched",
-            "local",
-            {"party": entry.party, "generation": entry.launch_generation(), "window_id": window_id},
-        )
-
-
 def _launch_line(ctx, tmux, entry, session_is_up):
-    window_id = tmux_windows.create_window(tmux, entry.party, entry.cwd, entry.command(), session_is_up)
+    window_id = tmux_windows.create_window(tmux, entry.window, entry.cwd, entry.command(), session_is_up)
     if window_id is None:
-        return "failed {}: tmux could not create the window".format(entry.party), False
-    _record_window(ctx, entry, window_id)
+        return "failed {}: tmux could not create the window".format(entry.window), False
+    entry.record_window(ctx, window_id)
     if not tmux_windows.pin_window_name(tmux, window_id):
-        return "failed {}: window created but its name could not be pinned".format(entry.party), True
-    return "launched {} ({})".format(entry.party, "resume" if entry.resumable() else "fresh"), True
+        return "failed {}: window created but its name could not be pinned".format(entry.window), True
+    return "launched {} ({})".format(entry.window, entry.label()), True
 
 
 def _launch(ctx, tmux, selected):
@@ -248,7 +336,7 @@ def _launch(ctx, tmux, selected):
     for entry in selected:
         reason = _skip_reason(entry, windows)
         if reason is not None:
-            lines.append("skipped {}: {}".format(entry.party, reason))
+            lines.append("skipped {}: {}".format(entry.window, reason))
             continue
         line, window_created = _launch_line(ctx, tmux, entry, session_is_up)
         lines.append(line)
@@ -258,16 +346,16 @@ def _launch(ctx, tmux, selected):
     return lines
 
 
-def run(ctx, party_names, select_all, list_only, transcripts_dir, tmux, ask_numbers):
+def run(ctx, party_names, adventurer_ids, select_all, list_only, transcripts_dir, tmux, ask_numbers):
     entries = _entries(ctx, transcripts_dir)
     if not entries:
-        return "no active parties"
+        return "nothing to revive"
     if list_only:
         return "\n".join(_listing_lines(entries, True))
     if select_all:
         selected = entries
-    elif party_names:
-        selected = _select_by_name(entries, party_names)
+    elif party_names or adventurer_ids:
+        selected = _select(entries, party_names, adventurer_ids)
     elif ask_numbers is not None:
         prompt = "\n".join([*_listing_lines(entries, False), "numbers to revive (e.g. 1,3): "])
         selected = _parse_numbers(ask_numbers(prompt), entries)

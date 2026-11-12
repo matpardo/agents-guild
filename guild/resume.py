@@ -16,12 +16,16 @@ def generation_name(party, generation):
     return "{}-g{}".format(party, generation)
 
 
-def resume_command(session_id, party, generation, permission_mode):
+def named_resume_command(session_id, name, permission_mode):
     return "claude --resume {} --name {}{}".format(
         shlex.quote(session_id),
-        shlex.quote(generation_name(party, generation)),
+        shlex.quote(name),
         _mode_flag(permission_mode),
     )
+
+
+def resume_command(session_id, party, generation, permission_mode):
+    return named_resume_command(session_id, generation_name(party, generation), permission_mode)
 
 
 def fresh_command(party, next_generation, model, permission_mode, prompt):
