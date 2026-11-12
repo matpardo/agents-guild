@@ -33,7 +33,7 @@ class CliHelpTest(unittest.TestCase):
             "show the next action for your party",
             "read-only: PRs in the order to merge by hand",
             "track PRs and set their state",
-            "relaunch active parties after a reboot",
+            "relaunch active parties and stopped adventurers after a reboot",
             "serve the local board in a browser",
             "see docs/commands.md",
         ):

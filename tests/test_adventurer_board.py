@@ -69,6 +69,7 @@ class AdventurerBoardTests(AdventurerTestCase):
         self.assertEqual(entry["project"], "acme")
         self.assertEqual([pr["number"] for pr in entry["prs"]], [7])
         self.assertTrue(entry["stopped_without_report"])
+        self.assertTrue(entry["revivable"])
         self.assertFalse(entry["live"])
 
     def test_live_session_is_not_flagged(self):
@@ -77,6 +78,7 @@ class AdventurerBoardTests(AdventurerTestCase):
         entry = self._model()["adventurers"][0]
         self.assertTrue(entry["live"])
         self.assertFalse(entry["stopped_without_report"])
+        self.assertFalse(entry["revivable"])
 
     def test_done_stays_listed_until_dismissed(self):
         self.start("adv-1", "x", "--task", "demo-epic/T90")
@@ -85,6 +87,7 @@ class AdventurerBoardTests(AdventurerTestCase):
         self.assertEqual(
             (entry["state"], entry["pending"], entry["stopped_without_report"]), ("done", "left the tests", False)
         )
+        self.assertFalse(entry["revivable"])
         code, out, err = self.cli(["adventurer", "dismiss", "1"], None)
         self.assertEqual(code, 0, err)
         self.assertEqual(self._model()["adventurers"], [])
@@ -126,11 +129,13 @@ class AdventurerBoardTests(AdventurerTestCase):
         )
         party = self._model()["parties"][0]
         self.assertTrue(party["stopped_without_report"])
+        self.assertTrue(party["revivable"])
         self.assertIn("stopped without report", self._board_text())
         self.cli(["handoff", "--in-flight", "x", "--learned", "y"], "sess-1")
         party = self._model()["parties"][0]
         self.assertEqual(party["state"], "awaiting-leader")
         self.assertFalse(party["stopped_without_report"])
+        self.assertTrue(party["revivable"])
 
     def test_party_with_live_leader_is_not_flagged(self):
         self.cli(
@@ -138,7 +143,9 @@ class AdventurerBoardTests(AdventurerTestCase):
             "sess-1",
         )
         self.write_session(os.getpid(), "sess-1", "lead")
-        self.assertFalse(self._model()["parties"][0]["stopped_without_report"])
+        party = self._model()["parties"][0]
+        self.assertFalse(party["stopped_without_report"])
+        self.assertFalse(party["revivable"])
 
 
 class PartyClosePendingTests(AdventurerTestCase):

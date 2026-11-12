@@ -1293,6 +1293,55 @@ class WebPartyHandoffBehaviorTests(unittest.TestCase):
 
 
 @unittest.skipIf(shutil.which("node") is None, "node not installed")
+class WebReviveBehaviorTests(unittest.TestCase):
+    def _party_text(self, revivable):
+        parties = [dict(_BOARD["parties"][0], name="a", revivable=revivable)]
+        return _render(dict(_BOARD, parties=parties), "all", "all", "parties", "text")
+
+    def _adventurer_text(self, revivable):
+        board = dict(_BOARD, adventurers=[_adventurer(revivable=revivable)])
+        return _render(board, "all", "all", "adventurers", "text")
+
+    def _revive_all(self, parties, adventurers, click):
+        board = dict(_BOARD, parties=parties, adventurers=adventurers)
+        request = {
+            "src": str(_APP_JS_PATH),
+            "data": board,
+            "hash": _view_hash("all", "all"),
+            "outId": "revive-all",
+            "mode": "text",
+        }
+        if click is not None:
+            request["click"] = click
+        return node_harness.request(_HARNESS_NAME, request)
+
+    def test_party_revive_button_only_when_revivable(self):
+        self.assertIn("Revive", self._party_text(True))
+        self.assertNotIn("Revive", self._party_text(False))
+
+    def test_adventurer_revive_button_only_when_revivable(self):
+        self.assertIn("Revive", self._adventurer_text(True))
+        self.assertNotIn("Revive", self._adventurer_text(False))
+
+    def test_revive_all_hidden_when_nothing_is_revivable(self):
+        party = dict(_BOARD["parties"][0], revivable=False)
+        self.assertEqual(self._revive_all([party], [_adventurer(revivable=False)], None).strip(), "")
+
+    def test_revive_all_shown_for_a_revivable_party_or_adventurer(self):
+        party = dict(_BOARD["parties"][0], revivable=True)
+        self.assertEqual(self._revive_all([party], [], None).strip(), "Revive all")
+        self.assertEqual(self._revive_all([], [_adventurer(revivable=True)], None).strip(), "Revive all")
+
+    def test_revive_all_asks_for_confirmation_first(self):
+        party = dict(_BOARD["parties"][0], revivable=True)
+        self.assertEqual(self._revive_all([party], [], "Revive all").strip(), "Confirm revive all")
+
+    def test_revive_writes_go_through_send_post(self):
+        self.assertIn('sendPost("/api/revive", {})', _APP_JS)
+        self.assertIn("sendPost(url, {})", _APP_JS)
+
+
+@unittest.skipIf(shutil.which("node") is None, "node not installed")
 class WebPartyParkBehaviorTests(unittest.TestCase):
     def _rendered(self, state, parked, status):
         party = dict(_BOARD["parties"][0], name="a", state=state, parked=parked, status=status)

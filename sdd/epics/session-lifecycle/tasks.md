@@ -3,7 +3,7 @@ epic: session-lifecycle
 type: tasks
 title: Handoffs that clean up and sessions that respawn
 status: done
-updated: 2026-10-18
+updated: 2026-11-12
 ---
 
 # Tasks: Handoffs that clean up and sessions that respawn
@@ -227,3 +227,16 @@ updated: 2026-10-18
 - [x] A bound session with a generated name receives its title on the next prompt, with the usual context still delivered.
 - [x] A name set by the human, a collision name, a session already titled and an unbound session receive no title.
 - [x] Two runs of a health job or solo player get different session names and keep one window name.
+
+## T19 — Revive from the web board and for adventurers
+
+**Depends on:** T18
+**Status:** [x] done
+
+**What:** `guild revive` also relaunches stopped adventurers (`--adventurer <id>`, `--all`) and skips any session that is still live, so `--all` no longer starts a duplicate of a leader running outside tmux. The web board gets a `Revive all` button and a `Revive` button on each revivable party and adventurer, calling the same command.
+
+**Acceptance:**
+- [x] A party whose leader session is live, and an adventurer whose session is live, are skipped with a reason.
+- [x] A stopped adventurer that is not a health job resumes in its own `adventurer-<id>` window; one without a transcript is skipped with the reason.
+- [x] The board model marks revivable parties and adventurers, and the web shows the three buttons only for them, with a two-step `Revive all`.
+- [x] `POST /api/revive`, `/api/parties/<name>/revive` and `/api/adventurers/<id>/revive` run the CLI command and need the session token.

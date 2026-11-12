@@ -110,6 +110,11 @@ realmDoctorLines: [],
     baseStatuses: {},
     partyHandoffStatuses: {},
     partyHandoffBusy: {},
+    partyReviveStatuses: {},
+    partyReviveBusy: {},
+    adventurerReviveStatuses: {},
+    adventurerReviveBusy: {},
+    reviveAll: { confirm: false, busy: false, status: "", result: "" },
     partyParkOpen: {},
     partyParkDrafts: {},
     partyParkStatuses: {},
@@ -351,6 +356,9 @@ realmDoctorLines: [],
       ctx: "Context used by the leader session / the percentage at which it is nudged to run guild handoff.",
       remaining: "Tasks not done in the party's active quests plus open PRs outside them; the tooltip lists done/total per quest.",
       allDone: "Every task of the party's active quests is done and no open PR is left outside them.",
+      reviveAll: "Relaunch every active party and stopped adventurer that has no live session, each in its own tmux window.",
+      reviveParty: "Relaunch this party in a tmux window; it resumes its session or starts the next generation.",
+      reviveAdventurer: "Relaunch this stopped adventurer in a tmux window by resuming its session.",
       resumeCommand: "Run this to start the next generation of this party; it waits for a new leader.",
       leader: "The leader session of the party.",
       noLeader: "The party has no leader session right now.",
@@ -440,6 +448,14 @@ realmDoctorLines: [],
 
   function partyHandoffUrl(party) {
     return "/api/parties/" + party + "/hand-off";
+  }
+
+  function partyReviveUrl(party) {
+    return "/api/parties/" + party + "/revive";
+  }
+
+  function adventurerReviveUrl(adventurerId) {
+    return "/api/adventurers/" + adventurerId + "/revive";
   }
 
   function errorMessage(body) {
@@ -533,6 +549,49 @@ realmDoctorLines: [],
         delete state.partyHandoffStatuses[partyName];
       } else {
         state.partyHandoffStatuses[partyName] = errorMessage(result.body);
+      }
+      fetchBoard();
+    });
+  }
+
+  function postReviveEntry(url, statuses, busy, key) {
+    if (sessionToken === null) {
+      statuses[key] = NO_SESSION_MESSAGE;
+      fetchBoard();
+      return;
+    }
+    busy[key] = true;
+    statuses[key] = "sending...";
+    fetchBoard();
+    sendPost(url, {}).then(function (result) {
+      delete busy[key];
+      if (result.ok) {
+        statuses[key] = result.body.message.split("\n")[0];
+      } else {
+        statuses[key] = errorMessage(result.body);
+      }
+      fetchBoard();
+    });
+  }
+
+  function postReviveAll() {
+    if (sessionToken === null) {
+      state.reviveAll.status = NO_SESSION_MESSAGE;
+      fetchBoard();
+      return;
+    }
+    state.reviveAll.confirm = false;
+    state.reviveAll.busy = true;
+    state.reviveAll.status = "sending...";
+    state.reviveAll.result = "";
+    fetchBoard();
+    sendPost("/api/revive", {}).then(function (result) {
+      state.reviveAll.busy = false;
+      if (result.ok) {
+        state.reviveAll.status = "";
+        state.reviveAll.result = result.body.message;
+      } else {
+        state.reviveAll.status = errorMessage(result.body);
       }
       fetchBoard();
     });
@@ -2143,6 +2202,25 @@ realmDoctorLines: [],
     return actions;
   }
 
+  function renderAdventurerRevive(adventurer) {
+    var actions = el("div");
+    actions.className = "notice-actions";
+    var button = explain(textEl("button", "Revive"), "ui", "reviveAdventurer");
+    button.type = "button";
+    button.disabled = state.adventurerReviveBusy[adventurer.id] === true;
+    button.addEventListener("click", function () {
+      postReviveEntry(
+        adventurerReviveUrl(adventurer.id),
+        state.adventurerReviveStatuses,
+        state.adventurerReviveBusy,
+        adventurer.id
+      );
+    });
+    actions.appendChild(button);
+    actions.appendChild(classedText("span", state.adventurerReviveStatuses[adventurer.id] || "", "ask-status"));
+    return actions;
+  }
+
   function renderAdventurer(adventurer) {
     var article = el("article");
     article.className = "card adventurer";
@@ -2153,6 +2231,9 @@ realmDoctorLines: [],
     }
     if (adventurer.stopped_without_report) {
       article.appendChild(classedText("span", STOPPED_WITHOUT_REPORT_TEXT, "pill stopped-without-report"));
+    }
+    if (adventurer.revivable) {
+      article.appendChild(renderAdventurerRevive(adventurer));
     }
     if (adventurer.ideas.length > 0) {
       article.appendChild(textEl("p", "ideas: " + adventurer.ideas.map(ideaSummary).join(", ")));
@@ -3452,6 +3533,20 @@ realmDoctorLines: [],
     return controls;
   }
 
+  function renderPartyReviveControls(party) {
+    var controls = el("span");
+    controls.className = "pr-block-controls";
+    var button = explain(textEl("button", "Revive"), "ui", "reviveParty");
+    button.type = "button";
+    button.disabled = state.partyReviveBusy[party.name] === true;
+    button.addEventListener("click", function () {
+      postReviveEntry(partyReviveUrl(party.name), state.partyReviveStatuses, state.partyReviveBusy, party.name);
+    });
+    controls.appendChild(button);
+    controls.appendChild(classedText("span", state.partyReviveStatuses[party.name] || "", "ask-status"));
+    return controls;
+  }
+
   function partyParkButton(party, label, handler) {
     var button = textEl("button", label);
     button.type = "button";
@@ -3648,6 +3743,9 @@ realmDoctorLines: [],
 
     if (party.state === "active" && !party.has_live_leader) {
       details.appendChild(renderPartyHandoffControls(party));
+    }
+    if (party.revivable) {
+      details.appendChild(renderPartyReviveControls(party));
     }
     if (party.state !== "closed") {
       details.appendChild(renderPartyParkControls(party));
@@ -4708,6 +4806,44 @@ realmDoctorLines: [],
     nav.appendChild(top);
   }
 
+  function reviveAllModel(data) {
+    var any = data.parties.concat(data.adventurers).some(function (entry) {
+      return entry.revivable;
+    });
+    return {
+      revivable: any,
+      confirm: state.reviveAll.confirm,
+      busy: state.reviveAll.busy,
+      status: state.reviveAll.status,
+      result: state.reviveAll.result,
+    };
+  }
+
+  function renderReviveAll(model) {
+    var section = document.getElementById("revive-all");
+    clear(section);
+    if (model.revivable) {
+      var button = explain(textEl("button", model.confirm ? "Confirm revive all" : "Revive all"), "ui", "reviveAll");
+      button.type = "button";
+      button.disabled = model.busy;
+      button.addEventListener("click", function () {
+        if (!state.reviveAll.confirm) {
+          state.reviveAll.confirm = true;
+          fetchBoard();
+          return;
+        }
+        postReviveAll();
+      });
+      section.appendChild(button);
+    }
+    if (model.status !== "") {
+      section.appendChild(classedText("span", model.status, "ask-status"));
+    }
+    if (model.result !== "") {
+      section.appendChild(classedText("pre", model.result, "ask-status"));
+    }
+  }
+
   function renderBases(bases) {
     var section = document.getElementById("bases");
     clear(section);
@@ -4751,6 +4887,7 @@ realmDoctorLines: [],
       filtered.merge_queues = partyViewQueues(data, view.name);
     }
     renderSection("bases", [data.bases], renderBases, onlyIfChanged);
+    renderSection("revive-all", [reviveAllModel(data)], renderReviveAll, onlyIfChanged);
     renderSection("sidebar", [sidebarModel(data), view.hash], renderSidebar, onlyIfChanged);
     renderSection(
       "asks",

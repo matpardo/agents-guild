@@ -159,10 +159,11 @@ class ReviveBase(GuildTestCase):
         with db.writing(self.conn):
             self.conn.execute("UPDATE leaders SET cwd = ?, permission_mode = ? WHERE party = ?", (cwd, mode, party))
 
-    def _revive(self, party_names, select_all, list_only, tmux, ask_numbers):
+    def _revive(self, party_names, select_all, list_only, tmux, ask_numbers, adventurer_ids=()):
         return revive.run(
             _build_context(None, self.root),
             party_names,
+            list(adventurer_ids),
             select_all,
             list_only,
             self.claude_projects_dir,
@@ -302,7 +303,7 @@ class ListTests(ReviveBase):
         self.run_cli(["party", "close", "alpha", "--force", "--pending", "none"], "sess-a", self.work_a)
         self.run_cli(["party", "close", "beta", "--pending", "none"], "sess-b", self.work_b)
         out = self._revive([], False, True, self._tmux(), None)
-        self.assertEqual(out, "no active parties")
+        self.assertEqual(out, "nothing to revive")
 
 
 class SelectionTests(ReviveBase):
@@ -447,6 +448,13 @@ class LaunchTests(ReviveBase):
         self.assertNotIn("new-window", tmux.verbs())
         self.assertIn("skipped alpha: window already exists", out)
 
+    def test_live_leader_is_skipped_with_reason(self):
+        self.write_session(os.getpid(), "sess-a", "alpha-g1")
+        tmux = self._tmux()
+        out = self._revive(["alpha"], False, False, tmux, None)
+        self.assertEqual(tmux.windows, [])
+        self.assertIn("skipped alpha: leader session is live", out)
+
     def test_fresh_fallback_without_transcript(self):
         tmux = self._tmux()
         out = self._revive(["beta"], False, False, tmux, None)
@@ -512,6 +520,108 @@ class LaunchTests(ReviveBase):
         tmux.run = failing
         out = self._revive(["alpha"], False, False, tmux, None)
         self.assertIn("failed alpha", out)
+
+
+class AdventurerReviveTests(ReviveBase):
+    def setUp(self):
+        super().setUp()
+        self._set_leader("alpha", str(self.work_a), "acceptEdits")
+        self._set_leader("beta", str(self.work_b), None)
+        self.run_cli(
+            ["quest", "add", "chore", "--open", "--no-epic", "--title", "chore", "--tasks", "T01", "--titles", "one"],
+            None,
+            self.repo_dir,
+        )
+        self.work_c = self.repo_dir.parent / "work-c"
+        self.work_c.mkdir()
+        self.run_cli(
+            ["adventurer", "start", "fix typo", "--task", "chore/T01", "--reason", "test reason"],
+            "adv-1",
+            self.work_c,
+        )
+        _write_transcript(
+            self.claude_projects_dir, "-c", "adv-1", [{"cwd": str(self.work_c), "permissionMode": "plan"}]
+        )
+
+    def test_selected_adventurer_resumes_in_its_own_window(self):
+        tmux = self._tmux()
+        out = self._revive([], False, False, tmux, None, [1])
+        self.assertEqual(tmux.windows, ["adventurer-1"])
+        new_session = next(call for call in tmux.calls if call[0] == "new-session")
+        self.assertEqual(new_session[new_session.index("-c") + 1], str(self.work_c))
+        self.assertEqual(new_session[-1], "claude --resume adv-1 --name adventurer-1 --permission-mode plan")
+        self.assertIn("launched adventurer-1 (resume)", out)
+
+    def test_all_mixes_parties_and_adventurers(self):
+        tmux = self._tmux()
+        self._revive([], True, False, tmux, None)
+        self.assertEqual(sorted(tmux.windows), ["adventurer-1", "alpha", "beta"])
+
+    def test_listing_numbers_continue_across_parties_and_adventurers(self):
+        out = self._revive([], False, True, self._tmux(), None)
+        self.assertIn("3. adventurer 1 fix typo (acme) [resume]", out)
+        self.assertIn("task: chore/T01", out)
+        self.assertIn("claude --resume adv-1 --name adventurer-1", out)
+
+    def test_interactive_number_selects_the_adventurer(self):
+        tmux = self._tmux()
+        self._revive([], False, False, tmux, lambda prompt: "3")
+        self.assertEqual(tmux.windows, ["adventurer-1"])
+
+    def test_adventurer_without_transcript_is_skipped(self):
+        (self.claude_projects_dir / "-c" / "adv-1.jsonl").unlink()
+        tmux = self._tmux()
+        out = self._revive([], False, False, tmux, None, [1])
+        self.assertEqual(tmux.windows, [])
+        self.assertIn("skipped adventurer-1: no transcript; dismiss it with guild adventurer dismiss 1", out)
+
+    def test_adventurer_with_missing_cwd_is_skipped(self):
+        self.work_c.rmdir()
+        out = self._revive([], False, False, self._tmux(), None, [1])
+        self.assertIn("skipped adventurer-1: cwd missing", out)
+
+    def test_live_adventurer_is_skipped(self):
+        self.write_session(os.getpid(), "adv-1", "adv")
+        tmux = self._tmux()
+        out = self._revive([], False, False, tmux, None, [1])
+        self.assertEqual(tmux.windows, [])
+        self.assertIn("skipped adventurer-1: session is live", out)
+
+    def test_existing_window_is_skipped(self):
+        tmux = self._tmux(sessions=["guild"], windows=["adventurer-1"])
+        out = self._revive([], False, False, tmux, None, [1])
+        self.assertIn("skipped adventurer-1: window already exists", out)
+
+    def test_health_job_adventurer_is_not_listed(self):
+        with db.writing(self.conn):
+            self.conn.execute("UPDATE adventurers SET health_job = 'red-main' WHERE id = 1")
+        out = self._revive([], False, True, self._tmux(), None)
+        self.assertNotIn("adventurer 1", out)
+        with self.assertRaises(GuildError):
+            self._revive([], False, False, self._tmux(), None, [1])
+
+    def test_done_adventurer_is_not_listed(self):
+        self.run_cli(["adventurer", "done", "--pending", "none"], "adv-1", self.work_c)
+        out = self._revive([], False, True, self._tmux(), None)
+        self.assertNotIn("adventurer 1", out)
+
+    def test_unknown_adventurer_errors(self):
+        with self.assertRaises(GuildError) as raised:
+            self._revive([], False, False, self._tmux(), None, [9])
+        self.assertIn("adventurer 9", raised.exception.message)
+
+    def test_only_adventurers_is_not_nothing_to_revive(self):
+        self.run_cli(["party", "close", "alpha", "--force", "--pending", "none"], "sess-a", self.work_a)
+        self.run_cli(["party", "close", "beta", "--pending", "none"], "sess-b", self.work_b)
+        out = self._revive([], False, True, self._tmux(installed=False), None)
+        self.assertIn("1. adventurer 1", out)
+
+    def test_cli_adventurer_flag_launches(self):
+        tmux = self._tmux()
+        with mock.patch("guild.tmux_windows.Tmux", return_value=tmux):
+            code, out, err = self.run_cli(["revive", "--adventurer", "1"], None, self.root)
+        self.assertEqual(code, 0, err)
+        self.assertEqual(tmux.windows, ["adventurer-1"])
 
 
 class CliWiringTests(ReviveBase):

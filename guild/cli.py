@@ -74,6 +74,7 @@ def _handle_revive(ctx, args):
         revive_commands.run(
             ctx,
             args.party,
+            args.adventurer,
             args.all,
             args.list,
             paths.claude_projects_dir(),
@@ -1902,9 +1903,12 @@ def _add_drift_parser(subparsers):
 
 
 def _add_revive_parser(subparsers):
-    revive = subparsers.add_parser("revive", help="relaunch active parties after a reboot")
+    revive = subparsers.add_parser("revive", help="relaunch active parties and stopped adventurers after a reboot")
     revive.add_argument("--party", action="append", default=[], help="relaunch this party; repeatable")
-    revive.add_argument("--all", action="store_true", help="relaunch every active party")
+    revive.add_argument(
+        "--adventurer", action="append", default=[], type=int, help="relaunch this stopped adventurer; repeatable"
+    )
+    revive.add_argument("--all", action="store_true", help="relaunch every active party and stopped adventurer")
     revive.add_argument("--list", action="store_true", help="print copy-paste commands instead of launching")
     revive.set_defaults(handler=_handle_revive)
 
