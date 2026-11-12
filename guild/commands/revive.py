@@ -276,4 +276,4 @@ def run(ctx, party_names, select_all, list_only, transcripts_dir, tmux, ask_numb
     if not selected:
         return "nothing selected"
     lines = _launch(ctx, tmux, selected)
-    return "\n".join([*lines, _GOAL_REMINDER, "tmux attach -t {}".format(tmux_windows.SESSION)])
+    return "\n".join([*lines, _GOAL_REMINDER, *tmux_windows.ATTACH_HINT])

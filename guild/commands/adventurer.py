@@ -161,7 +161,7 @@ def launch_window(ctx, project, cwd, job, window_name, tmux):
             "local",
             {"window_id": window_id},
         )
-    return "launched {} in {}: tmux attach -t {}".format(job["name"], cwd, tmux_windows.SESSION)
+    return "\n".join(["launched {} in {}".format(job["name"], cwd), *tmux_windows.ATTACH_HINT])
 
 
 def launch(ctx, job_name, tmux):
