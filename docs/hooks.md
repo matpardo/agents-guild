@@ -51,6 +51,9 @@ The rules ship with the CLI, so they change in the same commit as the commands t
     "Stop": [
       {"hooks": [{"type": "command", "command": "guild hook stop"}]}
     ],
+    "StopFailure": [
+      {"hooks": [{"type": "command", "command": "guild hook stop-failure"}]}
+    ],
     "SubagentStart": [
       {"hooks": [{"type": "command", "command": "guild hook subagent-start"}]}
     ],
@@ -224,9 +227,11 @@ Fires on automatic compaction only (matcher `auto`, so a manual `/compact` never
 
 Mark and unmark a running subagent of the session (`agent_id` from stdin) for the `waiting-sub-agents` status. A subagent that stops while its own transcript (`agent_transcript_path`) shows a background command with no finished notification stays marked, so the leader keeps showing `waiting-sub-agents` until the subagent wakes and stops with nothing pending.
 
-#### `notification` and `stop`
+#### `notification`, `stop` and `stop-failure`
 
 Record the session status (see [Session status](#session-status)). They print nothing, ignore unbound sessions and exit 0 whatever the stdin carries.
+
+`stop-failure` runs when a turn ends on an API error (Claude Code fires `StopFailure` instead of `Stop`). It reads only `error` from stdin: `rate_limit` and `billing_error` record `waiting-limit` (detail is the error kind) and run the project's `notify` command with the wait `limit`; any other error records `stopped`, like `stop`. It works for adventurer sessions too and never stores `error_details` or `last_assistant_message`.
 
 #### Message framing
 
@@ -238,6 +243,7 @@ Every bound session has a status, kept in the `session_status` projection from l
 
 - `Notification` maps `notification_type` `permission_prompt` and `elicitation_dialog` to `waiting-permission`, and `idle_prompt` to `waiting-input`. Any other type is ignored.
 - `Stop` records `stopped`.
+- `StopFailure` with `rate_limit` or `billing_error` records `waiting-limit`; any other error records `stopped`.
 - `session-start` (bound leader), `prompt-submit` and `post-tool-use` record `working`, and only when the status changes, so a hundred tool calls add no event.
 
 Each party then gets one derived status, first match wins. A leader is live when its session id is the id of a running session file under the Claude sessions dir. A party whose state is `awaiting-leader`, without a leader session id or with a dead one has no live leader, and its stored session status is ignored.
@@ -254,6 +260,7 @@ Each party then gets one derived status, first match wins. A leader is live when
 | 6 | live leader, open ask and session not working | `waiting-ask` |
 | 7a | live leader idle or stopped while it has a live subagent | `waiting-sub-agents` (detail `N subagents`) |
 | 7b | live leader idle or stopped while a `guild pr wait` runs and no subagent is live | `waiting-background` (detail `pr <ref>`) |
+| 7c | live leader waiting on a usage or billing limit | `waiting-limit` (detail is the error kind; clears when the session works again) |
 | 8 | live leader waiting on an idle prompt | `waiting-input` |
 | 9 | live leader stopped | `stopped-with-work` when `guild next` would still return work, otherwise `done` |
 | 10 | live leader that never reported a status (for example a session started before the `Notification`/`Stop` hooks were wired) | `unknown` |

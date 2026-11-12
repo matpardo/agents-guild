@@ -72,6 +72,7 @@ _STATUS_STYLES = {
     "waiting-permission": "red",
     "waiting-ask": "yellow",
     "waiting-input": "red",
+    "waiting-limit": "magenta",
     "waiting-sub-agents": "dim",
     "waiting-background": "dim",
     "stopped-with-work": "cyan",

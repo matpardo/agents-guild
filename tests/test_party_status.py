@@ -238,6 +238,21 @@ class PartyStatusTests(GuildTestCase):
         self._waiting("idle", "")
         self.assertEqual(self._derive()["status"], "waiting-input")
 
+    def test_waiting_limit(self):
+        self._waiting("limit", "rate_limit")
+        result = self._derive()
+        self.assertEqual((result["status"], result["detail"]), ("waiting-limit", "rate_limit"))
+
+    def test_waiting_limit_is_not_hidden_by_subagents(self):
+        self._waiting("limit", "rate_limit")
+        background.mark(self._ctx().state_dir, "sess-1", background.subagent_key("a1"), "x")
+        self.assertEqual(self._derive()["status"], "waiting-limit")
+
+    def test_ask_beats_waiting_limit(self):
+        self._ask()
+        self._waiting("limit", "rate_limit")
+        self.assertEqual(self._derive()["status"], "waiting-ask")
+
     def _background(self, key, label):
         background.mark(self._ctx().state_dir, "sess-1", key, label)
 

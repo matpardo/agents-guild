@@ -14,6 +14,7 @@ EXPECTED_HOOKS = (
     ("PreToolUse", "Bash", "guild hook pre-answer"),
     ("Notification", None, "guild hook notification"),
     ("Stop", None, "guild hook stop"),
+    ("StopFailure", None, "guild hook stop-failure"),
     ("SubagentStart", None, "guild hook subagent-start"),
     ("SubagentStop", None, "guild hook subagent-stop"),
     ("PreCompact", "auto", "guild hook pre-compact"),

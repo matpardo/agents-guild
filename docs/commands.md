@@ -945,7 +945,7 @@ guild web: http://127.0.0.1:<port>/#t=<token>
 | `#overview` | notices, raids, drift, projects |
 
 - The menu lists needs you, adventurers, solo players, ideas, quest board and overview first, with counts for asks, ready PRs, blocked and context-high parties (a count above zero is a pill coloured by type), active adventurers, solo players, ideas, open quests and new notices. The solo players item is collapsed by default and opens to one link per project (it opens by itself on a project tab).
-- After them come the parties grouped by raid (a party in two raids shows under both) and a `parties` group for parties outside raids. Each party row shows its state badge, open asks, the work left and `stopped without report`. Parties sort by attention: waiting on permission, waiting on an ask, context high, waiting on input, stopped with work, working, queued, parked, blocked. A raid header shows its worst member state.
+- After them come the parties grouped by raid (a party in two raids shows under both) and a `parties` group for parties outside raids. Each party row shows its state badge, open asks, the work left and `stopped without report`. Parties sort by attention: waiting on permission, waiting on an ask, context high, waiting on input, waiting on a limit, stopped with work, working, queued, parked, blocked. A raid header shows its worst member state.
 - A party view shows the whole merge queue of its raids, or its own queue when it has no raid. The header keeps the PR state filter.
 
 **Progress.** Under the merge queue, the party and raid views show the tasks done out of the total of the active quests with a bar, one bar per quest, the active, blocked and queued counts, and the blocked tasks grouped by reason (the tooltip lists their ids). A raid view sums its member parties. `guild board --party` and `--raid` print the same as `PROGRESS · <done>/<total> tasks done (<pct>%)`.
@@ -1149,6 +1149,7 @@ guild hook pre-edit
 guild hook pre-commit      # git hook: no stdin, session from CLAUDE_CODE_SESSION_ID
 guild hook notification    # records the session status
 guild hook stop
+guild hook stop-failure    # records waiting-limit on a rate-limit or billing error
 guild hook subagent-start  # marks a running subagent
 guild hook subagent-stop
 guild hook pre-compact     # records the context percentage before an automatic compaction; bound sessions get summary instructions

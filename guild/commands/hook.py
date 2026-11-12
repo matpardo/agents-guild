@@ -201,6 +201,9 @@ _NOTIFICATION_WAITS = {
 }
 
 
+_LIMIT_ERRORS = ("rate_limit", "billing_error")
+
+
 def _session_actor(ctx):
     binding = identity.resolve_binding(ctx.conn, ctx.session_id)
     if binding is not None:
@@ -295,7 +298,7 @@ def _hides_pending_permission(wait, previous_row):
 
 
 def _run_push(ctx, binding, wait, push_runner):
-    if binding["project"] is None:
+    if binding["project"] is None or binding["party"] is None:
         return
     notify_config = config.load_project(ctx.projects_dir, binding["project"]).get("notify")
     if notify_config is None:
@@ -324,6 +327,21 @@ def notification(ctx, notification_type, message, push_runner):
     if wait not in _BLOCKING_WAITS:
         return
     _run_push(ctx, binding, wait, push_runner)
+
+
+def stop_failure(ctx, error, push_runner):
+    _spawn_due_jobs(ctx)
+    if error not in _LIMIT_ERRORS:
+        _record_stopped(ctx)
+        return
+    actor = _session_actor(ctx)
+    if actor is None:
+        return
+    with db.writing(ctx.conn):
+        if not session_status.is_change(ctx.conn, ctx.session_id, "waiting-limit"):
+            return
+        session_status.record_change(ctx, actor, "session.waiting", session_status.waiting_payload("limit", error))
+    _run_push(ctx, actor, "limit", push_runner)
 
 
 def _adopt_tmux_window(ctx, binding, tmux, tmux_pane):

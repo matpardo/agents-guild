@@ -357,6 +357,7 @@ _STATE_BOARD = dict(
         _state_party("p", [], "waiting-permission"),
         _state_party("i", [], "idle"),
         _state_party("sa", [], "waiting-sub-agents"),
+        _state_party("lm", [], "waiting-limit"),
         dict(
             _state_party("pk", [], "parked"), status={"name": "parked", "label": "parked 3h", "detail": "legal answer"}
         ),
@@ -376,7 +377,15 @@ class WebSidebarStateTests(unittest.TestCase):
 
     def test_party_rows_carry_a_status_badge_class(self):
         classes = [node["className"] for node in self._nodes()]
-        for name in ("working", "queued", "waiting-ask", "waiting-permission", "idle", "waiting-sub-agents"):
+        for name in (
+            "working",
+            "queued",
+            "waiting-ask",
+            "waiting-permission",
+            "idle",
+            "waiting-sub-agents",
+            "waiting-limit",
+        ):
             with self.subTest(status=name):
                 self.assertIn("status-badge status-" + name, classes)
 

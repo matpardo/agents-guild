@@ -1676,6 +1676,7 @@ HOOK_NAMES = (
     "pre-commit",
     "notification",
     "stop",
+    "stop-failure",
     "subagent-start",
     "subagent-stop",
     "pre-compact",
@@ -2165,6 +2166,9 @@ def _run_stateful_hook(hook_name, stdin_data):
             text = None
         elif hook_name == "stop":
             hook_commands.stop(ctx, tmux_windows.Tmux(), os.environ.get("TMUX_PANE"))
+            text = None
+        elif hook_name == "stop-failure":
+            hook_commands.stop_failure(ctx, stdin_data.get("error"), notify.spawn_detached)
             text = None
         elif hook_name == "subagent-start":
             hook_commands.subagent_start(ctx, stdin_data.get("agent_id"), stdin_data.get("transcript_path"))

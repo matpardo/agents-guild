@@ -844,6 +844,7 @@ _WAIT_STATUS = {
     "permission": "waiting-permission",
     "elicitation": "waiting-permission",
     "idle": "waiting-input",
+    "limit": "waiting-limit",
 }
 
 

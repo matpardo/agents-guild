@@ -44,6 +44,9 @@ class WireSettingsTests(GuildTestCase):
             },
         )
         self.assertEqual(settings["hooks"]["Stop"], [{"hooks": [{"type": "command", "command": "guild hook stop"}]}])
+        self.assertEqual(
+            settings["hooks"]["StopFailure"], [{"hooks": [{"type": "command", "command": "guild hook stop-failure"}]}]
+        )
         self.assertTrue(self.settings_path.read_text().endswith("}\n"))
         self.assertFalse(self.settings_path.with_name("settings.json.bak").exists())
 
@@ -68,7 +71,7 @@ class WireSettingsTests(GuildTestCase):
         self.assertEqual(settings["hooks"]["PreToolUse"][0], foreign_hook)
         self.assertEqual(len(settings["hooks"]["PreToolUse"]), 5)
         self.assertEqual(len(settings["hooks"]["Stop"]), 1)
-        self.assertNotIn("hook Stop", out)
+        self.assertNotIn("hook Stop:", out)
 
     def test_backup_holds_original_bytes(self):
         self.settings_path.parent.mkdir(parents=True)

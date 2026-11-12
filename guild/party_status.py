@@ -61,6 +61,8 @@ def derive(ctx, party_row):
     ask_since = _oldest_open_ask_since(ctx.conn, party_row["name"])
     if ask_since is not None and session_state != "working":
         return _result("waiting-ask", ask_since, None)
+    if session_state == "waiting-limit":
+        return _result("waiting-limit", session_row["since"], session_row["detail"])
     if session_state in ("waiting-input", "stopped"):
         leader_session_id = party_row["leader_session_id"]
         subagents = background.subagent_count(ctx.state_dir, leader_session_id, ctx.now)

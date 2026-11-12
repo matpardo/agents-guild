@@ -2,7 +2,7 @@
 epic: usage-limit
 type: spec
 title: Sessions stopped by the usage limit show as waiting, not dead
-status: active
+status: done
 owner: matpardo
 created: 2026-11-11
 updated: 2026-11-11
@@ -34,10 +34,10 @@ When Claude Code ends a turn because of the usage limit, the `Stop` hook does no
 
 ## Success criteria
 
-- [ ] A bound session whose turn ends with `error: rate_limit` shows `waiting-limit` on the board and the web.
-- [ ] Another error such as `server_error` shows `stopped`.
-- [ ] An unbound session records nothing.
-- [ ] The next prompt in that session shows it `working` again.
+- [x] A bound session whose turn ends with `error: rate_limit` shows `waiting-limit` on the board and the web.
+- [x] Another error such as `server_error` shows `stopped`.
+- [x] An unbound session records nothing.
+- [x] The next prompt in that session shows it `working` again.
 
 ## Security and data
 
