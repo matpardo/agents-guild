@@ -3,7 +3,7 @@ epic: human-docs
 type: tasks
 title: Human-friendly docs
 status: done
-updated: 2026-11-11
+updated: 2026-11-12
 ---
 
 # Tasks: Human-friendly docs
@@ -57,3 +57,14 @@ updated: 2026-11-11
 
 **Acceptance:**
 - [x] No client-domain wording or private skill names remain in the tree.
+
+## T06 — Daily flow guide and a clearer tmux launch note
+
+**Depends on:** —
+**Status:** [x] done
+
+**What:** The README opens daily use with `guild web` and `guild revive --all` instead of a long command list, and `revive` and `adventurer launch` end with a note saying the sessions run in the background in tmux, how to see them and how to leave them running.
+
+**Acceptance:**
+- [x] The README has a daily flow section and links to the full command reference.
+- [x] `revive` and `adventurer launch` output names `tmux attach -t guild` and `Ctrl-b d`.

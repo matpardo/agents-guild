@@ -493,11 +493,12 @@ class LaunchTests(ReviveBase):
             self._revive(["alpha"], False, False, self._tmux(installed=False), None)
         self.assertIn("install tmux", raised.exception.message)
 
-    def test_output_ends_with_attach_line_and_goal_reminder(self):
+    def test_output_ends_with_goal_reminder_and_attach_hint(self):
         out = self._revive(["alpha"], False, False, self._tmux(), None)
         lines = out.splitlines()
-        self.assertEqual(lines[-1], "tmux attach -t guild")
-        self.assertIn("/goal", lines[-2])
+        self.assertIn("/goal", lines[-4])
+        self.assertIn("tmux attach -t guild", lines[-2])
+        self.assertIn("Ctrl-b d", lines[-1])
 
     def test_failed_tmux_launch_is_reported(self):
         tmux = self._tmux()

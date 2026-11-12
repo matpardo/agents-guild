@@ -175,6 +175,8 @@ class HealthJobLaunchTests(HealthJobsTestCase):
         tmux = FakeTmux(True, [], [])
         code, out, err = self.launch(["adventurer", "launch", "red-main"], None, tmux)
         self.assertEqual(code, 0, err)
+        self.assertIn("tmux attach -t guild", out)
+        self.assertIn("Ctrl-b d", out)
         call = next(c for c in tmux.calls if c[0] == "new-session")
         self.assertEqual(call[call.index("-c") + 1], str(self.project_dir))
         command = call[-1]

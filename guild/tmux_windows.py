@@ -3,6 +3,12 @@ import shutil
 import subprocess
 
 SESSION = "guild"
+ATTACH_HINT = (
+    'The sessions run in the background, one tmux window each, in the tmux session "guild".'
+    " Closing this terminal does not stop them.",
+    "See them: tmux attach -t guild   (already inside tmux: tmux switch-client -t guild)",
+    "Inside: Ctrl-b w picks a window, Ctrl-b d leaves them running.",
+)
 HYPERLINK_FEATURE_SLOT = "terminal-features[10]"
 OPEN_LINK_ON_CTRL_CLICK = [
     "bind-key",

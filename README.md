@@ -126,26 +126,24 @@ Then remove by hand the `@~/.claude/GUILD.md` line from `~/.claude/CLAUDE.md`.
 
 More in [Concepts](docs/concepts.md).
 
-## Daily commands
+## Daily flow
+
+A normal day takes two commands, from any folder:
+
+1. `guild web` opens the board in your browser. Asks, PRs and the merge order are all there.
+2. `guild revive --all` relaunches every active party. Each one runs in its own window of a tmux session named `guild`, in the folder it was working in.
+
+The sessions run in the background: closing the terminal does not stop them. To watch them, run `tmux attach -t guild` (`tmux switch-client -t guild` when you are already in tmux). There, `Ctrl-b w` picks a window and `Ctrl-b d` leaves them running.
+
+Without tmux, `guild revive --list` prints one command per party to paste in your own terminal.
+
+A few commands help from the terminal too:
 
 ```
 guild board                       # what every party is doing
-guild board --party <name>        # only one party
-guild next                        # the next action for your party
 guild asks                        # open decisions waiting for you
-guild asks <id>                   # one ask in detail
 guild answer <id> "<text>"        # answer an ask, from your own terminal
-guild notices                     # notices addressed to you
-guild claims                      # active claims
-guild adventurers                 # one-job sessions and their state
 guild merge-queue                 # the order to merge PRs by hand
-guild merge-queue --head          # only the PR to merge now
-guild review-md                   # PRs ready for you, as markdown
-guild sync --source gh            # refresh PR state from GitHub
-guild revive --list               # commands to relaunch parties after a reboot
-guild ideas                       # parked ideas
-guild history                     # quests, raids and totals over time
-guild web                         # the local board in a browser
 guild doctor                      # check the install
 ```
 

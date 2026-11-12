@@ -179,7 +179,7 @@ It lists parties numbered (party, project, quest progress, status, last activity
 - Only `default`, `acceptEdits`, `plan`, `auto` and `dontAsk` are carried over. `bypassPermissions` and any other value are dropped, so a relaunched session never starts with permission checks off. This also covers `guild handoff --respawn`.
 - A party whose cwd no longer exists (a removed worktree) starts `fresh` from the nearest main checkout above it. With no such checkout, or with a window already in the `guild` session, the party is skipped with the reason printed.
 - `--list` prints, per party, a one-liner for terminals without tmux: it sets the tab title with `printf '\033]0;<party>\007'`, then `cd <cwd> && claude --resume <id> --name <party>-g<N> ...`.
-- The last line is `tmux attach -t guild`. `/goal` and other in-session state are not restored: re-issue `/goal` where you used it.
+- The output ends with a short note: the sessions run in the background in the tmux session `guild` and survive closing the terminal, `tmux attach -t guild` (or `tmux switch-client -t guild` inside tmux) shows them, `Ctrl-b w` picks a window and `Ctrl-b d` leaves them running. `guild adventurer launch` ends with the same note. `/goal` and other in-session state are not restored: re-issue `/goal` where you used it.
 - Without tmux installed, launching fails with an install hint. `--list` still works.
 
 **Names and tmux options.**
