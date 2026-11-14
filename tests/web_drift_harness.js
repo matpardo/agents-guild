@@ -31,7 +31,7 @@ async function openDetails(root, summaries) {
     }
   }
 }
-async function render({ src, data, hash, outId, mode, responses, open, click, steps }) {
+async function render({ src, data, hash, outId, mode, responses, open, click, steps, token }) {
   byId = {};
   const doc = {
     getElementById: (id) => (byId[id] = byId[id] || mk(id.endsWith("-filter") ? "select" : "div")),
@@ -40,8 +40,8 @@ async function render({ src, data, hash, outId, mode, responses, open, click, st
     activeElement: null, querySelector: () => null, querySelectorAll: () => [],
   };
   const intervals = [];
-  const ctx = { document: doc, window: {}, location: { hash }, addEventListener(n, f) { ctx.hashchange = f; }, console, setInterval(f) { intervals.push(f); }, setTimeout() {},
-    fetch: (url) => Promise.resolve({ json: () => Promise.resolve(responses && url in responses ? responses[url] : url === "/api/board" ? data : { token: "t" }) }) };
+  const ctx = { document: doc, window: {}, location: { hash }, addEventListener(n, f) { ctx.hashchange = f; }, console, setInterval(f) { intervals.push(f); }, setTimeout() {}, sessionStorage: { getItem: () => token || null },
+    fetch: (url) => Promise.resolve({ ok: true, json: () => Promise.resolve(responses && url in responses ? responses[url] : url === "/api/board" ? data : { token: "t" }) }) };
   ctx.window = ctx;
   vm.createContext(ctx);
   vm.runInContext(fs.readFileSync(src, "utf8"), ctx);

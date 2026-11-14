@@ -41,6 +41,7 @@ var REALM_FLAG_TEXT = "[flagged: looks like an instruction or a command] read it
   var BLOCKED_EXTERNAL_TEXT = "blocked: manual";
   var STOPPED_WITHOUT_REPORT_TEXT = "stopped without report";
   var NO_SESSION_MESSAGE = "session token missing, reopen the URL printed by guild web";
+  var TMUX_ATTACH_HINT = "open it in a terminal: tmux attach -t guild, then Ctrl-b w picks the window";
   var sessionToken = readToken();
 
   var answered = {
@@ -356,9 +357,9 @@ realmDoctorLines: [],
       ctx: "Context used by the leader session / the percentage at which it is nudged to run guild handoff.",
       remaining: "Tasks not done in the party's active quests plus open PRs outside them; the tooltip lists done/total per quest.",
       allDone: "Every task of the party's active quests is done and no open PR is left outside them.",
-      reviveAll: "Relaunch every active party and stopped adventurer that has no live session, each in its own tmux window.",
-      reviveParty: "Relaunch this party in a tmux window; it resumes its session or starts the next generation.",
-      reviveAdventurer: "Relaunch this stopped adventurer in a tmux window by resuming its session.",
+      reviveAll: "Relaunch every active party and stopped adventurer that has no live session, each in its own tmux window. Open them with tmux attach -t guild.",
+      reviveParty: "Relaunch this party in a tmux window; it resumes its session or starts the next generation. Open it with tmux attach -t guild.",
+      reviveAdventurer: "Relaunch this stopped adventurer in a tmux window by resuming its session. Open it with tmux attach -t guild.",
       resumeCommand: "Run this to start the next generation of this party; it waits for a new leader.",
       leader: "The leader session of the party.",
       noLeader: "The party has no leader session right now.",
@@ -554,6 +555,14 @@ realmDoctorLines: [],
     });
   }
 
+  function reviveStatus(message) {
+    var firstLine = message.split("\n")[0];
+    if (message.indexOf("tmux attach -t guild") === -1) {
+      return firstLine;
+    }
+    return firstLine + " · " + TMUX_ATTACH_HINT;
+  }
+
   function postReviveEntry(url, statuses, busy, key) {
     if (sessionToken === null) {
       statuses[key] = NO_SESSION_MESSAGE;
@@ -566,7 +575,7 @@ realmDoctorLines: [],
     sendPost(url, {}).then(function (result) {
       delete busy[key];
       if (result.ok) {
-        statuses[key] = result.body.message.split("\n")[0];
+        statuses[key] = reviveStatus(result.body.message);
       } else {
         statuses[key] = errorMessage(result.body);
       }

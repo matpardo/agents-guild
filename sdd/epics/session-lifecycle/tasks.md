@@ -3,7 +3,7 @@ epic: session-lifecycle
 type: tasks
 title: Handoffs that clean up and sessions that respawn
 status: done
-updated: 2026-11-12
+updated: 2026-11-14
 ---
 
 # Tasks: Handoffs that clean up and sessions that respawn
@@ -240,3 +240,15 @@ updated: 2026-11-12
 - [x] A stopped adventurer that is not a health job resumes in its own `adventurer-<id>` window; one without a transcript is skipped with the reason.
 - [x] The board model marks revivable parties and adventurers, and the web shows the three buttons only for them, with a two-step `Revive all`.
 - [x] `POST /api/revive`, `/api/parties/<name>/revive` and `/api/adventurers/<id>/revive` run the CLI command and need the session token.
+
+## T20 — Web revive tells how to open the tmux session
+
+**Depends on:** T19
+**Status:** [x] done
+
+**What:** A card's `Revive` button showed only the first line of the command output, so the hint on how to open the `guild` tmux session was lost. The card status now adds `tmux attach -t guild, then Ctrl-b w picks the window` when something was launched, and the three revive tooltips name the same command. Decisión del dev, 2026-11-14.
+
+**Acceptance:**
+- [x] After a card's `Revive` launches a session, its status shows the first output line plus the tmux attach hint.
+- [x] An output without a launch (`nothing to revive`) shows no hint.
+- [x] The `Revive all`, party `Revive` and adventurer `Revive` tooltips mention `tmux attach -t guild`.

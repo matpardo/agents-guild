@@ -1336,6 +1336,30 @@ class WebReviveBehaviorTests(unittest.TestCase):
         party = dict(_BOARD["parties"][0], revivable=True)
         self.assertEqual(self._revive_all([party], [], "Revive all").strip(), "Confirm revive all")
 
+    def _adventurer_revive_status(self, message):
+        request = {
+            "src": str(_APP_JS_PATH),
+            "data": dict(_BOARD, adventurers=[_adventurer(revivable=True)]),
+            "hash": _view_hash("all", "all"),
+            "outId": "adventurers",
+            "mode": "text",
+            "responses": {"/api/adventurers/1/revive": {"message": message}},
+            "click": "Revive",
+            "token": "t",
+        }
+        return node_harness.request(_HARNESS_NAME, request)
+
+    def test_revive_status_tells_how_to_open_the_tmux_session(self):
+        message = "adventurer 1: launched in window adventurer-1\nSee them: tmux attach -t guild"
+        text = self._adventurer_revive_status(message)
+        self.assertIn("adventurer 1: launched in window adventurer-1", text)
+        self.assertIn("tmux attach -t guild, then Ctrl-b w picks the window", text)
+
+    def test_revive_status_without_a_launch_shows_no_tmux_hint(self):
+        text = self._adventurer_revive_status("nothing to revive")
+        self.assertIn("nothing to revive", text)
+        self.assertNotIn("tmux attach", text)
+
     def test_revive_writes_go_through_send_post(self):
         self.assertIn('sendPost("/api/revive", {})', _APP_JS)
         self.assertIn("sendPost(url, {})", _APP_JS)
