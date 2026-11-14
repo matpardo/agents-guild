@@ -252,3 +252,14 @@ updated: 2026-11-14
 - [x] After a card's `Revive` launches a session, its status shows the first output line plus the tmux attach hint.
 - [x] An output without a launch (`nothing to revive`) shows no hint.
 - [x] The `Revive all`, party `Revive` and adventurer `Revive` tooltips mention `tmux attach -t guild`.
+
+## T21 — Resumed sessions start a turn
+
+**Depends on:** T19
+**Status:** [x] done
+
+**What:** A resumed session (`guild revive` of a party with a transcript or of an adventurer, and the resume command of an ask) opened idle until the human typed something. The resume command now carries the prompt `Continue where you left off.`, so the session starts working right away, as a fresh generation already does. Decisión del dev, 2026-11-14.
+
+**Acceptance:**
+- [x] The party and adventurer resume commands end with the quoted `Continue where you left off.` prompt, with or without a permission mode.
+- [x] Revive launches that prompt in the tmux window and prints it in `--list`.

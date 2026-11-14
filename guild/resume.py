@@ -1,6 +1,7 @@
 import shlex
 
 RESUME_PROMPT = "Continue the work described in the guild brief."
+CONTINUE_PROMPT = "Continue where you left off."
 
 
 CARRIED_PERMISSION_MODES = ("default", "acceptEdits", "plan", "auto", "dontAsk")
@@ -17,10 +18,11 @@ def generation_name(party, generation):
 
 
 def named_resume_command(session_id, name, permission_mode):
-    return "claude --resume {} --name {}{}".format(
+    return "claude --resume {} --name {}{} {}".format(
         shlex.quote(session_id),
         shlex.quote(name),
         _mode_flag(permission_mode),
+        shlex.quote(CONTINUE_PROMPT),
     )
 
 
