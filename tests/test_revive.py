@@ -50,11 +50,14 @@ class ResumeHelperTests(GuildTestCase):
     def test_resume_command_names_party_and_mode(self):
         self.assertEqual(
             resume.resume_command("sess-1", "alpha", 3, "acceptEdits"),
-            "claude --resume sess-1 --name alpha-g3 --permission-mode acceptEdits",
+            "claude --resume sess-1 --name alpha-g3 --permission-mode acceptEdits 'Continue where you left off.'",
         )
 
     def test_resume_command_omits_unknown_mode(self):
-        self.assertEqual(resume.resume_command("sess-1", "alpha", 3, None), "claude --resume sess-1 --name alpha-g3")
+        self.assertEqual(
+            resume.resume_command("sess-1", "alpha", 3, None),
+            "claude --resume sess-1 --name alpha-g3 'Continue where you left off.'",
+        )
 
     def test_fresh_command_keeps_generation_name_and_adds_mode(self):
         command = resume.fresh_command("alpha", 3, None, "plan", resume.RESUME_PROMPT)
@@ -384,7 +387,7 @@ class LaunchTests(ReviveBase):
                 "-P",
                 "-F",
                 "#{window_id}",
-                "claude --resume sess-a --name alpha-g1 --permission-mode acceptEdits",
+                "claude --resume sess-a --name alpha-g1 --permission-mode acceptEdits 'Continue where you left off.'",
             ],
             tmux.calls,
         )
@@ -549,7 +552,10 @@ class AdventurerReviveTests(ReviveBase):
         self.assertEqual(tmux.windows, ["adventurer-1"])
         new_session = next(call for call in tmux.calls if call[0] == "new-session")
         self.assertEqual(new_session[new_session.index("-c") + 1], str(self.work_c))
-        self.assertEqual(new_session[-1], "claude --resume adv-1 --name adventurer-1 --permission-mode plan")
+        self.assertEqual(
+            new_session[-1],
+            "claude --resume adv-1 --name adventurer-1 --permission-mode plan 'Continue where you left off.'",
+        )
         self.assertIn("launched adventurer-1 (resume)", out)
 
     def test_all_mixes_parties_and_adventurers(self):
