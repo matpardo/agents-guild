@@ -259,7 +259,7 @@ Each party then gets one derived status, first match wins. A leader is live when
 | 5 | live leader blocked on a permission prompt or an elicitation dialog | `waiting-permission` |
 | 6 | live leader, open ask and session not working | `waiting-ask` |
 | 7a | live leader idle or stopped while it has a live subagent | `waiting-sub-agents` (detail `N subagents`) |
-| 7b | live leader idle or stopped while a `guild pr wait` runs and no subagent is live | `waiting-background` (detail `pr <ref>`) |
+| 7b | live leader idle or stopped while a `guild pr wait` runs and no subagent is live | `waiting-background` (detail `pr <ref>`), or `waiting-human` when no checks are pending and the only waits left on the PR are a merge, a human review or an external block (detail `merge <ref>`) |
 | 7c | live leader waiting on a usage or billing limit | `waiting-limit` (detail is the error kind; clears when the session works again) |
 | 8 | live leader waiting on an idle prompt | `waiting-input` |
 | 9 | live leader stopped | `stopped-with-work` when `guild next` would still return work, otherwise `done` |

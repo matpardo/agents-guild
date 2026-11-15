@@ -209,6 +209,7 @@ realmDoctorLines: [],
       "waiting-limit": "The leader session hit a usage or billing limit; it resumes when the limit lifts or you fix billing.",
       "waiting-sub-agents": "The leader is waiting on its own subagents; nothing for you to do.",
       "waiting-background": "The leader is waiting on its own PR wait; nothing for you to do.",
+      "waiting-human": "The leader waits on a person: merge, review or an external block; act on the PR.",
       "stopped-with-work": "The leader session stopped but the party still has unfinished work; resume it.",
       working: "The leader session is running.",
       done: "The leader session stopped and the party has no work left.",
@@ -1373,6 +1374,21 @@ realmDoctorLines: [],
     }).length;
   }
 
+  function waitingHumanParties(parties) {
+    return parties.filter(function (party) {
+      return party.status.name === "waiting-human";
+    });
+  }
+
+  function renderWaitingHuman(party) {
+    var line = el("p");
+    line.className = "blocked-session";
+    line.appendChild(textEl("strong", party.name));
+    line.appendChild(document.createTextNode(" · " + party.status.label + " · "));
+    line.appendChild(textEl("code", party.status.detail));
+    return line;
+  }
+
   function renderSoloPending(entry) {
     var line = el("p");
     line.className = "blocked-session";
@@ -1385,6 +1401,7 @@ realmDoctorLines: [],
   function renderAsks(asks, blocked, parties, soloPending) {
     var section = document.getElementById("asks");
     var ctxHigh = ctxHighCount(parties);
+    var waitingHuman = waitingHumanParties(parties);
     clear(section);
     section.appendChild(
       textEl(
@@ -1393,6 +1410,8 @@ realmDoctorLines: [],
           asks.length +
           ") · blocked (" +
           blocked.length +
+          ") · waiting human (" +
+          waitingHuman.length +
           ") · context high (" +
           ctxHigh +
           ") · solo (" +
@@ -1400,11 +1419,12 @@ realmDoctorLines: [],
           ")"
       )
     );
-    if (asks.length === 0 && blocked.length === 0 && ctxHigh === 0 && soloPending.length === 0) {
+    if (asks.length === 0 && blocked.length === 0 && waitingHuman.length === 0 && ctxHigh === 0 && soloPending.length === 0) {
       section.appendChild(textEl("p", "nothing needs you"));
       return;
     }
     appendAll(section, blocked.map(renderBlocked));
+    appendAll(section, waitingHuman.map(renderWaitingHuman));
     appendAll(section, soloPending.map(renderSoloPending));
     appendAll(section, asks.map(renderAsk));
   }
@@ -1514,7 +1534,7 @@ realmDoctorLines: [],
   }
 
   function renderStatusDetail(status) {
-    if ((status.name !== "parked" && status.name !== "blocked") || status.detail === null) {
+    if ((status.name !== "parked" && status.name !== "blocked" && status.name !== "waiting-human") || status.detail === null) {
       return null;
     }
     var detail = textEl("span", status.detail);
@@ -4605,7 +4625,7 @@ realmDoctorLines: [],
     });
   }
 
-  var ATTENTION_ORDER = ["waiting-permission", "waiting-ask", "ctx-high", "waiting-input", "waiting-limit", "stopped-with-work", "working", "waiting-sub-agents", "waiting-background", "queued", "parked", "blocked"];
+  var ATTENTION_ORDER = ["waiting-permission", "waiting-ask", "waiting-human", "ctx-high", "waiting-input", "waiting-limit", "stopped-with-work", "working", "waiting-sub-agents", "waiting-background", "queued", "parked", "blocked"];
 
   function attentionRank(row) {
     var key = row.ctxHigh && row.status.name !== "waiting-permission" && row.status.name !== "waiting-ask" ? "ctx-high" : row.status.name;
@@ -4643,6 +4663,7 @@ realmDoctorLines: [],
       asks: data.asks.length,
       ready: data.ready_for_you.length,
       blocked: data.blocked.length,
+      waitingHuman: waitingHumanParties(data.parties).length,
       ctxHigh: ctxHighCount(data.parties),
       raids: data.raids.map(function (raid) {
         return {
@@ -4760,6 +4781,7 @@ realmDoctorLines: [],
       needsCount(model.asks, "asks", "asks"),
       needsCount(model.ready, "ready", "ready"),
       needsCount(model.blocked, "blocked", "blocked"),
+      needsCount(model.waitingHuman, "waiting human", "waiting-human"),
       needsCount(model.ctxHigh, "context high", "ctx-high"),
     ]);
     return counts;

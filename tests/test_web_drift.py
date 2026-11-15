@@ -1521,6 +1521,24 @@ class WebCtxBehaviorTests(unittest.TestCase):
 
 
 @unittest.skipIf(shutil.which("node") is None, "node not installed")
+class WebWaitingHumanBehaviorTests(unittest.TestCase):
+    def _rendered(self, out_id):
+        parties = [dict(party) for party in _BOARD["parties"]]
+        status = {"name": "waiting-human", "since": None, "detail": "merge acme/app#7", "label": "waiting-human 2h"}
+        parties[0]["status"] = status
+        return _render(dict(_BOARD, parties=parties), "all", "all", out_id, "text").strip()
+
+    def test_header_counts_and_line_lists_the_waiting_party(self):
+        out = self._rendered("asks")
+        self.assertIn("waiting human (1)", out)
+        self.assertIn("waiting-human 2h", out)
+        self.assertIn("merge acme/app#7", out)
+
+    def test_party_without_the_status_is_not_counted(self):
+        self.assertIn("waiting human (0)", _render(_BOARD, "all", "all", "asks", "text"))
+
+
+@unittest.skipIf(shutil.which("node") is None, "node not installed")
 class WebCloseBlockersBehaviorTests(unittest.TestCase):
     def _parties_text(self, close_blockers):
         quest = {

@@ -63,6 +63,8 @@ def _pr_waits(ctx, pr, entry):
     waits.extend(_wait(kind, pr["ref"], reason) for kind, reason in review)
     if pr["needs_human_pr_review"]:
         waits.append(_wait("human-review", pr["ref"], "human review"))
+    if pr["blocked_external"] is not None:
+        waits.append(_wait("blocked-external", pr["ref"], "blocked: {}".format(pr["blocked_external"])))
     if _draft_green(pr) and not review and pr["blocked_external"] is None:
         waits.append(_wait("draft-green", pr["ref"], "green draft: mark ready"))
     if pr["lifecycle"] == "ready" and entry["state"] == "ready" and entry["external"] is None:
@@ -78,6 +80,14 @@ def _party_prs(ctx, party_name):
         entry["ref"]: entry for entry in merge_queue.compute(records, pr_records.load_pins(ctx.conn), [])["queue"]
     }
     return [(pr, entries[pr["ref"]]) for pr in records if pr["party"] == party_name]
+
+
+def waits_for_refs(ctx, party_name, refs):
+    waits = []
+    for pr, entry in _party_prs(ctx, party_name):
+        if pr["ref"] in refs:
+            waits.extend(_pr_waits(ctx, pr, entry))
+    return waits
 
 
 def _ask_open_waits(ctx, party_name):
