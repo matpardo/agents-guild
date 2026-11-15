@@ -2,12 +2,13 @@ import json
 import os
 import sqlite3
 
-from guild import ctx_pressure, db, events, paths, statusline_state, timeutil
+from guild import background, ctx_pressure, db, events, paths, statusline_state, timeutil
 from guild import notices as notices_module
 from guild.cli import _build_context
 from guild.commands import board as board_commands
 from guild.commands import inbox as inbox_commands
 from guild.commands import notice as notice_commands
+from tests.mq_fixtures import OPEN_VIEW
 from tests.testutil import GuildTestCase
 
 
@@ -730,6 +731,36 @@ class BoardSessionStatusTests(GuildTestCase):
 
     def _context_high(self):
         statusline_state.record_ctx(paths.state_dir(), "sess-1", ctx_pressure.DEFAULT_HANDOFF_THRESHOLD + 6)
+
+    def _waiting_human(self):
+        self.run_cli(["quest", "add", "demo", "--title", "Demo", "--no-epic"], "sess-1", self.repo_dir)
+        self.run_cli(
+            ["task", "add", "demo/T01", "--title", "First", "--reason", "serves the goal"], "sess-1", self.repo_dir
+        )
+        self.write_gh_fixture("view_acme-app_7", dict(OPEN_VIEW, isDraft=False))
+        self.run_cli(
+            ["pr", "track", "acme/app#7", "--task", "demo/T01", "--what", "pr", "--waits", "review"],
+            "sess-1",
+            self.repo_dir,
+        )
+        self.run_cli(["pr", "set", "acme/app#7", "--lifecycle", "ready"], "sess-1", self.repo_dir)
+        conn = sqlite3.connect(str(self.data_home / "guild" / "guild.db"))
+        conn.execute("UPDATE prs SET checks_pending = 0, checks_failing = 0, checks_passing = 1 WHERE number = 7")
+        conn.commit()
+        conn.close()
+        self.run_hook("notification", self._hook_payload("idle_prompt", "idle"))
+        background.mark(paths.state_dir(), "sess-1", background.pr_key(os.getpid()), "pr acme/app#7")
+
+    def test_needs_you_counts_and_lists_waiting_human_parties(self):
+        self._waiting_human()
+        code, out, err = self.run_cli(["board"], None, None)
+        self.assertIn("NEEDS YOU · 1 waiting human", out)
+        self.assertRegex(out, r"\n  ⏳ alpha waiting-human \d+s: merge acme/app#7\n")
+
+    def test_needs_you_waiting_human_respects_the_party_filter(self):
+        self._waiting_human()
+        code, out, err = self.run_cli(["board", "--party", "other"], None, None)
+        self.assertNotIn("waiting human", out)
 
     def test_needs_you_counts_context_high_parties(self):
         self._context_high()

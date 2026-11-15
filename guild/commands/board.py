@@ -72,6 +72,7 @@ _FLAG_STYLES = (
 _STATUS_STYLES = {
     "waiting-permission": "red",
     "waiting-ask": "yellow",
+    "waiting-human": "yellow",
     "waiting-input": "red",
     "waiting-limit": "magenta",
     "waiting-sub-agents": "dim",
@@ -307,12 +308,14 @@ def _sorted_open_asks(conn, party_names):
     return rows
 
 
-def _needs_you_heading(ask_count, blocked_count, ctx_high_count, solo_count):
+def _needs_you_heading(ask_count, blocked_count, waiting_human_count, ctx_high_count, solo_count):
     parts = []
     if ask_count:
         parts.append("{} {}".format(ask_count, "open ask" if ask_count == 1 else "open asks"))
     if blocked_count:
         parts.append("{} blocked".format(blocked_count))
+    if waiting_human_count:
+        parts.append("{} waiting human".format(waiting_human_count))
     if ctx_high_count:
         parts.append("{} context high".format(ctx_high_count))
     if solo_count:
@@ -326,6 +329,23 @@ def _blocked_line(ctx, painter, row):
     if row["detail"]:
         text = '{}: "{}"'.format(text, row["detail"])
     return painter.paint(text, "red")
+
+
+def _waiting_human_parties(ctx, party_names):
+    party_rows = ctx.conn.execute("SELECT * FROM parties WHERE state != 'closed' ORDER BY name ASC").fetchall()
+    waiting = []
+    for party_row in party_rows:
+        if party_names is not None and party_row["name"] not in party_names:
+            continue
+        status = party_status.derive(ctx, party_row)
+        if status["status"] == "waiting-human":
+            waiting.append((party_row["name"], status))
+    return waiting
+
+
+def _waiting_human_line(ctx, painter, party, status):
+    text = "  ⏳ {} {}: {}".format(party, party_status.label(ctx, status), status["detail"])
+    return painter.paint(text, "yellow")
 
 
 def _ctx_high_parties(ctx, party_names):
@@ -358,12 +378,16 @@ def render_asks(ctx, party_names, color, width, detailed):
     painter = _Painter(color, width)
     rows = _sorted_open_asks(ctx.conn, party_names)
     blocked = session_status.blocked_rows(ctx.conn, party_names)
+    waiting_human = _waiting_human_parties(ctx, party_names)
     ctx_high = _ctx_high_parties(ctx, party_names)
     solo = _solo_needs_human(ctx, party_names)
-    if not rows and not blocked and not ctx_high and not solo:
+    if not rows and not blocked and not waiting_human and not ctx_high and not solo:
         return [painter.paint("NEEDS YOU · nothing", "green"), ""]
-    lines = [painter.paint(_needs_you_heading(len(rows), len(blocked), len(ctx_high), len(solo)), "bold")]
+    lines = [
+        painter.paint(_needs_you_heading(len(rows), len(blocked), len(waiting_human), len(ctx_high), len(solo)), "bold")
+    ]
     lines.extend(_blocked_line(ctx, painter, row) for row in blocked)
+    lines.extend(_waiting_human_line(ctx, painter, party, status) for party, status in waiting_human)
     lines.extend(_solo_line(painter, entry) for entry in solo)
     if detailed:
         for row in rows:

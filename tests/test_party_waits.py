@@ -100,9 +100,20 @@ class PartyWaitsTests(MergeQueueTestCase):
         self.update_pr("checks_passing = 1, checks_failing = 0, checks_pending = 0")
         self.assertEqual(self.waits(), [("draft-green", "acme/app#1", "green draft: mark ready")])
 
-    def test_blocked_external_pr_is_not_a_merge_wait(self):
+    def test_blocked_external_pr_waits_on_the_block_not_a_merge(self):
         self.update_pr("blocked_external = 'legal'")
-        self.assertEqual(self.waits(), [])
+        self.assertEqual(self.waits(), [("blocked-external", "acme/app#1", "blocked: legal")])
+
+    def test_waits_for_refs_keeps_only_the_given_prs(self):
+        self.update_pr("checks_pending = 0, checks_failing = 0, checks_passing = 1")
+        ctx = _build_context(None, self.repo_dir)
+        try:
+            kept = party_waits.waits_for_refs(ctx, "alpha", {"acme/app#1"})
+            dropped = party_waits.waits_for_refs(ctx, "alpha", {"acme/app#2"})
+            self.assertEqual([wait["kind"] for wait in kept], ["human-merge"])
+            self.assertEqual(dropped, [])
+        finally:
+            ctx.conn.close()
 
     def test_open_ask(self):
         self.run_cli(["ask", "which one?", "--context", "c", "--ref", "card:PROJ-12"], "sess-1", self.repo_dir)

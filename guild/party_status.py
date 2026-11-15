@@ -1,4 +1,7 @@
-from guild import background, party_progress, sanitize, session_info, session_status, timeutil, work_queue
+from guild import background, party_progress, party_waits, sanitize, session_info, session_status, timeutil, work_queue
+
+_PR_LABEL_PREFIX = "pr "
+_HUMAN_KINDS = ("human-merge", "human-review", "blocked-external")
 
 
 def _result(status, since, detail):
@@ -53,6 +56,16 @@ def _offline_result(ctx, party_row):
     return _result("idle", None, None)
 
 
+def _pr_wait_result(ctx, party_row, session_row, pr_labels):
+    refs = {pr_label[len(_PR_LABEL_PREFIX) :] for pr_label in pr_labels}
+    waits = party_waits.waits_for_refs(ctx, party_row["name"], refs)
+    human = [wait for wait in waits if wait["kind"] in _HUMAN_KINDS]
+    if human and not any(wait["kind"] == "checks-pending" for wait in waits):
+        detail = "; ".join("{} {}".format(wait["label"], wait["subject"]) for wait in human)
+        return _result("waiting-human", session_row["since"], detail)
+    return _result("waiting-background", session_row["since"], ", ".join(pr_labels))
+
+
 def derive(ctx, party_row):
     if party_row["state"] == "closed":
         return _result("closed", None, None)
@@ -74,7 +87,7 @@ def derive(ctx, party_row):
             return _result("waiting-sub-agents", session_row["since"], "{} subagents".format(subagents))
         pr_labels = background.pr_labels(ctx.state_dir, leader_session_id, ctx.now)
         if pr_labels:
-            return _result("waiting-background", session_row["since"], ", ".join(pr_labels))
+            return _pr_wait_result(ctx, party_row, session_row, pr_labels)
     if session_state == "waiting-input":
         return _result("waiting-input", session_row["since"], session_row["detail"])
     if session_state == "stopped":
@@ -92,6 +105,6 @@ def label(ctx, status):
 
 def label_with_detail(ctx, status):
     text = label(ctx, status)
-    if status["status"] not in ("parked", "blocked"):
+    if status["status"] not in ("parked", "blocked", "waiting-human"):
         return text
     return "{} — {}".format(text, sanitize.strip_control_sequences(status["detail"]))

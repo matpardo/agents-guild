@@ -1,9 +1,11 @@
 import os
+import sqlite3
 import subprocess
 from datetime import timedelta
 
 from guild import background, db, party_status, session_status
 from guild.cli import _build_context
+from tests.mq_fixtures import OPEN_VIEW
 from tests.testutil import GuildTestCase
 
 _BINDING = {"party": "alpha", "project": "acme", "generation": 1}
@@ -262,6 +264,49 @@ class PartyStatusTests(GuildTestCase):
         result = self._derive()
         self.assertEqual(result["status"], "waiting-background")
         self.assertEqual(result["detail"], "pr acme/app#7")
+
+    def _track_ready_pr(self, assignments):
+        self._add_task()
+        self.write_gh_fixture("view_acme-app_7", dict(OPEN_VIEW, isDraft=False))
+        self.run_cli(
+            ["pr", "track", "acme/app#7", "--task", "demo/T01", "--what", "pr", "--waits", "review"],
+            "sess-1",
+            self.repo_dir,
+        )
+        self.run_cli(["pr", "set", "acme/app#7", "--lifecycle", "ready"], "sess-1", self.repo_dir)
+        conn = sqlite3.connect(str(self.data_home / "guild" / "guild.db"))
+        conn.execute("UPDATE prs SET " + assignments + " WHERE number = 7")
+        conn.commit()
+        conn.close()
+        self._waiting("idle", "")
+        self._background(background.pr_key(os.getpid()), "pr acme/app#7")
+
+    def test_pr_wait_with_only_a_merge_left_is_waiting_human(self):
+        self._track_ready_pr("checks_pending = 0, checks_failing = 0, checks_passing = 1")
+        result = self._derive()
+        self.assertEqual((result["status"], result["detail"]), ("waiting-human", "merge acme/app#7"))
+
+    def test_pr_wait_with_pending_checks_is_waiting_background(self):
+        self._track_ready_pr("checks_pending = 1")
+        self.assertEqual(self._derive()["status"], "waiting-background")
+
+    def test_pr_wait_with_human_review_is_waiting_human(self):
+        self._track_ready_pr("checks_pending = 0, needs_human_pr_review = 1")
+        result = self._derive()
+        self.assertEqual(result["status"], "waiting-human")
+        self.assertIn("human review acme/app#7", result["detail"])
+
+    def test_pr_wait_with_external_block_is_waiting_human(self):
+        self._track_ready_pr("checks_pending = 0, blocked_external = 'legal'")
+        result = self._derive()
+        self.assertEqual((result["status"], result["detail"]), ("waiting-human", "blocked: legal acme/app#7"))
+
+    def test_label_with_detail_shows_the_waiting_human_detail(self):
+        self._track_ready_pr("checks_pending = 0, checks_failing = 0, checks_passing = 1")
+        ctx = self._ctx()
+        self.assertRegex(
+            party_status.label_with_detail(ctx, self._derive()), r"^waiting-human \d+s — merge acme/app#7$"
+        )
 
     def test_stopped_with_subagent_is_waiting_sub_agents(self):
         self._add_task()

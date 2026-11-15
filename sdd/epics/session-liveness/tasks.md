@@ -91,3 +91,10 @@ updated: 2026-10-04
 **Status:** [x] done
 
 **What:** a leader idle or stopped while its own subagents run shows `waiting-sub-agents`, separate from `waiting-background`, which now covers only a running `guild pr wait`; `parked` shows purple and `waiting-input` red.
+
+## T12 — waiting-human status for human-only PR gates
+
+**Depends on:** T11
+**Status:** [x] done
+
+**What:** a leader idle or stopped on its own `guild pr wait` shows `waiting-human`, not `waiting-background`, when no checks are pending and the only waits left on its PRs are a merge, a human review or an external block; the NEEDS YOU section of the CLI and the web counts and lists those parties, and `blocked-external` joins the party waits.
