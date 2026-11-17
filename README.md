@@ -142,6 +142,7 @@ A few commands help from the terminal too:
 ```
 guild board                       # what every party is doing
 guild asks                        # open decisions waiting for you
+guild asks <id> --share           # one ask as text to paste in a doc or message
 guild answer <id> "<text>"        # answer an ask, from your own terminal
 guild merge-queue                 # the order to merge PRs by hand
 guild doctor                      # check the install

@@ -216,6 +216,7 @@ class BoardModelShapeTests(BoardModelTestCase):
                 "answer",
                 "answered_at",
                 "dates",
+                "share",
             },
         )
         self.assertEqual((ask["state"], ask["answer"], ask["answered_at"]), ("open", None, None))

@@ -5,6 +5,7 @@ from datetime import timedelta
 
 from guild import (
     ask_legibility,
+    ask_share,
     config,
     ctx_pressure,
     final_report,
@@ -504,6 +505,7 @@ def _answered_ask_model(row):
         "answer": _optional_text(row["answer"]),
         "answered_at": row["answered_at"],
         "dates": _ask_dates(row),
+        "share": _share_model(row),
     }
 
 
@@ -1359,6 +1361,10 @@ def _task_card_key(conn, project, epic, tid):
     return row["jira_key"]
 
 
+def _share_model(row):
+    return {"text": ask_share.text(row), "html": ask_share.html(row)}
+
+
 def _ask_model(conn, row):
     ref_list = json.loads(row["refs"])
     return {
@@ -1376,6 +1382,7 @@ def _ask_model(conn, row):
         "answer": _optional_text(row["answer"]),
         "answered_at": row["answered_at"],
         "dates": _ask_dates(row),
+        "share": _share_model(row),
     }
 
 

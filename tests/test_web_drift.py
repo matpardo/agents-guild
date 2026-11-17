@@ -870,6 +870,7 @@ def _ask(**overrides):
         "answer": None,
         "answered_at": None,
         "dates": "created 2026-10-24 10:00",
+        "share": {"text": "plain share", "html": "<p>html share</p>"},
     }
     return dict(entry, **overrides)
 
@@ -1974,7 +1975,15 @@ class WebMultilineAnswerBehaviorTests(unittest.TestCase):
     def test_answered_list_keeps_answer_line_breaks(self):
         answered_model = {
             "asks": [
-                {"id": 5, "party": "alpha", "question": "Q", "answer": "one\ntwo", "answered_at": None, "dates": None}
+                {
+                    "id": 5,
+                    "party": "alpha",
+                    "question": "Q",
+                    "answer": "one\ntwo",
+                    "answered_at": None,
+                    "dates": None,
+                    "share": {"text": "t", "html": "h"},
+                }
             ],
             "total": 1,
             "page": 1,
@@ -1991,6 +2000,48 @@ class WebMultilineAnswerBehaviorTests(unittest.TestCase):
             dict(_BOARD, asks=[_ask(context="ctx", recommend=None)]), "asks", {"/api/asks/3": detail_model}, ["detail"]
         )
         self.assertEqual(self._breaks(rendered), 2)
+
+
+@unittest.skipIf(shutil.which("node") is None, "node not installed")
+class WebCopyAskBehaviorTests(unittest.TestCase):
+    _SHARE = {"text": "plain share", "html": "<p>html share</p>"}
+
+    def _copy(self, board, out_id, responses, open_summaries):
+        payload = {
+            "src": str(_APP_JS_PATH),
+            "data": board,
+            "hash": _view_hash("all", "all"),
+            "outId": out_id,
+            "responses": responses,
+            "open": open_summaries,
+            "click": "Copy",
+        }
+        buttons = [
+            node
+            for node in _flatten(json.loads(node_harness.request(_HARNESS_NAME, dict(payload, mode="tree"))))
+            if node["tag"] == "button" and node["text"] == "Copy"
+        ]
+        written = node_harness.request(_HARNESS_NAME, dict(payload, mode="clipboard"))
+        return buttons, json.loads(written)
+
+    def test_open_ask_copy_writes_html_and_plain_text(self):
+        buttons, written = self._copy(dict(_BOARD, asks=[_ask()]), "asks", {}, [])
+        self.assertEqual(len(buttons), 1)
+        self.assertIn("Copy question", buttons[0]["title"])
+        self.assertEqual(written, [["text/html", "<p>html share</p>"], ["text/plain", "plain share"]])
+
+    def test_answered_ask_copy_writes_html_and_plain_text(self):
+        answered_model = {
+            "asks": [dict(_ask(state="answered", answer="yes", answered_at=None, dates=None))],
+            "total": 1,
+            "page": 1,
+            "page_count": 1,
+        }
+        buttons, written = self._copy(
+            _BOARD, "answered-asks", {"/api/asks/answered?page=1": answered_model}, ["answered asks"]
+        )
+        self.assertEqual(len(buttons), 1)
+        self.assertEqual(written, [["text/html", "<p>html share</p>"], ["text/plain", "plain share"]])
 
 
 def _leaf_text(node):

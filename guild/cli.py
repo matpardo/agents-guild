@@ -388,13 +388,16 @@ def _handle_dismiss(ctx, args):
 
 
 def _handle_ask_detail(ctx, args):
-    from guild import ask_detail
+    from guild import ask_detail, ask_share
 
     if args.all or args.answered or args.page is not None or args.party is not None or args.since is not None:
         raise GuildError("guild asks <id> takes no filters", 1)
     row = ctx.conn.execute("SELECT * FROM asks WHERE id = ?", (args.ask_id,)).fetchone()
     if row is None:
         raise GuildError("unknown ask #{}".format(args.ask_id), 1)
+    if args.share:
+        _print(ask_share.text(row))
+        return 0
     _print_lines(ask_detail.render_lines(ask_detail.build(ctx, row)))
     return 0
 
@@ -404,6 +407,8 @@ def _handle_asks(ctx, args):
 
     if args.ask_id is not None:
         return _handle_ask_detail(ctx, args)
+    if args.share:
+        raise GuildError("--share needs an ask id", 1)
     if args.all and args.answered:
         raise GuildError("--all and --answered are exclusive", 1)
     if args.page is not None and not args.answered:
@@ -1765,6 +1770,7 @@ def _add_asks_parser(subparsers):
     asks.add_argument("--page", type=int, help="page number of answered asks")
     asks.add_argument("--party", help="only asks of this party")
     asks.add_argument("--since", help="only asks created within this duration, e.g. 3d")
+    asks.add_argument("--share", action="store_true", help="print the ask as text to share outside: no ids or refs")
     asks.set_defaults(handler=_handle_asks)
 
 

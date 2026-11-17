@@ -40,7 +40,9 @@ async function render({ src, data, hash, outId, mode, responses, open, click, st
     activeElement: null, querySelector: () => null, querySelectorAll: () => [],
   };
   const intervals = [];
-  const ctx = { document: doc, window: {}, location: { hash }, addEventListener(n, f) { ctx.hashchange = f; }, console, setInterval(f) { intervals.push(f); }, setTimeout() {}, sessionStorage: { getItem: () => token || null },
+  const clipboardWrites = [];
+  const ctx = { document: doc, window: {}, location: { hash }, addEventListener(n, f) { ctx.hashchange = f; }, console, Blob: class { constructor(parts) { this.text = parts[0]; } }, ClipboardItem: class { constructor(items) { this.items = items; } },
+    navigator: { clipboard: { write: (items) => { clipboardWrites.push(items[0].items); return Promise.resolve(); } } }, setInterval(f) { intervals.push(f); }, setTimeout() {}, sessionStorage: { getItem: () => token || null },
     fetch: (url) => Promise.resolve({ ok: true, json: () => Promise.resolve(responses && url in responses ? responses[url] : url === "/api/board" ? data : { token: "t" }) }) };
   ctx.window = ctx;
   vm.createContext(ctx);
@@ -59,6 +61,7 @@ async function render({ src, data, hash, outId, mode, responses, open, click, st
   if (open) await openDetails(out, open);
   if (click) for (const node of walk(out)) if (node.tag === "button" && node._text === click) node.h.click();
   if (click) { await tick(); await tick(); }
+  if (mode === "clipboard") return JSON.stringify(Object.keys(clipboardWrites[0] || {}).sort().map((type) => [type, clipboardWrites[0][type].text]));
   if (mode === "hash") return ctx.location.hash;
   if (mode === "hidden") return JSON.stringify(Object.keys(byId).filter((id) => byId[id].hidden === true).sort());
   return mode === "tree" ? JSON.stringify(tree(out)) : out.textContent;

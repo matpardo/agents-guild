@@ -1092,6 +1092,29 @@ realmDoctorLines: [],
     return button;
   }
 
+  function copyShare(share, onDone) {
+    var item = new ClipboardItem({
+      "text/html": new Blob([share.html], { type: "text/html" }),
+      "text/plain": new Blob([share.text], { type: "text/plain" }),
+    });
+    navigator.clipboard.write([item]).then(
+      function () {
+        onDone("copied");
+      },
+      function () {
+        onDone("copy failed");
+      }
+    );
+  }
+
+  function renderCopyButton(ask, onDone) {
+    var button = renderActionButton(ask, "Copy", function () {
+      copyShare(ask.share, onDone);
+    });
+    button.title = "Copy question, context, options and recommendation to paste in a doc or message";
+    return button;
+  }
+
   function renderAskControls(ask) {
     var controls = el("div");
     controls.className = "ask-controls";
@@ -1115,6 +1138,12 @@ realmDoctorLines: [],
     actions.appendChild(
       renderActionButton(ask, "Dismiss", function () {
         submitDismiss(ask.id);
+      })
+    );
+    actions.appendChild(
+      renderCopyButton(ask, function (message) {
+        state.statuses[ask.id] = message;
+        fetchBoard();
       })
     );
     var status = textEl("span", state.statuses[ask.id] || "");
@@ -1445,6 +1474,13 @@ realmDoctorLines: [],
     if (ask.dates !== null) {
       article.appendChild(classedText("p", ask.dates, "muted"));
     }
+    var status = classedText("span", "", "ask-status");
+    article.appendChild(
+      renderCopyButton(ask, function (message) {
+        status.textContent = message;
+      })
+    );
+    article.appendChild(status);
     return article;
   }
 
