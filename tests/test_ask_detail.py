@@ -67,6 +67,19 @@ class _Ctx:
         self.projects_dir = case.config_home / "guild" / "projects"
 
 
+class ShareFlagTests(AskDetailBase):
+    def test_share_prints_the_shareable_text(self):
+        self.ask("task:demo/T01")
+        code, out, err = self.run_cli(["asks", "1", "--share"], "sess-1", self.repo_dir)
+        self.assertEqual(code, 0, err)
+        self.assertIn("Options:\n- 3\n- 5", out)
+
+    def test_share_without_an_id_fails(self):
+        code, out, err = self.run_cli(["asks", "--share"], "sess-1", self.repo_dir)
+        self.assertEqual(code, 1)
+        self.assertIn("--share needs an ask id", err)
+
+
 class SddPathTests(AskDetailBase):
     def test_root_mode_paths(self):
         self.make_epic_quest()

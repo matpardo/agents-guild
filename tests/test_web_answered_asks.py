@@ -71,7 +71,7 @@ class AnsweredAsksEndpointTests(WebServerTestCase):
         self.assertEqual((model["page"], model["page_count"], model["total"]), (1, 2, 12))
         self.assertEqual([ask["id"] for ask in model["asks"]], list(range(12, 2, -1)))
         first = model["asks"][0]
-        self.assertEqual(set(first), {"id", "party", "question", "answer", "answered_at", "dates"})
+        self.assertEqual(set(first), {"id", "party", "question", "answer", "answered_at", "dates", "share"})
         self.assertEqual((first["party"], first["answer"]), ("alpha", "a12"))
         self.assertTrue(first["dates"].startswith("created "))
         self.assertIn(" · updated ", first["dates"])

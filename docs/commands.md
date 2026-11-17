@@ -663,7 +663,7 @@ guild ask "<question, at most 300 chars>" --context "<at most 2000 chars>" [--re
 guild ask wait <id> [--timeout <dur>]
 guild answer <id> "<text>"
 guild dismiss <id>
-guild asks [<id> | --all [--party <name>] [--since <dur>] | --answered [--page <n>] [--party <name>] [--since <dur>]]
+guild asks [<id> [--share] | --all [--party <name>] [--since <dur>] | --answered [--page <n>] [--party <name>] [--since <dur>]]
 ```
 
 Example:
@@ -681,6 +681,7 @@ guild ask "Ship the retry as a flag or always on?" --context "The sync retry cha
 - `ask wait` blocks until the ask is answered or dismissed ([Waiting for a change](#waiting-for-a-change)). It exits 0 on either, 1 on an unknown id and 3 on timeout (default 2h).
 - `asks` lists open asks. `asks <id>` expands one in two tiers. First what decides it: question, context, options, recommendation, the task with its state, the card with its status and tracker link (`tracker.browse_url`), and the PR with URL, lifecycle and checks. Then `dig in`: the task SDD spec and tasks paths (the filesystem path with `root`, or `git:<ref>:<path>` with `git_repo` and `git_ref`), the origin snapshot and the command that resumes the asking session. On the web `dig in` is closed by default. Asks created before snapshots print `origin: not recorded`. Times are local (`YYYY-MM-DD HH:MM`). The same detail is served at `GET /api/asks/<id>` and opens from the `detail` control of each ask on the web.
 - `asks --all` lists open, answered and dismissed asks in id order, with the answer and answer time of answered ones. `--party` and `--since` (on `created_at`) narrow it and need `--all` or `--answered`. `<id>` takes no filters.
+- `asks <id> --share` prints only the decision as markdown text to paste in a doc or message: question, context, options, recommendation and answer, with no ids, refs or party. The web has a `Copy` button on each open and answered ask that puts the same content on the clipboard as HTML and plain text.
 - `asks --answered` lists only answered asks, newest answer first, 10 per page (`--page <n>`), each with party, answer and answer time. The web shows the same list in a collapsed "answered asks" section, served at `GET /api/asks/answered?page=<n>`.
 
 **Ask ordering.** `guild asks` and the board summary sort open asks by how many of their refs are still blocked right now, computed at render time: blocked count descending, then `created_at` ascending, then id ascending.

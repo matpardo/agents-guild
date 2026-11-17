@@ -93,6 +93,16 @@ class PublishableTextTests(GuildTestCase):
         self.assertEqual(code, 0, err)
         self.assertIn(pii.LOCAL_ONLY_REMINDER, out)
 
+    def test_ask_share_output_has_no_traces(self):
+        self.run_cli(
+            ["ask", "q?", "--context", "c", "--option", "a", "--ref", "task:demo/T01"], "sess-1", self.repo_dir
+        )
+        code, out, err = self.run_cli(["asks", "1", "--share"], "sess-1", self.repo_dir)
+        self.assertEqual(code, 0, err)
+        self.assertIn("**q?**", out)
+        self.assertIsNone(_TRACE_RE.search(out))
+        self.assertNotIn("task:demo/T01", out)
+
     def test_brief_states_rule_when_unbound(self):
         code, out, err = self.run_cli(["brief"], "sess-unbound", self.repo_dir)
         self.assertEqual(code, 0, err)

@@ -136,3 +136,15 @@ updated: 2026-10-31
 **Acceptance:**
 - [x] The recommendation stands out from the rest of the card.
 - [x] Multi-line context, recommendation and answer read as compact paragraphs.
+
+## T13 — Share an ask as text
+
+**Depends on:** T08
+**Status:** [x] done
+
+**What:** `asks <id> --share` prints the question, context, options, recommendation and answer as text with no ids, refs or party, and the web gives each open and answered ask a `Copy` button that puts the same content on the clipboard as HTML and plain text.
+
+**Acceptance:**
+- [x] The shared text carries only the decision content and none of the local tool's identifiers.
+- [x] `--share` without an ask id fails.
+- [x] The `Copy` button writes `text/html` and `text/plain` to the clipboard.
