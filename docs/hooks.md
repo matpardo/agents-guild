@@ -178,7 +178,8 @@ What it checks:
 - While the repo's main is red:
   - A push to a branch with no open PR or a draft PR passes with a warning (keep iterating in draft, do not mark it Ready) naming the failing checks and since when.
   - A push to a Ready PR is blocked, as are `gh pr ready` and `gh pr create` without `--draft`/`-d` (also as `gh -R <repo> pr ...` or chained).
-  - The message gives the way out: `gh pr ready --undo <n>`, wait for main green, or flag the PR with `guild pr set <ref> --fixes-main` if it repairs main. Only `fixes-main` exempts, not `fixes-flaky`.
+  - The message gives the way out: `gh pr ready --undo <n>`, wait for main green, or flag the PR with `guild pr set <ref> --fixes-main` if it repairs main. Only `fixes-main` exempts, not `fixes-flaky`. It also says the gate can be turned off for the project with `"allow_ready_on_red_main": true` in its config.
+  - A project with `"allow_ready_on_red_main": true` skips this gate and its draft warning.
   - `gh pr ready --undo` always passes, and nothing is checked when there is no main status.
 - Branch deletions (`--delete`, `-d`, or a `:<branch>` refspec) push no commits and pass unchecked.
 - When a push is detected but its branch or directory cannot be determined (bad `-C` dir, detached HEAD, unparseable command), it warns via `systemMessage` instead of allowing the push unverified.

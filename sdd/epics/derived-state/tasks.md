@@ -3,7 +3,7 @@ epic: derived-state
 type: tasks
 title: Flags that follow the events that resolve them
 status: done
-updated: 2026-10-11
+updated: 2026-11-24
 ---
 
 # Tasks: Flags that follow the events that resolve them
@@ -78,3 +78,15 @@ updated: 2026-10-11
 **Acceptance:**
 - [x] Main whose failing checks are all fast and unannotated is marked `billing`.
 - [x] A slow failing check, or a fast one with another annotation, keeps main red.
+
+## T07 — Red main Ready gate is optional per project
+
+**Depends on:** T04
+**Status:** [x] done
+
+**What:** a project config with `"allow_ready_on_red_main": true` turns off the red main gate of `guild hook pre-push` for its repos: with main red, `gh pr ready`, a non-draft `gh pr create` and a push to a Ready PR pass, and a draft push gets no warning. Absent or `false` keeps the gate. Every refusal names the key so the human knows how to turn it off (decisión del dev, 2026-11-24).
+
+**Acceptance:**
+- [x] With the key `true`, the gate and its draft warning are skipped; absent or `false`, the gate refuses as before.
+- [x] Push and `gh pr` refusals name `"allow_ready_on_red_main": true`.
+- [x] A non-boolean value is rejected when the project config loads.

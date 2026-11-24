@@ -659,6 +659,18 @@ def _red_main_checks(ctx, repo):
     )
 
 
+_RED_MAIN_GATE_OFF_HINT = (
+    '; to turn this gate off for the project, set "allow_ready_on_red_main": true in its guild config'
+)
+
+
+def _red_main_gate_off(ctx, repo):
+    for project in config.load_all_projects(ctx.projects_dir):
+        if repo in project["github"]["repos"]:
+            return project.get("allow_ready_on_red_main") is True
+    return False
+
+
 def _fixes_main_pr_exists(ctx, repo, number, branch):
     if number is None and not branch:
         return False
@@ -672,7 +684,7 @@ def _fixes_main_pr_exists(ctx, repo, number, branch):
 
 def _red_main_push_result(ctx, target_dir, branch, open_pr):
     repo = localbase.origin_repo_slug(target_dir)
-    if repo is None:
+    if repo is None or _red_main_gate_off(ctx, repo):
         return None
     checks = _red_main_checks(ctx, repo)
     if checks is None:
@@ -685,8 +697,8 @@ def _red_main_push_result(ctx, target_dir, branch, open_pr):
     message = (
         "guild: main of {} is red: {}\n"
         "pushing to Ready PR #{} would fire CI on red main: go back to draft with `gh pr ready --undo {}`,"
-        " wait for main green, or flag it with `guild pr set <ref> --fixes-main` if it repairs main"
-    ).format(repo, checks, open_pr["number"], open_pr["number"])
+        " wait for main green, or flag it with `guild pr set <ref> --fixes-main` if it repairs main{}"
+    ).format(repo, checks, open_pr["number"], open_pr["number"], _RED_MAIN_GATE_OFF_HINT)
     return {"blocked": True, "message": message, "system_message": None}
 
 
@@ -748,7 +760,7 @@ def _gh_red_main_result(ctx, tokens, cwd):
         way_out = "create it with `--draft` and wait for main green"
     else:
         return None
-    if target["repo"] is None:
+    if target["repo"] is None or _red_main_gate_off(ctx, target["repo"]):
         return None
     checks = _red_main_checks(ctx, target["repo"])
     if checks is None:
@@ -757,8 +769,8 @@ def _gh_red_main_result(ctx, tokens, cwd):
         return None
     message = (
         "guild: main of {} is red: {}\n"
-        "this PR would fire CI on red main: {}, or flag it with `guild pr set <ref> --fixes-main` if it repairs main"
-    ).format(target["repo"], checks, way_out)
+        "this PR would fire CI on red main: {}, or flag it with `guild pr set <ref> --fixes-main` if it repairs main{}"
+    ).format(target["repo"], checks, way_out, _RED_MAIN_GATE_OFF_HINT)
     return {"blocked": True, "message": message, "system_message": None}
 
 

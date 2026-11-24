@@ -116,6 +116,7 @@ The loader rejects a wrong type with a clear error for every key except `sdd`, `
 | `shared_area_claim_ttl` | duration `30m`/`8h`/`3d` | required with `shared_areas` | The TTL the guards claim a matched area for. |
 | `migration_paths` | list of globs | absent: the migration clash check is skipped and no extra `gh` call is made | Matched with `fnmatch` against changed file paths, e.g. `db/migrate/*`. See "Migration version clash" under [`guild sync`](commands.md#guild-sync). |
 | `fast_forward_base` | boolean | absent or `false`: no clone is ever modified | `true` makes `sync --source gh` fast-forward the local base branch of merged repos (see "Base fast-forward" under [`guild sync`](commands.md#guild-sync)). |
+| `allow_ready_on_red_main` | boolean | absent or `false`: the red main gate is on | `true` turns off the `pre-push` red main gate for the project's repos: with main red, `gh pr ready`, a non-draft `gh pr create` and a push to a Ready PR pass, with no draft warning. See [`pre-push`](hooks.md#pre-push). |
 | `health_jobs` | list of `{"name", "command", "every"}` | absent: no jobs | Recurring jobs that keep the project healthy. See [`health_jobs`](#health_jobs). |
 | `solo_players` | list of `{"repo", "job", "name", "class", "command", "trigger"}` | absent: none | Per-repo solo players. See [`solo_players`](#solo_players). |
 | `lifecycle` | object | absent: no command ever runs | Commands run on PR lifecycle events. See [`lifecycle`](#lifecycle). |
