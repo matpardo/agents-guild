@@ -77,6 +77,14 @@ def _validate_fast_forward_base_config(data):
         raise GuildError("project config 'fast_forward_base' must be a boolean", 1)
 
 
+def _validate_allow_ready_on_red_main_config(data):
+    allow = data.get("allow_ready_on_red_main")
+    if allow is None:
+        return
+    if not isinstance(allow, bool):
+        raise GuildError("project config 'allow_ready_on_red_main' must be a boolean", 1)
+
+
 def _validate_max_open_prs_config(data, key):
     cap = data.get(key)
     if cap is None:
@@ -356,6 +364,7 @@ def validate_project_config(data):
     _validate_shared_areas_config(data)
     _validate_migration_paths_config(data)
     _validate_fast_forward_base_config(data)
+    _validate_allow_ready_on_red_main_config(data)
     _validate_lifecycle_config(data)
     _validate_next_config(data)
     _validate_human_ready_config(data)

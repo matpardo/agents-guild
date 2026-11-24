@@ -1,3 +1,4 @@
+import json
 import subprocess
 
 from tests.mq_fixtures import OPEN_VIEW, MergeQueueTestCase
@@ -225,6 +226,37 @@ class RedMainPushTests(MergeQueueTestCase):
         self.mark_red()
         self.track_fixer(["--fixes-flaky"])
         self.assertEqual(self.hook_command("gh pr ready 9")[0], 2)
+
+    def set_allow_ready_on_red_main(self, value):
+        config_file = self.config_home / "guild" / "projects" / "acme.json"
+        data = json.loads(config_file.read_text())
+        data["allow_ready_on_red_main"] = value
+        config_file.write_text(json.dumps(data))
+
+    def test_refusals_name_the_project_key_that_turns_the_gate_off(self):
+        self.mark_red()
+        self.list_pr(False)
+        self.assertIn('"allow_ready_on_red_main": true', self.push()[2])
+        self.assertIn('"allow_ready_on_red_main": true', self.hook_command("gh pr ready 12")[2])
+
+    def test_project_allowing_ready_on_red_main_skips_the_gate(self):
+        self.mark_red()
+        self.set_allow_ready_on_red_main(True)
+        self.list_pr(False)
+        self.assertEqual(self.push()[:2], (0, ""))
+        self.assertEqual(self.hook_command("gh pr ready 12"), (0, "", ""))
+        self.assertEqual(self.hook_command("gh pr create --title x"), (0, "", ""))
+
+    def test_project_allowing_ready_on_red_main_skips_the_draft_warning(self):
+        self.mark_red()
+        self.set_allow_ready_on_red_main(True)
+        self.list_pr(True)
+        self.assertEqual(self.push()[:2], (0, ""))
+
+    def test_project_with_the_key_false_keeps_the_gate(self):
+        self.mark_red()
+        self.set_allow_ready_on_red_main(False)
+        self.assertEqual(self.hook_command("gh pr ready 12")[0], 2)
 
     def test_billing_blocked_main_does_not_refuse_gh_pr_ready(self):
         self.mark_billing_blocked()

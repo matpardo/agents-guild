@@ -262,3 +262,16 @@ class FastForwardBaseConfigTests(GuildTestCase):
     def test_non_boolean_is_rejected(self):
         with self.assertRaises(GuildError):
             config.validate_project_config(self._data("yes"))
+
+
+class AllowReadyOnRedMainConfigTests(GuildTestCase):
+    def _data(self, value):
+        return {"name": "acme", "paths": ["/x/*"], "github": {"repos": []}, "allow_ready_on_red_main": value}
+
+    def test_boolean_is_accepted(self):
+        config.validate_project_config(self._data(True))
+        config.validate_project_config(self._data(False))
+
+    def test_non_boolean_is_rejected(self):
+        with self.assertRaises(GuildError):
+            config.validate_project_config(self._data("yes"))
