@@ -113,7 +113,7 @@ def _tail_records(path):
     return [_decode(line) for line in lines if line.strip()]
 
 
-def rate_limit_reset(path):
+def rate_limit_hit(path):
     try:
         records = _tail_records(path)
     except OSError:
@@ -128,4 +128,5 @@ def rate_limit_reset(path):
     resets_at = limits.get("resetsAt") if isinstance(limits, dict) else None
     if isinstance(resets_at, bool) or not isinstance(resets_at, int):
         return None
-    return resets_at
+    limit_type = limits.get("rateLimitType")
+    return resets_at, limit_type if isinstance(limit_type, str) else None

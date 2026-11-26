@@ -2,6 +2,7 @@ import json
 import os
 import sqlite3
 import time
+from datetime import datetime
 
 from guild import party_waits
 from guild.cli import _build_context
@@ -9,14 +10,17 @@ from tests.mq_fixtures import TASKS_MD, MergeQueueTestCase
 from tests.transcript_fixtures import write_transcript
 
 
-def _limit_line(resets_at):
+def _limit_line(resets_at, limit_type="five_hour"):
+    quota = {"status": "rejected", "resetsAt": resets_at}
+    if limit_type is not None:
+        quota["rateLimitType"] = limit_type
     return json.dumps(
         {
             "type": "assistant",
             "isApiErrorMessage": True,
             "error": "rate_limit",
             "apiErrorStatus": 429,
-            "quotaLimits": {"status": "rejected", "resetsAt": resets_at, "rateLimitType": "five_hour"},
+            "quotaLimits": quota,
             "message": {"model": "<synthetic>", "content": [{"type": "text", "text": "limit"}]},
         }
     )
@@ -148,9 +152,25 @@ class PartyWaitsTests(MergeQueueTestCase):
         future = int(time.time()) + 3600
         write_transcript(transcript, [_limit_line(future)])
         kind, subject, label = [wait for wait in self.waits() if wait[0] == "limit-reset"][0]
-        self.assertTrue(label.startswith("resets "))
+        self.assertTrue(label.startswith("5h limit, resets "))
         write_transcript(transcript, [_limit_line(int(time.time()) - 60)])
         self.assertIn(("limit-reset", "alpha", "reset: resume by hand"), self.waits())
+
+    def limit_label(self, resets_at, limit_type):
+        self.write_session(os.getpid(), "sess-1", "alpha")
+        transcript = self.claude_projects_dir / "p" / "sess-1.jsonl"
+        write_transcript(transcript, [_limit_line(resets_at, limit_type)])
+        return [wait for wait in self.waits() if wait[0] == "limit-reset"][0][2]
+
+    def test_weekly_limit_days_away_shows_its_date(self):
+        resets_at = int(time.time()) + 3 * 86400
+        expected = datetime.fromtimestamp(resets_at).strftime("%b %d %H:%M")
+        self.assertEqual(self.limit_label(resets_at, "seven_day"), "weekly limit, resets " + expected)
+
+    def test_limit_of_unknown_type_shows_only_the_reset(self):
+        resets_at = int(time.time()) + 3 * 86400
+        expected = datetime.fromtimestamp(resets_at).strftime("%b %d %H:%M")
+        self.assertEqual(self.limit_label(resets_at, None), "resets " + expected)
 
     def test_closed_party_has_no_waits(self):
         self.update_pr("checks_pending = 2")
