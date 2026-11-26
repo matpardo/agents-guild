@@ -132,17 +132,32 @@ def _unseen_waits(ctx, party_row):
     return waits
 
 
+def _limit_name(limit_type):
+    if limit_type == "five_hour":
+        return "5h limit, "
+    if limit_type is not None and limit_type.startswith("seven_day"):
+        return "weekly limit, "
+    return ""
+
+
+def _reset_time(reset, now):
+    moment = datetime.fromtimestamp(reset)
+    if moment.date() == datetime.fromtimestamp(now.timestamp()).date():
+        return moment.strftime("%H:%M")
+    return moment.strftime("%b %d %H:%M")
+
+
 def _limit_wait(ctx, party_row):
     if party_row["leader_session_id"] not in session_info.live_session_ids(ctx.sessions_dir):
         return []
     transcript = transcripts.find_transcript(paths.claude_projects_dir(), party_row["leader_session_id"])
-    reset = None if transcript is None else transcript_usage.rate_limit_reset(transcript)
-    if reset is None:
+    hit = None if transcript is None else transcript_usage.rate_limit_hit(transcript)
+    if hit is None:
         return []
+    reset, limit_type = hit
     if ctx.now.timestamp() < reset:
-        return [
-            _wait("limit-reset", party_row["name"], "resets {}".format(datetime.fromtimestamp(reset).strftime("%H:%M")))
-        ]
+        label = "{}resets {}".format(_limit_name(limit_type), _reset_time(reset, ctx.now))
+        return [_wait("limit-reset", party_row["name"], label)]
     return [_wait("limit-reset", party_row["name"], "reset: resume by hand")]
 
 
