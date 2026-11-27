@@ -1,9 +1,9 @@
-from guild import config, db, events, localbase, locking
+from guild import config, db, events, lifecycle, localbase, locking
 from guild.commands import notice as notice_commands
 from guild.errors import GuildError
 
 _NOTICE_TTL = "12h"
-_NOTICE_TEMPLATE = "lifecycle {} failed for {} ({}): see guild history"
+_NOTICE_TEMPLATE = "lifecycle {} failed for {} ({}) on {}: see guild history"
 _LOCK_DIR_NAME = "lifecycle"
 _SECONDS_PER_MINUTE = 60
 _NOTIFYING_STATUSES = ("failed", "timeout", "error")
@@ -57,17 +57,13 @@ def _record_ran(ctx, payload):
         )
 
 
-def _failure_detail(payload):
-    if payload["status"] == "failed":
-        return "exit {}".format(payload["exit_code"])
-    return payload["status"]
-
-
 def _notify_failure(ctx, payload):
     announces = "lifecycle:{}:{}:{}".format(payload["project"], payload["event"], payload["triggers"][0])
     if notice_commands.announced(ctx.conn, announces):
         return
-    text = _NOTICE_TEMPLATE.format(payload["event"], payload["project"], _failure_detail(payload))
+    text = _NOTICE_TEMPLATE.format(
+        payload["event"], payload["project"], lifecycle.failure_detail(payload), lifecycle.trigger_refs(payload)
+    )
     notice_commands.create_announcing(ctx, None, text, "project:{}".format(payload["project"]), _NOTICE_TTL, announces)
 
 

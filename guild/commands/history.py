@@ -2,7 +2,7 @@ import json
 import statistics
 from datetime import timedelta
 
-from guild import config, party_progress, timeutil
+from guild import config, lifecycle, party_progress, timeutil
 
 _WEEK = timedelta(days=7)
 
@@ -554,9 +554,10 @@ def _last_output_line(output_tail):
 
 
 def _lifecycle_failure_detail(payload):
-    if payload["status"] == "failed":
-        return "exit {}".format(payload["exit_code"])
-    return payload["status"]
+    detail = lifecycle.failure_detail(payload)
+    if payload["reason"] is None:
+        return detail
+    return "{}: {}".format(detail, payload["reason"])
 
 
 def _lifecycle_failure_entry(event):
@@ -568,6 +569,7 @@ def _lifecycle_failure_entry(event):
         "status": payload["status"],
         "ts": event["ts"],
         "detail": _lifecycle_failure_detail(payload),
+        "refs": lifecycle.trigger_refs(payload),
         "last_line": _last_output_line(payload["output_tail"]),
     }
 
@@ -714,8 +716,14 @@ def _raid_lines(raid):
 
 
 def _lifecycle_failure_line(entry):
-    return "  {} lifecycle.{} {} ({}): {}".format(
-        entry["project"], entry["event"], entry["status"], entry["detail"], entry["last_line"] or "no output"
+    return "  {} {} lifecycle.{} {} ({}) on {}: {}".format(
+        _date(entry["ts"]),
+        entry["project"],
+        entry["event"],
+        entry["status"],
+        entry["detail"],
+        entry["refs"],
+        entry["last_line"] or "no output",
     )
 
 
