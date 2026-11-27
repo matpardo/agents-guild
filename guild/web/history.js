@@ -483,8 +483,8 @@
   }
 
   function lifecycleFailureLine(entry) {
-    var text = entry.project + " lifecycle." + entry.event + " " + entry.status + " (" + entry.detail + "): " +
-      (entry.last_line || "no output");
+    var text = formatDate(entry.ts) + " " + entry.project + " lifecycle." + entry.event + " " + entry.status +
+      " (" + entry.detail + ") on " + entry.refs + ": " + (entry.last_line || "no output");
     return textEl("li", text);
   }
 

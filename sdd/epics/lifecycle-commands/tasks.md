@@ -3,7 +3,7 @@ epic: lifecycle-commands
 type: tasks
 title: Run project commands on PR lifecycle events
 status: done
-updated: 2026-10-04
+updated: 2026-11-26
 ---
 
 # Tasks: Run project commands on PR lifecycle events
@@ -68,3 +68,15 @@ updated: 2026-10-04
 - [x] `ok_exit_codes` must be a non-empty list of unique integers from 1 to 255; other types and values are rejected.
 - [x] A listed exit code records status `ok` with the real exit code and posts no notice.
 - [x] An unlisted non-zero exit code still records `failed` and posts the unchanged notice.
+
+## T06 — Readable lifecycle failures
+
+**Depends on:** T05
+**Status:** [x] done
+
+**What:** A lifecycle failure says when it ran, which PRs triggered it and why it failed, so a failure in `guild history` and its notice can be traced without reading the event log.
+
+**Acceptance:**
+- [x] Exit 127 reads `exit 127, command not found` and 126 `exit 126, not executable`, in the notice and in history.
+- [x] The notice names the PR refs that triggered the run, and still carries no output and no argv.
+- [x] Each history failure line, in the CLI and the web, shows its time and PR refs; an error shows its reason.

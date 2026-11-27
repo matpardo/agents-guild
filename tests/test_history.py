@@ -84,6 +84,27 @@ class HistoryTestCase(GuildTestCase):
             },
         )
 
+    def _lifecycle_ran_on(self, hours, status, exit_code, triggers, reason):
+        self._event(
+            hours,
+            None,
+            "acme",
+            "lifecycle.ran",
+            {
+                "project": "acme",
+                "event": "on_pr_merged",
+                "repo": "acme/app",
+                "triggers": triggers,
+                "argv": ["true"],
+                "cwd": "/tmp",
+                "status": status,
+                "exit_code": exit_code,
+                "duration_ms": 10,
+                "output_tail": "\u2514  Done\n",
+                "reason": reason,
+            },
+        )
+
     def _lifecycle_ran(self, hours, project, event_kind, status, exit_code, output_tail):
         self._event(
             hours,
@@ -749,6 +770,31 @@ class LifecycleFailureTests(HistoryTestCase):
         projects = sorted(entry["project"] for entry in self._model(party="alpha")["lifecycle_failures"])
         self.assertEqual(projects, ["acme", "other"])
 
+    def test_line_carries_time_and_pr_refs(self):
+        self._lifecycle_ran_on(1, "failed", 1, ["acme/app#7", "acme/app#9"], None)
+        line = history._lifecycle_failure_line(self._model()["lifecycle_failures"][0])
+        self.assertEqual(
+            line,
+            "  {} acme lifecycle.on_pr_merged failed (exit 1) on acme/app#7, acme/app#9: \u2514  Done".format(
+                history._date(_at(1))
+            ),
+        )
+
+    def test_command_not_found_is_named(self):
+        self._lifecycle_ran_on(1, "failed", 127, ["acme/app#7"], None)
+        entry = self._model()["lifecycle_failures"][0]
+        self.assertEqual(entry["detail"], "exit 127, command not found")
+
+    def test_not_executable_is_named(self):
+        self._lifecycle_ran_on(1, "failed", 126, ["acme/app#7"], None)
+        entry = self._model()["lifecycle_failures"][0]
+        self.assertEqual(entry["detail"], "exit 126, not executable")
+
+    def test_error_carries_its_reason(self):
+        self._lifecycle_ran_on(1, "error", None, ["acme/app#7"], "no checkout")
+        entry = self._model()["lifecycle_failures"][0]
+        self.assertEqual(entry["detail"], "error: no checkout")
+
     def test_newest_first(self):
         self._lifecycle_ran(1, "acme", "on_pr_merged", "failed", 1, "old")
         self._lifecycle_ran(5, "acme", "on_pr_closed", "error", None, "new")
@@ -834,4 +880,4 @@ class HistoryCliTests(LiveHistoryTestCase):
         code, out, err = self.run_cli(["history"], None, self.root)
         self.assertEqual(code, 0, err)
         self.assertIn("Lifecycle failures (1)", out)
-        self.assertIn("acme lifecycle.on_pr_merged failed (exit 1): boom", out)
+        self.assertIn("acme lifecycle.on_pr_merged failed (exit 1) on manual: boom", out)

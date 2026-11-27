@@ -8,11 +8,25 @@ from guild import sanitize
 
 _OUTPUT_TAIL_CHARS = 2000
 _OUTPUT_TAIL_BYTES = 8000
+_EXIT_MEANINGS = {126: "not executable", 127: "command not found"}
 
 
 def output_tail(raw):
     text = sanitize.strip_control_sequences(raw.decode("utf-8", errors="replace"))
     return text[-_OUTPUT_TAIL_CHARS:]
+
+
+def failure_detail(payload):
+    if payload["status"] != "failed":
+        return payload["status"]
+    meaning = _EXIT_MEANINGS.get(payload["exit_code"])
+    if meaning is None:
+        return "exit {}".format(payload["exit_code"])
+    return "exit {}, {}".format(payload["exit_code"], meaning)
+
+
+def trigger_refs(payload):
+    return ", ".join(payload["triggers"])
 
 
 def _kill_group(process):
