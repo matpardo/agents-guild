@@ -200,3 +200,14 @@ updated: 2026-11-11
 **Acceptance:**
 - [x] Two starts with the same state dir share the token.
 - [x] The token file is private, and an invalid file or a symlink is replaced by a fresh token.
+
+## T27 — Color the party of each merge queue PR
+
+**Depends on:** —
+**Status:** [x] done
+
+**What:** the web merge queue shows each PR's party as a colored pill, one fixed color per party name, so a raid queue reads by party. A party view keeps the whole raid queue and colors only its own PRs; the other parties' names stay dim.
+
+**Acceptance:**
+- [x] In a raid view every party pill is colored and the same party always gets the same color.
+- [x] In a party view only the viewed party's pills are colored, and every PR of the raid queue still shows.

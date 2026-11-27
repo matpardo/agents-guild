@@ -426,6 +426,78 @@ def _health_job(**overrides):
     return dict(job, **overrides)
 
 
+def _party_queue_entry(number, party):
+    return {
+        "ref": "o/r#{}".format(number),
+        "repo": "o/r",
+        "number": number,
+        "party": party,
+        "task": "q/T1",
+        "lifecycle": "ready",
+        "branch": "b",
+        "checks_failing": 0,
+        "checks_passing": 1,
+        "checks_pending": 0,
+        "labels": [],
+        "url": "https://example.test/{}".format(number),
+        "position": number,
+        "unblocks": 0,
+        "state": "ready",
+        "next_action": False,
+        "action": "merge",
+        "why": "ready",
+        "reasons": [],
+        "blockers": [],
+        "waits": [],
+        "gates": [],
+        "human_state": "ready",
+        "human_missing": [],
+        "notes": [],
+    }
+
+
+def _raid_queue_board():
+    queue = {
+        "head": {"ref": "o/r#1", "url": "https://example.test/1", "party": "a", "task": "q/T1"},
+        "scope": "raid:r",
+        "synced_at": "now",
+        "synced_label": "synced now",
+        "main": [],
+        "queue": [_party_queue_entry(1, "a"), _party_queue_entry(2, "c"), _party_queue_entry(3, "a")],
+    }
+    parties = [dict(party, raids=[{"raid": "r"}]) for party in _BOARD["parties"]]
+    return dict(_BOARD, merge_queues=[queue], parties=parties, raids=[{"name": "r", "members": ["a", "c"]}])
+
+
+def _party_tags(view_hash):
+    tree = json.loads(_render_at(_raid_queue_board(), view_hash, "merge-queues", "tree"))
+    return [
+        (node["text"], node["className"])
+        for node in _walk_tree(tree)
+        if node["text"] in ("a", "c") and node["tag"] == "span"
+    ]
+
+
+@unittest.skipIf(shutil.which("node") is None, "node not installed")
+class WebQueuePartyTagTests(unittest.TestCase):
+    def test_raid_view_colors_every_party_and_keeps_one_color_per_party(self):
+        tags = _party_tags("#raid/r")
+        self.assertEqual([text for text, _ in tags], ["a", "a", "c", "a"])
+        self.assertTrue(all(cls.startswith("pill party-pill party-color-") for _, cls in tags))
+        self.assertEqual(len({cls for text, cls in tags if text == "a"}), 1)
+
+    def test_party_view_colors_only_the_viewed_party(self):
+        tags = _party_tags("#party/c")
+        self.assertEqual(tags[0], ("a", "muted"))
+        self.assertEqual([cls for text, cls in tags if text == "a"], ["muted", "muted", "muted"])
+        self.assertEqual(len([cls for text, cls in tags if text == "c" and cls.startswith("pill party-pill")]), 1)
+
+    def test_party_view_shows_the_whole_raid_queue(self):
+        out = _render_at(_raid_queue_board(), "#party/c", "merge-queues", "text")
+        for ref in ("o/r#1", "o/r#2", "o/r#3"):
+            self.assertIn(ref, out)
+
+
 @unittest.skipIf(shutil.which("node") is None, "node not installed")
 class WebHealthJobBehaviorTests(unittest.TestCase):
     def _text(self, jobs, party_filter="all"):

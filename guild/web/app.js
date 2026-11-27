@@ -2886,7 +2886,24 @@ realmDoctorLines: [],
     return explain(pill, "queueState", entry.human_state);
   }
 
-  function renderQueueEntryHead(entry) {
+  var PARTY_COLOR_COUNT = 8;
+
+  function partyColorIndex(name) {
+    var hash = 0;
+    for (var i = 0; i < name.length; i++) {
+      hash = (hash * 31 + name.charCodeAt(i)) % 1000003;
+    }
+    return hash % PARTY_COLOR_COUNT;
+  }
+
+  function renderPartyTag(partyName, highlightParty) {
+    if (highlightParty !== "" && highlightParty !== partyName) {
+      return classedText("span", partyName, "muted");
+    }
+    return classedText("span", partyName, "pill party-pill party-color-" + partyColorIndex(partyName));
+  }
+
+  function renderQueueEntryHead(entry, highlightParty) {
     var head = el("div");
     head.className = "queue-entry-head";
     head.appendChild(link(entry.url, entry.ref));
@@ -2909,7 +2926,7 @@ realmDoctorLines: [],
       head.appendChild(renderReadyPill(entry));
     }
     head.appendChild(renderChecks(entry));
-    head.appendChild(textEl("span", entry.party));
+    head.appendChild(renderPartyTag(entry.party, highlightParty));
     head.appendChild(textEl("span", entry.task || "-"));
     return head;
   }
@@ -2977,11 +2994,11 @@ realmDoctorLines: [],
     return summary;
   }
 
-  function renderQueueEntry(entry) {
+  function renderQueueEntry(entry, highlightParty) {
     var item = el("li");
     item.className = "queue-entry queue-" + entry.state;
     item.value = entry.position;
-    item.appendChild(renderQueueEntryHead(entry));
+    item.appendChild(renderQueueEntryHead(entry, highlightParty));
     item.appendChild(renderQueueSummary(entry));
     item.appendChild(renderPrBlockControls(entry.ref, entry.blocked_external, "queue"));
     if (entry.unseen_comments > 0) {
@@ -3007,7 +3024,7 @@ realmDoctorLines: [],
     return explain(classedText("p", text, "queue-main-red"), "ui", "mainRed");
   }
 
-  function renderNextToMerge(head) {
+  function renderNextToMerge(head, highlightParty) {
     if (head === null) {
       return explain(classedText("p", "no PR ready to merge", "muted"), "ui", "noMergeReady");
     }
@@ -3015,11 +3032,13 @@ realmDoctorLines: [],
     line.className = "queue-next-to-merge";
     line.appendChild(document.createTextNode("next to merge: "));
     line.appendChild(link(head.url, head.ref));
-    line.appendChild(document.createTextNode(" (" + head.party + ")"));
+    line.appendChild(document.createTextNode(" ("));
+    line.appendChild(renderPartyTag(head.party, highlightParty));
+    line.appendChild(document.createTextNode(")"));
     return explain(line, "ui", "nextToMerge");
   }
 
-  function renderMergeQueue(queue) {
+  function renderMergeQueue(queue, highlightParty) {
     var article = el("article");
     article.className = "card merge-queue";
     var head = el("div");
@@ -3028,10 +3047,15 @@ realmDoctorLines: [],
     head.appendChild(explain(textEl("span", queue.synced_label), "ui", "synced"));
     article.appendChild(head);
     appendAll(article, queue.main.map(renderMainRow));
-    article.appendChild(renderNextToMerge(queue.head));
+    article.appendChild(renderNextToMerge(queue.head, highlightParty));
     var list = el("ol");
     list.className = "queue-list";
-    appendAll(list, queue.queue.map(renderQueueEntry));
+    appendAll(
+      list,
+      queue.queue.map(function (entry) {
+        return renderQueueEntry(entry, highlightParty);
+      })
+    );
     article.appendChild(list);
     return article;
   }
@@ -3069,7 +3093,7 @@ realmDoctorLines: [],
     section.appendChild(list);
   }
 
-  function renderMergeQueues(queues) {
+  function renderMergeQueues(queues, highlightParty) {
     var section = document.getElementById("merge-queues");
     clear(section);
     section.appendChild(textEl("h2", "merge queue"));
@@ -3077,7 +3101,12 @@ realmDoctorLines: [],
       section.appendChild(textEl("p", "no open PRs in scope"));
       return;
     }
-    appendAll(section, queues.map(renderMergeQueue));
+    appendAll(
+      section,
+      queues.map(function (queue) {
+        return renderMergeQueue(queue, highlightParty);
+      })
+    );
     section.appendChild(classedText("p", "guild never merges: merge in this order by hand", "muted"));
   }
 
@@ -4985,7 +5014,12 @@ realmDoctorLines: [],
     );
     renderSection("memory", [filtered.memory], renderMemory, onlyIfChanged);
     renderSection("raids", [filtered.raids], renderRaids, onlyIfChanged);
-    renderSection("merge-queues", [filtered.merge_queues], renderMergeQueues, onlyIfChanged);
+    renderSection(
+      "merge-queues",
+      [filtered.merge_queues, view.kind === "party" ? view.name : ""],
+      renderMergeQueues,
+      onlyIfChanged
+    );
     renderSection("progress", [filtered.parties], renderProgress, onlyIfChanged);
     renderSection("daily-tasks", [filtered.parties], renderDailyTasks, onlyIfChanged);
     renderSection("drift", [filtered.drift], renderDrift, onlyIfChanged);
